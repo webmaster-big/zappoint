@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 
 // Types
-interface AddOn { name: string; price: number; unit?: string; }
+// interface AddOn { name: string; price: number; unit?: string; }
 interface Attraction { name: string; price: number; unit?: string; }
 interface PromoOrGiftCard { name: string; code: string; description?: string; }
 interface Package {
@@ -34,7 +34,7 @@ const TIME_SLOTS = [
 const BookPackage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const [pkg, setPkg] = useState<Package | null>(null);
-  const [addOns, setAddOns] = useState<AddOn[]>([]);
+  // const [addOns, setAddOns] = useState<AddOn[]>([]);
   const [attractions, setAttractions] = useState<Attraction[]>([]);
   const [selectedAddOns, setSelectedAddOns] = useState<{ [name: string]: number }>({});
   const [selectedAttractions, setSelectedAttractions] = useState<{ [name: string]: number }>({});
@@ -63,7 +63,7 @@ const BookPackage: React.FC = () => {
     const packages = JSON.parse(localStorage.getItem("zapzone_packages") || "[]");
     const found = packages.find((p: Package) => p.id === id);
     setPkg(found || null);
-    setAddOns(JSON.parse(localStorage.getItem("zapzone_addons") || "[]"));
+    // setAddOns(JSON.parse(localStorage.getItem("zapzone_addons") || "[]"));
     setAttractions(JSON.parse(localStorage.getItem("zapzone_attractions") || "[]"));
   }, [id]);
 

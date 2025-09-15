@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 
 // Types
-interface AddOn { name: string; price: number; unit?: string; }
+// interface AddOn { name: string; price: number; unit?: string; }
 interface Attraction { name: string; price: number; unit?: string; }
 interface PromoOrGiftCard { name: string; code: string; description?: string; }
 interface Package {
@@ -38,7 +38,7 @@ interface BookingWidgetProps {
 
 const BookingWidget: React.FC<BookingWidgetProps> = ({ packageId, onBookingComplete, apiUrl }) => {
   const [pkg, setPkg] = useState<Package | null>(null);
-  const [addOns, setAddOns] = useState<AddOn[]>([]);
+//   const [addOns, setAddOns] = useState<AddOn[]>([]);
   const [attractions, setAttractions] = useState<Attraction[]>([]);
   const [selectedAddOns, setSelectedAddOns] = useState<{ [name: string]: number }>({});
   const [selectedAttractions, setSelectedAttractions] = useState<{ [name: string]: number }>({});
@@ -93,7 +93,7 @@ const BookingWidget: React.FC<BookingWidgetProps> = ({ packageId, onBookingCompl
         const packages = JSON.parse(localStorage.getItem("zapzone_packages") || "[]");
         const found = packages.find((p: Package) => p.id === packageId);
         setPkg(found || null);
-        setAddOns(JSON.parse(localStorage.getItem("zapzone_addons") || "[]"));
+        // setAddOns(JSON.parse(localStorage.getItem("zapzone_addons") || "[]"));
         setAttractions(JSON.parse(localStorage.getItem("zapzone_attractions") || "[]"));
       } catch (error) {
         console.error("Failed to load data from localStorage:", error);
