@@ -5,3 +5,13 @@ body {
   font-optical-sizing: auto;
   font-style: normal;
 }
+
+/* Hide scrollbar but keep scrolling enabled */
+.hidden-scrollbar {
+  overflow-y: scroll; /* or auto */
+  scrollbar-width: none; /* Firefox */
+}
+
+.hidden-scrollbar::-webkit-scrollbar {
+  display: none; /* Chrome, Safari */
+}
