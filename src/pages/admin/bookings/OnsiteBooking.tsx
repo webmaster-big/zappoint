@@ -314,10 +314,9 @@ const OnsiteBooking: React.FC = () => {
     }));
   };
 
-  const handleAddOnToggle = (addOnName: string) => {
+  const handleAddOnToggle = (addOnName: string, price: number) => {
     setBookingData(prev => {
       const existingIndex = prev.selectedAddOns.findIndex(a => a.name === addOnName);
-      
       if (existingIndex >= 0) {
         // Remove add-on
         return {
@@ -325,10 +324,10 @@ const OnsiteBooking: React.FC = () => {
           selectedAddOns: prev.selectedAddOns.filter(a => a.name !== addOnName)
         };
       } else {
-        // Add add-on with default quantity 1
+        // Add add-on with default quantity 1 and price
         return {
           ...prev,
-          selectedAddOns: [...prev.selectedAddOns, { name: addOnName, quantity: 1 }]
+          selectedAddOns: [...prev.selectedAddOns, { name: addOnName, quantity: 1, price }]
         };
       }
     });
