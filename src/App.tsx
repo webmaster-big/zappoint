@@ -12,6 +12,7 @@ import BookingWidget from "./components/embed/BookingWidget"
 import Bookings from "./pages/admin/bookings/Bookings"
 import CalendarView from "./pages/admin/bookings/CalendarView"
 import OnsiteBooking from "./pages/admin/bookings/OnsiteBooking"
+import CheckIn from "./pages/admin/bookings/CheckIn"
 
 
 function App() {
@@ -30,6 +31,7 @@ function App() {
       <Route path="/bookings" element={<Bookings />} /> 
       <Route path="/bookings/calendar" element={<CalendarView />} /> 
       <Route path="/bookings/create" element={<OnsiteBooking />} /> 
+      <Route path="/bookings/check-in" element={<CheckIn />} /> 
        {/* Add embed route */}
       <Route path="/embed/booking/:packageId" element={
         <div className="container mx-auto p-4">
