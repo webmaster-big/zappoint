@@ -113,14 +113,14 @@ const AttendeesDashboard: React.FC = () => {
      { id: 5, date: new Date('2025-09-17'), time: '4:30 PM', duration: 2, activity: 'Bowling', package: null, participants: 8, status: 'Cancelled', payment: 'Refunded', customer: 'David Miller', contact: 'David Miller', phone: '(555) 876-5432', email: 'davidm@email.com', amount: '$200', specialRequests: 'Need two lanes' },
      { id: 6, date: new Date('2025-09-20'), time: '11:00 AM', duration: 1.5, activity: null, package: 'Corporate Package', participants: 10, status: 'Confirmed', payment: 'Paid', customer: 'XYZ Corp', contact: 'Robert Brown', phone: '(555) 345-6789', email: 'rbrown@xyz.com', amount: '$500', specialRequests: 'Executive team' },
      { id: 7, date: new Date('2025-09-19'), time: '3:00 PM', duration: 2, activity: 'Arcade', package: null, participants: 6, status: 'Confirmed', payment: 'Partial', customer: 'Jennifer Lee', contact: 'Jennifer Lee', phone: '(555) 765-4321', email: 'jennifer@email.com', amount: '$150', specialRequests: 'Family outing' },
+     // Additional bookings to demonstrate same time slots
+     { id: 8, date: new Date('2025-09-16'), time: '9:00 AM', duration: 1, activity: 'VR Experience', package: null, participants: 4, status: 'Confirmed', payment: 'Paid', customer: 'Innovate Tech', contact: 'Alex Johnson', phone: '(555) 111-2222', email: 'alex@innovatetech.com', amount: '$120', specialRequests: 'VR setup needed' },
+     { id: 9, date: new Date('2025-09-17'), time: '10:30 AM', duration: 2, activity: 'Escape Room', package: null, participants: 8, status: 'Confirmed', payment: 'Paid', customer: 'Team Builders Co.', contact: 'Maria Garcia', phone: '(555) 333-4444', email: 'maria@teambuilders.com', amount: '$240', specialRequests: 'Beginner level room' },
    ];
-
-   console.log(weekDates.map(date => date.toDateString()));
 
    // Only show bookings for the current week in the calendar and table
    const bookingsThisWeek = weeklyBookings.filter(booking => {
-	console.log(booking.date.toDateString());
-     return weekDates.some(date =>date.toDateString() === booking.date.toDateString());
+     return weekDates.some(date => date.toDateString() === booking.date.toDateString());
    });
 
    // Get unique activities and packages for filter options
@@ -139,6 +139,48 @@ const AttendeesDashboard: React.FC = () => {
      if (calendarFilter.type === 'package' && booking.package === calendarFilter.value) return true;
      return false;
    });
+
+   // Generate time slots from 8:00 AM to 8:00 PM in 30-minute intervals
+   const generateTimeSlots = () => {
+     const slots = [];
+     for (let hour = 8; hour <= 20; hour++) {
+       for (let minute = 0; minute < 60; minute += 30) {
+         const timeString = `${hour > 12 ? hour - 12 : hour}:${minute === 0 ? '00' : minute} ${hour >= 12 ? 'PM' : 'AM'}`;
+         slots.push(timeString);
+       }
+     }
+     return slots;
+   };
+
+   const timeSlots = generateTimeSlots();
+
+   // Group bookings by time slot and day
+   const groupBookingsByTimeAndDay = () => {
+     const grouped: {[key: string]: {[key: string]: any[]}} = {};
+     
+     // Initialize structure
+     timeSlots.forEach(time => {
+       grouped[time] = {};
+       weekDates.forEach(date => {
+         const dateStr = date.toDateString();
+         grouped[time][dateStr] = [];
+       });
+     });
+     
+     // Populate with bookings
+     filteredCalendarBookings.forEach(booking => {
+       const dateStr = booking.date.toDateString();
+       const time = booking.time;
+       
+       if (grouped[time] && grouped[time][dateStr]) {
+         grouped[time][dateStr].push(booking);
+       }
+     });
+     
+     return grouped;
+   };
+
+   const groupedBookings = groupBookingsByTimeAndDay();
 
    // Quick actions
    const quickActions = [
@@ -162,21 +204,10 @@ const AttendeesDashboard: React.FC = () => {
      Refunded: 'bg-rose-100 text-rose-700',
    };
 
-   // Check if a date has any bookings
-//    const hasBookings = (date: Date): boolean => {
-//      return bookingsThisWeek.some(booking => 
-//        booking.date.getDate() === date.getDate() && 
-//        booking.date.getMonth() === date.getMonth() &&
-//        booking.date.getFullYear() === date.getFullYear()
-//      );
-//    };
-
    // Filter bookings by status for the table
    const filteredBookings = selectedStatus === 'all' 
      ? bookingsThisWeek 
      : bookingsThisWeek.filter(booking => booking.status === selectedStatus);
-
-	 console.log(filteredBookings, "or", bookingsThisWeek, "or", weeklyBookings);
 
    // Clear calendar filter
    const clearCalendarFilter = () => {
@@ -368,77 +399,69 @@ const AttendeesDashboard: React.FC = () => {
              </div>
            )}
            
-           {/* Calendar grid implementation */}
-           <div className="overflow-x-auto">
-             <div className="min-w-[900px]">
-               {/* Day headers */}
-               <div className="grid grid-cols-8">
-                 <div className="bg-gray-50"></div>
-                 {weekDates.map((date, idx) => (
-                   <div key={idx} className="bg-gray-50 text-left py-2 border-b border-gray-100">
-                     <div className="font-medium text-gray-900 text-sm">{date.toLocaleDateString('en-US', { weekday: 'short' })}</div>
-                     <div className="text-xs text-gray-500">{date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
-                   </div>
+           {/* Table-based calendar */}
+           <div className="overflow-x-auto rounded-lg border border-gray-200">
+             <table className="w-full">
+               <thead className="bg-gray-50">
+                 <tr>
+                   <th className="w-24 px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-r border-gray-200">
+                     Time
+                   </th>
+                   {weekDates.map((date, index) => (
+                     <th key={index} className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-r border-gray-200 last:border-r-0">
+                       <div>{date.toLocaleDateString('en-US', { weekday: 'short' })}</div>
+                       <div className="text-xs text-gray-400">{date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
+                     </th>
+                   ))}
+                 </tr>
+               </thead>
+               <tbody className="bg-white divide-y divide-gray-200">
+                 {timeSlots.map((time, timeIndex) => (
+                   <tr key={timeIndex} className="hover:bg-gray-50">
+                     <td className="px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900 border-r border-gray-200">
+                       {time}
+                     </td>
+                     {weekDates.map((date, dateIndex) => {
+                       const dateStr = date.toDateString();
+                       const bookingsForCell = groupedBookings[time]?.[dateStr] || [];
+                       
+                       return (
+                         <td key={dateIndex} className="px-3 py-2 text-sm text-gray-500 border-r border-gray-200 last:border-r-0 align-top min-w-[180px]">
+                           {bookingsForCell.length > 0 ? (
+                             <div className="space-y-2">
+                               {bookingsForCell.map((booking, bookingIndex) => (
+                                 <div
+                                   key={bookingIndex}
+                                   className={`p-2 rounded border cursor-pointer ${
+                                     booking.status === 'Confirmed'
+                                       ? 'bg-emerald-50 border-emerald-200'
+                                       : booking.status === 'Pending'
+                                       ? 'bg-amber-50 border-amber-200'
+                                       : 'bg-rose-50 border-rose-200'
+                                   }`}
+                                 >
+                                   <div className="font-medium text-gray-900 text-xs">
+                                     {booking.activity || booking.package}
+                                   </div>
+                                   <div className="text-xs text-gray-500 mt-1">
+                                     {booking.customer}
+                                   </div>
+                                   <div className="text-xs text-gray-500">
+                                     {booking.participants} participants
+                                   </div>
+                                 </div>
+                               ))}
+                             </div>
+                           ) : (
+                             <span className="text-gray-300">-</span>
+                           )}
+                         </td>
+                       );
+                     })}
+                   </tr>
                  ))}
-               </div>
-               {/* Time slots and bookings grid */}
-               <div
-                 className="relative grid"
-                 style={{
-                   gridTemplateColumns: '64px repeat(7, 1fr)',
-                   gridTemplateRows: `repeat(25, 40px)` // 8:00 AM to 8:00 PM, 30-min intervals
-                 }}
-               >
-                 {/* Time labels */}
-                 {Array.from({ length: 25 }).map((_, rowIdx) => (
-                   <div key={rowIdx} className="border-t border-gray-100 text-xs text-gray-500 flex items-start justify-end pr-2 pt-1">
-                     {rowIdx % 2 === 0 ? `${8 + Math.floor(rowIdx / 2)}:00` : `${8 + Math.floor(rowIdx / 2)}:30`}
-                   </div>
-                 ))}
-                 {/* Day grid cells */}
-                 {weekDates.map((_, colIdx) => (
-                   Array.from({ length: 25 }).map((_, rowIdx) => (
-                     <div key={colIdx + '-' + rowIdx} className="border-t border-l border-gray-100" style={{ gridColumn: colIdx + 2, gridRow: rowIdx + 1 }}></div>
-                   ))
-                 ))}
-                 {/* Bookings as grid items */}
-                 {filteredCalendarBookings.map((booking) => {
-                   // Find column (day)
-                   const col = weekDates.findIndex(d => d.toDateString() === booking.date.toDateString());
-                   if (col === -1) return null;
-                   // Find row (start)
-                   const [timeStr, ampm] = booking.time.split(' ');
-                   let [hour, minute] = timeStr.split(':').map(Number);
-                   if (ampm === 'PM' && hour !== 12) hour += 12;
-                   if (ampm === 'AM' && hour === 12) hour = 0;
-                   const startRow = (hour - 8) * 2 + (minute === 30 ? 2 : 1);
-                   const rowSpan = Math.round(booking.duration * 2); // 30-min intervals
-                   return (
-                     <div
-                       key={booking.id}
-                       className={`z-10 rounded-lg p-2 shadow-sm cursor-pointer overflow-hidden border
-                         ${booking.status === 'Confirmed' ? 'border-emerald-400 bg-emerald-50' :
-                           booking.status === 'Pending' ? 'border-amber-400 bg-amber-50' :
-                           'border-rose-400 bg-rose-50'}`}
-                       style={{
-                         gridColumn: col + 2,
-                         gridRow: `${startRow} / span ${rowSpan}`,
-                         margin: '2px',
-                       }}
-                     >
-                       <div className="flex justify-between items-start">
-                         <div>
-                           <h4 className="font-medium text-gray-900 text-xs">{booking.activity || booking.package}</h4>
-                           <p className="text-xs text-gray-500 mt-1">{booking.time}</p>
-                         </div>
-                       </div>
-                       <p className="text-xs text-gray-700 mt-2 truncate">{booking.customer}</p>
-                       <p className="text-xs text-gray-500 mt-1">{booking.participants} participants</p>
-                     </div>
-                   );
-                 })}
-               </div>
-             </div>
+               </tbody>
+             </table>
            </div>
          </div>
 
