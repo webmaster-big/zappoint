@@ -471,15 +471,15 @@ const OnsiteBooking: React.FC = () => {
             key={pkg.id}
             className={`border rounded-lg p-6 cursor-pointer transition-all ${
               selectedPackage?.id === pkg.id
-                ? 'border-blue-500 bg-blue-50'
-                : 'border-gray-200 hover:border-blue-300'
+                ? 'border-purple-500 bg-purple-50'
+                : 'border-gray-200 hover:border-purple-300'
             }`}
             onClick={() => handlePackageSelect(pkg)}
           >
             <h3 className="text-xl font-semibold text-gray-900">{pkg.name}</h3>
             <p className="text-gray-600 mt-2">{pkg.description}</p>
             <div className="mt-4">
-              <p className="text-2xl font-bold text-blue-600">${pkg.price}</p>
+              <p className="text-2xl font-bold text-purple-600">${pkg.price}</p>
               <p className="text-sm text-gray-500">Max {pkg.maxParticipants} participants</p>
             </div>
           </div>
@@ -491,7 +491,7 @@ const OnsiteBooking: React.FC = () => {
           <button
             type="button"
             onClick={() => setStep(2)}
-            className="w-full md:w-auto bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700"
+            className="w-full md:w-auto bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700"
           >
             Continue to Attractions & Add-ons
           </button>
@@ -516,7 +516,7 @@ const OnsiteBooking: React.FC = () => {
               <div
                 key={attraction.id}
                 className={`border rounded-lg p-4 ${
-                  isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
+                  isSelected ? 'border-purple-500 bg-purple-50' : 'border-gray-200'
                 }`}
               >
                 <div className="flex justify-between items-start">
@@ -533,7 +533,7 @@ const OnsiteBooking: React.FC = () => {
                     className={`px-3 py-1 rounded text-sm ${
                       isSelected
                         ? 'bg-red-100 text-red-700 hover:bg-red-200'
-                        : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                        : 'bg-purple-100 text-purple-700 hover:bg-purple-200'
                     }`}
                   >
                     {isSelected ? 'Remove' : 'Add'}
@@ -581,7 +581,7 @@ const OnsiteBooking: React.FC = () => {
                 <div
                   key={addOn.name}
                   className={`border rounded-lg p-4 ${
-                    isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
+                    isSelected ? 'border-purple-500 bg-purple-50' : 'border-gray-200'
                   }`}
                 >
                   <div className="flex justify-between items-start">
@@ -595,7 +595,7 @@ const OnsiteBooking: React.FC = () => {
                       className={`px-3 py-1 rounded text-sm ${
                         isSelected
                           ? 'bg-red-100 text-red-700 hover:bg-red-200'
-                          : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                          : 'bg-purple-100 text-purple-700 hover:bg-purple-200'
                       }`}
                     >
                       {isSelected ? 'Remove' : 'Add'}
@@ -642,7 +642,7 @@ const OnsiteBooking: React.FC = () => {
         <button
           type="button"
           onClick={() => setStep(3)}
-          className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700"
+          className="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700"
         >
           Continue to Date & Time
         </button>
@@ -665,7 +665,7 @@ const OnsiteBooking: React.FC = () => {
             name="date"
             value={bookingData.date}
             onChange={handleInputChange}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400"
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-400"
             required
           >
             <option value="">Select a date</option>
@@ -687,7 +687,7 @@ const OnsiteBooking: React.FC = () => {
             name="time"
             value={bookingData.time}
             onChange={handleInputChange}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400"
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-400"
             required
           >
             <option value="">Select a time</option>
@@ -710,7 +710,7 @@ const OnsiteBooking: React.FC = () => {
             max={selectedPackage?.maxParticipants || 50}
             value={bookingData.participants}
             onChange={handleInputChange}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400"
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-400"
             required
           />
         </div>
@@ -727,7 +727,7 @@ const OnsiteBooking: React.FC = () => {
         <button
           type="button"
           onClick={() => setStep(4)}
-            className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700"
+            className="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700"
           >
             Continue to Customer Details
           </button>
@@ -747,7 +747,7 @@ const OnsiteBooking: React.FC = () => {
               name="customer.firstName"
               value={bookingData.customer.firstName}
               onChange={handleInputChange}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-400"
               required
             />
           </div>
@@ -759,7 +759,7 @@ const OnsiteBooking: React.FC = () => {
               name="customer.lastName"
               value={bookingData.customer.lastName}
               onChange={handleInputChange}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-400"
               required
             />
           </div>
@@ -771,7 +771,7 @@ const OnsiteBooking: React.FC = () => {
               name="customer.email"
               value={bookingData.customer.email}
               onChange={handleInputChange}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-400"
               required
             />
           </div>
@@ -783,7 +783,7 @@ const OnsiteBooking: React.FC = () => {
               name="customer.phone"
               value={bookingData.customer.phone}
               onChange={handleInputChange}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-400"
               required
             />
           </div>
@@ -800,7 +800,7 @@ const OnsiteBooking: React.FC = () => {
             name="giftCardCode"
             value={bookingData.giftCardCode}
             onChange={handleInputChange}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400"
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-400"
             placeholder="Enter gift card code"
           />
         </div>
@@ -816,7 +816,7 @@ const OnsiteBooking: React.FC = () => {
             name="promoCode"
             value={bookingData.promoCode}
             onChange={handleInputChange}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400"
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-400"
             placeholder="Enter promo code"
           />
         </div>
@@ -829,7 +829,7 @@ const OnsiteBooking: React.FC = () => {
             value={bookingData.notes}
             onChange={handleInputChange}
             rows={3}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400"
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-400"
             placeholder="Any special requests or notes..."
           />
         </div>
@@ -845,7 +845,7 @@ const OnsiteBooking: React.FC = () => {
           <button
             type="button"
             onClick={() => setStep(5)}
-            className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700"
+            className="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700"
           >
             Continue to Payment
           </button>
@@ -928,7 +928,7 @@ const OnsiteBooking: React.FC = () => {
             name="paymentMethod"
             value={bookingData.paymentMethod}
             onChange={handleInputChange}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400"
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-400"
             required
           >
             <option value="cash">Cash</option>
@@ -972,7 +972,7 @@ const OnsiteBooking: React.FC = () => {
                 <div
                   key={stepNum}
                   className={`flex-1 h-2 mx-1 rounded-full ${
-                    step >= stepNum ? 'bg-blue-600' : 'bg-gray-300'
+                    step >= stepNum ? 'bg-purple-600' : 'bg-gray-300'
                   }`}
                 />
               ))}

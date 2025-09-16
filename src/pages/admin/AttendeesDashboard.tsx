@@ -68,7 +68,7 @@ const AttendeesDashboard: React.FC = () => {
        change: '+12% from last week',
        trend: 'up',
        icon: Calendar,
-       accent: 'bg-blue-100 text-blue-600',
+       accent: 'bg-purple-100 text-purple-600',
      },
      {
        title: 'Pending Approvals',
@@ -76,7 +76,7 @@ const AttendeesDashboard: React.FC = () => {
        change: '2 require urgent attention',
        trend: 'neutral',
        icon: AlertTriangle,
-       accent: 'bg-blue-100 text-blue-600',
+       accent: 'bg-purple-100 text-purple-600',
      },
      {
        title: 'Activities Scheduled',
@@ -84,7 +84,7 @@ const AttendeesDashboard: React.FC = () => {
        change: 'Laser Tag most popular',
        trend: 'up',
        icon: Zap,
-       accent: 'bg-blue-100 text-blue-600',
+       accent: 'bg-purple-100 text-purple-600',
      },
      {
        title: 'Packages Booked',
@@ -92,7 +92,7 @@ const AttendeesDashboard: React.FC = () => {
        change: 'Corporate leading',
        trend: 'up',
        icon: Package,
-       accent: 'bg-blue-100 text-blue-600',
+       accent: 'bg-purple-100 text-purple-600',
      },
      {
        title: 'Weekly Revenue',
@@ -100,7 +100,7 @@ const AttendeesDashboard: React.FC = () => {
        change: '+8% from last week',
        trend: 'up',
        icon: DollarSign,
-       accent: 'bg-blue-100 text-blue-600',
+       accent: 'bg-purple-100 text-purple-600',
      },
    ];
 
@@ -184,10 +184,10 @@ const AttendeesDashboard: React.FC = () => {
 
    // Quick actions
    const quickActions = [
-     { title: 'New Booking', icon: Plus, accent: 'bg-blue-500 hover:bg-blue-600' },
-     { title: 'Check-in', icon: CheckCircle, accent: 'bg-blue-500 hover:bg-blue-600' },
-     { title: 'Send Reminders', icon: Mail, accent: 'bg-blue-500 hover:bg-blue-600' },
-     { title: 'Export Data', icon: Download, accent: 'bg-blue-500 hover:bg-blue-600' },
+     { title: 'New Booking', icon: Plus, accent: 'bg-purple-500 hover:bg-purple-600' },
+     { title: 'Check-in', icon: CheckCircle, accent: 'bg-purple-500 hover:bg-purple-600' },
+     { title: 'Send Reminders', icon: Mail, accent: 'bg-purple-500 hover:bg-purple-600' },
+     { title: 'Export Data', icon: Download, accent: 'bg-purple-500 hover:bg-purple-600' },
    ];
 
    // Status colors
@@ -221,11 +221,11 @@ const AttendeesDashboard: React.FC = () => {
          <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-2">
            <div>
              <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2 mb-1">
-               <Users className="w-7 h-7 text-blue-600" /> Attendees Dashboard
+                Attendees Dashboard
              </h1>
              <p className="text-base text-gray-500">Weekly overview of bookings and activities</p>
            </div>
-           <button className="mt-4 md:mt-0 px-5 py-2.5 bg-blue-600 text-white rounded-xl flex items-center gap-2 hover:bg-blue-700 transition font-semibold shadow-sm">
+           <button className="mt-4 md:mt-0 px-5 py-2.5 bg-purple-600 text-white rounded-xl flex items-center gap-2 hover:bg-purple-700 transition font-semibold shadow-sm">
              <Plus size={20} />
              <span>New Booking</span>
            </button>
@@ -257,7 +257,7 @@ const AttendeesDashboard: React.FC = () => {
          <div className="bg-white rounded-xl shadow-sm p-4 md:p-6 border border-gray-100">
            <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
              <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-               <Calendar className="w-6 h-6 text-blue-600" /> Weekly Calendar
+               <Calendar className="w-6 h-6 text-purple-600" /> Weekly Calendar
              </h2>
              <div className="flex items-center space-x-2 mt-4 md:mt-0">
                <button 
@@ -276,7 +276,7 @@ const AttendeesDashboard: React.FC = () => {
                >
                  <ChevronRight size={18} />
                </button>
-               <button className="ml-2 px-3 py-2 text-sm bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200" onClick={() => setCurrentWeek(new Date())}>
+               <button className="ml-2 px-3 py-2 text-sm bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200" onClick={() => setCurrentWeek(new Date())}>
                  Today
                </button>
                
@@ -285,14 +285,14 @@ const AttendeesDashboard: React.FC = () => {
                  onClick={() => setShowFilterPanel(!showFilterPanel)}
                  className={`ml-2 px-3 py-2 text-sm rounded-lg flex items-center ${
                    calendarFilter.type !== 'all' 
-                     ? 'bg-blue-100 text-blue-700 border border-blue-300' 
+                     ? 'bg-purple-100 text-purple-700 border border-purple-300' 
                      : 'bg-gray-100 text-gray-700 border border-gray-200'
                  }`}
                >
                  <Filter size={16} className="mr-1" />
                  Filter
                  {calendarFilter.type !== 'all' && (
-                   <span className="ml-1 bg-blue-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs">
+                   <span className="ml-1 bg-purple-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs">
                      !
                    </span>
                  )}
@@ -383,7 +383,7 @@ const AttendeesDashboard: React.FC = () => {
                  {calendarFilter.type !== 'all' && (
                    <button
                      onClick={clearCalendarFilter}
-                     className="ml-auto text-sm text-blue-600 hover:text-blue-800 flex items-center"
+                     className="ml-auto text-sm text-purple-600 hover:text-purple-800 flex items-center"
                    >
                      <X size={14} className="mr-1" />
                      Clear Filter
@@ -470,7 +470,7 @@ const AttendeesDashboard: React.FC = () => {
            {/* Quick Actions */}
            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 flex flex-col gap-4">
              <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-               <Zap className="w-5 h-5 text-blue-600" /> Quick Actions
+               <Zap className="w-5 h-5 text-purple-600" /> Quick Actions
              </h2>
              <div className="grid grid-cols-2 gap-3">
                {quickActions.map((action, index) => {
@@ -492,9 +492,9 @@ const AttendeesDashboard: React.FC = () => {
            <div className="lg:col-span-2 bg-white rounded-xl border border-gray-100 shadow-sm p-5">
              <div className="flex items-center justify-between mb-4">
                <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                 <Activity className="w-5 h-5 text-blue-600" /> Recent Activity
+                 <Activity className="w-5 h-5 text-purple-600" /> Recent Activity
                </h2>
-               <button className="text-sm text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1">
+               <button className="text-sm text-purple-600 hover:text-purple-800 font-medium flex items-center gap-1">
                  <ChevronRight size={16} /> View all
                </button>
              </div>
@@ -552,13 +552,13 @@ const AttendeesDashboard: React.FC = () => {
                  <input
                    type="text"
                    placeholder="Search bookings..."
-                   className="pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                   className="pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
                  />
                </div>
                <select 
                  value={selectedStatus}
                  onChange={(e) => setSelectedStatus(e.target.value)}
-                 className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                 className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
                >
                  <option value="all">All Statuses</option>
                  <option value="Confirmed">Confirmed</option>
@@ -622,7 +622,7 @@ const AttendeesDashboard: React.FC = () => {
                      <td className="px-4 py-3 font-medium">{booking.amount}</td>
                      <td className="px-4 py-3">
                        <div className="flex space-x-2">
-                         <button className="p-1 text-blue-600 hover:text-blue-800" title="Check-in">
+                         <button className="p-1 text-purple-600 hover:text-purple-800" title="Check-in">
                            <CheckCircle size={16} />
                          </button>
                          <button className="p-1 text-gray-600 hover:text-gray-800" title="Send reminder">

@@ -11,13 +11,13 @@ export interface ToastProps {
 const typeStyles = {
   success: "text-emerald-700",
   error: "text-rose-700",
-  info: "text-blue-700",
+  info: "text-purple-700",
 };
 
 const iconMap = {
   success: <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />,
   error: <AlertTriangle className="w-5 h-5 text-rose-500 shrink-0" />,
-  info: <Info className="w-5 h-5 text-blue-500 shrink-0" />,
+  info: <Info className="w-5 h-5 text-purple-500 shrink-0" />,
 };
 
 

@@ -645,7 +645,7 @@ const CreatePackage: React.FC = () => {
                             <div className="flex gap-2 mt-6">
                                 <button
                                     type="submit"
-                                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-md transition text-base flex items-center justify-center gap-2 visible"
+                                    className="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 rounded-md transition text-base flex items-center justify-center gap-2 visible"
                                 >
                                     <Plus className="w-5 h-5" /> Submit
                                 </button>

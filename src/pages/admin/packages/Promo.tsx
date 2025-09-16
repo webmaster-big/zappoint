@@ -228,7 +228,7 @@ const Promo: React.FC = () => {
               <p className="text-gray-500 mt-1">Create and manage promotional codes</p>
             </div>
             <button
-              className="bg-blue-600 text-white rounded-lg px-4 py-2.5 flex items-center gap-2 hover:bg-blue-700 transition-colors shadow-sm"
+              className="bg-purple-600 text-white rounded-lg px-4 py-2.5 flex items-center gap-2 hover:bg-purple-700 transition-colors shadow-sm"
               onClick={() => setShowModal(true)}
             >
               <Plus className="w-5 h-5" /> New Promo Code
@@ -238,7 +238,7 @@ const Promo: React.FC = () => {
           {/* Filter Section */}
           <div className="mb-6 flex flex-wrap gap-2">
             <button 
-              className={`px-3 py-1.5 rounded-full text-sm ${filterStatus === "all" ? "bg-blue-100 text-blue-800" : "bg-gray-100 text-gray-600"}`}
+              className={`px-3 py-1.5 rounded-full text-sm ${filterStatus === "all" ? "bg-purple-100 text-purple-800" : "bg-gray-100 text-gray-600"}`}
               onClick={() => setFilterStatus("all")}
             >
               All
@@ -287,7 +287,7 @@ const Promo: React.FC = () => {
                       </div>
                       <div className="flex gap-1">
                         <button 
-                          className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-md"
+                          className="p-1.5 text-gray-500 hover:text-purple-600 hover:bg-purple-50 rounded-md"
                           onClick={() => openEditModal(i)}
                         >
                           <Edit2 className="w-4 h-4" />
@@ -324,7 +324,7 @@ const Promo: React.FC = () => {
                         <h3 className="font-semibold text-gray-900">Promo Code</h3>
                         <button 
                           onClick={() => copyToClipboard(promo.code)}
-                          className="text-blue-500 hover:text-blue-700"
+                          className="text-purple-500 hover:text-purple-700"
                           title="Copy code"
                         >
                           <Copy className="w-4 h-4" />
@@ -389,7 +389,7 @@ const Promo: React.FC = () => {
               <div className="text-gray-400 mb-2">No promo codes found</div>
               <p className="text-gray-500 text-sm mb-4">Create your first promo code to get started</p>
               <button
-                className="bg-blue-600 text-white rounded-lg px-4 py-2 flex items-center gap-2 hover:bg-blue-700 transition-colors mx-auto shadow-sm"
+                className="bg-purple-600 text-white rounded-lg px-4 py-2 flex items-center gap-2 hover:bg-purple-700 transition-colors mx-auto shadow-sm"
                 onClick={() => setShowModal(true)}
               >
                 <Plus className="w-4 h-4" /> Create Promo Code
@@ -414,7 +414,7 @@ const Promo: React.FC = () => {
                       name="type" 
                       value={form.type} 
                       onChange={handleChange} 
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                     >
                       <option value="fixed">Fixed Amount</option>
                       <option value="percentage">Percentage</option>
@@ -429,7 +429,7 @@ const Promo: React.FC = () => {
                       name="value" 
                       value={form.value} 
                       onChange={handleChange} 
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-purple-500 focus:border-purple-500" 
                       min="0" 
                       required 
                       placeholder={form.type === "fixed" ? "0.00" : "0"}
@@ -443,7 +443,7 @@ const Promo: React.FC = () => {
                         name="code" 
                         value={form.code} 
                         onChange={handleChange} 
-                        className="flex-1 border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                        className="flex-1 border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-purple-500 focus:border-purple-500" 
                         placeholder="Leave empty to auto-generate"
                       />
                       <button 
@@ -462,7 +462,7 @@ const Promo: React.FC = () => {
                       name="start_date" 
                       value={form.start_date} 
                       onChange={handleChange} 
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-purple-500 focus:border-purple-500" 
                     />
                   </div>
                   <div>
@@ -472,7 +472,7 @@ const Promo: React.FC = () => {
                       name="end_date" 
                       value={form.end_date} 
                       onChange={handleChange} 
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-purple-500 focus:border-purple-500" 
                     />
                   </div>
                   <div>
@@ -482,7 +482,7 @@ const Promo: React.FC = () => {
                       name="usage_limit_total" 
                       value={form.usage_limit_total} 
                       onChange={handleChange} 
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-purple-500 focus:border-purple-500" 
                       min="1" 
                       required 
                     />
@@ -494,7 +494,7 @@ const Promo: React.FC = () => {
                       name="usage_limit_per_user" 
                       value={form.usage_limit_per_user} 
                       onChange={handleChange} 
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-purple-500 focus:border-purple-500" 
                       min="1" 
                       required 
                     />
@@ -505,7 +505,7 @@ const Promo: React.FC = () => {
                       name="description" 
                       value={form.description} 
                       onChange={handleChange} 
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-purple-500 focus:border-purple-500" 
                       rows={2} 
                       placeholder="Optional description"
                     />
@@ -513,7 +513,7 @@ const Promo: React.FC = () => {
                 </div>
                 <button 
                   type="submit" 
-                  className="w-full bg-blue-600 text-white py-2.5 rounded-lg font-medium mt-2 hover:bg-blue-700 transition-colors"
+                  className="w-full bg-purple-600 text-white py-2.5 rounded-lg font-medium mt-2 hover:bg-purple-700 transition-colors"
                 >
                   Create Promo Code
                 </button>
@@ -538,7 +538,7 @@ const Promo: React.FC = () => {
                       name="type"
                       value={editForm.type || ''}
                       onChange={handleEditChange}
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                     >
                       <option value="fixed">Fixed Amount</option>
                       <option value="percentage">Percentage</option>
@@ -551,7 +551,7 @@ const Promo: React.FC = () => {
                       name="value"
                       value={editForm.value === undefined ? '' : editForm.value}
                       onChange={handleEditChange}
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                       min="0"
                       required
                     />
@@ -563,7 +563,7 @@ const Promo: React.FC = () => {
                       name="start_date"
                       value={editForm.start_date || ''}
                       onChange={handleEditChange}
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                     />
                   </div>
                   <div>
@@ -573,7 +573,7 @@ const Promo: React.FC = () => {
                       name="end_date"
                       value={editForm.end_date || ''}
                       onChange={handleEditChange}
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                     />
                   </div>
                   <div>
@@ -583,7 +583,7 @@ const Promo: React.FC = () => {
                       name="usage_limit_total"
                       value={editForm.usage_limit_total === undefined ? '' : editForm.usage_limit_total}
                       onChange={handleEditChange}
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                       min="1"
                       required
                     />
@@ -595,7 +595,7 @@ const Promo: React.FC = () => {
                       name="usage_limit_per_user"
                       value={editForm.usage_limit_per_user === undefined ? '' : editForm.usage_limit_per_user}
                       onChange={handleEditChange}
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                       min="1"
                       required
                     />
@@ -606,7 +606,7 @@ const Promo: React.FC = () => {
                       name="status"
                       value={editForm.status || ''}
                       onChange={handleEditChange}
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                     >
                       <option value="active">Active</option>
                       <option value="inactive">Inactive</option>
@@ -620,7 +620,7 @@ const Promo: React.FC = () => {
                       name="description"
                       value={editForm.description || ''}
                       onChange={handleEditChange}
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                       rows={2}
                     />
                   </div>
@@ -628,7 +628,7 @@ const Promo: React.FC = () => {
                 <div className="flex gap-3 mt-6">
                   <button
                     type="submit"
-                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 rounded-lg transition text-base"
+                    className="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-medium py-2.5 rounded-lg transition text-base"
                   >
                     Save Changes
                   </button>

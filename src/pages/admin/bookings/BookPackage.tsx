@@ -212,11 +212,11 @@ const BookPackage: React.FC = () => {
             <div className="flex flex-wrap gap-2">
               {pkg.features && Array.isArray(pkg.features)
                 ? <>{pkg.features.map((f: string) => (
-                    <span key={f} className="inline-flex items-center rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">{f}</span>
+                    <span key={f} className="inline-flex items-center rounded-full bg-purple-50 px-3 py-1 text-xs font-medium text-purple-700">{f}</span>
                   ))}</>
                 : typeof pkg.features === 'string' && pkg.features.trim() !== ''
                   ? <>{pkg.features.split(',').map((f: string) => (
-                      <span key={f.trim()} className="inline-flex items-center rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">{f.trim()}</span>
+                      <span key={f.trim()} className="inline-flex items-center rounded-full bg-purple-50 px-3 py-1 text-xs font-medium text-purple-700">{f.trim()}</span>
                     ))}</>
                   : null}
             </div>
@@ -225,22 +225,22 @@ const BookPackage: React.FC = () => {
           {/* Step Navigation */}
           <div className="flex mb-6 bg-white rounded-xl p-4 shadow-sm border border-gray-100">
             <div className="flex-1 flex items-center">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center mr-3 ${currentStep >= 1 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-500'}`}>
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center mr-3 ${currentStep >= 1 ? 'bg-purple-600 text-white' : 'bg-gray-200 text-gray-500'}`}>
                 1
               </div>
-              <span className={`text-sm font-medium ${currentStep >= 1 ? 'text-blue-600' : 'text-gray-500'}`}>Booking Details</span>
+              <span className={`text-sm font-medium ${currentStep >= 1 ? 'text-purple-600' : 'text-gray-500'}`}>Booking Details</span>
             </div>
             <div className="flex-1 flex items-center">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center mr-3 ${currentStep >= 2 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-500'}`}>
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center mr-3 ${currentStep >= 2 ? 'bg-purple-600 text-white' : 'bg-gray-200 text-gray-500'}`}>
                 2
               </div>
-              <span className={`text-sm font-medium ${currentStep >= 2 ? 'text-blue-600' : 'text-gray-500'}`}>Personal Info</span>
+              <span className={`text-sm font-medium ${currentStep >= 2 ? 'text-purple-600' : 'text-gray-500'}`}>Personal Info</span>
             </div>
             <div className="flex-1 flex items-center">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center mr-3 ${currentStep >= 3 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-500'}`}>
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center mr-3 ${currentStep >= 3 ? 'bg-purple-600 text-white' : 'bg-gray-200 text-gray-500'}`}>
                 3
               </div>
-              <span className={`text-sm font-medium ${currentStep >= 3 ? 'text-blue-600' : 'text-gray-500'}`}>Payment</span>
+              <span className={`text-sm font-medium ${currentStep >= 3 ? 'text-purple-600' : 'text-gray-500'}`}>Payment</span>
             </div>
           </div>
           
@@ -248,7 +248,7 @@ const BookPackage: React.FC = () => {
             {currentStep === 1 ? (
               <>
                 {/* Date and Time Selection */}
-                <div className="bg-blue-50 p-5 rounded-xl">
+                <div className="bg-purple-50 p-5 rounded-xl">
                   <h3 className="font-medium mb-4 text-gray-700 text-sm uppercase tracking-wide">Select Date & Time</h3>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
@@ -257,7 +257,7 @@ const BookPackage: React.FC = () => {
                       <select
                         value={selectedDate}
                         onChange={(e) => setSelectedDate(e.target.value)}
-                        className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                       >
                         {availableDates.map((date) => (
                           <option key={date.toISOString()} value={date.toISOString().split('T')[0]}>
@@ -272,7 +272,7 @@ const BookPackage: React.FC = () => {
                       <select
                         value={selectedTime}
                         onChange={(e) => setSelectedTime(e.target.value)}
-                        className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                       >
                         {availableTimes.map((time) => (
                           <option key={time} value={time}>{time}</option>
@@ -288,7 +288,7 @@ const BookPackage: React.FC = () => {
                   </div>
                 </div>
                 
-                <div className="bg-blue-50 p-5 rounded-xl">
+                <div className="bg-purple-50 p-5 rounded-xl">
                   <label className="block font-medium mb-3 text-gray-700 text-sm uppercase tracking-wide">Participants</label>
                   <div className="flex items-center">
                     <button 
@@ -432,7 +432,7 @@ const BookPackage: React.FC = () => {
                       <button 
                         type="button" 
                         onClick={() => handleApplyCode("promo")}
-                        className="px-4 py-2.5 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 transition text-sm shadow-sm"
+                        className="px-4 py-2.5 rounded-lg bg-purple-600 text-white font-medium hover:bg-purple-700 transition text-sm shadow-sm"
                       >
                         Apply
                       </button>
@@ -472,7 +472,7 @@ const BookPackage: React.FC = () => {
                 
                 <div className="flex justify-end pt-4">
                   <button 
-                    className="py-3 px-6 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 transition shadow-sm flex items-center"
+                    className="py-3 px-6 rounded-lg bg-purple-600 text-white font-medium hover:bg-purple-700 transition shadow-sm flex items-center"
                     onClick={() => setCurrentStep(2)}
                   >
                     Continue to Personal Info
@@ -491,7 +491,7 @@ const BookPackage: React.FC = () => {
                     <input 
                       type="text" 
                       placeholder="First Name" 
-                      className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                      className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500" 
                       value={form.firstName} 
                       onChange={e => setForm(f => ({ ...f, firstName: e.target.value }))} 
                     />
@@ -501,7 +501,7 @@ const BookPackage: React.FC = () => {
                     <input 
                       type="text" 
                       placeholder="Last Name" 
-                      className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                      className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500" 
                       value={form.lastName} 
                       onChange={e => setForm(f => ({ ...f, lastName: e.target.value }))} 
                     />
@@ -511,7 +511,7 @@ const BookPackage: React.FC = () => {
                     <input 
                       type="email" 
                       placeholder="Email" 
-                      className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                      className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500" 
                       value={form.email} 
                       onChange={e => setForm(f => ({ ...f, email: e.target.value }))} 
                     />
@@ -521,7 +521,7 @@ const BookPackage: React.FC = () => {
                     <input 
                       type="tel" 
                       placeholder="Phone Number" 
-                      className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                      className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500" 
                       value={form.phone} 
                       onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} 
                     />
@@ -539,7 +539,7 @@ const BookPackage: React.FC = () => {
                     Back
                   </button>
                   <button 
-                    className="py-3 px-6 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 transition shadow-sm flex items-center"
+                    className="py-3 px-6 rounded-lg bg-purple-600 text-white font-medium hover:bg-purple-700 transition shadow-sm flex items-center"
                     onClick={() => setCurrentStep(3)}
                   >
                     Continue to Payment
@@ -554,11 +554,11 @@ const BookPackage: React.FC = () => {
                 <h3 className="text-lg font-medium text-gray-800 mb-6 border-b pb-3">Payment Method</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-6">
                   <div 
-                    className={`border rounded-xl p-5 cursor-pointer transition ${paymentMethod === "stripe" ? "border-blue-500 bg-blue-50" : "border-gray-300 hover:border-gray-400 bg-white"}`}
+                    className={`border rounded-xl p-5 cursor-pointer transition ${paymentMethod === "stripe" ? "border-purple-500 bg-purple-50" : "border-gray-300 hover:border-gray-400 bg-white"}`}
                     onClick={() => setPaymentMethod("stripe")}
                   >
                     <div className="flex items-center">
-                      <div className={`w-5 h-5 rounded-full border flex items-center justify-center mr-3 ${paymentMethod === "stripe" ? "border-blue-500 bg-blue-500" : "border-gray-400 bg-white"}`}>
+                      <div className={`w-5 h-5 rounded-full border flex items-center justify-center mr-3 ${paymentMethod === "stripe" ? "border-purple-500 bg-purple-500" : "border-gray-400 bg-white"}`}>
                         {paymentMethod === "stripe" && <div className="w-2 h-2 rounded-full bg-white"></div>}
                       </div>
                       <span className="font-medium text-sm">Credit/Debit Card</span>
@@ -575,11 +575,11 @@ const BookPackage: React.FC = () => {
                     </div>
                   </div>
                   <div 
-                    className={`border rounded-xl p-5 cursor-pointer transition ${paymentMethod === "paypal" ? "border-blue-500 bg-blue-50" : "border-gray-300 hover:border-gray-400 bg-white"}`}
+                    className={`border rounded-xl p-5 cursor-pointer transition ${paymentMethod === "paypal" ? "border-purple-500 bg-purple-50" : "border-gray-300 hover:border-gray-400 bg-white"}`}
                     onClick={() => setPaymentMethod("paypal")}
                   >
                     <div className="flex items-center">
-                      <div className={`w-5 h-5 rounded-full border flex items-center justify-center mr-3 ${paymentMethod === "paypal" ? "border-blue-500 bg-blue-500" : "border-gray-400 bg-white"}`}>
+                      <div className={`w-5 h-5 rounded-full border flex items-center justify-center mr-3 ${paymentMethod === "paypal" ? "border-purple-500 bg-purple-500" : "border-gray-400 bg-white"}`}>
                         {paymentMethod === "paypal" && <div className="w-2 h-2 rounded-full bg-white"></div>}
                       </div>
                       <span className="font-medium text-sm">PayPal</span>
@@ -606,7 +606,7 @@ const BookPackage: React.FC = () => {
                         value="full"
                         checked={paymentType === 'full'}
                         onChange={() => setPaymentType('full')}
-                        className="accent-blue-600"
+                        className="accent-purple-600"
                       />
                       <span className="text-sm">Full Payment</span>
                     </label>
@@ -617,14 +617,14 @@ const BookPackage: React.FC = () => {
                         value="partial"
                         checked={paymentType === 'partial'}
                         onChange={() => setPaymentType('partial')}
-                        className="accent-blue-600"
+                        className="accent-purple-600"
                       />
                       <span className="text-sm">Partial Payment (20%)</span>
                     </label>
                   </div>
                   {paymentType === 'partial' && (
                     <div className="mt-2 text-xs text-gray-600">
-                      You will pay <span className="font-semibold text-blue-600">${partialAmount.toFixed(2)}</span> now. Remaining balance will be paid on site.
+                      You will pay <span className="font-semibold text-purple-600">${partialAmount.toFixed(2)}</span> now. Remaining balance will be paid on site.
                     </div>
                   )}
                 </div>
@@ -639,7 +639,7 @@ const BookPackage: React.FC = () => {
                     </svg>
                     Back
                   </button>
-                  <button className="py-3 px-8 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 transition shadow-sm">
+                  <button className="py-3 px-8 rounded-lg bg-purple-600 text-white font-medium hover:bg-purple-700 transition shadow-sm">
                     Pay Now
                   </button>
                   {/* Save booking to localStorage on Pay Now */}
@@ -764,7 +764,7 @@ const BookPackage: React.FC = () => {
               
               <div className="flex justify-between pt-3 border-t font-semibold text-base">
                 <span>Total</span>
-                <span className="text-blue-600">${total.toFixed(2)}</span>
+                <span className="text-purple-600">${total.toFixed(2)}</span>
               </div>
             </div>
             

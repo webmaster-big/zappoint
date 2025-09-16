@@ -211,7 +211,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen }) => {
         {(() => {
           const Icon = item.icon;
           // @ts-expect-error lucide-react icons accept 'size' prop
-          return <Icon size={18} className={isActive ? 'text-blue-700' : 'stroke-1'} />;
+          return <Icon size={18} className={isActive ? 'text-purple-700' : 'stroke-1'} />;
         })()}
         <span className="ml-3 text-sm flex-1">{item.label}</span>
         {hasItems && (
@@ -226,7 +226,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen }) => {
       <div>
         {hasItems ? (
           <div
-            className={`flex items-center p-2 rounded-lg cursor-pointer transition-colors ${isActive || isChildActive ? 'bg-blue-100 text-blue-700 font-semibold' : 'hover:bg-gray-100 text-gray-700'} ${depth > 0 ? 'pl-8' : ''}`}
+            className={`flex items-center p-2 rounded-lg cursor-pointer transition-colors ${isActive || isChildActive ? 'bg-purple-100 text-purple-700 font-semibold' : 'hover:bg-gray-100 text-gray-700'} ${depth > 0 ? 'pl-8' : ''}`}
             onClick={() => toggleDropdown(item.label)}
           >
             {content}
@@ -234,7 +234,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen }) => {
         ) : item.href ? (
           <Link
             to={item.href}
-            className={`flex items-center p-2 rounded-lg transition-colors ${isActive ? 'bg-blue-100 text-blue-700 font-semibold' : 'hover:bg-gray-100 text-gray-700'} ${depth > 0 ? 'pl-8' : ''}`}
+            className={`flex items-center p-2 rounded-lg transition-colors ${isActive ? 'bg-purple-100 text-purple-700 font-semibold' : 'hover:bg-gray-100 text-gray-700'} ${depth > 0 ? 'pl-8' : ''}`}
             onClick={() => setIsOpen(false)}
           >
             {content}
@@ -263,7 +263,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen }) => {
       {/* Floating Toggle Button */}
       {!isOpen && (
         <button
-          className="fixed top-4 left-4 z-50 p-2 rounded-full bg-blue-600 text-white shadow-lg lg:hidden"
+          className="fixed top-4 left-4 z-50 p-2 rounded-full bg-purple-600 text-white shadow-lg lg:hidden"
           style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.12)' }}
           onClick={() => setIsOpen(true)}
         >
@@ -280,7 +280,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen }) => {
           {/* Header */}
           <div className="flex items-center justify-between p-4">
             <div className="flex items-center">
-              <div className="w-8 h-8 bg-blue-400 rounded-lg flex items-center justify-center">
+              <div className="w-8 h-8 bg-purple-400 rounded-lg flex items-center justify-center">
                 <span className="text-black font-bold text-sm">Z</span>
               </div>
               <span className="ml-2 font-semibold text-gray-800">Zapzone</span>
@@ -300,7 +300,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen }) => {
               <input
                 type="text"
                 placeholder="Search..."
-                className="w-full pl-10 pr-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
+                className="w-full pl-10 pr-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-purple-400"
               />
             </div>
           </div>

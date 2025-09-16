@@ -273,7 +273,7 @@ const CheckIn: React.FC = () => {
             className={`mt-4 sm:mt-0 flex items-center px-4 py-2 rounded-lg ${
               scanning 
                 ? 'bg-red-100 text-red-700 hover:bg-red-200' 
-                : 'bg-blue-600 text-white hover:bg-blue-700'
+                : 'bg-purple-600 text-white hover:bg-purple-700'
             }`}
           >
             <QrCode className="h-5 w-5 mr-2" />
@@ -285,7 +285,7 @@ const CheckIn: React.FC = () => {
         {scanning && (
           <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100 mb-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">QR Code Scanner</h2>
-            <p className="text-sm text-blue-700 bg-blue-50 rounded px-3 py-2 mb-4">
+            <p className="text-sm text-purple-700 bg-purple-50 rounded px-3 py-2 mb-4">
               For best results, use a mobile device or tablet with a camera for scanning QR codes. Desktop webcams may not focus well on QR codes.
             </p>
             <div className="relative">
@@ -296,14 +296,14 @@ const CheckIn: React.FC = () => {
                 playsInline
               />
               <div className="absolute inset-0 flex items-center justify-center">
-                <div className="border-2 border-blue-500 rounded-lg w-64 h-64"></div>
+                <div className="border-2 border-purple-500 rounded-lg w-64 h-64"></div>
               </div>
             </div>
             <div className="mt-4 text-center">
               <p className="text-gray-600 mb-4">Position the QR code within the frame</p>
               <button
                 onClick={handleScan}
-                className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700"
+                className="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700"
               >
                 Simulate Scan (Demo)
               </button>
@@ -323,7 +323,7 @@ const CheckIn: React.FC = () => {
                 type="date"
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-400"
               />
             </div>
             <div className="md:col-span-2">
@@ -337,7 +337,7 @@ const CheckIn: React.FC = () => {
                   placeholder="Search by name, email, phone, or package..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg pl-10 pr-4 py-2 focus:ring-2 focus:ring-blue-400"
+                  className="w-full border border-gray-300 rounded-lg pl-10 pr-4 py-2 focus:ring-2 focus:ring-purple-400"
                 />
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               </div>
@@ -420,7 +420,7 @@ const CheckIn: React.FC = () => {
                           )}
                           <button
                             onClick={() => viewDetails(booking)}
-                            className="text-blue-600 hover:text-blue-800 flex items-center"
+                            className="text-purple-600 hover:text-purple-800 flex items-center"
                             title="View Details"
                           >
                             <Eye className="h-5 w-5 mr-1" />
@@ -452,7 +452,7 @@ const CheckIn: React.FC = () => {
                 </div>
                 {scannedData && (
                   <div className="mb-4">
-                    <span className="text-xs text-blue-700 bg-blue-50 rounded px-2 py-1">Scanned Booking ID: {scannedData}</span>
+                    <span className="text-xs text-purple-700 bg-purple-50 rounded px-2 py-1">Scanned Booking ID: {scannedData}</span>
                   </div>
                 )}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">

@@ -208,7 +208,7 @@ const GiftCard: React.FC = () => {
               <p className="text-gray-500 mt-1">Create and manage gift cards for your customers</p>
             </div>
             <button
-              className="bg-blue-600 text-white rounded-lg px-4 py-2.5 flex items-center gap-2 hover:bg-blue-700 transition-colors shadow-sm"
+              className="bg-purple-600 text-white rounded-lg px-4 py-2.5 flex items-center gap-2 hover:bg-purple-700 transition-colors shadow-sm"
               onClick={() => setShowModal(true)}
             >
               <Plus className="w-5 h-5" /> New Gift Card
@@ -218,7 +218,7 @@ const GiftCard: React.FC = () => {
           {/* Filter Section */}
           <div className="mb-6 flex flex-wrap gap-2">
             <button 
-              className={`px-3 py-1.5 rounded-full text-sm ${filterStatus === "all" ? "bg-blue-100 text-blue-800" : "bg-gray-100 text-gray-600"}`}
+              className={`px-3 py-1.5 rounded-full text-sm ${filterStatus === "all" ? "bg-purple-100 text-purple-800" : "bg-gray-100 text-gray-600"}`}
               onClick={() => setFilterStatus("all")}
             >
               All
@@ -262,7 +262,7 @@ const GiftCard: React.FC = () => {
                       </div>
                       <div className="flex gap-1">
                         <button 
-                          className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-md"
+                          className="p-1.5 text-gray-500 hover:text-purple-600 hover:bg-purple-50 rounded-md"
                           onClick={() => openEditModal(originalIndex)}
                         >
                           <Edit2 className="w-4 h-4" />
@@ -299,7 +299,7 @@ const GiftCard: React.FC = () => {
                         <h3 className="font-semibold text-gray-900">Gift Card Code</h3>
                         <button 
                           onClick={() => copyToClipboard(gc.code)}
-                          className="text-blue-500 hover:text-blue-700"
+                          className="text-purple-500 hover:text-purple-700"
                           title="Copy code"
                         >
                           <Copy className="w-4 h-4" />
@@ -355,7 +355,7 @@ const GiftCard: React.FC = () => {
               <div className="text-gray-400 mb-2">No gift cards found</div>
               <p className="text-gray-500 text-sm mb-4">Create your first gift card to get started</p>
               <button
-                className="bg-blue-600 text-white rounded-lg px-4 py-2 flex items-center gap-2 hover:bg-blue-700 transition-colors mx-auto shadow-sm"
+                className="bg-purple-600 text-white rounded-lg px-4 py-2 flex items-center gap-2 hover:bg-purple-700 transition-colors mx-auto shadow-sm"
                 onClick={() => setShowModal(true)}
               >
                 <Plus className="w-4 h-4" /> Create Gift Card
@@ -379,7 +379,7 @@ const GiftCard: React.FC = () => {
                     name="type" 
                     value={form.type} 
                     onChange={handleChange} 
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                   >
                     <option value="fixed">Fixed Value</option>
                     <option value="percentage">Percentage</option>
@@ -394,7 +394,7 @@ const GiftCard: React.FC = () => {
                     name="initial_value" 
                     value={form.initial_value} 
                     onChange={handleChange} 
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-purple-500 focus:border-purple-500" 
                     min="0" 
                     required 
                     placeholder={form.type === "fixed" ? "0.00" : "0"}
@@ -407,7 +407,7 @@ const GiftCard: React.FC = () => {
                     name="max_usage" 
                     value={form.max_usage} 
                     onChange={handleChange} 
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-purple-500 focus:border-purple-500" 
                     min="1" 
                     required 
                   />
@@ -419,7 +419,7 @@ const GiftCard: React.FC = () => {
                     name="expiry_date" 
                     value={form.expiry_date} 
                     onChange={handleChange} 
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-purple-500 focus:border-purple-500" 
                   />
                 </div>
                 <div>
@@ -428,14 +428,14 @@ const GiftCard: React.FC = () => {
                     name="description" 
                     value={form.description} 
                     onChange={handleChange} 
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-purple-500 focus:border-purple-500" 
                     rows={2} 
                     placeholder="Optional description"
                   />
                 </div>
                 <button 
                   type="submit" 
-                  className="w-full bg-blue-600 text-white py-2.5 rounded-lg font-medium mt-2 hover:bg-blue-700 transition-colors"
+                  className="w-full bg-purple-600 text-white py-2.5 rounded-lg font-medium mt-2 hover:bg-purple-700 transition-colors"
                 >
                   Create Gift Card
                 </button>
@@ -460,7 +460,7 @@ const GiftCard: React.FC = () => {
                       name="type" 
                       value={editForm.type || ''} 
                       onChange={handleEditChange} 
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                     >
                       <option value="fixed">Fixed Value</option>
                       <option value="percentage">Percentage</option>
@@ -473,7 +473,7 @@ const GiftCard: React.FC = () => {
                       name="initial_value" 
                       value={editForm.initial_value || ''} 
                       onChange={handleEditChange} 
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-purple-500 focus:border-purple-500" 
                       min="0" 
                       required 
                       placeholder={editForm.type === "fixed" ? "0.00" : "0"}
@@ -486,7 +486,7 @@ const GiftCard: React.FC = () => {
                       name="max_usage" 
                       value={editForm.max_usage || ''} 
                       onChange={handleEditChange} 
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-purple-500 focus:border-purple-500" 
                       min="1" 
                       required 
                     />
@@ -498,7 +498,7 @@ const GiftCard: React.FC = () => {
                       name="expiry_date" 
                       value={editForm.expiry_date || ''} 
                       onChange={handleEditChange} 
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-purple-500 focus:border-purple-500" 
                     />
                   </div>
                 </div>
@@ -508,7 +508,7 @@ const GiftCard: React.FC = () => {
                     name="description" 
                     value={editForm.description || ''} 
                     onChange={handleEditChange} 
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-purple-500 focus:border-purple-500" 
                     rows={2} 
                     placeholder="Optional description"
                   />
@@ -519,7 +519,7 @@ const GiftCard: React.FC = () => {
                     name="status" 
                     value={editForm.status || ''} 
                     onChange={handleEditChange} 
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                   >
                     <option value="active">Active</option>
                     <option value="inactive">Inactive</option>
@@ -532,7 +532,7 @@ const GiftCard: React.FC = () => {
                 <div className="flex gap-3 mt-6">
                   <button 
                     onClick={handleEditSave} 
-                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 rounded-lg transition text-base"
+                    className="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-medium py-2.5 rounded-lg transition text-base"
                   >
                     Save Changes
                   </button>

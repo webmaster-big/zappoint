@@ -72,12 +72,12 @@ const Bookings: React.FC = () => {
     pending: 'bg-yellow-100 text-yellow-800',
     confirmed: 'bg-green-100 text-green-800',
     cancelled: 'bg-red-100 text-red-800',
-    completed: 'bg-blue-100 text-blue-800'
+    completed: 'bg-purple-100 text-purple-800'
   };
 
   const paymentColors = {
     credit_card: 'bg-purple-100 text-purple-800',
-    paypal: 'bg-blue-100 text-blue-800',
+    paypal: 'bg-purple-100 text-purple-800',
     cash: 'bg-green-100 text-green-800'
   };
 
@@ -89,7 +89,7 @@ const Bookings: React.FC = () => {
       change: '+12% from last week',
       trend: 'up',
       icon: Calendar,
-      accent: 'bg-blue-100 text-blue-600',
+      accent: 'bg-purple-100 text-purple-600',
     },
     {
       title: 'Activities Scheduled',
@@ -97,7 +97,7 @@ const Bookings: React.FC = () => {
       change: 'Laser Tag most popular',
       trend: 'up',
       icon: Zap,
-      accent: 'bg-blue-100 text-blue-600',
+      accent: 'bg-purple-100 text-purple-600',
     },
     {
       title: 'Packages Booked',
@@ -105,7 +105,7 @@ const Bookings: React.FC = () => {
       change: 'Corporate leading',
       trend: 'up',
       icon: Package,
-      accent: 'bg-blue-100 text-blue-600',
+      accent: 'bg-purple-100 text-purple-600',
     },
     {
       title: 'Participants',
@@ -113,7 +113,7 @@ const Bookings: React.FC = () => {
       change: '+8% from last week',
       trend: 'up',
       icon: Users,
-      accent: 'bg-blue-100 text-blue-600',
+      accent: 'bg-purple-100 text-purple-600',
     },
     {
       title: 'Revenue',
@@ -121,7 +121,7 @@ const Bookings: React.FC = () => {
       change: '+8% from last week',
       trend: 'up',
       icon: DollarSign,
-      accent: 'bg-blue-100 text-blue-600',
+      accent: 'bg-purple-100 text-purple-600',
     },
   ];
 
@@ -353,7 +353,7 @@ const Bookings: React.FC = () => {
     return (
       <MainLayout>
         <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
         </div>
       </MainLayout>
     );
@@ -370,7 +370,7 @@ const Bookings: React.FC = () => {
           </div>
           <Link
             to="/book/packages"
-            className="mt-4 sm:mt-0 inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            className="mt-4 sm:mt-0 inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
           >
             <Plus className="h-5 w-5 mr-2" />
             Create Booking
@@ -411,7 +411,7 @@ const Bookings: React.FC = () => {
                 placeholder="Search bookings..."
                 value={filters.search}
                 onChange={(e) => handleFilterChange('search', e.target.value)}
-                className="pl-9 pr-3 py-1.5 border border-gray-200 rounded-lg w-full text-sm focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
+                className="pl-9 pr-3 py-1.5 border border-gray-200 rounded-lg w-full text-sm focus:ring-2 focus:ring-purple-400 focus:border-purple-400"
               />
             </div>
             <div className="flex gap-1">
@@ -440,7 +440,7 @@ const Bookings: React.FC = () => {
                   <select
                     value={filters.status}
                     onChange={(e) => handleFilterChange('status', e.target.value)}
-                    className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
+                    className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-purple-400 focus:border-purple-400"
                   >
                     <option value="all">All Statuses</option>
                     <option value="pending">Pending</option>
@@ -454,7 +454,7 @@ const Bookings: React.FC = () => {
                   <select
                     value={filters.payment}
                     onChange={(e) => handleFilterChange('payment', e.target.value)}
-                    className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
+                    className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-purple-400 focus:border-purple-400"
                   >
                     <option value="all">All Methods</option>
                     <option value="credit_card">Credit Card</option>
@@ -468,7 +468,7 @@ const Bookings: React.FC = () => {
                     type="date"
                     value={filters.dateRange.start}
                     onChange={(e) => handleDateRangeChange('start', e.target.value)}
-                    className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
+                    className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-purple-400 focus:border-purple-400"
                   />
                 </div>
                 <div>
@@ -477,7 +477,7 @@ const Bookings: React.FC = () => {
                     type="date"
                     value={filters.dateRange.end}
                     onChange={(e) => handleDateRangeChange('end', e.target.value)}
-                    className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
+                    className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-purple-400 focus:border-purple-400"
                   />
                 </div>
               </div>
@@ -495,14 +495,14 @@ const Bookings: React.FC = () => {
 
         {/* Bulk Actions */}
         {selectedBookings.length > 0 && (
-          <div className="bg-blue-50 p-4 rounded-lg mb-6 flex flex-wrap items-center gap-4">
-            <span className="text-blue-800 font-medium">
+          <div className="bg-purple-50 p-4 rounded-lg mb-6 flex flex-wrap items-center gap-4">
+            <span className="text-purple-800 font-medium">
               {selectedBookings.length} booking(s) selected
             </span>
             <div className="flex gap-2">
               <select
                 onChange={(e) => handleBulkStatusChange(e.target.value as Booking['status'])}
-                className="border border-gray-200 rounded-lg px-3 py-1 focus:ring-2 focus:ring-blue-400"
+                className="border border-gray-200 rounded-lg px-3 py-1 focus:ring-2 focus:ring-purple-400"
               >
                 <option value="">Change Status</option>
                 <option value="confirmed">Confirm</option>
@@ -531,7 +531,7 @@ const Bookings: React.FC = () => {
                       type="checkbox"
                       checked={selectedBookings.length === currentBookings.length && currentBookings.length > 0}
                       onChange={handleSelectAll}
-                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-400"
+                      className="rounded border-gray-300 text-purple-600 focus:ring-purple-400"
                     />
                   </th>
                   <th scope="col" className="px-4 py-3 font-medium w-40">Date & Time</th>
@@ -561,7 +561,7 @@ const Bookings: React.FC = () => {
                           type="checkbox"
                           checked={selectedBookings.includes(booking.id)}
                           onChange={() => handleSelectBooking(booking.id)}
-                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-400"
+                          className="rounded border-gray-300 text-purple-600 focus:ring-purple-400"
                         />
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
@@ -591,7 +591,7 @@ const Bookings: React.FC = () => {
                         <select
                           value={booking.status}
                           onChange={(e) => handleStatusChange(booking.id, e.target.value as Booking['status'])}
-                          className={`text-xs font-medium px-2 py-1 rounded-full ${statusColors[booking.status]} border-none focus:ring-2 focus:ring-blue-400`}
+                          className={`text-xs font-medium px-2 py-1 rounded-full ${statusColors[booking.status]} border-none focus:ring-2 focus:ring-purple-400`}
                         >
                           <option value="pending">Pending</option>
                           <option value="confirmed">Confirmed</option>
@@ -611,7 +611,7 @@ const Bookings: React.FC = () => {
                         <div className="flex items-center gap-2">
                           <button
                             onClick={() => {/* View details */}}
-                            className="p-1 text-blue-600 hover:text-blue-800"
+                            className="p-1 text-purple-600 hover:text-purple-800"
                             title="Check-in"
                           >
                             <CheckCircle2 className="h-4 w-4" />
@@ -672,7 +672,7 @@ const Bookings: React.FC = () => {
                       onClick={() => paginate(page)}
                       className={`px-3 py-1 border rounded-lg text-sm font-medium ${
                         currentPage === page
-                          ? 'border-blue-500 bg-blue-500 text-white'
+                          ? 'border-purple-500 bg-purple-500 text-white'
                           : 'border-gray-200 text-gray-700 hover:bg-gray-50'
                       }`}
                     >
