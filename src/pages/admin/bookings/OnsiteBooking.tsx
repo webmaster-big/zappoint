@@ -53,7 +53,7 @@ interface Attraction {
   name: string;
   description: string;
   price: number;
-  pricingType: 'per_person' | 'per_unit' | 'fixed';
+  pricingType: 'per_person' | 'per_unit' | 'fixed' | 'per_lane';
   maxCapacity: number;
   category: string;
 }
@@ -314,7 +314,7 @@ const OnsiteBooking: React.FC = () => {
     }));
   };
 
-  const handleAddOnToggle = (addOnName: string, price: number) => {
+  const handleAddOnToggle = (addOnName: string) => {
     setBookingData(prev => {
       const existingIndex = prev.selectedAddOns.findIndex(a => a.name === addOnName);
       

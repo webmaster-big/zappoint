@@ -311,13 +311,13 @@ const Bookings: React.FC = () => {
     localStorage.setItem('zapzone_bookings', JSON.stringify(updatedBookings));
   };
 
-  const handleDeleteBooking = (id: string) => {
-    if (window.confirm('Are you sure you want to delete this booking?')) {
-      const updatedBookings = bookings.filter(booking => booking.id !== id);
-      setBookings(updatedBookings);
-      localStorage.setItem('zapzone_bookings', JSON.stringify(updatedBookings));
-    }
-  };
+  // const handleDeleteBooking = (id: string) => {
+  //   if (window.confirm('Are you sure you want to delete this booking?')) {
+  //     const updatedBookings = bookings.filter(booking => booking.id !== id);
+  //     setBookings(updatedBookings);
+  //     localStorage.setItem('zapzone_bookings', JSON.stringify(updatedBookings));
+  //   }
+  // };
 
   const handleBulkDelete = () => {
     if (selectedBookings.length === 0) return;
