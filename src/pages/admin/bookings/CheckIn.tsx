@@ -239,9 +239,14 @@ const CheckIn: React.FC = () => {
   };
 
   const viewDetails = (booking: Booking) => {
-    // Always fetch the latest booking details from the bookings array
-    const latestBooking = bookings.find(b => b.id === booking.id) || booking;
-    setSelectedBooking(latestBooking);
+    // If scannedData is present, use it to find the booking
+    if (scannedData) {
+      const scannedBooking = bookings.find(b => b.id === scannedData);
+      setSelectedBooking(scannedBooking || booking);
+    } else {
+      const latestBooking = bookings.find(b => b.id === booking.id) || booking;
+      setSelectedBooking(latestBooking);
+    }
     setShowDetailsModal(true);
   };
 
@@ -445,7 +450,11 @@ const CheckIn: React.FC = () => {
                     <XCircle className="h-5 w-5" />
                   </button>
                 </div>
-                
+                {scannedData && (
+                  <div className="mb-4">
+                    <span className="text-xs text-blue-700 bg-blue-50 rounded px-2 py-1">Scanned Booking ID: {scannedData}</span>
+                  </div>
+                )}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                   <div>
                     <h4 className="font-medium text-gray-900">Customer Details</h4>
