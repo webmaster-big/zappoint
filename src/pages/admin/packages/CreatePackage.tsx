@@ -190,15 +190,19 @@ const CreatePackage: React.FC = () => {
         const promoObjs = form.promos.map(code => promos.find(p => p.code === code)).filter(Boolean);
         const giftCardObjs = form.giftCards.map(code => giftCards.find(g => g.code === code)).filter(Boolean);
         const addOnObjs = form.addOns.map(name => addOns.find(a => a.name === name)).filter(Boolean);
-        
+
+        // Generate a temporary unique id
+        const tempId = `pkg_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
+
         const newPackage = {
+            id: tempId,
             ...form,
             promos: promoObjs,
             giftCards: giftCardObjs,
             addOns: addOnObjs,
             pricePerAdditional: form.pricePerAdditional,
         };
-        
+
         // Append and save
         localStorage.setItem("zapzone_packages", JSON.stringify([...existing, newPackage]));
         showToast("Package saved!", "success");
@@ -243,7 +247,7 @@ const CreatePackage: React.FC = () => {
 
     return (
         <MainLayout>
-            <div className="w-full mx-auto sm:px-4 pb-6 flex flex-col md:flex-row gap-8 md:gap-12">
+            <div className="w-full mx-auto sm:px-4 md:mt-8 pb-6 flex flex-col md:flex-row gap-8 md:gap-12">
                 {/* Form Section */}
                 <div className="flex-1 mx-auto">
                     <div className="bg-white rounded-xl p-4 sm:p-6 md:p-8">

@@ -1,5 +1,4 @@
 // MainLayout component that would use the Sidebar
-import { Menu } from 'lucide-react';
 import Sidebar from './../components/admin/AdminSidebar';
 import { useState } from 'react';
 
@@ -28,16 +27,16 @@ const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       
       <div className="flex-1 flex flex-col overflow-hidden bg-white rounded-tl-2xl shadow-xl">
         <header className="sticky top-0 z-30 bg-white/90 backdrop-blur px-8 flex items-center gap-4 ">
-          <button
+          {/* <button
             className="lg:hidden p-2 rounded-lg border border-gray-200 bg-white shadow hover:bg-gray-100 transition"
             onClick={() => setIsSidebarOpen(true)}
             aria-label="Open sidebar"
           >
             <Menu size={24} />
-          </button>
+          </button> */}
          
         </header>
-        <main className="bg-gray-50 flex-1 overflow-y-auto p-8 ">
+        <main className="bg-gray-50 flex-1 overflow-y-auto sm:p-6 p-2">
           {children}
         </main>
       </div>

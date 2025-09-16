@@ -9,6 +9,9 @@ import BookPackage from "./pages/admin/bookings/BookPackage"
 import GiftCard from "./pages/admin/packages/GiftCard"
 import Promo from "./pages/admin/packages/Promo"
 import BookingWidget from "./components/embed/BookingWidget"
+import Bookings from "./pages/admin/bookings/Bookings"
+import CalendarView from "./pages/admin/bookings/CalendarView"
+import OnsiteBooking from "./pages/admin/bookings/OnsiteBooking"
 
 
 function App() {
@@ -24,6 +27,9 @@ function App() {
       <Route path="/packages/promos" element={<Promo/>} />
       <Route path="/packages/gift-cards" element={<GiftCard />} />
       <Route path="/book/packages/:id" element={<BookPackage />} />
+      <Route path="/bookings" element={<Bookings />} /> 
+      <Route path="/bookings/calendar" element={<CalendarView />} /> 
+      <Route path="/bookings/create" element={<OnsiteBooking />} /> 
        {/* Add embed route */}
       <Route path="/embed/booking/:packageId" element={
         <div className="container mx-auto p-4">

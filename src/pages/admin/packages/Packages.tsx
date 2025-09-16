@@ -64,7 +64,8 @@ const Packages: React.FC = () => {
   };
 
   // Domain for booking links
-  const bookingDomain = "yourdomain.com"; // Replace with your actual domain
+//   or how about using an the url 
+  const bookingDomain = window.location.origin; 
 
   return (
     <MainLayout>
@@ -192,7 +193,7 @@ const Packages: React.FC = () => {
                           <Link2 className="w-4 h-4" /> Embed Link
                         </div>
                         <div className="text-xs text-blue-600 break-all bg-blue-50 rounded px-2 py-1.5 border border-blue-100">
-                          {`${bookingDomain}/book/embed?id=${idx + 1}`}
+                          {`${bookingDomain}/book/embed?id=${pkg.id}`}
                         </div>
                       </div>
                       
@@ -201,7 +202,7 @@ const Packages: React.FC = () => {
                           <ExternalLink className="w-4 h-4" /> Booking Page
                         </div>
                         <div className="text-xs text-blue-600 break-all bg-blue-50 rounded px-2 py-1.5 border border-blue-100">
-                          {`${bookingDomain}/book/package?id=${idx + 1}`}
+                          {`${bookingDomain}/book/package/${pkg.id}`}
                         </div>
                       </div>
                     </div>

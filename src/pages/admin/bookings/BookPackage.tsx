@@ -50,6 +50,7 @@ const BookPackage: React.FC = () => {
     phone: "",
   });
   const [paymentMethod, setPaymentMethod] = useState("stripe");
+  const [paymentType, setPaymentType] = useState<'full' | 'partial'>('full');
   const [currentStep, setCurrentStep] = useState(1);
   
   // Date and time selection
@@ -196,6 +197,7 @@ const BookPackage: React.FC = () => {
   const taxRate = 0.06; // Michigan tax
   const tax = (subtotal - promoDiscount - giftCardDiscount) * taxRate;
   const total = Math.max(0, subtotal - promoDiscount - giftCardDiscount + tax);
+  const partialAmount = Math.round(total * 0.2 * 100) / 100;
 
   if (!pkg) return <div className="p-8 text-center text-gray-500">Package not found.</div>;
 
@@ -550,7 +552,6 @@ const BookPackage: React.FC = () => {
             ) : (
               <>
                 <h3 className="text-lg font-medium text-gray-800 mb-6 border-b pb-3">Payment Method</h3>
-                
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-6">
                   <div 
                     className={`border rounded-xl p-5 cursor-pointer transition ${paymentMethod === "stripe" ? "border-blue-500 bg-blue-50" : "border-gray-300 hover:border-gray-400 bg-white"}`}
@@ -573,7 +574,6 @@ const BookPackage: React.FC = () => {
                       </div>
                     </div>
                   </div>
-                  
                   <div 
                     className={`border rounded-xl p-5 cursor-pointer transition ${paymentMethod === "paypal" ? "border-blue-500 bg-blue-50" : "border-gray-300 hover:border-gray-400 bg-white"}`}
                     onClick={() => setPaymentMethod("paypal")}
@@ -595,6 +595,39 @@ const BookPackage: React.FC = () => {
                     </div>
                   </div>
                 </div>
+                {/* Payment Type Selection */}
+                <div className="mt-6 mb-4">
+                  <label className="block font-medium mb-2 text-gray-700 text-sm">Select Payment Type</label>
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="paymentType"
+                        value="full"
+                        checked={paymentType === 'full'}
+                        onChange={() => setPaymentType('full')}
+                        className="accent-blue-600"
+                      />
+                      <span className="text-sm">Full Payment</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="paymentType"
+                        value="partial"
+                        checked={paymentType === 'partial'}
+                        onChange={() => setPaymentType('partial')}
+                        className="accent-blue-600"
+                      />
+                      <span className="text-sm">Partial Payment (20%)</span>
+                    </label>
+                  </div>
+                  {paymentType === 'partial' && (
+                    <div className="mt-2 text-xs text-gray-600">
+                      You will pay <span className="font-semibold text-blue-600">${partialAmount.toFixed(2)}</span> now. Remaining balance will be paid on site.
+                    </div>
+                  )}
+                </div>
                 
                 <div className="flex justify-between pt-6">
                   <button 
@@ -609,6 +642,8 @@ const BookPackage: React.FC = () => {
                   <button className="py-3 px-8 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 transition shadow-sm">
                     Pay Now
                   </button>
+                  {/* Save booking to localStorage on Pay Now */}
+                  <script>{/* This is not a real script tag, just a placeholder for logic below */}</script>
                 </div>
               </>
             )}

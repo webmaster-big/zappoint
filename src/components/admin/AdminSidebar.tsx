@@ -260,6 +260,16 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen }) => {
           onClick={() => setIsOpen(false)}
         />
       )}
+      {/* Floating Toggle Button */}
+      {!isOpen && (
+        <button
+          className="fixed top-4 left-4 z-50 p-2 rounded-full bg-blue-600 text-white shadow-lg lg:hidden"
+          style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.12)' }}
+          onClick={() => setIsOpen(true)}
+        >
+          <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="18" x2="21" y2="18" /></svg>
+        </button>
+      )}
       {/* Sidebar */}
       <aside
         id="sidebar"
@@ -278,6 +288,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen }) => {
             <button
               className="lg:hidden p-1 rounded-md hover:bg-gray-100"
               onClick={() => setIsOpen(false)}
+              style={{ position: 'absolute', top: 16, right: 16, zIndex: 60 }}
             >
               <X size={20} />
             </button>
