@@ -15,7 +15,6 @@ import {
   Mail,
   Zap,
   X,
-  Users,
   Activity,
   Star,
 } from 'lucide-react';
