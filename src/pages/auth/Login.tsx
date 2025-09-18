@@ -32,7 +32,7 @@ export default function Login() {
       <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-6 sm:p-8 border border-zinc-100 m-3">
         {/* Logo container with Zap Zone logo */}
         <div className="flex justify-center mb-8 pt-2">
-          <img src="/src/assets/imgs/Zap-Zone.png" alt="Logo" className="w-3/5 mr-2" />
+          <img src="/public/Zap-Zone.png" alt="Logo" className="w-3/5 mr-2" />
           
         </div>
         {/* Demo account selection */}
@@ -114,7 +114,7 @@ export default function Login() {
           </button>
         </form>
         <div className="mt-6 text-center text-xs text-zinc-400">
-          &copy; {new Date().getFullYear()} zappoint. All rights reserved.
+          &copy; {new Date().getFullYear()} zapzone. All rights reserved.
         </div>
       </div>
     </div>
