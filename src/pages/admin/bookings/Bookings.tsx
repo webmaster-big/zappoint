@@ -347,6 +347,14 @@ const Bookings: React.FC = () => {
     }
   };
 
+    const handleCheckIn = (id: string, checkInStatus: 'checked-in') => {
+    const updatedBookings = bookings.map(booking =>
+      booking.id === id ? { ...booking, status: checkInStatus } : booking
+    );
+    setBookings(updatedBookings);
+    localStorage.setItem('zapzone_bookings', JSON.stringify(updatedBookings));
+  };
+
   const handleStatusChange = (id: string, newStatus: Booking['status']) => {
     const updatedBookings = bookings.map(booking =>
       booking.id === id ? { ...booking, status: newStatus } : booking
@@ -355,13 +363,7 @@ const Bookings: React.FC = () => {
     localStorage.setItem('zapzone_bookings', JSON.stringify(updatedBookings));
   };
 
-  const handleCheckIn = (id: string) => {
-    const updatedBookings = bookings.map(booking =>
-      booking.id === id ? { ...booking, status: 'checked-in' } : booking
-    );
-    setBookings(updatedBookings);
-    localStorage.setItem('zapzone_bookings', JSON.stringify(updatedBookings));
-  };
+
 
   const handleBulkDelete = () => {
     if (selectedBookings.length === 0) return;
@@ -671,7 +673,7 @@ const Bookings: React.FC = () => {
                         <div className="flex items-center gap-2">
                           {booking.status !== 'checked-in' && booking.status !== 'completed' && (
                             <button
-                              onClick={() => handleCheckIn(booking.id)}
+                              onClick={() => handleCheckIn(booking.id, 'checked-in')}
                               className="p-1 text-green-800 hover:text-green-800"
                               title="Check-in"
                             >

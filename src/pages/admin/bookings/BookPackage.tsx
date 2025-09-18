@@ -337,7 +337,7 @@ const BookPackage: React.FC = () => {
                 
                 {pkg.attractions && pkg.attractions.length > 0 && (
                   <div className="border border-gray-200 rounded-xl p-5">
-                    <label className="block font-medium mb-3 text-gray-700 text-sm uppercase tracking-wide">Attractions</label>
+                    <label className="block font-medium mb-3 text-gray-700 text-sm uppercase tracking-wide">Additional Attractions</label>
                     <div className="space-y-4">
                       {pkg.attractions.map((a) => {
                         // If a is an object, use its properties; if string, use all available from attractions array

@@ -37,7 +37,7 @@ const MainLayout: React.FC = () => {
   const handleSignOut = useCallback(() => {
     localStorage.removeItem('zapzone_user');
     setUserData(null);
-    navigate('/login');
+    navigate('/');
   }, [navigate]);
 
   return (

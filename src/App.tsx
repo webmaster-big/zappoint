@@ -24,10 +24,11 @@ import CompanyDashboard from "./pages/admin/CompanyDashboard";
 function App() {
   return (
     <Routes>
-      <Route path="/login" element={<Login />} />
-      <Route path="/" element={<Home />} />
+      <Route path="/" element={<Login />} />
+      <Route path="/home" element={<Home />} />
       <Route path="/book/package/:id" element={<BookPackage />} />
       <Route path="/book/attraction/:id" element={<BookingAttraction />} />
+      
   <Route element={<MainLayout />}>
         <Route path="/attendee/dashboard" element={<AttendeesDashboard />} />
         <Route path="/manager/dashboard" element={<LocationManagerDashboard />} />
@@ -42,14 +43,14 @@ function App() {
         <Route path="/bookings/calendar" element={<CalendarView />} />
         <Route path="/bookings/create" element={<OnsiteBooking />} />
         <Route path="/bookings/check-in" element={<CheckIn />} />
+        </Route>
 
-        {/* Add embed route */}
+           {/* Add embed route */}
         <Route path="/embed/booking/:packageId" element={
           <div className="container mx-auto p-4">
             <BookingWidget packageId="{packageId}" />
           </div>
         } />
-  </Route>
     </Routes>
   );
 }
