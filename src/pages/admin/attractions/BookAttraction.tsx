@@ -9,7 +9,9 @@ import {
   CheckCircle,
   Star,
   Shield,
-  Zap
+  Zap,
+  CreditCard,
+  Wallet
 } from 'lucide-react';
 
 // Define interfaces for our data structures
@@ -49,13 +51,13 @@ const BookingAttraction = () => {
     email: '',
     phone: ''
   });
+  const [paymentMethod, setPaymentMethod] = useState('credit_card');
   const [currentStep, setCurrentStep] = useState(1);
   const [availableDates, setAvailableDates] = useState<string[]>([]);
   const [availableTimes, setAvailableTimes] = useState<string[]>([]);
 
   // Load attraction data
   useEffect(() => {
-    // In a real app, this would be an API call
     const loadAttraction = () => {
       try {
         const attractions = JSON.parse(localStorage.getItem('zapzone_attractions') || '[]');
@@ -126,7 +128,7 @@ const BookingAttraction = () => {
   };
 
   const calculateTotal = () => {
-    if (!attraction) return '0.00';
+    if (!attraction) return 0;
     
     let total = parseFloat(attraction.price.toString());
     
@@ -134,30 +136,33 @@ const BookingAttraction = () => {
     if (attraction.pricingType === 'per_person') {
       total = total * participants;
     }
-    // Other pricing types could be handled here
     
-    return total.toFixed(2);
+    return total;
   };
 
   const handleBooking = () => {
     if (!attraction) return;
     
-    // Create booking object
+    // Create booking object with the correct structure
     const booking = {
       id: `booking_${Date.now()}`,
-      attractionId: attraction.id,
+      type: 'attraction' as const,
       attractionName: attraction.name,
-      customerInfo,
+      customerName: `${customerInfo.firstName} ${customerInfo.lastName}`,
+      email: customerInfo.email,
+      phone: customerInfo.phone,
       date: selectedDate,
       time: selectedTime,
-      participants,
+      participants: participants,
+      status: 'confirmed' as const,
       totalAmount: calculateTotal(),
-      status: 'confirmed',
-      bookedAt: new Date().toISOString(),
-      type: 'attraction'
+      createdAt: new Date().toISOString(),
+      paymentMethod: paymentMethod,
+      duration: `${attraction.duration} ${attraction.durationUnit}`,
+      activity: attraction.name
     };
     
-    // Save to localStorage (in a real app, this would be an API call)
+    // Save to localStorage
     const existingBookings = JSON.parse(localStorage.getItem('zapzone_bookings') || '[]');
     localStorage.setItem('zapzone_bookings', JSON.stringify([...existingBookings, booking]));
     
@@ -213,7 +218,7 @@ const BookingAttraction = () => {
               <div className="border-b border-gray-200">
                 <div className="px-6 py-4">
                   <div className="flex items-center justify-between mb-2">
-                    {[1, 2, 3, 4].map(step => (
+                    {[1, 2, 3, 4, 5].map(step => (
                       <div key={step} className="flex items-center">
                         <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
                           currentStep >= step 
@@ -222,7 +227,7 @@ const BookingAttraction = () => {
                         }`}>
                           {step}
                         </div>
-                        {step < 4 && (
+                        {step < 5 && (
                           <div className={`w-16 h-1 mx-2 ${currentStep > step ? 'bg-purple-600' : 'bg-gray-200'}`}></div>
                         )}
                       </div>
@@ -232,6 +237,7 @@ const BookingAttraction = () => {
                     <span>Date & Time</span>
                     <span>Participants</span>
                     <span>Your Info</span>
+                    <span>Payment</span>
                     <span>Confirmation</span>
                   </div>
                 </div>
@@ -414,9 +420,93 @@ const BookingAttraction = () => {
                       Back
                     </button>
                     <button
-                      onClick={handleBooking}
+                      onClick={() => setCurrentStep(4)}
                       disabled={!customerInfo.firstName || !customerInfo.lastName || !customerInfo.email}
                       className="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Continue to Payment
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 4: Payment Method */}
+              {currentStep === 4 && (
+                <div className="p-6">
+                  <h2 className="text-xl font-semibold text-gray-900 mb-6">Payment Method</h2>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                    <div 
+                      className={`border-2 rounded-lg p-4 cursor-pointer ${
+                        paymentMethod === 'credit_card' 
+                          ? 'border-purple-600 bg-purple-50' 
+                          : 'border-gray-300 hover:border-gray-400'
+                      }`}
+                      onClick={() => setPaymentMethod('credit_card')}
+                    >
+                      <div className="flex items-center">
+                        <CreditCard className="h-6 w-6 mr-2 text-gray-600" />
+                        <span className="font-medium">Credit/Debit Card</span>
+                      </div>
+                      <p className="text-sm text-gray-500 mt-1">Pay securely with your card</p>
+                    </div>
+                    
+                    <div 
+                      className={`border-2 rounded-lg p-4 cursor-pointer ${
+                        paymentMethod === 'paypal' 
+                          ? 'border-purple-600 bg-purple-50' 
+                          : 'border-gray-300 hover:border-gray-400'
+                      }`}
+                      onClick={() => setPaymentMethod('paypal')}
+                    >
+                      <div className="flex items-center">
+                        <Wallet className="h-6 w-6 mr-2 text-blue-600" />
+                        <span className="font-medium">PayPal</span>
+                      </div>
+                      <p className="text-sm text-gray-500 mt-1">Pay with your PayPal account</p>
+                    </div>
+                    
+                    <div 
+                      className={`border-2 rounded-lg p-4 cursor-pointer ${
+                        paymentMethod === 'cash' 
+                          ? 'border-purple-600 bg-purple-50' 
+                          : 'border-gray-300 hover:border-gray-400'
+                      }`}
+                      onClick={() => setPaymentMethod('cash')}
+                    >
+                      <div className="flex items-center">
+                        <Wallet className="h-6 w-6 mr-2 text-green-600" />
+                        <span className="font-medium">Cash Payment</span>
+                      </div>
+                      <p className="text-sm text-gray-500 mt-1">Pay in person at the venue</p>
+                    </div>
+                    
+                    <div 
+                      className={`border-2 rounded-lg p-4 cursor-pointer ${
+                        paymentMethod === 'e-wallet' 
+                          ? 'border-purple-600 bg-purple-50' 
+                          : 'border-gray-300 hover:border-gray-400'
+                      }`}
+                      onClick={() => setPaymentMethod('e-wallet')}
+                    >
+                      <div className="flex items-center">
+                        <Wallet className="h-6 w-6 mr-2 text-orange-600" />
+                        <span className="font-medium">E-Wallet</span>
+                      </div>
+                      <p className="text-sm text-gray-500 mt-1">Pay with digital wallet</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex justify-between">
+                    <button
+                      onClick={() => setCurrentStep(3)}
+                      className="bg-gray-200 text-gray-800 px-6 py-2 rounded-lg hover:bg-gray-300"
+                    >
+                      Back
+                    </button>
+                    <button
+                      onClick={handleBooking}
+                      className="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700"
                     >
                       Complete Booking
                     </button>
@@ -424,8 +514,8 @@ const BookingAttraction = () => {
                 </div>
               )}
 
-              {/* Step 4: Confirmation */}
-              {currentStep === 4 && (
+              {/* Step 5: Confirmation */}
+              {currentStep === 5 && (
                 <div className="p-6 text-center">
                   <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
                   <h2 className="text-2xl font-bold text-gray-900 mb-2">Booking Confirmed!</h2>
@@ -438,7 +528,8 @@ const BookingAttraction = () => {
                     <p><strong>Date:</strong> {new Date(selectedDate).toLocaleDateString()}</p>
                     <p><strong>Time:</strong> {selectedTime}</p>
                     <p><strong>Participants:</strong> {participants}</p>
-                    <p><strong>Total:</strong> ${calculateTotal()}</p>
+                    <p><strong>Payment Method:</strong> {paymentMethod.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}</p>
+                    <p><strong>Total:</strong> ${calculateTotal().toFixed(2)}</p>
                   </div>
                   
                   <div className="flex justify-center space-x-4">
@@ -502,7 +593,7 @@ const BookingAttraction = () => {
                     <span className="text-sm text-gray-600">
                       {attraction.pricingType === 'per_person' ? 'Per person' : 'Fixed price'}
                     </span>
-                    <span className="font-semibold">${attraction.price}</span>
+                    <span className="font-semibold">${attraction.price.toFixed(2)}</span>
                   </div>
                   
                   {currentStep >= 2 && (
@@ -523,7 +614,7 @@ const BookingAttraction = () => {
                   
                   <div className="flex justify-between items-center mt-3 pt-3 border-t border-gray-200">
                     <span className="font-bold text-gray-900">Total</span>
-                    <span className="text-xl font-bold text-purple-600">${calculateTotal()}</span>
+                    <span className="text-xl font-bold text-purple-600">${calculateTotal().toFixed(2)}</span>
                   </div>
                 </div>
                 

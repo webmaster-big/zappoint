@@ -32,7 +32,7 @@ export default function Login() {
       <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-6 sm:p-8 border border-zinc-100 m-3">
         {/* Logo container with Zap Zone logo */}
         <div className="flex justify-center mb-8 pt-2">
-          <img src="/public/Zap-Zone.png" alt="Logo" className="w-3/5 mr-2" />
+          <img src="/Zap-Zone.png" alt="Logo" className="w-3/5 mr-2" />
           
         </div>
         {/* Demo account selection */}
@@ -49,7 +49,7 @@ export default function Login() {
               </button>
             ))}
           </div>
-          <p className="text-center text-xs text-zinc-400">Demo accounts: autofill email & password</p>
+          {/* <p className="text-center text-xs text-zinc-400">Demo accounts: autofill email & password</p> */}
         </div>
         <div className="mb-8">
           <h1 className="text-center text-2xl sm:text-3xl font-bold text-zinc-900 mb-2 tracking-tight">Sign in to your account</h1>

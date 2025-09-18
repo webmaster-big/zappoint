@@ -300,7 +300,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
           {/* Header */}
           <div className="flex items-center justify-between p-4">
             <div className="flex items-center justify-center w-full ">
-              <img src="/public/Zap-Zone.png" alt="Logo" className="w-3/5 mr-2"/>
+              <img src="\Zap-Zone.png" alt="Logo" className="w-3/5 mr-2"/>
             </div>
             {/* <button
               className="lg:hidden p-1 rounded-md hover:bg-gray-100"
