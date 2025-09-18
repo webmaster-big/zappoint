@@ -792,7 +792,7 @@ const CalendarView: React.FC = () => {
                 Packages
               </Link>
               <Link
-                to="/attractions"
+                to="/book/attractions"
                 className="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
               >
                 <Ticket className="h-5 w-5 mr-2" />

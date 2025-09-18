@@ -6,30 +6,52 @@ import {
   MapPin, 
   Calendar, 
   ArrowLeft,
-  CreditCard,
   CheckCircle,
   Star,
   Shield,
   Zap
 } from 'lucide-react';
 
+// Define interfaces for our data structures
+interface Attraction {
+  id: string;
+  name: string;
+  description: string;
+  location: string;
+  duration: number;
+  durationUnit: string;
+  maxCapacity: number;
+  price: number;
+  pricingType: 'per_person' | 'fixed' | 'group';
+  availability: Record<string, boolean>;
+  timeSlots: string[];
+  images: string[];
+}
+
+interface CustomerInfo {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+}
+
 const BookingAttraction = () => {
-  const { id } = useParams();
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [attraction, setAttraction] = useState(null);
+  const [attraction, setAttraction] = useState<Attraction | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedTime, setSelectedTime] = useState('');
   const [participants, setParticipants] = useState(1);
-  const [customerInfo, setCustomerInfo] = useState({
+  const [customerInfo, setCustomerInfo] = useState<CustomerInfo>({
     firstName: '',
     lastName: '',
     email: '',
     phone: ''
   });
   const [currentStep, setCurrentStep] = useState(1);
-  const [availableDates, setAvailableDates] = useState([]);
-  const [availableTimes, setAvailableTimes] = useState([]);
+  const [availableDates, setAvailableDates] = useState<string[]>([]);
+  const [availableTimes, setAvailableTimes] = useState<string[]>([]);
 
   // Load attraction data
   useEffect(() => {
@@ -37,13 +59,13 @@ const BookingAttraction = () => {
     const loadAttraction = () => {
       try {
         const attractions = JSON.parse(localStorage.getItem('zapzone_attractions') || '[]');
-        const foundAttraction = attractions.find(a => a.id === id);
+        const foundAttraction = attractions.find((a: Attraction) => a.id === id);
         
         if (foundAttraction) {
           setAttraction(foundAttraction);
           
           // Generate available dates (next 30 days)
-          const dates = [];
+          const dates: string[] = [];
           const today = new Date();
           for (let i = 0; i < 30; i++) {
             const date = new Date();
@@ -72,7 +94,7 @@ const BookingAttraction = () => {
     };
 
     loadAttraction();
-  }, [id, navigate]);
+  }, [id, navigate, selectedDate]);
 
   // Update available times when date changes
   useEffect(() => {
@@ -93,9 +115,9 @@ const BookingAttraction = () => {
         setSelectedTime('');
       }
     }
-  }, [selectedDate, attraction]);
+  }, [selectedDate, attraction, selectedTime]);
 
-  const handleInputChange = (e) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setCustomerInfo(prev => ({
       ...prev,
@@ -104,9 +126,9 @@ const BookingAttraction = () => {
   };
 
   const calculateTotal = () => {
-    if (!attraction) return 0;
+    if (!attraction) return '0.00';
     
-    let total = parseFloat(attraction.price);
+    let total = parseFloat(attraction.price.toString());
     
     // Apply pricing logic based on pricing type
     if (attraction.pricingType === 'per_person') {
@@ -118,6 +140,8 @@ const BookingAttraction = () => {
   };
 
   const handleBooking = () => {
+    if (!attraction) return;
+    
     // Create booking object
     const booking = {
       id: `booking_${Date.now()}`,

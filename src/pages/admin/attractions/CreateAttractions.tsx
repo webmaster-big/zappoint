@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Camera, 
@@ -12,9 +12,35 @@ import {
   Link as LinkIcon
 } from 'lucide-react';
 
+interface FormData {
+  name: string;
+  description: string;
+  category: string;
+  price: string;
+  pricingType: string;
+  maxCapacity: string;
+  duration: string;
+  durationUnit: string;
+  location: string;
+  images: string[];
+  bookingLink: string;
+  embedCode: string;
+  availability: {
+    monday: boolean;
+    tuesday: boolean;
+    wednesday: boolean;
+    thursday: boolean;
+    friday: boolean;
+    saturday: boolean;
+    sunday: boolean;
+  };
+  timeSlots: string[];
+  id?: string;
+}
+
 const CreateAttraction = () => {
   const navigate = useNavigate();
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormData>({
     name: '',
     description: '',
     category: '',
@@ -39,10 +65,10 @@ const CreateAttraction = () => {
     timeSlots: ['9:00 AM', '10:00 AM', '11:00 AM', '12:00 PM', '1:00 PM', '2:00 PM', '3:00 PM', '4:00 PM', '5:00 PM', '6:00 PM', '7:00 PM', '8:00 PM']
   });
 
-  const [imagePreviews, setImagePreviews] = useState([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [showAdvanced, setShowAdvanced] = useState(false);
 
-  const handleInputChange = (e) => {
+  const handleInputChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
@@ -50,7 +76,7 @@ const CreateAttraction = () => {
     }));
   };
 
-  const handleAvailabilityChange = (day) => {
+  const handleAvailabilityChange = (day: keyof FormData['availability']) => {
     setFormData(prev => ({
       ...prev,
       availability: {
@@ -60,25 +86,28 @@ const CreateAttraction = () => {
     }));
   };
 
-  const handleImageUpload = (e) => {
-    const files = Array.from(e.target.files);
-    if (files.length + formData.images.length > 5) {
+  const handleImageUpload = (e: ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+
+    const fileArray = Array.from(files);
+    if (fileArray.length + formData.images.length > 5) {
       alert('Maximum 5 images allowed');
       return;
     }
 
-    const newImagePreviews = files.map(file => URL.createObjectURL(file));
+    const newImagePreviews = fileArray.map(file => URL.createObjectURL(file));
     setImagePreviews(prev => [...prev, ...newImagePreviews]);
 
     // In a real app, you would upload these to a server
     // For this demo, we'll just store the file names
     setFormData(prev => ({
       ...prev,
-      images: [...prev.images, ...files.map(file => file.name)]
+      images: [...prev.images, ...fileArray.map(file => file.name)]
     }));
   };
 
-  const removeImage = (index) => {
+  const removeImage = (index: number) => {
     const newImages = [...formData.images];
     const newPreviews = [...imagePreviews];
     
@@ -89,7 +118,7 @@ const CreateAttraction = () => {
     setImagePreviews(newPreviews);
   };
 
-  const handleTimeSlotToggle = (slot) => {
+  const handleTimeSlotToggle = (slot: string) => {
     setFormData(prev => {
       const currentSlots = prev.timeSlots;
       if (currentSlots.includes(slot)) {
@@ -106,7 +135,7 @@ const CreateAttraction = () => {
     });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
     const newId = `attr_${Date.now()}`;
@@ -119,12 +148,6 @@ const CreateAttraction = () => {
     };
 
     localStorage.setItem('zapzone_attractions', JSON.stringify([...existingAttractions, newAttraction]));
-
-    // Optionally update formData with id for future use
-    setFormData(prev => ({
-      ...prev,
-      id: newId
-    }));
 
     // Show success message and redirect
     alert('Attraction created successfully!');
@@ -145,7 +168,7 @@ const CreateAttraction = () => {
     { key: 'friday', label: 'Friday' },
     { key: 'saturday', label: 'Saturday' },
     { key: 'sunday', label: 'Sunday' }
-  ];
+  ] as const;
 
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
