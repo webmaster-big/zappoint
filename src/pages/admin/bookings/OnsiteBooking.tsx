@@ -1,7 +1,7 @@
 // src/pages/onsite-booking/OnsiteBooking.tsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {  Calendar, Clock, Users, CreditCard, Gift, Tag, Plus, Minus } from 'lucide-react';
+import { Calendar, Clock, Users, CreditCard, Gift, Tag, Plus, Minus } from 'lucide-react';
 
 // Types
 interface Package {
@@ -94,6 +94,7 @@ const OnsiteBooking: React.FC = () => {
   const [availableDates, setAvailableDates] = useState<Date[]>([]);
   const [availableTimes, setAvailableTimes] = useState<string[]>([]);
   const [step, setStep] = useState(1);
+  const [bookingType, setBookingType] = useState<null | 'package' | 'attraction'>(null);
   const [bookingData, setBookingData] = useState<BookingData>({
     packageId: null,
     selectedAttractions: [],
@@ -121,7 +122,7 @@ const OnsiteBooking: React.FC = () => {
 
   // Load packages and attractions
   useEffect(() => {
-    // In a real app, this would be an API call
+    // Load packages (sample or from localStorage)
     const samplePackages: Package[] = [
       {
         id: 'pkg_1757977625822_92891',
@@ -197,38 +198,19 @@ const OnsiteBooking: React.FC = () => {
       }
     ];
 
-    const sampleAttractions: Attraction[] = [
-      {
-        id: 'attr_1',
-        name: 'Laser Tag',
-        description: 'Exciting laser tag arena for all ages',
-        price: 250,
-        pricingType: 'per_person',
-        maxCapacity: 20,
-        category: 'Adventure'
-      },
-      {
-        id: 'attr_2',
-        name: 'Bowling',
-        description: 'Standard bowling lanes',
-        price: 200,
-        pricingType: 'per_lane',
-        maxCapacity: 6,
-        category: 'Sports'
-      },
-      {
-        id: 'attr_3',
-        name: 'Arcade Games',
-        description: 'Unlimited arcade games',
-        price: 150,
-        pricingType: 'per_person',
-        maxCapacity: 50,
-        category: 'Arcade'
-      }
-    ];
-
     setPackages(samplePackages);
-    setAttractions(sampleAttractions);
+
+    // Load attractions from localStorage
+    const storedAttractions = localStorage.getItem("zapzone_attractions");
+    if (storedAttractions) {
+      try {
+        setAttractions(JSON.parse(storedAttractions));
+      } catch {
+        setAttractions([]);
+      }
+    } else {
+      setAttractions([]);
+    }
   }, []);
 
   // Calculate available dates based on package availability
@@ -344,7 +326,7 @@ const OnsiteBooking: React.FC = () => {
         // Add add-on with default quantity 1 and price
         return {
           ...prev,
-          selectedAddOns: [...prev.selectedAddOns, { name: addOnName, quantity: 1, price }]
+          selectedAddOns: [...prev.selectedAddOns, { name: addOnName, quantity: 1 }]
         };
       }
     });
@@ -447,14 +429,15 @@ const OnsiteBooking: React.FC = () => {
     // Create the booking object
     const booking = {
       id: `booking_${Date.now()}`,
-      packageName: selectedPackage?.name || 'Custom Booking',
+      type: selectedPackage ? 'package' : 'attraction',
+      packageName: selectedPackage?.name || null,
       customerName: `${bookingData.customer.firstName} ${bookingData.customer.lastName}`,
       email: bookingData.customer.email,
       phone: bookingData.customer.phone,
       date: bookingData.date,
       time: bookingData.time,
       participants: bookingData.participants,
-      status: 'confirmed' as const,
+      status: 'confirmed',
       totalAmount: calculateTotal(),
       amountPaid: calculateTotal(),
       createdAt: new Date().toISOString(),
@@ -465,7 +448,7 @@ const OnsiteBooking: React.FC = () => {
       }),
       addOns: bookingData.selectedAddOns,
       duration: selectedPackage ? formatDuration(selectedPackage) : '2 hours',
-      activity: selectedPackage?.category,
+      activity: selectedPackage?.category || 'Attraction Booking',
       notes: bookingData.notes
     };
     
@@ -478,118 +461,201 @@ const OnsiteBooking: React.FC = () => {
     navigate('/admin/bookings', { state: { message: 'Booking created successfully!' } });
   };
 
-  const renderStep1 = () => (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-gray-900">Select a Package</h2>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {packages.map(pkg => (
-          <div
-            key={pkg.id}
-            className={`border rounded-lg p-6 cursor-pointer transition-all ${
-              selectedPackage?.id === pkg.id
-                ? 'border-blue-600 bg-blue-50'
-                : 'border-gray-200 hover:border-blue-300'
-            }`}
-            onClick={() => handlePackageSelect(pkg)}
-          >
-            <h3 className="text-xl font-semibold text-gray-900">{pkg.name}</h3>
-            <p className="text-gray-700 mt-2">{pkg.description}</p>
-            <div className="mt-4">
-              <p className="text-2xl font-bold text-blue-700">${pkg.price}</p>
-              <p className="text-sm text-gray-600">Max {pkg.maxParticipants} participants</p>
-              <p className="text-sm text-gray-600 mt-1">
-                <Clock className="inline mr-1 h-4 w-4" />
-                Duration: {formatDuration(pkg)}
-              </p>
-            </div>
-          </div>
-        ))}
+  const renderBookingTypeSelect = () => (
+    <div className="space-y-8">
+      <h2 className="text-2xl font-bold text-gray-900 mb-6">What would you like to book?</h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <button
+          type="button"
+          className="border rounded-xl p-8 flex flex-col items-center justify-center bg-blue-50 hover:bg-blue-100 transition cursor-pointer"
+          onClick={() => setBookingType('package')}
+        >
+          <span className="text-3xl font-bold text-blue-700 mb-2">Package</span>
+          <span className="text-gray-600 text-base text-center">Book a bundled package deal with multiple activities and add-ons.</span>
+        </button>
+        <button
+          type="button"
+          className="border rounded-xl p-8 flex flex-col items-center justify-center bg-green-50 hover:bg-green-100 transition cursor-pointer"
+          onClick={() => setBookingType('attraction')}
+        >
+          <span className="text-3xl font-bold text-green-700 mb-2">Attraction</span>
+          <span className="text-gray-600 text-base text-center">Book a single attraction directly (e.g. Laser Tag, Bowling).</span>
+        </button>
       </div>
-      
-      {selectedPackage && (
-        <div className="mt-8">
-          <button
-            type="button"
-            onClick={() => setStep(2)}
-            className="w-full md:w-auto bg-blue-700 text-white px-6 py-3 rounded-lg hover:bg-blue-700"
-          >
-            Continue to Attractions & Add-ons
-          </button>
-        </div>
-      )}
     </div>
   );
+
+  const renderStep1 = () => {
+    if (!bookingType) return renderBookingTypeSelect();
+
+    return (
+      <div className="space-y-6">
+        <h2 className="text-2xl font-bold text-gray-900">
+          {bookingType === 'package' ? 'Select a Package' : 'Select an Attraction'}
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {bookingType === 'package' && packages.map(pkg => (
+            <div
+              key={pkg.id}
+              className={`border rounded-lg p-6 cursor-pointer transition-all ${
+                selectedPackage?.id === pkg.id
+                  ? 'border-blue-600 bg-blue-50'
+                  : 'border-gray-200 hover:border-blue-300'
+              }`}
+              onClick={() => handlePackageSelect(pkg)}
+            >
+              <h3 className="text-xl font-semibold text-gray-900">{pkg.name}</h3>
+              <p className="text-gray-700 mt-2">{pkg.description}</p>
+              <div className="mt-4">
+                <p className="text-2xl font-bold text-blue-700">${pkg.price}</p>
+                <p className="text-sm text-gray-600">Max {pkg.maxParticipants} participants</p>
+                <p className="text-sm text-gray-600 mt-1">
+                  <Clock className="inline mr-1 h-4 w-4" />
+                  Duration: {formatDuration(pkg)}
+                </p>
+              </div>
+            </div>
+          ))}
+          {bookingType === 'attraction' && attractions.map(attraction => (
+            <div
+              key={attraction.id}
+              className={`border rounded-lg p-6 cursor-pointer transition-all ${
+                bookingData.selectedAttractions.some(a => a.id === attraction.id) && !selectedPackage
+                  ? 'border-blue-600 bg-blue-50'
+                  : 'border-gray-200 hover:border-blue-300'
+              }`}
+              onClick={() => {
+                setSelectedPackage(null);
+                setBookingData(prev => ({
+                  ...prev,
+                  packageId: null,
+                  selectedAttractions: [{ id: attraction.id, quantity: 1 }]
+                }));
+                setStep(2);
+              }}
+            >
+              <h4 className="text-lg font-semibold text-gray-900">{attraction.name}</h4>
+              <p className="text-gray-700 mt-2">{attraction.description}</p>
+              <div className="mt-4">
+                <p className="text-lg font-bold text-blue-700">${attraction.price}</p>
+                <p className="text-sm text-gray-600">Category: {attraction.category}</p>
+                <p className="text-sm text-gray-600">Max {attraction.maxCapacity} participants</p>
+              </div>
+              <button
+                type="button"
+                className="mt-4 w-full bg-blue-700 text-white px-4 py-2 rounded-lg hover:bg-blue-800"
+              >
+                Book This Attraction
+              </button>
+            </div>
+          ))}
+        </div>
+        {/* Continue button for package selection */}
+        {bookingType === 'package' && selectedPackage && (
+          <div className="mt-8">
+            <button
+              type="button"
+              onClick={() => setStep(2)}
+              className="w-full md:w-auto bg-blue-700 text-white px-6 py-3 rounded-lg hover:bg-blue-700"
+            >
+              Continue to Attractions & Add-ons
+            </button>
+          </div>
+        )}
+        {/* Back button to change booking type */}
+        <div className="mt-4">
+          <button
+            type="button"
+            onClick={() => {
+              setBookingType(null);
+              setSelectedPackage(null);
+              setBookingData(prev => ({
+                ...prev,
+                packageId: null,
+                selectedAttractions: [],
+                selectedAddOns: []
+              }));
+            }}
+            className="text-gray-500 underline"
+          >
+            &larr; Change booking type
+          </button>
+        </div>
+      </div>
+    );
+  };
 
   const renderStep2 = () => (
     <div className="space-y-8">
       <h2 className="text-2xl font-bold text-gray-900">Add Attractions & Add-ons</h2>
       
-      {/* Attractions */}
-      <div>
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Additional Attractions</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {attractions.map(attraction => {
-            const isSelected = bookingData.selectedAttractions.some(a => a.id === attraction.id);
-            const selectedQty = bookingData.selectedAttractions.find(a => a.id === attraction.id)?.quantity || 0;
-            
-            return (
-              <div
-                key={attraction.id}
-                className={`border rounded-lg p-4 ${
-                  isSelected ? 'border-blue-600 bg-blue-50' : 'border-gray-200'
-                }`}
-              >
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h4 className="font-medium text-gray-900">{attraction.name}</h4>
-                    <p className="text-sm text-gray-700">{attraction.description}</p>
-                    <p className="text-sm text-gray-700 mt-1">
-                      ${attraction.price} {attraction.pricingType === 'per_person' ? 'per person' : 'per unit'}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleAttractionToggle(attraction.id)}
-                    className={`px-3 py-1 rounded text-sm ${
-                      isSelected
-                        ? 'bg-red-100 text-red-700 hover:bg-red-200'
-                        : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-                    }`}
-                  >
-                    {isSelected ? 'Remove' : 'Add'}
-                  </button>
-                </div>
-                
-                {isSelected && (
-                  <div className="mt-3 flex items-center">
-                    <span className="text-sm text-gray-700 mr-3">Quantity:</span>
-                    <div className="flex items-center">
-                      <button
-                        type="button"
-                        onClick={() => handleAttractionQuantityChange(attraction.id, selectedQty - 1)}
-                        className="p-1 rounded bg-gray-200"
-                      >
-                        <Minus size={14} />
-                      </button>
-                      <span className="mx-2 w-8 text-center">{selectedQty}</span>
-                      <button
-                        type="button"
-                        onClick={() => handleAttractionQuantityChange(attraction.id, selectedQty + 1)}
-                        className="p-1 rounded bg-gray-200"
-                      >
-                        <Plus size={14} />
-                      </button>
+      {/* Attractions - Only show if a package is selected */}
+      {selectedPackage && (
+        <div>
+          <h3 className="text-lg font-medium text-gray-900 mb-4">Additional Attractions</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {attractions.map(attraction => {
+              const isSelected = bookingData.selectedAttractions.some(a => a.id === attraction.id);
+              const selectedQty = bookingData.selectedAttractions.find(a => a.id === attraction.id)?.quantity || 0;
+              
+              return (
+                <div
+                  key={attraction.id}
+                  className={`border rounded-lg p-4 ${
+                    isSelected ? 'border-blue-600 bg-blue-50' : 'border-gray-200'
+                  }`}
+                >
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h4 className="font-medium text-gray-900">{attraction.name}</h4>
+                      <p className="text-sm text-gray-700">{attraction.description}</p>
+                      <p className="text-sm text-gray-700 mt-1">
+                        ${attraction.price} {attraction.pricingType === 'per_person' ? 'per person' : 'per unit'}
+                      </p>
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => handleAttractionToggle(attraction.id)}
+                      className={`px-3 py-1 rounded text-sm ${
+                        isSelected
+                          ? 'bg-red-100 text-red-700 hover:bg-red-200'
+                          : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                      }`}
+                    >
+                      {isSelected ? 'Remove' : 'Add'}
+                    </button>
                   </div>
-                )}
-              </div>
-            );
-          })}
+                  
+                  {isSelected && (
+                    <div className="mt-3 flex items-center">
+                      <span className="text-sm text-gray-700 mr-3">Quantity:</span>
+                      <div className="flex items-center">
+                        <button
+                          type="button"
+                          onClick={() => handleAttractionQuantityChange(attraction.id, selectedQty - 1)}
+                          className="p-1 rounded bg-gray-200"
+                        >
+                          <Minus size={14} />
+                        </button>
+                        <span className="mx-2 w-8 text-center">{selectedQty}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleAttractionQuantityChange(attraction.id, selectedQty + 1)}
+                          className="p-1 rounded bg-gray-200"
+                        >
+                          <Plus size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
       
-      {/* Add-ons */}
+      {/* Add-ons - Only show if a package is selected */}
       {selectedPackage?.addOns && selectedPackage.addOns.length > 0 && (
         <div>
           <h3 className="text-lg font-medium text-gray-900 mb-4">Package Add-ons</h3>
@@ -658,7 +724,7 @@ const OnsiteBooking: React.FC = () => {
           onClick={() => setStep(1)}
           className="bg-gray-200 text-gray-800 px-6 py-3 rounded-lg hover:bg-gray-300"
         >
-          Back to Packages
+          Back to {selectedPackage ? 'Packages' : 'Attractions'}
         </button>
         <button
           type="button"
@@ -756,284 +822,287 @@ const OnsiteBooking: React.FC = () => {
           onClick={() => setStep(2)}
           className="bg-gray-200 text-gray-800 px-6 py-3 rounded-lg hover:bg-gray-300"
         >
-          Back to Attractions
+          Back to {selectedPackage ? 'Attractions' : 'Attractions'}
         </button>
         <button
           type="button"
           onClick={() => setStep(4)}
-            className="bg-blue-700 text-white px-6 py-3 rounded-lg hover:bg-blue-700"
-          >
-            Continue to Customer Details
-          </button>
-        </div>
+          className="bg-blue-700 text-white px-6 py-3 rounded-lg hover:bg-blue-700"
+        >
+          Continue to Customer Details
+        </button>
       </div>
-    );
+    </div>
+  );
 
-    const renderStep4 = () => (
-      <div className="space-y-6">
-        <h2 className="text-2xl font-bold text-gray-900">Customer Information</h2>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">First Name</label>
-            <input
-              type="text"
-              name="customer.firstName"
-              value={bookingData.customer.firstName}
-              onChange={handleInputChange}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400"
-              required
-            />
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Last Name</label>
-            <input
-              type="text"
-              name="customer.lastName"
-              value={bookingData.customer.lastName}
-              onChange={handleInputChange}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400"
-              required
-            />
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
-            <input
-              type="email"
-              name="customer.email"
-              value={bookingData.customer.email}
-              onChange={handleInputChange}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400"
-              required
-            />
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
-            <input
-              type="tel"
-              name="customer.phone"
-              value={bookingData.customer.phone}
-              onChange={handleInputChange}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400"
-              required
-            />
-          </div>
-        </div>
-        
-        {/* Gift Card */}
+  const renderStep4 = () => (
+    <div className="space-y-6">
+      <h2 className="text-2xl font-bold text-gray-900">Customer Information</h2>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            <Gift className="inline mr-2 h-4 w-4" />
-            Gift Card Code (Optional)
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">First Name</label>
           <input
             type="text"
-            name="giftCardCode"
-            value={bookingData.giftCardCode}
-            onChange={handleInputChange}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400"
-            placeholder="Enter gift card code"
-          />
-        </div>
-        
-        {/* Promo Code */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            <Tag className="inline mr-2 h-4 w-4" />
-            Promo Code (Optional)
-          </label>
-          <input
-            type="text"
-            name="promoCode"
-            value={bookingData.promoCode}
-            onChange={handleInputChange}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400"
-            placeholder="Enter promo code"
-          />
-        </div>
-        
-        {/* Notes */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Additional Notes</label>
-          <textarea
-            name="notes"
-            value={bookingData.notes}
-            onChange={handleInputChange}
-            rows={3}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400"
-            placeholder="Any special requests or notes..."
-          />
-        </div>
-        
-        <div className="flex justify-between">
-          <button
-            type="button"
-            onClick={() => setStep(3)}
-            className="bg-gray-200 text-gray-800 px-6 py-3 rounded-lg hover:bg-gray-300"
-          >
-            Back to Date & Time
-          </button>
-          <button
-            type="button"
-            onClick={() => setStep(5)}
-            className="bg-blue-700 text-white px-6 py-3 rounded-lg hover:bg-blue-700"
-          >
-            Continue to Payment
-          </button>
-        </div>
-      </div>
-    );
-
-    const renderStep5 = () => (
-      <div className="space-y-6">
-        <h2 className="text-2xl font-bold text-gray-900">Payment Details</h2>
-        
-        <div className="bg-gray-50 p-6 rounded-lg">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Booking Summary</h3>
-          
-          <div className="space-y-3">
-            <div className="flex justify-between">
-              <span>Package:</span>
-              <span className="font-medium">{selectedPackage?.name}</span>
-            </div>
-            
-            <div className="flex justify-between">
-              <span>Date & Time:</span>
-              <span className="font-medium">
-                {new Date(bookingData.date).toLocaleDateString()} at {bookingData.time}
-              </span>
-            </div>
-            
-            <div className="flex justify-between">
-              <span>Participants:</span>
-              <span className="font-medium">{bookingData.participants}</span>
-            </div>
-
-            <div className="flex justify-between">
-              <span>Duration:</span>
-              <span className="font-medium">{selectedPackage ? formatDuration(selectedPackage) : 'Not specified'}</span>
-            </div>
-            
-            {bookingData.selectedAttractions.length > 0 && (
-              <div>
-                <div className="font-medium mb-1">Attractions:</div>
-                {bookingData.selectedAttractions.map(({ id, quantity }) => {
-                  const attraction = attractions.find(a => a.id === id);
-                  return (
-                    <div key={id} className="flex justify-between text-sm ml-2">
-                      <span>{attraction?.name} (x{quantity})</span>
-                      <span>
-                        ${attraction ? attraction.price * quantity * (attraction.pricingType === 'per_person' ? bookingData.participants : 1) : 0}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-            
-            {bookingData.selectedAddOns.length > 0 && (
-              <div>
-                <div className="font-medium mb-1">Add-ons:</div>
-                {bookingData.selectedAddOns.map(({ name, quantity }) => {
-                  const addOn = selectedPackage?.addOns.find(a => a.name === name);
-                  return (
-                    <div key={name} className="flex justify-between text-sm ml-2">
-                      <span>{name} (x{quantity})</span>
-                      <span>${addOn ? addOn.price * quantity : 0}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-            
-            <div className="border-t pt-3 mt-3">
-              <div className="flex justify-between text-lg font-bold">
-                <span>Total:</span>
-                <span>${calculateTotal().toFixed(2)}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            <CreditCard className="inline mr-2 h-4 w-4" />
-            Payment Method
-          </label>
-          <select
-            name="paymentMethod"
-            value={bookingData.paymentMethod}
+            name="customer.firstName"
+            value={bookingData.customer.firstName}
             onChange={handleInputChange}
             className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400"
             required
-          >
-            <option value="cash">Cash</option>
-            <option value="credit">Credit Card</option>
-            <option value="debit">Debit Card</option>
-            <option value="e-wallet">E-Wallet</option>
-          </select>
+          />
         </div>
         
-        <div className="flex justify-between">
-          <button
-            type="button"
-            onClick={() => setStep(4)}
-            className="bg-gray-200 text-gray-800 px-6 py-3 rounded-lg hover:bg-gray-300"
-          >
-            Back to Customer Details
-          </button>
-          <button
-            type="submit"
-            className="bg-green-700 text-white px-6 py-3 rounded-lg hover:bg-green-700"
-          >
-            Confirm Booking
-          </button>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Last Name</label>
+          <input
+            type="text"
+            name="customer.lastName"
+            value={bookingData.customer.lastName}
+            onChange={handleInputChange}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400"
+            required
+          />
+        </div>
+        
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+          <input
+            type="email"
+            name="customer.email"
+            value={bookingData.customer.email}
+            onChange={handleInputChange}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400"
+            required
+          />
+        </div>
+        
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
+          <input
+            type="tel"
+            name="customer.phone"
+            value={bookingData.customer.phone}
+            onChange={handleInputChange}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400"
+            required
+          />
         </div>
       </div>
-    );
+      
+      {/* Gift Card */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          <Gift className="inline mr-2 h-4 w-4" />
+          Gift Card Code (Optional)
+        </label>
+        <input
+          type="text"
+          name="giftCardCode"
+          value={bookingData.giftCardCode}
+          onChange={handleInputChange}
+          className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400"
+          placeholder="Enter gift card code"
+        />
+      </div>
+      
+      {/* Promo Code */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          <Tag className="inline mr-2 h-4 w-4" />
+          Promo Code (Optional)
+        </label>
+        <input
+          type="text"
+          name="promoCode"
+          value={bookingData.promoCode}
+          onChange={handleInputChange}
+          className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400"
+          placeholder="Enter promo code"
+        />
+      </div>
+      
+      {/* Notes */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Additional Notes</label>
+        <textarea
+          name="notes"
+          value={bookingData.notes}
+          onChange={handleInputChange}
+          rows={3}
+          className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400"
+          placeholder="Any special requests or notes..."
+        />
+      </div>
+      
+      <div className="flex justify-between">
+        <button
+          type="button"
+          onClick={() => setStep(3)}
+          className="bg-gray-200 text-gray-800 px-6 py-3 rounded-lg hover:bg-gray-300"
+        >
+          Back to Date & Time
+        </button>
+        <button
+          type="button"
+          onClick={() => setStep(5)}
+          className="bg-blue-700 text-white px-6 py-3 rounded-lg hover:bg-blue-700"
+        >
+          Continue to Payment
+        </button>
+      </div>
+    </div>
+  );
 
-    return (
-        <div className=" py-8">
-          {/* Header */}
-          <div className="flex items-center mb-8 px-1">
-            
-            <h1 className="text-3xl font-bold text-gray-900 ml-4">On-site Booking</h1>
+  const renderStep5 = () => (
+    <div className="space-y-6">
+      <h2 className="text-2xl font-bold text-gray-900">Payment Details</h2>
+      
+      <div className="bg-gray-50 p-6 rounded-lg">
+        <h3 className="text-lg font-medium text-gray-900 mb-4">Booking Summary</h3>
+        
+        <div className="space-y-3">
+          {selectedPackage && (
+            <div className="flex justify-between">
+              <span>Package:</span>
+              <span className="font-medium">{selectedPackage.name}</span>
+            </div>
+          )}
+          
+          <div className="flex justify-between">
+            <span>Date & Time:</span>
+            <span className="font-medium">
+              {new Date(bookingData.date).toLocaleDateString()} at {bookingData.time}
+            </span>
           </div>
           
-          {/* Progress Steps */}
-          <div className="mb-8 px-4">
-            <div className="flex justify-between mb-2">
-              {[1, 2, 3, 4, 5].map(stepNum => (
-                <div
-                  key={stepNum}
-                  className={`flex-1 h-2 mx-1 rounded-full ${
-                    step >= stepNum ? 'bg-blue-700' : 'bg-gray-300'
-                  }`}
-                />
-              ))}
+          <div className="flex justify-between">
+            <span>Participants:</span>
+            <span className="font-medium">{bookingData.participants}</span>
+          </div>
+
+          {selectedPackage && (
+            <div className="flex justify-between">
+              <span>Duration:</span>
+              <span className="font-medium">{formatDuration(selectedPackage)}</span>
             </div>
-            <div className="flex justify-between text-xs text-gray-700">
-              <span>Package</span>
-              <span>Add-ons</span>
-              <span>Date & Time</span>
-              <span>Customer</span>
-              <span>Payment</span>
+          )}
+          
+          {bookingData.selectedAttractions.length > 0 && (
+            <div>
+              <div className="font-medium mb-1">Attractions:</div>
+              {bookingData.selectedAttractions.map(({ id, quantity }) => {
+                const attraction = attractions.find(a => a.id === id);
+                return (
+                  <div key={id} className="flex justify-between text-sm ml-2">
+                    <span>{attraction?.name} (x{quantity})</span>
+                    <span>
+                      ${attraction ? attraction.price * quantity * (attraction.pricingType === 'per_person' ? bookingData.participants : 1) : 0}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          
+          {bookingData.selectedAddOns.length > 0 && (
+            <div>
+              <div className="font-medium mb-1">Add-ons:</div>
+              {bookingData.selectedAddOns.map(({ name, quantity }) => {
+                const addOn = selectedPackage?.addOns.find(a => a.name === name);
+                return (
+                  <div key={name} className="flex justify-between text-sm ml-2">
+                    <span>{name} (x{quantity})</span>
+                    <span>${addOn ? addOn.price * quantity : 0}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          
+          <div className="border-t pt-3 mt-3">
+            <div className="flex justify-between text-lg font-bold">
+              <span>Total:</span>
+              <span>${calculateTotal().toFixed(2)}</span>
             </div>
           </div>
-          
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-sm p-6">
-            {step === 1 && renderStep1()}
-            {step === 2 && renderStep2()}
-            {step === 3 && renderStep3()}
-            {step === 4 && renderStep4()}
-            {step === 5 && renderStep5()}
-          </form>
         </div>
-    );
-  };
+      </div>
+      
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          <CreditCard className="inline mr-2 h-4 w-4" />
+          Payment Method
+        </label>
+        <select
+          name="paymentMethod"
+          value={bookingData.paymentMethod}
+          onChange={handleInputChange}
+          className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400"
+          required
+        >
+          <option value="cash">Cash</option>
+          <option value="credit">Credit Card</option>
+          <option value="debit">Debit Card</option>
+          <option value="e-wallet">E-Wallet</option>
+        </select>
+      </div>
+      
+      <div className="flex justify-between">
+        <button
+          type="button"
+          onClick={() => setStep(4)}
+          className="bg-gray-200 text-gray-800 px-6 py-3 rounded-lg hover:bg-gray-300"
+        >
+          Back to Customer Details
+        </button>
+        <button
+          type="submit"
+          className="bg-green-700 text-white px-6 py-3 rounded-lg hover:bg-green-700"
+        >
+          Confirm Booking
+        </button>
+      </div>
+    </div>
+  );
 
-  export default OnsiteBooking;
+  return (
+    <div className="py-8">
+      {/* Header */}
+      <div className="flex items-center mb-8 px-1">
+        <h1 className="text-3xl font-bold text-gray-900 ml-4">On-site Booking</h1>
+      </div>
+      
+      {/* Progress Steps */}
+      <div className="mb-8 px-4">
+        <div className="flex justify-between mb-2">
+          {[1, 2, 3, 4, 5].map(stepNum => (
+            <div
+              key={stepNum}
+              className={`flex-1 h-2 mx-1 rounded-full ${
+                step >= stepNum ? 'bg-blue-700' : 'bg-gray-300'
+              }`}
+            />
+          ))}
+        </div>
+        <div className="flex justify-between text-xs text-gray-700">
+          <span>{bookingType === 'package' ? 'Package' : 'Attraction'}</span>
+          <span>{selectedPackage ? 'Add-ons' : 'Details'}</span>
+          <span>Date & Time</span>
+          <span>Customer</span>
+          <span>Payment</span>
+        </div>
+      </div>
+      
+      {/* Form */}
+      <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-sm p-6">
+        {step === 1 && renderStep1()}
+        {step === 2 && renderStep2()}
+        {step === 3 && renderStep3()}
+        {step === 4 && renderStep4()}
+        {step === 5 && renderStep5()}
+      </form>
+    </div>
+  );
+};
+
+export default OnsiteBooking;

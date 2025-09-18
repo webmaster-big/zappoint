@@ -9,8 +9,8 @@ export interface GiftCard {
   code: string;
   type: GiftCardType;
   initial_value: number;
+  balance: number;
   max_usage: number;
-  remaining_usage: number;
   description: string;
   status: GiftCardStatus;
   expiry_date?: string; // ISO string
@@ -26,12 +26,14 @@ const GiftCard: React.FC = () => {
   const [form, setForm] = useState<{
     type: GiftCardType;
     initial_value: string;
+    balance: string;
     expiry_date: string;
     description: string;
     max_usage: string;
   }>({
     type: "fixed",
     initial_value: "",
+    balance: "",
     expiry_date: "",
     description: "",
     max_usage: "1",
@@ -82,18 +84,19 @@ const GiftCard: React.FC = () => {
   const handleAdd = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.initial_value.trim() || isNaN(Number(form.initial_value))) return;
+    if (!form.balance.trim() || isNaN(Number(form.balance))) return;
     if (!form.max_usage.trim() || isNaN(Number(form.max_usage))) return;
     const now = new Date().toISOString();
     const code = generateGiftCardCode();
     const initialValue = Number(form.initial_value);
+    const balanceValue = Number(form.balance);
     const maxUsage = Number(form.max_usage);
     const newCard: GiftCard = {
       code,
       type: form.type,
       initial_value: initialValue,
-  // removed remaining_balance
+      balance: balanceValue,
       max_usage: maxUsage,
-      remaining_usage: maxUsage,
       description: form.description,
       status: "active",
       expiry_date: form.expiry_date ? new Date(form.expiry_date).toISOString() : undefined,
@@ -103,7 +106,7 @@ const GiftCard: React.FC = () => {
     const updated = [...giftCards, newCard];
     setGiftCards(updated);
     localStorage.setItem("zapzone_giftcards", JSON.stringify(updated));
-    setForm({ type: "fixed", initial_value: "", expiry_date: "", description: "", max_usage: "1" });
+    setForm({ type: "fixed", initial_value: "", balance: "", expiry_date: "", description: "", max_usage: "1" });
     setShowModal(false);
   };
 
@@ -113,6 +116,7 @@ const GiftCard: React.FC = () => {
     setEditForm({
       type: card.type,
       initial_value: card.initial_value.toString(),
+      balance: card.balance?.toString() || '',
       max_usage: card.max_usage.toString(),
       description: card.description || '',
       expiry_date: card.expiry_date ? card.expiry_date.slice(0, 10) : '',
@@ -133,6 +137,7 @@ const GiftCard: React.FC = () => {
     const card = { ...updatedCards[editIndex] };
     if (editForm.type) card.type = editForm.type as GiftCardType;
     if (editForm.initial_value !== undefined) card.initial_value = Number(editForm.initial_value);
+    if (editForm.balance !== undefined) card.balance = Number(editForm.balance);
     if (editForm.max_usage !== undefined) card.max_usage = Number(editForm.max_usage);
     if (editForm.description !== undefined) card.description = editForm.description;
     if (editForm.expiry_date !== undefined) card.expiry_date = editForm.expiry_date ? new Date(editForm.expiry_date).toISOString() : undefined;
@@ -308,32 +313,32 @@ const GiftCard: React.FC = () => {
                       </div>
                     </div>
 
-                      <div className="grid grid-cols-2 gap-4 mb-4">
-                        <div>
-                          <div className="flex items-center gap-1 text-sm text-gray-500 mb-1">
-                            <span>Value</span>
-                          </div>
-                          <div className="font-medium">
-                            {gc.type === "fixed" ? `$${gc.initial_value}` : `${gc.initial_value}%`}
-                          </div>
+                    <div className="grid grid-cols-2 gap-4 mb-4">
+                      <div>
+                        <div className="flex items-center gap-1 text-sm text-gray-500 mb-1">
+                          <span>Value</span>
                         </div>
-                        <div>
-                          <div className="flex items-center gap-1 text-sm text-gray-500 mb-1">
-                            <span>Usage</span>
-                          </div>
-                          <div className="font-medium">
-                            {gc.remaining_usage} / {gc.max_usage}
-                          </div>
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-1 text-sm text-gray-500 mb-1">
-                            <span>Expires</span>
-                          </div>
-                          <div className="font-medium">
-                            {gc.expiry_date ? gc.expiry_date.slice(0, 10) : 'No expiry'}
-                          </div>
+                        <div className="font-medium">
+                          {gc.type === "fixed" ? `$${gc.initial_value}` : `${gc.initial_value}%`}
                         </div>
                       </div>
+                      <div>
+                        <div className="flex items-center gap-1 text-sm text-gray-500 mb-1">
+                          <span>Balance</span>
+                        </div>
+                        <div className="font-medium">
+                          {gc.type === "fixed" ? `$${gc.balance}` : `${gc.balance}%`}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-1 text-sm text-gray-500 mb-1">
+                          <span>Expires</span>
+                        </div>
+                        <div className="font-medium">
+                          {gc.expiry_date ? gc.expiry_date.slice(0, 10) : 'No expiry'}
+                        </div>
+                      </div>
+                    </div>
 
                     {gc.description && (
                       <div className="mb-4">
@@ -361,61 +366,78 @@ const GiftCard: React.FC = () => {
 
         {/* Create Modal */}
         {showModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 ">
             <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-md relative animate-fade-in-up border border-gray-200 m-4">
               <button className="absolute top-4 right-4 p-1 rounded-lg hover:bg-gray-100" onClick={() => setShowModal(false)}>
                 <X className="w-5 h-5 text-gray-500" />
               </button>
               <h3 className="text-xl font-semibold mb-4 text-gray-900">Create Gift Card</h3>
               <form className="space-y-4" onSubmit={handleAdd}>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
-                  <select 
-                    name="type" 
-                    value={form.type} 
-                    onChange={handleChange} 
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-700 focus:border-blue-700"
-                  >
-                    <option value="fixed">Fixed Value</option>
-                    <option value="percentage">Percentage</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {form.type === "fixed" ? "Value ($)" : "Percentage (%)"}
-                  </label>
-                  <input 
-                    type="number" 
-                    name="initial_value" 
-                    value={form.initial_value} 
-                    onChange={handleChange} 
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-700 focus:border-blue-700" 
-                    min="0" 
-                    required 
-                    placeholder={form.type === "fixed" ? "0.00" : "0"}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Max Usage</label>
-                  <input 
-                    type="number" 
-                    name="max_usage" 
-                    value={form.max_usage} 
-                    onChange={handleChange} 
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-700 focus:border-blue-700" 
-                    min="1" 
-                    required 
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Expiry Date</label>
-                  <input 
-                    type="date" 
-                    name="expiry_date" 
-                    value={form.expiry_date} 
-                    onChange={handleChange} 
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-700 focus:border-blue-700" 
-                  />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+                    <select 
+                      name="type" 
+                      value={form.type} 
+                      onChange={handleChange} 
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-700 focus:border-blue-700"
+                    >
+                      <option value="fixed">Fixed Value</option>
+                      <option value="percentage">Percentage</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      {form.type === "fixed" ? "Value ($)" : "Percentage (%)"}
+                    </label>
+                    <input 
+                      type="number" 
+                      name="initial_value" 
+                      value={form.initial_value} 
+                      onChange={handleChange} 
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-700 focus:border-blue-700" 
+                      min="0" 
+                      required 
+                      placeholder={form.type === "fixed" ? "0.00" : "0"}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      {form.type === "fixed" ? "Balance ($)" : "Balance (%)"}
+                    </label>
+                    <input 
+                      type="number" 
+                      name="balance" 
+                      value={form.balance} 
+                      onChange={handleChange} 
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-700 focus:border-blue-700" 
+                      min="0" 
+                      required 
+                      placeholder={form.type === "fixed" ? "0.00" : "0"}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Max Usage</label>
+                    <input 
+                      type="number" 
+                      name="max_usage" 
+                      value={form.max_usage} 
+                      onChange={handleChange} 
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-700 focus:border-blue-700" 
+                      min="1" 
+                      required 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Expiry Date</label>
+                    <input 
+                      type="date" 
+                      name="expiry_date" 
+                      value={form.expiry_date} 
+                      onChange={handleChange} 
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-700 focus:border-blue-700" 
+                    />
+                  </div>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
@@ -441,7 +463,7 @@ const GiftCard: React.FC = () => {
 
         {/* Edit Modal */}
         {editIndex !== null && editForm && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
             <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-md relative animate-fade-in-up border border-gray-200 m-4">
               <button className="absolute top-4 right-4 p-1 rounded-lg hover:bg-gray-100" onClick={closeEditModal}>
                 <X className="w-5 h-5 text-gray-500" />
@@ -467,6 +489,19 @@ const GiftCard: React.FC = () => {
                       type="number" 
                       name="initial_value" 
                       value={editForm.initial_value || ''} 
+                      onChange={handleEditChange} 
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-700 focus:border-blue-700" 
+                      min="0" 
+                      required 
+                      placeholder={editForm.type === "fixed" ? "0.00" : "0"}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">{editForm.type === "fixed" ? "Balance ($)" : "Balance (%)"}</label>
+                    <input 
+                      type="number" 
+                      name="balance" 
+                      value={editForm.balance || ''} 
                       onChange={handleEditChange} 
                       className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-700 focus:border-blue-700" 
                       min="0" 

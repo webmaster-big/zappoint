@@ -7,13 +7,9 @@ import {
   Plus, 
   Search, 
   Filter, 
-  RefreshCcw, 
-  Users,
-  DollarSign,
-  Clock,
-  MapPin,
-  Zap,
-  Image as ImageIcon
+  RefreshCcw,
+  Copy,
+  Link as LinkIcon
 } from 'lucide-react';
 
 // Types
@@ -54,6 +50,7 @@ const ManageAttractions = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
   const [showFilters, setShowFilters] = useState(false);
+  const [copiedLink, setCopiedLink] = useState<string | null>(null);
 
   // Status colors
   const statusColors = {
@@ -68,15 +65,13 @@ const ManageAttractions = () => {
       title: 'Total Attractions',
       value: attractions.length.toString(),
       change: `${attractions.filter(a => a.status === 'active').length} active`,
-      icon: Zap,
       accent: 'bg-blue-100 text-blue-700',
     },
     {
       title: 'Active Attractions',
       value: attractions.filter(a => a.status === 'active').length.toString(),
       change: `${attractions.filter(a => a.status === 'inactive').length} inactive`,
-      icon: Zap,
-      accent: 'bg-blue-100 text-blue-700',
+      accent: 'bg-green-100 text-green-700',
     },
     {
       title: 'Avg. Price',
@@ -84,15 +79,13 @@ const ManageAttractions = () => {
         ? `$${(attractions.reduce((sum, a) => sum + a.price, 0) / attractions.length).toFixed(2)}` 
         : '$0.00',
       change: 'Per attraction',
-      icon: DollarSign,
-      accent: 'bg-blue-100 text-blue-700',
+      accent: 'bg-purple-100 text-purple-700',
     },
     {
       title: 'Total Capacity',
       value: attractions.reduce((sum, a) => sum + a.maxCapacity, 0).toString(),
       change: 'Across all attractions',
-      icon: Users,
-      accent: 'bg-blue-100 text-blue-700',
+      accent: 'bg-orange-100 text-orange-700',
     }
   ];
 
@@ -163,7 +156,7 @@ const ManageAttractions = () => {
               saturday: true,
               sunday: true
             },
-            timeSlots: ['11:00 AM', '12:00 PM', '1:00 PM', '2:00 PM', '3:00 PM', '4:00 PM', '5:00 PM', '6:00 PM', '7:00 PM', '8:00 PM', '9:00 PM']
+            timeSlots: ['11:00 AM', '12:00 PM', '1:00 PM', '2:00 PM', '3:00 PM', '4:00 PM', '5:00 PM', '6:00 PM', '7:00 PM', '9:00 PM']
           },
           {
             id: 'attr_3',
@@ -184,61 +177,11 @@ const ManageAttractions = () => {
               tuesday: false,
               wednesday: true,
               thursday: true,
-              Friday: true,
+              friday: true,
               saturday: true,
               sunday: true
             },
             timeSlots: ['12:00 PM', '1:00 PM', '2:00 PM', '3:00 PM', '4:00 PM', '5:00 PM', '6:00 PM', '7:00 PM']
-          },
-          {
-            id: 'attr_4',
-            name: 'Rock Climbing Wall',
-            description: 'Indoor rock climbing wall with varying difficulty levels and safety equipment',
-            category: 'Adventure',
-            price: 18,
-            pricingType: 'per_person',
-            maxCapacity: 10,
-            duration: '45',
-            durationUnit: 'minutes',
-            location: 'Adventure Zone, East Wall',
-            images: ['rock-climbing.jpg'],
-            status: 'active',
-            createdAt: '2024-01-18T11:45:00Z',
-            availability: {
-              monday: true,
-              tuesday: true,
-              wednesday: true,
-              thursday: true,
-              friday: true,
-              saturday: true,
-              sunday: false
-            },
-            timeSlots: ['10:00 AM', '11:00 AM', '12:00 PM', '1:00 PM', '2:00 PM', '3:00 PM', '4:00 PM']
-          },
-          {
-            id: 'attr_5',
-            name: 'Escape Room',
-            description: 'Challenging puzzle rooms with different themes and difficulty levels',
-            category: 'Entertainment',
-            price: 120,
-            pricingType: 'per_group',
-            maxCapacity: 8,
-            duration: '60',
-            durationUnit: 'minutes',
-            location: 'Puzzle Corridor, Room 3',
-            images: ['escape-room.jpg'],
-            status: 'inactive',
-            createdAt: '2024-01-22T16:20:00Z',
-            availability: {
-              monday: false,
-              tuesday: false,
-              wednesday: false,
-              thursday: true,
-              friday: true,
-              saturday: true,
-              sunday: true
-            },
-            timeSlots: ['4:00 PM', '5:00 PM', '6:00 PM', '7:00 PM', '8:00 PM', '9:00 PM']
           }
         ];
         setAttractions(sampleAttractions);
@@ -347,6 +290,13 @@ const ManageAttractions = () => {
     localStorage.setItem('zapzone_attractions', JSON.stringify(updatedAttractions));
   };
 
+  const copyBookingLink = (id: string) => {
+    const bookingLink = `${window.location.origin}/book/attraction/${id}`;
+    navigator.clipboard.writeText(bookingLink);
+    setCopiedLink(id);
+    setTimeout(() => setCopiedLink(null), 2000);
+  };
+
   // Get unique categories
   const getUniqueCategories = () => {
     const categories = attractions.map(attraction => attraction.category);
@@ -379,7 +329,7 @@ const ManageAttractions = () => {
         </div>
         <Link
           to="/create-attraction"
-          className="mt-4 sm:mt-0 inline-flex items-center px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          className="mt-4 sm:mt-0 inline-flex items-center px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800 transition-colors"
         >
           <Plus className="h-5 w-5 mr-2" />
           New Attraction
@@ -388,24 +338,18 @@ const ManageAttractions = () => {
 
       {/* Metrics Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        {metrics.map((metric, index) => {
-          const Icon = metric.icon;
-          return (
-            <div
-              key={index}
-              className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 flex flex-col gap-2 hover:shadow-md transition-shadow min-h-[120px]"
-            >
-              <div className="flex items-center gap-2">
-                <div className={`p-2 rounded-lg ${metric.accent}`}><Icon size={20} /></div>
-                <span className="text-base font-semibold text-gray-700">{metric.title}</span>
-              </div>
-              <div className="flex items-end gap-2 mt-2">
-                <h3 className="text-2xl font-bold text-gray-900">{metric.value}</h3>
-              </div>
-              <p className="text-xs mt-1 text-gray-400">{metric.change}</p>
+        {metrics.map((metric, index) => (
+          <div
+            key={index}
+            className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 flex flex-col gap-2 hover:shadow-md transition-shadow min-h-[120px]"
+          >
+            <span className="text-base font-semibold text-gray-700">{metric.title}</span>
+            <div className="flex items-end gap-2 mt-2">
+              <h3 className="text-2xl font-bold text-gray-900">{metric.value}</h3>
             </div>
-          );
-        })}
+            <p className="text-xs mt-1 text-gray-400">{metric.change}</p>
+          </div>
+        ))}
       </div>
 
       {/* Filters and Search */}
@@ -420,20 +364,20 @@ const ManageAttractions = () => {
               placeholder="Search attractions..."
               value={filters.search}
               onChange={(e) => handleFilterChange('search', e.target.value)}
-              className="pl-9 pr-3 py-1.5 border border-gray-200 rounded-lg w-full text-sm focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
+              className="pl-9 pr-3 py-2 border border-gray-200 rounded-lg w-full focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
             />
           </div>
-          <div className="flex gap-1">
+          <div className="flex gap-2">
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className="flex items-center px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 text-sm"
+              className="flex items-center px-3 py-2 border border-gray-200 rounded-lg hover:bg-gray-50"
             >
               <Filter className="h-4 w-4 mr-1" />
               Filters
             </button>
             <button
               onClick={loadAttractions}
-              className="flex items-center px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 text-sm"
+              className="flex items-center px-3 py-2 border border-gray-200 rounded-lg hover:bg-gray-50"
             >
               <RefreshCcw className="h-4 w-4" />
             </button>
@@ -442,14 +386,14 @@ const ManageAttractions = () => {
 
         {/* Advanced Filters */}
         {showFilters && (
-          <div className="mt-3 p-3 bg-gray-50 rounded-lg">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Status</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
                 <select
                   value={filters.status}
                   onChange={(e) => handleFilterChange('status', e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
                 >
                   <option value="all">All Statuses</option>
                   <option value="active">Active</option>
@@ -458,11 +402,11 @@ const ManageAttractions = () => {
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Category</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
                 <select
                   value={filters.category}
                   onChange={(e) => handleFilterChange('category', e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
                 >
                   <option value="all">All Categories</option>
                   {getUniqueCategories().map(category => (
@@ -471,10 +415,10 @@ const ManageAttractions = () => {
                 </select>
               </div>
             </div>
-            <div className="mt-3 flex justify-end">
+            <div className="mt-4 flex justify-end">
               <button
                 onClick={clearFilters}
-                className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800"
+                className="px-3 py-2 text-sm text-gray-600 hover:text-gray-800"
               >
                 Clear Filters
               </button>
@@ -492,7 +436,7 @@ const ManageAttractions = () => {
           <div className="flex gap-2">
             <select
               onChange={(e) => handleBulkStatusChange(e.target.value as Attraction['status'])}
-              className="border border-gray-200 rounded-lg px-3 py-1 focus:ring-2 focus:ring-blue-400"
+              className="border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400"
             >
               <option value="">Change Status</option>
               <option value="active">Activate</option>
@@ -501,7 +445,7 @@ const ManageAttractions = () => {
             </select>
             <button
               onClick={handleBulkDelete}
-              className="flex items-center px-3 py-1 bg-red-100 text-red-700 rounded-lg hover:bg-red-200"
+              className="flex items-center px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200"
             >
               <Trash2 className="h-4 w-4 mr-1" />
               Delete
@@ -516,7 +460,7 @@ const ManageAttractions = () => {
           <table className="w-full text-sm text-left">
             <thead className="text-xs text-gray-700 uppercase bg-gray-50 border-b">
               <tr>
-                <th scope="col" className="px-4 py-3 font-medium w-12">
+                <th scope="col" className="px-6 py-4 font-medium w-12">
                   <input
                     type="checkbox"
                     checked={selectedAttractions.length === currentAttractions.length && currentAttractions.length > 0}
@@ -524,14 +468,14 @@ const ManageAttractions = () => {
                     className="rounded border-gray-300 text-blue-700 focus:ring-blue-400"
                   />
                 </th>
-                <th scope="col" className="px-4 py-3 font-medium">Attraction</th>
-                <th scope="col" className="px-4 py-3 font-medium">Category</th>
-                <th scope="col" className="px-4 py-3 font-medium">Location</th>
-                <th scope="col" className="px-4 py-3 font-medium">Price</th>
-                <th scope="col" className="px-4 py-3 font-medium">Capacity</th>
-                <th scope="col" className="px-4 py-3 font-medium">Duration</th>
-                <th scope="col" className="px-4 py-3 font-medium">Status</th>
-                <th scope="col" className="px-4 py-3 font-medium">Actions</th>
+                <th scope="col" className="px-6 py-4 font-medium">Attraction</th>
+                <th scope="col" className="px-6 py-4 font-medium">Category</th>
+                <th scope="col" className="px-6 py-4 font-medium">Price</th>
+                <th scope="col" className="px-6 py-4 font-medium">Capacity</th>
+                <th scope="col" className="px-6 py-4 font-medium">Duration</th>
+                <th scope="col" className="px-6 py-4 font-medium">Status</th>
+                <th scope="col" className="px-6 py-4 font-medium">Booking Link</th>
+                <th scope="col" className="px-6 py-4 font-medium">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -544,7 +488,7 @@ const ManageAttractions = () => {
               ) : (
                 currentAttractions.map((attraction) => (
                   <tr key={attraction.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 whitespace-nowrap">
+                    <td className="px-6 py-4 whitespace-nowrap">
                       <input
                         type="checkbox"
                         checked={selectedAttractions.includes(attraction.id)}
@@ -552,85 +496,73 @@ const ManageAttractions = () => {
                         className="rounded border-gray-300 text-blue-700 focus:ring-blue-400"
                       />
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <div className="flex items-center">
-                        {attraction.images && attraction.images.length > 0 ? (
-                          <div className="w-10 h-10 bg-gray-200 rounded-md flex items-center justify-center mr-3">
-                            <ImageIcon className="h-5 w-5 text-gray-400" />
-                          </div>
-                        ) : (
-                          <div className="w-10 h-10 bg-blue-100 rounded-md flex items-center justify-center mr-3">
-                            <Zap className="h-5 w-5 text-blue-700" />
-                          </div>
-                        )}
-                        <div>
-                          <div className="font-medium text-gray-900">{attraction.name}</div>
-                          <div className="text-xs text-gray-700 line-clamp-1">{attraction.description}</div>
-                        </div>
+                    <td className="px-6 py-4">
+                      <div>
+                        <div className="font-medium text-gray-900">{attraction.name}</div>
+                        <div className="text-xs text-gray-600 mt-1">{attraction.location}</div>
+                        <div className="text-xs text-gray-500 mt-1 line-clamp-2">{attraction.description}</div>
                       </div>
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {attraction.category}
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <div className="flex items-center text-sm text-gray-900">
-                        <MapPin className="h-4 w-4 text-gray-400 mr-1" />
-                        {attraction.location}
-                      </div>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      ${attraction.price}
+                      <span className="text-xs text-gray-600 ml-1">
+                        {attraction.pricingType === 'per_person' ? '/person' : 
+                         attraction.pricingType === 'per_group' ? '/group' : 
+                         attraction.pricingType === 'per_hour' ? '/hour' : ''}
+                      </span>
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                      <div className="flex items-center">
-                        <DollarSign className="h-4 w-4 text-gray-400 mr-1" />
-                        {attraction.price}
-                        <span className="text-xs text-gray-700 ml-1">
-                          {attraction.pricingType === 'per_person' ? '/person' : 
-                           attraction.pricingType === 'per_group' ? '/group' : 
-                           attraction.pricingType === 'per_hour' ? '/hour' : ''}
-                        </span>
-                      </div>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {attraction.maxCapacity} people
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                      <div className="flex items-center">
-                        <Users className="h-4 w-4 text-gray-400 mr-1" />
-                        {attraction.maxCapacity}
-                      </div>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {attraction.duration} {attraction.durationUnit}
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                      <div className="flex items-center">
-                        <Clock className="h-4 w-4 text-gray-400 mr-1" />
-                        {attraction.duration} {attraction.durationUnit}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
+                    <td className="px-6 py-4 whitespace-nowrap">
                       <select
                         value={attraction.status}
                         onChange={(e) => handleStatusChange(attraction.id, e.target.value as Attraction['status'])}
-                        className={`text-xs font-medium px-2 py-1 rounded-full ${statusColors[attraction.status]} border-none focus:ring-2 focus:ring-blue-400`}
+                        className={`text-xs font-medium px-3 py-1 rounded-full ${statusColors[attraction.status]} border-none focus:ring-2 focus:ring-blue-400`}
                       >
                         <option value="active">Active</option>
                         <option value="inactive">Inactive</option>
                         <option value="maintenance">Maintenance</option>
                       </select>
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm font-medium">
+                    <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => copyBookingLink(attraction.id)}
+                          className="flex items-center px-3 py-1 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors text-xs"
+                          title="Copy booking link"
+                        >
+                          <LinkIcon className="h-3 w-3 mr-1" />
+                          {copiedLink === attraction.id ? 'Copied!' : 'Copy Link'}
+                        </button>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center gap-3">
                         <Link
                           to={`/book/attraction/${attraction.id}`}
-                          className="p-1 text-blue-700 hover:text-blue-800"
+                          className="text-blue-600 hover:text-blue-800"
                           title="View Booking Page"
+                          target="_blank"
                         >
                           <Eye className="h-4 w-4" />
                         </Link>
                         <Link
                           to={`/edit-attraction/${attraction.id}`}
-                          className="p-1 text-gray-600 hover:text-gray-800"
+                          className="text-gray-600 hover:text-gray-800"
                           title="Edit"
                         >
                           <Pencil className="h-4 w-4" />
                         </Link>
                         <button
                           onClick={() => handleDeleteAttraction(attraction.id)}
-                          className="p-1 text-red-600 hover:text-red-800"
+                          className="text-red-600 hover:text-red-800"
                           title="Delete"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -659,7 +591,7 @@ const ManageAttractions = () => {
                 <button
                   onClick={() => paginate(Math.max(1, currentPage - 1))}
                   disabled={currentPage === 1}
-                  className="px-3 py-1 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                  className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
                 >
                   Previous
                 </button>
@@ -668,7 +600,7 @@ const ManageAttractions = () => {
                   <button
                     key={page}
                     onClick={() => paginate(page)}
-                    className={`px-3 py-1 border rounded-lg text-sm font-medium ${
+                    className={`px-3 py-2 border rounded-lg text-sm font-medium ${
                       currentPage === page
                         ? 'border-blue-700 bg-blue-700 text-white'
                         : 'border-gray-200 text-gray-700 hover:bg-gray-50'
@@ -681,7 +613,7 @@ const ManageAttractions = () => {
                 <button
                   onClick={() => paginate(Math.min(totalPages, currentPage + 1))}
                   disabled={currentPage === totalPages}
-                  className="px-3 py-1 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                  className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
                 >
                   Next
                 </button>

@@ -2,6 +2,29 @@ import React, { useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+const generateTimeSlots = (duration: number, unit: string) => {
+  const slots: string[] = [];
+  let hour = 13; // 1 PM
+  let minute = 0;
+  // Calculate duration in minutes
+  const durationMinutes = unit === "hours" ? duration * 60 : duration;
+  // Last possible start time is 12:00 AM minus duration
+  const closingHour = 24, closingMinute = 0;
+  let lastStart = closingHour * 60 + closingMinute - durationMinutes;
+  // Only allow slots that end by 12:00 AM
+  while ((hour * 60 + minute) <= lastStart) {
+    const ampm = hour < 12 ? "AM" : "PM";
+    const displayHour = ((hour - 1) % 12) + 1;
+    slots.push(`${displayHour}:${minute === 0 ? "00" : "30"} ${ampm}`);
+    minute += 30;
+    if (minute === 60) {
+      minute = 0;
+      hour++;
+    }
+  }
+  return slots;
+};
+
 interface FormData {
   name: string;
   description: string;
@@ -52,18 +75,30 @@ const CreateAttraction = () => {
       saturday: true,
       sunday: true
     },
-    timeSlots: ['9:00 AM', '10:00 AM', '11:00 AM', '12:00 PM', '1:00 PM', '2:00 PM', '3:00 PM', '4:00 PM', '5:00 PM', '6:00 PM', '7:00 PM', '8:00 PM']
+    timeSlots: generateTimeSlots(60, 'minutes'), // default 60 minutes
   });
 
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [customCategory, setCustomCategory] = useState('');
+  const [customLocation, setCustomLocation] = useState('');
   // const [showAdditionalOptions, setShowAdditionalOptions] = useState(false);
 
   const handleInputChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    setFormData(prev => {
+      let updated = { ...prev, [name]: value };
+      // If duration or durationUnit changes, update timeSlots
+      if (name === 'duration' || name === 'durationUnit') {
+        const durationVal = name === 'duration' ? Number(value) : Number(updated.duration);
+        const unitVal = name === 'durationUnit' ? value : updated.durationUnit;
+        if (durationVal > 0) {
+          updated.timeSlots = generateTimeSlots(durationVal, unitVal);
+        } else {
+          updated.timeSlots = [];
+        }
+      }
+      return updated;
+    });
   };
 
   const handleAvailabilityChange = (day: keyof FormData['availability']) => {
@@ -123,6 +158,40 @@ const CreateAttraction = () => {
     });
   };
 
+  const handleCategoryChange = (e: ChangeEvent<HTMLSelectElement>) => {
+    const value = e.target.value;
+    setFormData(prev => ({
+      ...prev,
+      category: value === 'other' ? customCategory : value
+    }));
+  };
+
+  const handleCustomCategoryChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setCustomCategory(value);
+    setFormData(prev => ({
+      ...prev,
+      category: value
+    }));
+  };
+
+  const handleLocationChange = (e: ChangeEvent<HTMLSelectElement>) => {
+    const value = e.target.value;
+    setFormData(prev => ({
+      ...prev,
+      location: value === 'other' ? customLocation : value
+    }));
+  };
+
+  const handleCustomLocationChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setCustomLocation(value);
+    setFormData(prev => ({
+      ...prev,
+      location: value
+    }));
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -135,17 +204,14 @@ const CreateAttraction = () => {
       status: 'active'
     };
 
+    // TODO: Send newAttraction to backend API instead of localStorage
     localStorage.setItem('zapzone_attractions', JSON.stringify([...existingAttractions, newAttraction]));
 
     alert('Attraction created successfully!');
     navigate('/manage-attractions');
   };
 
-  const allTimeSlots = [
-    '9:00 AM', '10:00 AM', '11:00 AM', '12:00 PM', 
-    '1:00 PM', '2:00 PM', '3:00 PM', '4:00 PM', 
-    '5:00 PM', '6:00 PM', '7:00 PM', '8:00 PM'
-  ];
+  const allTimeSlots = formData.timeSlots;
 
   const daysOfWeek = [
     { key: 'monday', label: 'Mon' },
@@ -303,8 +369,8 @@ const CreateAttraction = () => {
                       name="category"
                       id="category"
                       required
-                      value={formData.category}
-                      onChange={handleInputChange}
+                      value={formData.category === customCategory ? 'other' : formData.category}
+                      onChange={handleCategoryChange}
                       className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
                     >
                       <option value="">Select a category</option>
@@ -313,24 +379,51 @@ const CreateAttraction = () => {
                       <option value="arcade">Arcade</option>
                       <option value="entertainment">Entertainment</option>
                       <option value="educational">Educational</option>
+                      <option value="food">Food & Dining</option>
+                      <option value="kids">Kids</option>
                       <option value="other">Other</option>
                     </select>
+                    {formData.category === customCategory || formData.category === 'other' ? (
+                      <input
+                        type="text"
+                        placeholder="Enter custom category"
+                        className="mt-2 w-full px-4 py-2 border border-gray-200 rounded-lg"
+                        value={customCategory}
+                        onChange={handleCustomCategoryChange}
+                      />
+                    ) : null}
                   </div>
 
                   <div>
                     <label htmlFor="location" className="block text-sm font-medium text-gray-700 mb-2">
                       Location *
                     </label>
-                    <input
-                      type="text"
+                    <select
                       name="location"
                       id="location"
                       required
-                      value={formData.location}
-                      onChange={handleInputChange}
+                      value={formData.location === customLocation ? 'other' : formData.location}
+                      onChange={handleLocationChange}
                       className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                      placeholder="e.g., Main Arena, Zone B"
-                    />
+                    >
+                      <option value="">Select a location</option>
+                      <option value="main_arena">Main Arena</option>
+                      <option value="zone_a">Zone A</option>
+                      <option value="zone_b">Zone B</option>
+                      <option value="arcade_floor">Arcade Floor</option>
+                      <option value="party_room">Party Room</option>
+                      <option value="outdoor">Outdoor</option>
+                      <option value="other">Other</option>
+                    </select>
+                    {formData.location === customLocation || formData.location === 'other' ? (
+                      <input
+                        type="text"
+                        placeholder="Enter custom location"
+                        className="mt-2 w-full px-4 py-2 border border-gray-200 rounded-lg"
+                        value={customLocation}
+                        onChange={handleCustomLocationChange}
+                      />
+                    ) : null}
                   </div>
                 </div>
               </div>
