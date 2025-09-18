@@ -46,7 +46,6 @@ interface SidebarProps {
 // Grouped navigation for sidebar sections
 const getNavigation = (role: UserData['role']): NavItem[] => {
   const commonItems: NavItem[] = [
-    { label: 'Dashboard', icon: Home, href: '/dashboard' },
     { label: 'Bookings', icon: Calendar, items: [
       { label: 'Calendar View', href: '/bookings/calendar', icon: Dot },
       { label: 'Bookings', href: '/bookings', icon: Dot },

@@ -1,17 +1,6 @@
 import React, { useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  Camera, 
-  MapPin, 
-  Clock, 
-  Users, 
-  DollarSign, 
-  BookOpen,
-  Calendar,
-  X,
-  Link as LinkIcon
-} from 'lucide-react';
 
 interface FormData {
   name: string;
@@ -67,7 +56,7 @@ const CreateAttraction = () => {
   });
 
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
-  const [showAdvanced, setShowAdvanced] = useState(false);
+  // const [showAdditionalOptions, setShowAdditionalOptions] = useState(false);
 
   const handleInputChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -100,8 +89,6 @@ const CreateAttraction = () => {
     const newImagePreviews = fileArray.map(file => URL.createObjectURL(file));
     setImagePreviews(prev => [...prev, ...newImagePreviews]);
 
-    // In a real app, you would upload these to a server
-    // For this demo, we'll just store the file names
     setFormData(prev => ({
       ...prev,
       images: [...prev.images, ...fileArray.map(file => file.name)]
@@ -150,7 +137,6 @@ const CreateAttraction = () => {
 
     localStorage.setItem('zapzone_attractions', JSON.stringify([...existingAttractions, newAttraction]));
 
-    // Show success message and redirect
     alert('Attraction created successfully!');
     navigate('/manage-attractions');
   };
@@ -162,400 +148,428 @@ const CreateAttraction = () => {
   ];
 
   const daysOfWeek = [
-    { key: 'monday', label: 'Monday' },
-    { key: 'tuesday', label: 'Tuesday' },
-    { key: 'wednesday', label: 'Wednesday' },
-    { key: 'thursday', label: 'Thursday' },
-    { key: 'friday', label: 'Friday' },
-    { key: 'saturday', label: 'Saturday' },
-    { key: 'sunday', label: 'Sunday' }
+    { key: 'monday', label: 'Mon' },
+    { key: 'tuesday', label: 'Tue' },
+    { key: 'wednesday', label: 'Wed' },
+    { key: 'thursday', label: 'Thu' },
+    { key: 'friday', label: 'Fri' },
+    { key: 'saturday', label: 'Sat' },
+    { key: 'sunday', label: 'Sun' }
   ] as const;
 
+  // LivePreview component
+  const LivePreview: React.FC<{ formData: FormData; imagePreviews: string[] }> = ({ formData, imagePreviews }) => {
+    return (
+      <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
+        <h2 className="text-xl font-bold mb-4 text-blue-700 border-b pb-2">Live Preview</h2>
+        
+        {imagePreviews.length > 0 && (
+          <div className="mb-4">
+            <img
+              src={imagePreviews[0]}
+              alt="Preview"
+              className="w-full h-48 object-cover rounded-lg mb-2"
+            />
+          </div>
+        )}
+        
+        <div className="space-y-3">
+          <div>
+            <h3 className="font-semibold text-lg text-gray-800">{formData.name || "Attraction Name"}</h3>
+            <p className="text-sm text-gray-600 mt-1">{formData.category || "Category"}</p>
+          </div>
+          
+          <div>
+            <p className="text-gray-700 text-sm">{formData.description || "No description provided"}</p>
+          </div>
+          
+          <div className="flex justify-between items-center">
+            <span className="font-bold text-lg text-blue-700">
+              {formData.price ? `$${formData.price}` : "$0.00"}
+              <span className="text-xs font-normal text-gray-500 ml-1">
+                {formData.pricingType === 'per_person' ? '/person' : 
+                 formData.pricingType === 'per_hour' ? '/hour' : 
+                 formData.pricingType === 'per_game' ? '/game' : ''}
+              </span>
+            </span>
+            {formData.duration && (
+              <span className="text-sm text-gray-600">
+                {formData.duration} {formData.durationUnit}
+              </span>
+            )}
+          </div>
+          
+          <div className="text-sm text-gray-600">
+            <span className="font-medium">Location:</span> {formData.location || "Not specified"}
+          </div>
+          
+          <div className="text-sm text-gray-600">
+            <span className="font-medium">Capacity:</span> {formData.maxCapacity ? `Up to ${formData.maxCapacity} people` : "Not specified"}
+          </div>
+          
+          <div className="pt-2 border-t border-gray-100">
+            <h4 className="font-medium text-gray-700 mb-2">Available Days:</h4>
+            <div className="flex flex-wrap gap-1">
+              {Object.entries(formData.availability)
+                .filter(([_, v]) => v)
+                .map(([day]) => (
+                  <span key={day} className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs">
+                    {day.slice(0, 3)}
+                  </span>
+                ))}
+            </div>
+          </div>
+          
+          {formData.timeSlots.length > 0 && (
+            <div className="pt-2 border-t border-gray-100">
+              <h4 className="font-medium text-gray-700 mb-2">Available Times:</h4>
+              <div className="flex flex-wrap gap-1">
+                {formData.timeSlots.slice(0, 4).map(slot => (
+                  <span key={slot} className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs">
+                    {slot}
+                  </span>
+                ))}
+                {formData.timeSlots.length > 4 && (
+                  <span className="text-xs text-gray-500">
+                    +{formData.timeSlots.length - 4} more
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-4xl mx-auto">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 py-8 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Create New Attraction</h1>
-          <p className="mt-2 text-sm text-gray-600">
+          <h1 className="text-3xl font-bold text-gray-800">Create New Attraction</h1>
+          <p className="mt-2 text-gray-600">
             Set up a new attraction that customers can book directly
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="bg-white shadow-sm rounded-lg overflow-hidden">
-          {/* Basic Information Section */}
-          <div className="p-6 border-b border-gray-200">
-            <h2 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
-              <BookOpen className="h-5 w-5 mr-2 text-blue-700" />
-              Basic Information
-            </h2>
-            
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="sm:col-span-2">
-                <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-                  Attraction Name *
-                </label>
-                <input
-                  type="text"
-                  name="name"
-                  id="name"
-                  required
-                  value={formData.name}
-                  onChange={handleInputChange}
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                  placeholder="e.g., Laser Tag, Bowling, Escape Room"
-                />
-              </div>
-
-              <div className="sm:col-span-2">
-                <label htmlFor="description" className="block text-sm font-medium text-gray-700">
-                  Description *
-                </label>
-                <textarea
-                  name="description"
-                  id="description"
-                  rows={3}
-                  required
-                  value={formData.description}
-                  onChange={handleInputChange}
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                  placeholder="Describe the attraction in detail..."
-                />
-              </div>
-
-              <div>
-                <label htmlFor="category" className="block text-sm font-medium text-gray-700">
-                  Category *
-                </label>
-                <select
-                  name="category"
-                  id="category"
-                  required
-                  value={formData.category}
-                  onChange={handleInputChange}
-                  className="mt-1 block w-full bg-white border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                >
-                  <option value="">Select a category</option>
-                  <option value="adventure">Adventure</option>
-                  <option value="sports">Sports</option>
-                  <option value="arcade">Arcade</option>
-                  <option value="entertainment">Entertainment</option>
-                  <option value="educational">Educational</option>
-                  <option value="other">Other</option>
-                </select>
-              </div>
-
-              <div>
-                <label htmlFor="location" className="block text-sm font-medium text-gray-700">
-                  Location *
-                </label>
-                <div className="mt-1 relative rounded-md shadow-sm">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <MapPin className="h-5 w-5 text-gray-400" />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Form Container - 2/3 width */}
+          <div className="lg:col-span-2">
+            <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-lg overflow-hidden">
+              {/* Basic Information Section */}
+              <div className="p-6 border-b border-gray-100">
+                <h2 className="text-xl font-semibold text-gray-800 mb-6 pb-2 border-b border-gray-100">
+                  Basic Information
+                </h2>
+                
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                  <div className="sm:col-span-2">
+                    <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
+                      Attraction Name *
+                    </label>
+                    <input
+                      type="text"
+                      name="name"
+                      id="name"
+                      required
+                      value={formData.name}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                      placeholder="e.g., Laser Tag, Bowling, Escape Room"
+                    />
                   </div>
-                  <input
-                    type="text"
-                    name="location"
-                    id="location"
-                    required
-                    value={formData.location}
-                    onChange={handleInputChange}
-                    className="block w-full pl-10 border border-gray-300 rounded-md py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                    placeholder="e.g., Main Arena, Zone B"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
 
-          {/* Pricing & Capacity Section */}
-          <div className="p-6 border-b border-gray-200">
-            <h2 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
-              <DollarSign className="h-5 w-5 mr-2 text-blue-700" />
-              Pricing & Capacity
-            </h2>
-            
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <label htmlFor="price" className="block text-sm font-medium text-gray-700">
-                  Price *
-                </label>
-                <div className="mt-1 relative rounded-md shadow-sm">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <span className="text-gray-500 sm:text-sm">$</span>
+                  <div className="sm:col-span-2">
+                    <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
+                      Description *
+                    </label>
+                    <textarea
+                      name="description"
+                      id="description"
+                      rows={3}
+                      required
+                      value={formData.description}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                      placeholder="Describe the attraction in detail..."
+                    />
                   </div>
-                  <input
-                    type="number"
-                    name="price"
-                    id="price"
-                    min="0"
-                    step="0.01"
-                    required
-                    value={formData.price}
-                    onChange={handleInputChange}
-                    className="block w-full pl-7 border border-gray-300 rounded-md py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                    placeholder="0.00"
-                  />
+
+                  <div>
+                    <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-2">
+                      Category *
+                    </label>
+                    <select
+                      name="category"
+                      id="category"
+                      required
+                      value={formData.category}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                    >
+                      <option value="">Select a category</option>
+                      <option value="adventure">Adventure</option>
+                      <option value="sports">Sports</option>
+                      <option value="arcade">Arcade</option>
+                      <option value="entertainment">Entertainment</option>
+                      <option value="educational">Educational</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label htmlFor="location" className="block text-sm font-medium text-gray-700 mb-2">
+                      Location *
+                    </label>
+                    <input
+                      type="text"
+                      name="location"
+                      id="location"
+                      required
+                      value={formData.location}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                      placeholder="e.g., Main Arena, Zone B"
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div>
-                <label htmlFor="pricingType" className="block text-sm font-medium text-gray-700">
-                  Pricing Type *
-                </label>
-                <select
-                  name="pricingType"
-                  id="pricingType"
-                  required
-                  value={formData.pricingType}
-                  onChange={handleInputChange}
-                  className="mt-1 block w-full bg-white border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                >
-                  <option value="per_person">Per Person</option>
-                  <option value="per_group">Per Group</option>
-                  <option value="per_hour">Per Hour</option>
-                  <option value="per_game">Per Game</option>
-                  <option value="fixed">Fixed Price</option>
-                </select>
-              </div>
-
-              <div>
-                <label htmlFor="maxCapacity" className="block text-sm font-medium text-gray-700">
-                  Maximum Capacity *
-                </label>
-                <div className="mt-1 relative rounded-md shadow-sm">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Users className="h-5 w-5 text-gray-400" />
-                  </div>
-                  <input
-                    type="number"
-                    name="maxCapacity"
-                    id="maxCapacity"
-                    min="1"
-                    required
-                    value={formData.maxCapacity}
-                    onChange={handleInputChange}
-                    className="block w-full pl-10 border border-gray-300 rounded-md py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                    placeholder="e.g., 10"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label htmlFor="duration" className="block text-sm font-medium text-gray-700">
-                  Duration *
-                </label>
-                <div className="mt-1 flex rounded-md shadow-sm">
-                  <div className="relative flex items-stretch flex-grow">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <Clock className="h-5 w-5 text-gray-400" />
+              {/* Pricing & Capacity Section */}
+              <div className="p-6 border-b border-gray-100">
+                <h2 className="text-xl font-semibold text-gray-800 mb-6 pb-2 border-b border-gray-100">
+                  Pricing & Capacity
+                </h2>
+                
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                  <div>
+                    <label htmlFor="price" className="block text-sm font-medium text-gray-700 mb-2">
+                      Price *
+                    </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <span className="text-gray-500">$</span>
+                      </div>
+                      <input
+                        type="number"
+                        name="price"
+                        id="price"
+                        min="0"
+                        step="0.01"
+                        required
+                        value={formData.price}
+                        onChange={handleInputChange}
+                        className="w-full pl-8 px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                        placeholder="0.00"
+                      />
                     </div>
+                  </div>
+
+                  <div>
+                    <label htmlFor="pricingType" className="block text-sm font-medium text-gray-700 mb-2">
+                      Pricing Type *
+                    </label>
+                    <select
+                      name="pricingType"
+                      id="pricingType"
+                      required
+                      value={formData.pricingType}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                    >
+                      <option value="per_person">Per Person</option>
+                      <option value="per_group">Per Group</option>
+                      <option value="per_hour">Per Hour</option>
+                      <option value="per_game">Per Game</option>
+                      <option value="fixed">Fixed Price</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label htmlFor="maxCapacity" className="block text-sm font-medium text-gray-700 mb-2">
+                      Maximum Capacity *
+                    </label>
                     <input
                       type="number"
-                      name="duration"
-                      id="duration"
+                      name="maxCapacity"
+                      id="maxCapacity"
                       min="1"
                       required
-                      value={formData.duration}
+                      value={formData.maxCapacity}
                       onChange={handleInputChange}
-                      className="block w-full pl-10 border border-gray-300 rounded-l-md py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                      placeholder="e.g., 60"
+                      className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                      placeholder="e.g., 10"
                     />
                   </div>
-                  <select
-                    name="durationUnit"
-                    value={formData.durationUnit}
-                    onChange={handleInputChange}
-                    className="-ml-px relative inline-flex items-center px-3 py-2 border border-gray-300 rounded-r-md bg-gray-50 text-gray-700 sm:text-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="minutes">Minutes</option>
-                    <option value="hours">Hours</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-          </div>
 
-          {/* Availability Section */}
-          <div className="p-6 border-b border-gray-200">
-            <h2 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
-              <Calendar className="h-5 w-5 mr-2 text-blue-700" />
-              Availability
-            </h2>
-            
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Available Days
-              </label>
-              <div className="flex flex-wrap gap-2">
-                {daysOfWeek.map(day => (
-                  <button
-                    key={day.key}
-                    type="button"
-                    onClick={() => handleAvailabilityChange(day.key)}
-                    className={`px-3 py-2 rounded-md text-sm font-medium ${
-                      formData.availability[day.key] 
-                        ? 'bg-blue-100 text-blue-800' 
-                        : 'bg-gray-100 text-gray-800'
-                    }`}
-                  >
-                    {day.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Available Time Slots
-              </label>
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
-                {allTimeSlots.map(slot => (
-                  <button
-                    key={slot}
-                    type="button"
-                    onClick={() => handleTimeSlotToggle(slot)}
-                    className={`px-2 py-2 rounded-md text-xs font-medium ${
-                      formData.timeSlots.includes(slot) 
-                        ? 'bg-green-100 text-green-800' 
-                        : 'bg-gray-100 text-gray-800'
-                    }`}
-                  >
-                    {slot}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Images Section */}
-          <div className="p-6 border-b border-gray-200">
-            <h2 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
-              <Camera className="h-5 w-5 mr-2 text-blue-700" />
-              Images
-            </h2>
-            
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700">
-                Upload Images (Max 5)
-              </label>
-              <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
-                <div className="space-y-1 text-center">
-                  <div className="flex text-sm text-gray-600 justify-center">
-                    <label
-                      htmlFor="image-upload"
-                      className="relative cursor-pointer bg-white rounded-md font-medium text-blue-700 hover:text-blue-500 focus-within:outline-none"
-                    >
-                      <span>Upload images</span>
-                      <input
-                        id="image-upload"
-                        name="image-upload"
-                        type="file"
-                        className="sr-only"
-                        multiple
-                        accept="image/*"
-                        onChange={handleImageUpload}
-                      />
+                  <div>
+                    <label htmlFor="duration" className="block text-sm font-medium text-gray-700 mb-2">
+                      Duration *
                     </label>
-                  </div>
-                  <p className="text-xs text-gray-500">PNG, JPG, GIF up to 10MB</p>
-                </div>
-              </div>
-            </div>
-
-            {imagePreviews.length > 0 && (
-              <div className="mt-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Image Previews
-                </label>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                  {imagePreviews.map((preview, index) => (
-                    <div key={index} className="relative group">
-                      <img
-                        src={preview}
-                        alt={`Preview ${index + 1}`}
-                        className="h-32 w-full object-cover rounded-md"
+                    <div className="flex rounded-lg overflow-hidden border border-gray-200 focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent">
+                      <input
+                        type="number"
+                        name="duration"
+                        id="duration"
+                        min="1"
+                        required
+                        value={formData.duration}
+                        onChange={handleInputChange}
+                        className="flex-1 px-4 py-3 focus:outline-none"
+                        placeholder="e.g., 60"
                       />
-                      <button
-                        type="button"
-                        onClick={() => removeImage(index)}
-                        className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                      <select
+                        name="durationUnit"
+                        value={formData.durationUnit}
+                        onChange={handleInputChange}
+                        className="px-3 py-3 bg-gray-50 text-gray-700 border-l border-gray-200 focus:outline-none"
                       >
-                        <X className="h-4 w-4" />
-                      </button>
+                        <option value="minutes">Minutes</option>
+                        <option value="hours">Hours</option>
+                      </select>
                     </div>
-                  ))}
+                  </div>
                 </div>
               </div>
-            )}
-          </div>
 
-          {/* Advanced Options */}
-          <div className="p-6">
-            <button
-              type="button"
-              onClick={() => setShowAdvanced(!showAdvanced)}
-              className="flex items-center text-sm font-medium text-blue-700 hover:text-blue-500 mb-4"
-            >
-              {showAdvanced ? 'Hide' : 'Show'} Advanced Options
-            </button>
-
-            {showAdvanced && (
-              <div className="space-y-4">
-                <div>
-                  <label htmlFor="bookingLink" className="block text-sm font-medium text-gray-700">
-                    Direct Booking Link
+              {/* Availability Section */}
+              <div className="p-6 border-b border-gray-100">
+                <h2 className="text-xl font-semibold text-gray-800 mb-6 pb-2 border-b border-gray-100">
+                  Availability
+                </h2>
+                
+                <div className="mb-8">
+                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                    Available Days
                   </label>
-                  <div className="mt-1 relative rounded-md shadow-sm">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <LinkIcon className="h-5 w-5 text-gray-400" />
-                    </div>
-                    <input
-                      type="url"
-                      name="bookingLink"
-                      id="bookingLink"
-                      value={formData.bookingLink}
-                      onChange={handleInputChange}
-                      className="block w-full pl-10 border border-gray-300 rounded-md py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                      placeholder="https://example.com/booking"
-                    />
+                  <div className="flex flex-wrap gap-2">
+                    {daysOfWeek.map(day => (
+                      <button
+                        key={day.key}
+                        type="button"
+                        onClick={() => handleAvailabilityChange(day.key)}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                          formData.availability[day.key] 
+                            ? 'bg-blue-500 text-white shadow-md' 
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        {day.label}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
                 <div>
-                  <label htmlFor="embedCode" className="block text-sm font-medium text-gray-700">
-                    Embed Code
+                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                    Available Time Slots
                   </label>
-                  <textarea
-                    name="embedCode"
-                    id="embedCode"
-                    rows={3}
-                    value={formData.embedCode}
-                    onChange={handleInputChange}
-                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm font-mono text-sm"
-                    placeholder='<iframe src="..." width="100%" height="400"></iframe>'
-                  />
+                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
+                    {allTimeSlots.map(slot => (
+                      <button
+                        key={slot}
+                        type="button"
+                        onClick={() => handleTimeSlotToggle(slot)}
+                        className={`px-2 py-2 rounded-lg text-xs font-medium transition-colors ${
+                          formData.timeSlots.includes(slot) 
+                            ? 'bg-green-500 text-white shadow-md' 
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        {slot}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
-            )}
+
+              {/* Images Section */}
+              <div className="p-6 border-b border-gray-100">
+                <h2 className="text-xl font-semibold text-gray-800 mb-6 pb-2 border-b border-gray-100">
+                  Images
+                </h2>
+                
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                    Upload Images (Max 5)
+                  </label>
+                  <div className="mt-1 flex justify-center px-6 pt-8 pb-8 border-2 border-dashed border-gray-300 rounded-xl hover:border-blue-400 transition-colors">
+                    <div className="space-y-2 text-center">
+                      <div className="flex text-sm text-gray-600 justify-center">
+                        <label
+                          htmlFor="image-upload"
+                          className="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none"
+                        >
+                          <span>Select images</span>
+                          <input
+                            id="image-upload"
+                            name="image-upload"
+                            type="file"
+                            className="sr-only"
+                            multiple
+                            accept="image/*"
+                            onChange={handleImageUpload}
+                          />
+                        </label>
+                      </div>
+                      <p className="text-xs text-gray-500">PNG, JPG, GIF up to 10MB</p>
+                    </div>
+                  </div>
+                </div>
+
+                {imagePreviews.length > 0 && (
+                  <div className="mt-6">
+                    <label className="block text-sm font-medium text-gray-700 mb-3">
+                      Image Previews
+                    </label>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                      {imagePreviews.map((preview, index) => (
+                        <div key={index} className="relative group rounded-xl overflow-hidden shadow-sm">
+                          <img
+                            src={preview}
+                            alt={`Preview ${index + 1}`}
+                            className="h-40 w-full object-cover"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeImage(index)}
+                            className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center opacity-80 group-hover:opacity-100 transition-opacity"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Form Actions */}
+              <div className="px-6 py-5 bg-gray-50 text-right space-x-3">
+                <button
+                  type="button"
+                  onClick={() => navigate('/manage-attractions')}
+                  className="px-5 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white hover:from-blue-700 hover:to-blue-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all"
+                >
+                  Create Attraction
+                </button>
+              </div>
+            </form>
           </div>
 
-          {/* Form Actions */}
-          <div className="px-6 py-4 bg-gray-50 text-right">
-            <button
-              type="button"
-              onClick={() => navigate('/manage-attractions')}
-              className="bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="ml-3 inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-700 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-            >
-              Create Attraction
-            </button>
+          {/* Live Preview Container - 1/3 width, sticky */}
+          <div className="lg:col-span-1">
+            <div className="sticky top-8">
+              <LivePreview formData={formData} imagePreviews={imagePreviews} />
+            </div>
           </div>
-        </form>
+        </div>
       </div>
     </div>
   );

@@ -3,7 +3,6 @@ import { Route, Routes } from "react-router-dom"
 import MainLayout from "./layouts/AdminMainLayout";
 import Home from "./pages/Home"
 import Login from "./pages/auth/Login"
-import AttendeesDashboard from "./pages/admin/AttendeesDashboard"
 import CreatePackage from "./pages/admin/packages/CreatePackage"
 import Packages from "./pages/admin/packages/Packages"
 import BookPackage from "./pages/admin/bookings/BookPackage"
@@ -19,6 +18,7 @@ import BookingAttraction from "./pages/admin/attractions/BookAttraction";
 import ManageAttractions from "./pages/admin/attractions/ManageAttractions";
 import LocationManagerDashboard from "./pages/admin/ManagerDashboard";
 import CompanyDashboard from "./pages/admin/CompanyDashboard";
+import AttendantDashboard from "./pages/admin/AttendeesDashboard";
 
 
 function App() {
@@ -30,7 +30,7 @@ function App() {
       <Route path="/book/attraction/:id" element={<BookingAttraction />} />
       
   <Route element={<MainLayout />}>
-        <Route path="/attendee/dashboard" element={<AttendeesDashboard />} />
+        <Route path="/attendant/dashboard" element={<AttendantDashboard />} />
         <Route path="/manager/dashboard" element={<LocationManagerDashboard />} />
         <Route path="/company/dashboard" element={<CompanyDashboard />} />
         <Route path="/attractions/create" element={<CreateAttraction />} />
