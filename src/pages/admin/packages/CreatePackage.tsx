@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import Toast from "../../../components/ui/Toast";
-import MainLayout from "../../../layouts/AdminMainLayout";
-import { Info, Plus, RefreshCcw, Calendar, Clock } from "lucide-react";
+import { Info, Plus, RefreshCcw, Calendar, Clock, Gift, Tag } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 // Mock data tables (simulate fetch)
 const initialAttractions = ["Laser Tag", "Arcade", "Bowling", "Axe Throwing", "Party Room"];
@@ -32,6 +32,8 @@ const getActiveGiftCards = () => {
 };
 
 const CreatePackage: React.FC = () => {
+    const navigate = useNavigate();
+    
     // Option tables (simulate fetch)
     type Attraction = { name: string; price: number; unit?: string };
     const [attractions, setAttractions] = useState<Attraction[]>(() => {
@@ -58,6 +60,10 @@ const CreatePackage: React.FC = () => {
         price: "",
         maxParticipants: "",
         pricePerAdditional: "",
+        duration: "",
+        durationUnit: "hours" as "hours" | "minutes",
+        pricePerAdditional30min: "",
+        pricePerAdditional1hr: "",
         promos: [] as string[], // will store promo.code
         giftCards: [] as string[], // will store giftCard.code
         addOns: [] as string[],
@@ -201,6 +207,8 @@ const CreatePackage: React.FC = () => {
             giftCards: giftCardObjs,
             addOns: addOnObjs,
             pricePerAdditional: form.pricePerAdditional,
+            pricePerAdditional30min: form.pricePerAdditional30min,
+            pricePerAdditional1hr: form.pricePerAdditional1hr,
         };
 
         // Append and save
@@ -215,6 +223,10 @@ const CreatePackage: React.FC = () => {
             price: "",
             maxParticipants: "",
             pricePerAdditional: "",
+            duration: "",
+            durationUnit: "hours",
+            pricePerAdditional30min: "",
+            pricePerAdditional1hr: "",
             promos: [],
             giftCards: [],
             addOns: [],
@@ -245,12 +257,17 @@ const CreatePackage: React.FC = () => {
         return "Not specified";
     };
 
+    // Format duration for display
+    const formatDuration = () => {
+        if (!form.duration) return "Not specified";
+        return `${form.duration} ${form.durationUnit}`;
+    };
+
     return (
-        <MainLayout>
             <div className="w-full mx-auto sm:px-4 md:mt-8 pb-6 flex flex-col md:flex-row gap-8 md:gap-12">
                 {/* Form Section */}
                 <div className="flex-1 mx-auto">
-                    <div className="bg-white rounded-xl p-4 sm:p-6 md:p-8">
+                    <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6 md:p-8">
                         <h2 className="text-2xl sm:text-3xl font-bold text-neutral-900 tracking-tight">Create Package Deal</h2>
                         <p className="text-sm text-gray-500 mb-8 mt-2">Fill in the details below to create a new package deal.</p>    
                         <form className="space-y-8" onSubmit={handleSubmit} autoComplete="off">
@@ -272,32 +289,93 @@ const CreatePackage: React.FC = () => {
                                             required
                                         />
                                     </div>
-                                    <div>
-                                        <label className="block font-semibold mb-2 text-base text-neutral-800">Max Participants</label>
-                                        <input
-                                            type="number"
-                                            name="maxParticipants"
-                                            value={form.maxParticipants}
-                                            onChange={handleChange}
-                                            className="w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-primary focus:border-primary bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400"
-                                            min="1"
-                                            placeholder="Enter max participants"
-                                        />
-                                    </div>
-                                    {form.maxParticipants && (
+                                    
+                                    {/* Duration Section */}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div>
-                                            <label className="block font-semibold mb-2 text-base text-neutral-800">Price per Additional Participant</label>
+                                            <label className="block font-semibold mb-2 text-base text-neutral-800">Duration</label>
+                                            <div className="flex gap-2">
+                                                <input
+                                                    type="number"
+                                                    name="duration"
+                                                    value={form.duration}
+                                                    onChange={handleChange}
+                                                    className="w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-primary focus:border-primary bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400"
+                                                    min="1"
+                                                    placeholder="Duration"
+                                                />
+                                                <select
+                                                    name="durationUnit"
+                                                    value={form.durationUnit}
+                                                    onChange={handleChange}
+                                                    className="rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-primary focus:border-primary bg-white text-neutral-900 text-base transition-all"
+                                                >
+                                                    <option value="hours">Hours</option>
+                                                    <option value="minutes">Minutes</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        
+                                        <div>
+                                            <label className="block font-semibold mb-2 text-base text-neutral-800">Max Participants</label>
                                             <input
                                                 type="number"
-                                                name="pricePerAdditional"
-                                                value={form.pricePerAdditional}
+                                                name="maxParticipants"
+                                                value={form.maxParticipants}
+                                                onChange={handleChange}
+                                                className="w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-primary focus:border-primary bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400"
+                                                min="1"
+                                                placeholder="Enter max participants"
+                                            />
+                                        </div>
+                                    </div>
+                                    
+                                    {/* Additional Pricing Section */}
+                                    {form.maxParticipants && (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block font-semibold mb-2 text-base text-neutral-800">Price per Additional Participant</label>
+                                                <input
+                                                    type="number"
+                                                    name="pricePerAdditional"
+                                                    value={form.pricePerAdditional}
+                                                    onChange={handleChange}
+                                                    className="w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-primary focus:border-primary bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400"
+                                                    min="0"
+                                                    placeholder="Enter price for each additional participant"
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+                                    
+                                    {/* Additional Time Pricing Section */}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block font-semibold mb-2 text-base text-neutral-800">Price for Additional 30 Minutes</label>
+                                            <input
+                                                type="number"
+                                                name="pricePerAdditional30min"
+                                                value={form.pricePerAdditional30min}
                                                 onChange={handleChange}
                                                 className="w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-primary focus:border-primary bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400"
                                                 min="0"
-                                                placeholder="Enter price for each additional participant"
+                                                placeholder="Enter price for 30 min extension"
                                             />
                                         </div>
-                                    )}
+                                        <div>
+                                            <label className="block font-semibold mb-2 text-base text-neutral-800">Price for Additional 1 Hour</label>
+                                            <input
+                                                type="number"
+                                                name="pricePerAdditional1hr"
+                                                value={form.pricePerAdditional1hr}
+                                                onChange={handleChange}
+                                                className="w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-primary focus:border-primary bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400"
+                                                min="0"
+                                                placeholder="Enter price for 1 hr extension"
+                                            />
+                                        </div>
+                                    </div>
+                                    
                                     <div>
                                         <label className="block font-semibold mb-2 text-base text-neutral-800">Category</label>
                                         <div className="flex flex-col sm:flex-row gap-2">
@@ -515,8 +593,6 @@ const CreatePackage: React.FC = () => {
                                 </div>
                             </div>
                             
-                            {/* Rest of the form remains the same (Add-ons, Promos, Gift Cards, Pricing) */}
-                            
                             {/* Add-ons Section */}
                             <div>
                                 <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2">
@@ -565,63 +641,91 @@ const CreatePackage: React.FC = () => {
                             {/* Promos Section */}
                             <div>
                                 <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2">
-                                    <Info className="w-5 h-5 text-primary" /> Promos
+                                    <Tag className="w-5 h-5 text-primary" /> Promos
                                 </h3>
-                                <div className="flex flex-wrap gap-2 items-center mb-2">
-                                    {promos.map((promo) => (
-                                        <label key={promo.code} className={`flex items-center gap-2 px-3 py-1 rounded-full border cursor-pointer text-sm font-medium transition-all duration-150 hover:bg-primary/10 hover:border-primary/60 focus-within:ring-2 focus-within:ring-primary/30 ${form.promos.includes(promo.code) ? "bg-primary/10 border-primary text-primary" : "bg-white border-gray-200 text-neutral-700"}`}>
-                                            <input
-                                                type="checkbox"
-                                                checked={form.promos.includes(promo.code)}
-                                                onChange={() => handleMultiSelectCheckbox('promos', promo.code)}
-                                                className="accent-indigo-500"
-                                            />
-                                            <span className="relative group cursor-pointer flex items-center gap-1">
-                                                {promo.name}
-                                                <span className="text-xs text-gray-400 ml-1">[{promo.code}]</span>
-                                                {promo.description && (
-                                                    <span className="ml-1">
-                                                        <Info className="w-4 h-4 text-gray-400 group-hover:text-primary transition" />
-                                                        <span className="absolute z-20 left-1/2 -translate-x-1/2 bottom-full mb-2 min-w-[180px] max-w-xs bg-white border border-gray-200 shadow-lg text-gray-900 text-xs rounded-md px-3 py-2 opacity-0 group-hover:opacity-100 pointer-events-none transition-all whitespace-pre-line text-left content-fit">
-                                                            {promo.description}
+                                {promos.length === 0 ? (
+                                    <div className="bg-gray-50 rounded-lg p-4 text-center border border-dashed border-gray-300">
+                                        <p className="text-gray-500 mb-3 text-sm">No promos available yet</p>
+                                        <button
+                                            type="button"
+                                            onClick={() => navigate('/packages/promos')}
+                                            className="inline-flex items-center gap-2 bg-blue-700 text-xs hover:bg-blue-800 text-white px-4 py-2 rounded-md transition"
+                                        >
+                                            <Plus className="w-4 h-4" />
+                                            Create Promo
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-wrap gap-2 items-center mb-2">
+                                        {promos.map((promo) => (
+                                            <label key={promo.code} className={`flex items-center gap-2 px-3 py-1 rounded-full border cursor-pointer text-sm font-medium transition-all duration-150 hover:bg-primary/10 hover:border-primary/60 focus-within:ring-2 focus-within:ring-primary/30 ${form.promos.includes(promo.code) ? "bg-primary/10 border-primary text-primary" : "bg-white border-gray-200 text-neutral-700"}`}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={form.promos.includes(promo.code)}
+                                                    onChange={() => handleMultiSelectCheckbox('promos', promo.code)}
+                                                    className="accent-indigo-500"
+                                                />
+                                                <span className="relative group cursor-pointer flex items-center gap-1">
+                                                    {promo.name}
+                                                    <span className="text-xs text-gray-400 ml-1">[{promo.code}]</span>
+                                                    {promo.description && (
+                                                        <span className="ml-1">
+                                                            <Info className="w-4 h-4 text-gray-400 group-hover:text-primary transition" />
+                                                            <span className="absolute z-20 left-1/2 -translate-x-1/2 bottom-full mb-2 min-w-[180px] max-w-xs bg-white border border-gray-200 shadow-lg text-gray-900 text-xs rounded-md px-3 py-2 opacity-0 group-hover:opacity-100 pointer-events-none transition-all whitespace-pre-line text-left content-fit">
+                                                                {promo.description}
+                                                            </span>
                                                         </span>
-                                                    </span>
-                                                )}
-                                            </span>
-                                        </label>
-                                    ))}
-                                </div>
+                                                    )}
+                                                </span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                             
                             {/* Gift Cards Section */}
                             <div>
                                 <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2">
-                                    <Info className="w-5 h-5 text-primary" /> Gift Cards
+                                    <Gift className="w-5 h-5 text-primary" /> Gift Cards
                                 </h3>
-                                <div className="flex flex-wrap gap-2 items-center mb-2">
-                                    {giftCards.map((gc) => (
-                                        <label key={gc.code} className={`flex items-center gap-2 px-3 py-1 rounded-full border cursor-pointer text-sm font-medium transition-all duration-150 hover:bg-emerald-50 hover:border-emerald-400/60 focus-within:ring-2 focus-within:ring-emerald-200 ${form.giftCards.includes(gc.code) ? "bg-emerald-50 border-emerald-400 text-emerald-700" : "bg-white border-gray-200 text-neutral-700"}`}>
-                                            <input
-                                                type="checkbox"
-                                                checked={form.giftCards.includes(gc.code)}
-                                                onChange={() => handleMultiSelectCheckbox('giftCards', gc.code)}
-                                                className="accent-emerald-500"
-                                            />
-                                            <span className="relative group cursor-pointer flex items-center gap-1">
-                                                {gc.name}
-                                                <span className="text-xs text-gray-400 ml-1">[{gc.code}]</span>
-                                                {gc.description && (
-                                                    <span className="ml-1">
-                                                        <Info className="w-4 h-4 text-emerald-400 group-hover:text-emerald-700 transition" />
-                                                        <span className="absolute z-20 left-1/2 -translate-x-1/2 bottom-full mb-2 min-w-[180px] max-w-xs bg-white border border-gray-200 shadow-lg text-gray-900 text-xs rounded-md px-3 py-2 opacity-0 group-hover:opacity-100 pointer-events-none transition-all whitespace-pre-line text-left content-fit">
-                                                            {gc.description}
+                                {giftCards.length === 0 ? (
+                                    <div className="bg-gray-50 rounded-lg p-4 text-center border border-dashed border-gray-300">
+                                        <p className="text-gray-500 mb-3 text-sm">No gift cards available yet</p>
+                                        <button
+                                            type="button"
+                                            onClick={() => navigate('/packages/gift-cards')}
+                                            className="inline-flex items-center gap-2 bg-blue-700 text-xs hover:bg-blue-800 text-white px-4 py-2 rounded-md transition"
+                                        >
+                                            <Plus className="w-4 h-4" />
+                                            Create Gift Card
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-wrap gap-2 items-center mb-2">
+                                        {giftCards.map((gc) => (
+                                            <label key={gc.code} className={`flex items-center gap-2 px-3 py-1 rounded-full border cursor-pointer text-sm font-medium transition-all duration-150 hover:bg-emerald-50 hover:border-emerald-400/60 focus-within:ring-2 focus-within:ring-emerald-200 ${form.giftCards.includes(gc.code) ? "bg-emerald-50 border-emerald-400 text-emerald-700" : "bg-white border-gray-200 text-neutral-700"}`}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={form.giftCards.includes(gc.code)}
+                                                    onChange={() => handleMultiSelectCheckbox('giftCards', gc.code)}
+                                                    className="accent-emerald-500"
+                                                />
+                                                <span className="relative group cursor-pointer flex items-center gap-1">
+                                                    {gc.name}
+                                                    <span className="text-xs text-gray-400 ml-1">[{gc.code}]</span>
+                                                    {gc.description && (
+                                                        <span className="ml-1">
+                                                            <Info className="w-4 h-4 text-emerald-400 group-hover:text-emerald-700 transition" />
+                                                            <span className="absolute z-20 left-1/2 -translate-x-1/2 bottom-full mb-2 min-w-[180px] max-w-xs bg-white border border-gray-200 shadow-lg text-gray-900 text-xs rounded-md px-3 py-2 opacity-0 group-hover:opacity-100 pointer-events-none transition-all whitespace-pre-line text-left content-fit">
+                                                                {gc.description}
+                                                            </span>
                                                         </span>
-                                                    </span>
-                                                )}
-                                            </span>
-                                        </label>
-                                    ))}
-                                </div>
+                                                    )}
+                                                </span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                             
                             {/* Pricing Section */}
@@ -645,7 +749,7 @@ const CreatePackage: React.FC = () => {
                             <div className="flex gap-2 mt-6">
                                 <button
                                     type="submit"
-                                    className="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 rounded-md transition text-base flex items-center justify-center gap-2 visible"
+                                    className="flex-1 bg-blue-700 hover:bg-blue-800 text-white font-semibold py-2 rounded-md transition text-base flex items-center justify-center gap-2 visible"
                                 >
                                     <Plus className="w-5 h-5" /> Submit
                                 </button>
@@ -661,6 +765,10 @@ const CreatePackage: React.FC = () => {
                                         price: "",
                                         maxParticipants: "",
                                         pricePerAdditional: "",
+                                        duration: "",
+                                        durationUnit: "hours",
+                                        pricePerAdditional30min: "",
+                                        pricePerAdditional1hr: "",
                                         promos: [],
                                         giftCards: [],
                                         addOns: [],
@@ -688,14 +796,38 @@ const CreatePackage: React.FC = () => {
                             </div>
                             <div className="text-xs text-gray-500 mb-2">{form.category || <span className='text-gray-300'>Category</span>}</div>
                             
-                            {/* Availability in Preview */}
+                            {/* Duration in Preview */}
                             <div className="mb-2 flex items-center gap-2">
                                 <Clock className="w-4 h-4 text-gray-500" />
+                                <span className="font-semibold">Duration:</span> 
+                                <span className="text-neutral-700 text-sm">
+                                    {formatDuration()}
+                                </span>
+                            </div>
+                            
+                            {/* Availability in Preview */}
+                            <div className="mb-2 flex items-center gap-2">
+                                <Calendar className="w-4 h-4 text-gray-500" />
                                 <span className="font-semibold">Available:</span> 
                                 <span className="text-neutral-700 text-sm">
                                     {formatAvailability()}
                                 </span>
                             </div>
+                            
+                            {/* Additional Time Pricing in Preview */}
+                            {(form.pricePerAdditional30min || form.pricePerAdditional1hr) && (
+                                <div className="mb-2">
+                                    <span className="font-semibold">Extension Pricing:</span>
+                                    <div className="text-neutral-700 text-sm">
+                                        {form.pricePerAdditional30min && (
+                                            <div>+30 min: ${form.pricePerAdditional30min}</div>
+                                        )}
+                                        {form.pricePerAdditional1hr && (
+                                            <div>+1 hr: ${form.pricePerAdditional1hr}</div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
                             
                             <div className="mb-4 text-neutral-700 text-base min-h-[48px]">{form.description || <span className='text-gray-300'>Description</span>}</div>
                             <div className="mb-2">
@@ -758,15 +890,17 @@ const CreatePackage: React.FC = () => {
                         </div>
                     </div>
                 </div>
-            </div>
-            
+        
+        
             {/* Toast notification (top right) */}
             {toast && (
                 <div className="fixed top-6 right-6 z-50 animate-fade-in-up">
                     <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />
                 </div>
             )}
-        </MainLayout>
+        </div>
+
+            
     );
 };
 

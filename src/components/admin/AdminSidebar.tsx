@@ -1,10 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Home,
   Calendar,
   Package,
   Users,
-  Clock,
   User,
   Ticket,
   BarChart3,
@@ -13,8 +12,10 @@ import {
   ChevronDown,
   Search,
   Bell,
-  X,
-  Dot
+  // X,
+  Dot,
+  Settings,
+  Menu
 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 
@@ -35,11 +36,11 @@ interface UserData {
   role: 'attendee' | 'location_manager' | 'company_admin';
 }
 
-
 interface SidebarProps {
   user: UserData;
   isOpen: boolean;
   setIsOpen: (isOpen: boolean) => void;
+  handleSignOut: () => void;
 }
 
 // Grouped navigation for sidebar sections
@@ -60,7 +61,7 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
       { label: 'Customer Analytics', href: '/customers/analytics', icon: Dot },
       { label: 'Customers', href: '/customers', icon: Dot }
     ]},
-    { label: 'Shift Management', icon: Clock, href: '/shift-management' }
+    // { label: 'Shift Management', icon: Clock, href: '/shift-management' }
   ];
 
   switch(role) {
@@ -68,8 +69,8 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
       return [
         { label: 'Dashboard', icon: Home, href: '/attendee/dashboard' },
         { label: 'Attractions', icon: Ticket, items: [
-          { label: 'Manage Attractions', href: '/activities', icon: Dot },
-          { label: 'Create Attractions', href: '/activities/create', icon: Dot }
+          { label: 'Manage Attractions', href: '/attractions', icon: Dot },
+          { label: 'Create Attractions', href: '/attractions/create', icon: Dot }
         ]},
         { label: 'Bookings', icon: Calendar, items: [
           { label: 'Calendar View', href: '/bookings/calendar', icon: Dot },
@@ -87,21 +88,21 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
           { label: 'Customer Analytics', href: '/customers/analytics', icon: Dot },
           { label: 'Customers', href: '/customers', icon: Dot }
         ]},
-        { label: 'Shift Management', icon: Clock, href: '/attendee/shift-management' },
-        { label: 'Profile', icon: User, href: '/attendee/profile' }
+        // { label: 'Shift Management', icon: Clock, href: '/attendee/shift-management' },
+        { label: 'Profile', icon: User, href: '/attendee/profile' },
+        { label: 'Settings', icon: Settings, href: '/attendee/settings' }
       ];
     case 'location_manager':
       return [
         { label: 'Dashboard', icon: Home, href: '/manager/dashboard' },
-        { label: 'Activities/Attractions', icon: Ticket, items: [
-          { label: 'Manage Attractions', href: '/activities', icon: Dot },
-          { label: 'Create Attractions', href: '/activities/create', icon: Dot }
+        { label: 'Attractions', icon: Ticket, items: [
+          { label: 'Manage Attractions', href: '/attractions', icon: Dot },
+          { label: 'Create Attractions', href: '/attractions/create', icon: Dot }
         ]},
-        { label: 'Calendar & Resource', icon: Calendar, items: [
-          { label: 'Calendar View', href: '/calendar', icon: Dot },
-          { label: 'Occupancy Reports', href: '/occupancy', icon: Dot },
-          { label: 'Resource Management', href: '/resources', icon: Dot }
-        ]},
+        // { label: 'Resources', icon: Calendar, items: [
+        //   { label: 'Occupancy Reports', href: '/occupancy', icon: Dot },
+        //   { label: 'Resource Management', href: '/resources', icon: Dot }
+        // ]},
         { label: 'Bookings', icon: Calendar, items: [
           { label: 'Calendar View', href: '/bookings/calendar', icon: Dot },
           { label: 'Bookings', href: '/bookings', icon: Dot },
@@ -118,29 +119,29 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
           { label: 'Customer Analytics', href: '/customers/analytics', icon: Dot },
           { label: 'Customers', href: '/customers', icon: Dot }
         ]},
-        { label: 'Shift Management', icon: Clock, href: '/shift-management' },
         { label: 'Attendees Management', icon: Users, items: [
-          { label: 'Create Attendees', href: '/users/create', icon: Dot },
+          { label: 'Create Account', href: '/users/create', icon: Dot },
           { label: 'Account Activity Log', href: '/users/activity', icon: Dot },
           { label: 'Attendees Performance', href: '/users/performance', icon: Dot },
-          { label: 'Package Deals', href: '/users/packages', icon: Dot }
+          // { label: 'Package Deals', href: '/users/packages', icon: Dot }
         ]},
+        // { label: 'Shift Management', icon: Clock, href: '/shift-management' },
         { label: 'Analytics & Reports', icon: BarChart3, href: '/analytics' },
         { label: 'Notifications', icon: Bell, href: '/notifications' },
-        { label: 'Profile', icon: User, href: '/profile' }
+        { label: 'Profile', icon: User, href: '/profile' },
+        { label: 'Settings', icon: Settings, href: '/manager/settings' }
       ];
     case 'company_admin':
       return [
-        { label: 'Dashboard', icon: Home, href: '/dashboard' },
+        { label: 'Dashboard', icon: Home, href: '/company/dashboard' },
         { label: 'Attractions', icon: Ticket, items: [
-          { label: 'Manage Attractions', href: '/activities', icon: Dot },
-          { label: 'Create Attractions', href: '/activities/create', icon: Dot }
+          { label: 'Manage Attractions', href: '/attractions', icon: Dot },
+          { label: 'Create Attractions', href: '/attractions/create', icon: Dot }
         ]},
-        { label: 'Calendar & Resource', icon: Calendar, items: [
-          { label: 'Calendar View', href: '/calendar', icon: Dot },
-          { label: 'Occupancy Reports', href: '/occupancy', icon: Dot },
-          { label: 'Resource Management', href: '/resources', icon: Dot }
-        ]},
+        // { label: 'Resources', icon: Calendar, items: [
+        //   { label: 'Occupancy Reports', href: '/occupancy', icon: Dot },
+        //   { label: 'Resource Management', href: '/resources', icon: Dot }
+        // ]},
         { label: 'Bookings', icon: Calendar, items: [
           { label: 'Calendar View', href: '/bookings/calendar', icon: Dot },
           { label: 'Bookings', href: '/bookings', icon: Dot },
@@ -157,29 +158,32 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
           { label: 'Customer Analytics', href: '/customers/analytics', icon: Dot },
           { label: 'Customers', href: '/customers', icon: Dot }
         ]},
-        { label: 'Shift Management', icon: Clock, href: '/shift-management' },
         { label: 'User Management', icon: Users, items: [
           { label: 'Create Accounts', href: '/admin/users/create', icon: Dot },
           { label: 'Activity Log', href: '/admin/activity', icon: Dot },
           { label: 'Attendees Performance', href: '/admin/performance', icon: Dot },
-          { label: 'Package Deals', href: '/admin/packages', icon: Dot }
+          // { label: 'Package Deals', href: '/admin/packages', icon: Dot }
         ]},
         { label: 'Analytics & Reports', icon: BarChart3, href: '/analytics' },
         { label: 'Accounting', icon: DollarSign, href: '/accounting' },
         { label: 'Activity Logs', icon: FileText, href: '/admin/activity-logs' },
         { label: 'Notifications', icon: Bell, href: '/notifications' },
-        { label: 'Profile', icon: User, href: '/profile' }
+        { label: 'Profile', icon: User, href: '/profile' },
+        { label: 'Settings', icon: Settings, href: '/admin/settings' }
       ];
     default:
-      return commonItems;
+      return [
+        ...commonItems,
+        { label: 'Settings', icon: Settings, href: '/settings' }
+      ];
   }
 };
 
-const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen }) => {
+const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOut }) => {
   const location = useLocation();
   const [openDropdowns, setOpenDropdowns] = useState<Record<string, boolean>>({});
-  const navigation = getNavigation(user.role);
-
+  const [showProfileDropdown, setShowProfileDropdown] = useState(false);
+  const profileDropdownRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     // Close sidebar when clicking outside on mobile
     const handleClickOutside = (event: MouseEvent) => {
@@ -187,11 +191,19 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen }) => {
       if (isOpen && sidebar && !sidebar.contains(event.target as Node)) {
         setIsOpen(false);
       }
+      // Close profile dropdown when clicking outside
+      if (showProfileDropdown && profileDropdownRef.current && 
+          !profileDropdownRef.current.contains(event.target as Node)) {
+        setShowProfileDropdown(false);
+      }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isOpen, setIsOpen]);
+  }, [isOpen, setIsOpen, showProfileDropdown]);
+
+  if (!user) return null;
+  const navigation = getNavigation(user.role);
 
   const toggleDropdown = (label: string) => {
     setOpenDropdowns(prev => ({
@@ -199,6 +211,8 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen }) => {
       [label]: !prev[label]
     }));
   };
+
+
 
   const NavItemComponent: React.FC<{ item: NavItem; depth?: number }> = ({ item, depth = 0 }) => {
     const hasItems = item.items && item.items.length > 0;
@@ -211,7 +225,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen }) => {
         {(() => {
           const Icon = item.icon;
           // @ts-expect-error lucide-react icons accept 'size' prop
-          return <Icon size={18} className={isActive ? 'text-purple-700' : 'stroke-1'} />;
+          return <Icon size={18} className={isActive ? 'text-blue-700' : 'stroke-1'} />;
         })()}
         <span className="ml-3 text-sm flex-1">{item.label}</span>
         {hasItems && (
@@ -222,11 +236,17 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen }) => {
         )}
       </>
     );
+    // Only close sidebar on navigation for mobile screens
+    const handleNavClick = () => {
+      if (window.innerWidth < 1024) {
+        setIsOpen(false);
+      }
+    };
     return (
       <div>
         {hasItems ? (
           <div
-            className={`flex items-center p-2 rounded-lg cursor-pointer transition-colors ${isActive || isChildActive ? 'bg-purple-100 text-purple-700 font-semibold' : 'hover:bg-gray-100 text-gray-700'} ${depth > 0 ? 'pl-8' : ''}`}
+            className={`flex items-center p-2 rounded-lg cursor-pointer transition-colors ${isActive || isChildActive ? 'bg-blue-100 text-blue-700 font-semibold' : 'hover:bg-gray-100 text-gray-700'} ${depth > 0 ? 'pl-8' : ''}`}
             onClick={() => toggleDropdown(item.label)}
           >
             {content}
@@ -234,8 +254,8 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen }) => {
         ) : item.href ? (
           <Link
             to={item.href}
-            className={`flex items-center p-2 rounded-lg transition-colors ${isActive ? 'bg-purple-100 text-purple-700 font-semibold' : 'hover:bg-gray-100 text-gray-700'} ${depth > 0 ? 'pl-8' : ''}`}
-            onClick={() => setIsOpen(false)}
+            className={`flex items-center p-2 rounded-lg transition-colors ${isActive ? 'bg-blue-100 text-blue-700 font-semibold' : 'hover:bg-gray-100 text-gray-700'} ${depth > 0 ? 'pl-8' : ''}`}
+            onClick={handleNavClick}
           >
             {content}
           </Link>
@@ -263,11 +283,11 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen }) => {
       {/* Floating Toggle Button */}
       {!isOpen && (
         <button
-          className="fixed top-4 left-4 z-50 p-2 rounded-full bg-purple-600 text-white shadow-lg lg:hidden"
+          className="fixed top-4 right-4 z-50 p-2 rounded bg-blue-700 text-white shadow-lg lg:hidden"
           style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.12)' }}
           onClick={() => setIsOpen(true)}
         >
-          <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="18" x2="21" y2="18" /></svg>
+          <Menu size={20} />
         </button>
       )}
       {/* Sidebar */}
@@ -279,28 +299,25 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen }) => {
         <div className="flex flex-col h-full">
           {/* Header */}
           <div className="flex items-center justify-between p-4">
-            <div className="flex items-center">
-              <div className="w-8 h-8 bg-purple-400 rounded-lg flex items-center justify-center">
-                <span className="text-black font-bold text-sm">Z</span>
-              </div>
-              <span className="ml-2 font-semibold text-gray-800">Zapzone</span>
+            <div className="flex items-center justify-center w-full ">
+              <img src="/src/assets/imgs/Zap-Zone.png" alt="Logo" className="w-3/5 mr-2"/>
             </div>
-            <button
+            {/* <button
               className="lg:hidden p-1 rounded-md hover:bg-gray-100"
               onClick={() => setIsOpen(false)}
               style={{ position: 'absolute', top: 16, right: 16, zIndex: 60 }}
             >
               <X size={20} />
-            </button>
+            </button> */}
           </div>
           {/* Search */}
           <div className="p-4">
             <div className="relative">
-              <Search size={18} className="absolute left-3 top-2.5 text-gray-400" />
+              <Search size={18} className="absolute left-3 top-2.5 text-gray-700" />
               <input
                 type="text"
                 placeholder="Search..."
-                className="w-full pl-10 pr-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-purple-400"
+                className="w-full pl-10 pr-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-700 focus:border-blue-700"
               />
             </div>
           </div>
@@ -312,18 +329,40 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen }) => {
           </nav>
           {/* User profile & Notifications */}
           <div className="p-4 border-t border-gray-200">
-            
-            <div className="flex items-center">
-              <div className="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center">
-                <User size={20} className="text-gray-600" />
+            {/* User Profile Dropdown */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <div className="w-10 h-10 bg-blue-200 rounded-full flex items-center justify-center">
+                  <User size={20} className="text-blue-700" />
+                </div>
+                <div className="ml-3 text-left">
+                  <p className="text-sm font-medium text-gray-900">{user.name}</p>
+                  <p className="text-xs text-gray-500">{user.position}</p>
+                  <p className="text-xs text-gray-500">
+                    {user.company}
+                    {user.subcompany && ` • ${user.subcompany}`}
+                  </p>
+                </div>
               </div>
-              <div className="ml-3">
-                <p className="text-sm font-medium text-gray-900">{user.name}</p>
-                <p className="text-xs text-gray-500">{user.position}</p>
-                <p className="text-xs text-gray-500">
-                  {user.company}
-                  {user.subcompany && ` • ${user.subcompany}`}
-                </p>
+              <div className="relative" ref={profileDropdownRef}>
+                <button
+                  className="p-2 rounded-full hover:bg-blue-100 focus:outline-none"
+                  onClick={() => setShowProfileDropdown((prev: boolean) => !prev)}
+                  id="profile-dropdown-toggle"
+                  type="button"
+                >
+                  <ChevronDown size={18} className="text-blue-700" />
+                </button>
+                {showProfileDropdown && (
+                  <div className="absolute right-0 bottom-0 mb-10 w-40 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
+                    <button
+                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 rounded-lg"
+                      onClick={handleSignOut}
+                    >
+                      Sign Out
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>

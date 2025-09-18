@@ -1,6 +1,5 @@
 // src/pages/admin/bookings/CalendarView.tsx
 import React, { useState, useEffect } from 'react';
-import MainLayout from '../../../layouts/AdminMainLayout';
 import { Link } from 'react-router-dom';
 import { 
   ChevronLeft, 
@@ -9,32 +8,34 @@ import {
   Filter,
   Search,
   X,
-  List,
   Clock,
   Users,
   CreditCard,
   PackageIcon,
   Zap,
-  Gift
+  Gift,
+  Ticket
 } from 'lucide-react';
 
 // Types
 interface Booking {
   id: string;
-  packageName: string;
+  type: 'package' | 'attraction';
+  packageName?: string;
+  attractionName?: string;
   customerName: string;
   email: string;
   phone: string;
   date: string;
   time: string;
   participants: number;
-  status: 'pending' | 'confirmed' | 'cancelled' | 'completed';
+  status: 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'checked-in';
   totalAmount: number;
   amountPaid: number;
   createdAt: string;
   paymentMethod: string;
-  attractions: { name: string; quantity: number }[];
-  addOns: { name: string; quantity: number; price: number }[];
+  attractions?: { name: string; quantity: number }[];
+  addOns?: { name: string; quantity: number; price: number }[];
   duration?: string;
   activity?: string;
   notes?: string;
@@ -44,11 +45,13 @@ interface FilterOptions {
   view: 'day' | 'week' | 'month' | 'range';
   activities: string[];
   packages: string[];
+  attractions: string[];
   dateRange: {
     start: string;
     end: string;
   };
   search: string;
+  type: string;
 }
 
 const CalendarView: React.FC = () => {
@@ -60,11 +63,13 @@ const CalendarView: React.FC = () => {
     view: 'month',
     activities: [],
     packages: [],
+    attractions: [],
     dateRange: {
       start: '',
       end: ''
     },
-    search: ''
+    search: '',
+    type: 'all'
   });
   const [showFilters, setShowFilters] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -95,10 +100,11 @@ const CalendarView: React.FC = () => {
           }
         }
       } else {
-        // Sample data for 2025
+        // Sample data for 2025 with both package and attraction bookings
         const sampleBookings: Booking[] = [
           {
             id: '1',
+            type: 'package',
             packageName: 'Family Fun Package',
             customerName: 'John Doe',
             email: 'john@example.com',
@@ -119,11 +125,12 @@ const CalendarView: React.FC = () => {
               { name: 'Extra Pizza', quantity: 1, price: 12.99 }
             ],
             duration: '2 hours',
-            activity: 'Laser Tag',
+            activity: 'Family Entertainment',
             notes: 'Allergy: None'
           },
           {
             id: '2',
+            type: 'package',
             packageName: 'Corporate Event',
             customerName: 'Jane Smith',
             email: 'jane@company.com',
@@ -147,7 +154,8 @@ const CalendarView: React.FC = () => {
           },
           {
             id: '3',
-            packageName: 'Birthday Party',
+            type: 'attraction',
+            attractionName: 'Laser Tag',
             customerName: 'Mike Johnson',
             email: 'mike@example.com',
             phone: '555-9012',
@@ -155,10 +163,48 @@ const CalendarView: React.FC = () => {
             time: '3:00 PM',
             participants: 8,
             status: 'completed',
-            totalAmount: 299.99,
-            amountPaid: 299.99,
+            totalAmount: 120.00,
+            amountPaid: 120.00,
             createdAt: '2025-01-05T09:15:00Z',
             paymentMethod: 'cash',
+            duration: '1 hour',
+            activity: 'Laser Tag',
+            notes: 'Group of 8 friends'
+          },
+          {
+            id: '4',
+            type: 'attraction',
+            attractionName: 'Bowling',
+            customerName: 'Sarah Wilson',
+            email: 'sarah@example.com',
+            phone: '555-3456',
+            date: '2025-03-15',
+            time: '1:00 PM',
+            participants: 6,
+            status: 'confirmed',
+            totalAmount: 90.00,
+            amountPaid: 90.00,
+            createdAt: '2025-01-15T16:20:00Z',
+            paymentMethod: 'e-wallet',
+            duration: '2 hours',
+            activity: 'Bowling',
+            notes: '2 lanes requested'
+          },
+          {
+            id: '5',
+            type: 'package',
+            packageName: 'Birthday Party',
+            customerName: 'Robert Brown',
+            email: 'robert@example.com',
+            phone: '555-7890',
+            date: '2025-03-25',
+            time: '1:00 PM',
+            participants: 10,
+            status: 'checked-in',
+            totalAmount: 350.00,
+            amountPaid: 350.00,
+            createdAt: '2025-01-18T11:45:00Z',
+            paymentMethod: 'credit_card',
             attractions: [
               { name: 'Party Room', quantity: 1 },
               { name: 'Laser Tag', quantity: 2 }
@@ -172,55 +218,23 @@ const CalendarView: React.FC = () => {
             notes: 'Birthday boy is 10 years old'
           },
           {
-            id: '4',
-            packageName: 'Kids Party',
-            customerName: 'Sarah Wilson',
-            email: 'sarah@example.com',
-            phone: '555-3456',
-            date: '2025-03-15',
-            time: '1:00 PM',
-            participants: 10,
+            id: '6',
+            type: 'attraction',
+            attractionName: 'Arcade Games',
+            customerName: 'Alex Chen',
+            email: 'alex@example.com',
+            phone: '555-2468',
+            date: '2025-03-20',
+            time: '5:00 PM',
+            participants: 3,
             status: 'confirmed',
-            totalAmount: 249.99,
-            amountPaid: 249.99,
-            createdAt: '2025-01-08T11:20:00Z',
+            totalAmount: 45.00,
+            amountPaid: 45.00,
+            createdAt: '2025-02-10T14:30:00Z',
             paymentMethod: 'credit_card',
-            attractions: [
-              { name: 'Arcade', quantity: 3 },
-              { name: 'Mini Golf', quantity: 2 }
-            ],
-            addOns: [
-              { name: 'Goodie Bags', quantity: 10, price: 5.99 }
-            ],
-            duration: '3 hours',
-            activity: 'Kids Party',
-            notes: '2 gluten-free goodie bags needed'
-          },
-          {
-            id: '5',
-            packageName: 'Date Night Package',
-            customerName: 'Robert Kim',
-            email: 'robert@example.com',
-            phone: '555-7890',
-            date: '2025-03-25',
-            time: '7:00 PM',
-            participants: 2,
-            status: 'confirmed',
-            totalAmount: 129.99,
-            amountPaid: 129.99,
-            createdAt: '2025-02-14T16:20:00Z',
-            paymentMethod: 'credit_card',
-            attractions: [
-              { name: 'Bowling', quantity: 1 },
-              { name: 'Arcade', quantity: 2 }
-            ],
-            addOns: [
-              { name: 'Chocolate Fondue', quantity: 1, price: 19.99 },
-              { name: 'Rose Petals', quantity: 1, price: 9.99 }
-            ],
-            duration: '2 hours',
-            activity: 'Date Night',
-            notes: 'Anniversary celebration'
+            duration: '1.5 hours',
+            activity: 'Arcade',
+            notes: 'Unlimited play package'
           }
         ];
         setBookings(sampleBookings);
@@ -245,9 +259,15 @@ const CalendarView: React.FC = () => {
       result = result.filter(booking =>
         booking.customerName.toLowerCase().includes(searchTerm) ||
         booking.email.toLowerCase().includes(searchTerm) ||
-        booking.packageName.toLowerCase().includes(searchTerm) ||
+        (booking.packageName && booking.packageName.toLowerCase().includes(searchTerm)) ||
+        (booking.attractionName && booking.attractionName.toLowerCase().includes(searchTerm)) ||
         booking.phone.includes(searchTerm)
       );
+    }
+
+    // Apply type filter
+    if (filters.type !== 'all') {
+      result = result.filter(booking => booking.type === filters.type);
     }
 
     // Apply activities filter
@@ -260,7 +280,14 @@ const CalendarView: React.FC = () => {
     // Apply packages filter
     if (filters.packages.length > 0) {
       result = result.filter(booking => 
-        filters.packages.includes(booking.packageName)
+        booking.packageName && filters.packages.includes(booking.packageName)
+      );
+    }
+
+    // Apply attractions filter
+    if (filters.attractions.length > 0) {
+      result = result.filter(booking => 
+        booking.attractionName && filters.attractions.includes(booking.attractionName)
       );
     }
 
@@ -342,16 +369,28 @@ const CalendarView: React.FC = () => {
     });
   };
 
+  const handleAttractionToggle = (attractionName: string) => {
+    setFilters(prev => {
+      const attractions = prev.attractions.includes(attractionName)
+        ? prev.attractions.filter(a => a !== attractionName)
+        : [...prev.attractions, attractionName];
+      
+      return { ...prev, attractions };
+    });
+  };
+
   const clearFilters = () => {
     setFilters({
       view: 'month',
       activities: [],
       packages: [],
+      attractions: [],
       dateRange: {
         start: '',
         end: ''
       },
-      search: ''
+      search: '',
+      type: 'all'
     });
   };
 
@@ -436,8 +475,35 @@ const CalendarView: React.FC = () => {
   };
 
   const getUniquePackages = () => {
-    const packages = bookings.map(booking => booking.packageName);
+    const packages = bookings
+      .map(booking => booking.packageName)
+      .filter((pkg): pkg is string => !!pkg);
+    
     return [...new Set(packages)];
+  };
+
+  const getUniqueAttractions = () => {
+    const attractions = bookings
+      .map(booking => booking.attractionName)
+      .filter((attraction): attraction is string => !!attraction);
+    
+    return [...new Set(attractions)];
+  };
+
+  const getBookingTitle = (booking: Booking) => {
+    if (booking.type === 'package') {
+      return booking.packageName || 'Package Booking';
+    } else {
+      return booking.attractionName || 'Attraction Booking';
+    }
+  };
+
+  const getBookingColor = (booking: Booking) => {
+    if (booking.type === 'package') {
+      return 'bg-blue-100 text-blue-800';
+    } else {
+      return 'bg-green-100 text-green-800';
+    }
   };
 
   const renderDayView = () => {
@@ -458,17 +524,23 @@ const CalendarView: React.FC = () => {
                 <div className="flex justify-between items-start">
                   <div>
                     <h4 className="font-medium text-gray-900">{booking.customerName}</h4>
-                    <p className="text-sm text-gray-500">{booking.packageName}</p>
+                    <p className="text-sm text-gray-500">{getBookingTitle(booking)}</p>
                     <p className="text-sm text-gray-500">{booking.time}</p>
                   </div>
-                  <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                    booking.status === 'confirmed' ? 'bg-green-100 text-green-800' :
-                    booking.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                    booking.status === 'cancelled' ? 'bg-red-100 text-red-800' :
-                    'bg-purple-100 text-purple-800'
-                  }`}>
-                    {booking.status}
-                  </span>
+                  <div className="flex flex-col items-end gap-2">
+                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                      booking.status === 'confirmed' ? 'bg-green-100 text-green-800' :
+                      booking.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                      booking.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                      booking.status === 'checked-in' ? 'bg-blue-100 text-blue-800' :
+                      'bg-gray-100 text-gray-800'
+                    }`}>
+                      {booking.status}
+                    </span>
+                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${getBookingColor(booking)}`}>
+                      {booking.type === 'package' ? 'Package' : 'Attraction'}
+                    </span>
+                  </div>
                 </div>
                 <div className="mt-2 text-sm">
                   <p>Participants: {booking.participants}</p>
@@ -501,7 +573,7 @@ const CalendarView: React.FC = () => {
               <div 
                 key={day.toISOString()} 
                 className={`border border-gray-200 rounded-lg p-3 min-h-40 ${
-                  day.toDateString() === new Date().toDateString() ? 'bg-purple-50' : ''
+                  day.toDateString() === new Date().toDateString() ? 'bg-blue-50' : ''
                 }`}
               >
                 <div className="text-sm font-medium mb-2">
@@ -510,12 +582,12 @@ const CalendarView: React.FC = () => {
                 {dayBookings.slice(0, 3).map(booking => (
                   <div 
                     key={booking.id} 
-                    className="text-xs bg-purple-100 text-purple-800 rounded p-2 mb-2 cursor-pointer"
+                    className={`text-xs rounded p-2 mb-2 cursor-pointer ${getBookingColor(booking)}`}
                     title={`${booking.customerName} - ${booking.time}`}
                     onClick={() => setSelectedBooking(booking)}
                   >
                     <div className="font-medium truncate">{booking.time} - {booking.customerName}</div>
-                    <div className="truncate">{booking.packageName}</div>
+                    <div className="truncate">{getBookingTitle(booking)}</div>
                   </div>
                 ))}
                 {dayBookings.length > 3 && (
@@ -572,7 +644,7 @@ const CalendarView: React.FC = () => {
               <div 
                 key={day.toISOString()} 
                 className={`border border-gray-200 rounded-lg p-3 h-32 overflow-hidden ${
-                  day.toDateString() === new Date().toDateString() ? 'bg-purple-50' : ''
+                  day.toDateString() === new Date().toDateString() ? 'bg-blue-50' : ''
                 }`}
                 onClick={() => setSelectedDate(day.toISOString().split('T')[0])}
               >
@@ -583,11 +655,15 @@ const CalendarView: React.FC = () => {
                 {dayBookings.slice(0, 2).map(booking => (
                   <div 
                     key={booking.id} 
-                    className="text-xs bg-purple-100 text-purple-800 rounded p-2 mb-2"
+                    className={`text-xs rounded p-2 mb-2 cursor-pointer ${getBookingColor(booking)}`}
                     title={`${booking.customerName} - ${booking.time}`}
+                    onClick={e => {
+                      e.stopPropagation();
+                      setSelectedBooking(booking);
+                    }}
                   >
                     <div className="font-medium truncate">{booking.time} - {booking.customerName}</div>
-                    <div className="truncate">{booking.packageName}</div>
+                    <div className="truncate">{getBookingTitle(booking)}</div>
                   </div>
                 ))}
                 
@@ -632,23 +708,29 @@ const CalendarView: React.FC = () => {
         ) : (
           <div className="space-y-4">
             {rangeBookings.map(booking => (
-              <div key={booking.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+              <div key={booking.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer" onClick={() => setSelectedBooking(booking)}>
                 <div className="flex justify-between items-start">
                   <div>
                     <h4 className="font-medium text-gray-900">{booking.customerName}</h4>
-                    <p className="text-sm text-gray-500">{booking.packageName}</p>
+                    <p className="text-sm text-gray-500">{getBookingTitle(booking)}</p>
                     <p className="text-sm text-gray-500">
                       {new Date(booking.date).toLocaleDateString()} at {booking.time}
                     </p>
                   </div>
-                  <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                    booking.status === 'confirmed' ? 'bg-green-100 text-green-800' :
-                    booking.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                    booking.status === 'cancelled' ? 'bg-red-100 text-red-800' :
-                    'bg-purple-100 text-purple-800'
-                  }`}>
-                    {booking.status}
-                  </span>
+                  <div className="flex flex-col items-end gap-2">
+                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                      booking.status === 'confirmed' ? 'bg-green-100 text-green-800' :
+                      booking.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                      booking.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                      booking.status === 'checked-in' ? 'bg-blue-100 text-blue-800' :
+                      'bg-gray-100 text-gray-800'
+                    }`}>
+                      {booking.status}
+                    </span>
+                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${getBookingColor(booking)}`}>
+                      {booking.type === 'package' ? 'Package' : 'Attraction'}
+                    </span>
+                  </div>
                 </div>
                 <div className="mt-2 text-sm">
                   <p>Participants: {booking.participants}</p>
@@ -679,38 +761,44 @@ const CalendarView: React.FC = () => {
 
   if (loading) {
     return (
-      <MainLayout>
         <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-700"></div>
         </div>
-      </MainLayout>
     );
   }
 
   return (
-    <MainLayout>
       <div className="px-6 py-8 h-full flex flex-col">
         {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Booking Calendar</h1>
-            <p className="text-gray-600 mt-2">View and manage bookings in calendar format</p>
+            <p className="text-gray-600 mt-2">View and manage package and attraction bookings</p>
           </div>
           <div className="flex gap-2 mt-4 sm:mt-0">
             <Link
-              to="/admin/bookings"
+              to="/bookings"
               className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
             >
-              <List className="h-5 w-5 mr-2" />
+              {/* <List className="h-5 w-5 mr-2" /> */}
               List View
             </Link>
-            <Link
-              to="/book/packages"
-              className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
-            >
-              <CalendarIcon className="h-5 w-5 mr-2" />
-              New Booking
-            </Link>
+            <div className="flex gap-2">
+              <Link
+                to="/packages"
+                className="inline-flex items-center px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-700"
+              >
+                <PackageIcon className="h-5 w-5 mr-2" />
+                Packages
+              </Link>
+              <Link
+                to="/attractions"
+                className="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+              >
+                <Ticket className="h-5 w-5 mr-2" />
+                Attractions
+              </Link>
+            </div>
           </div>
         </div>
 
@@ -748,7 +836,7 @@ const CalendarView: React.FC = () => {
               <select
                 value={filters.view}
                 onChange={(e) => handleFilterChange('view', e.target.value as 'day' | 'week' | 'month' | 'range')}
-                className="border border-gray-300 rounded-lg px-3 py-1 text-sm focus:ring-2 focus:ring-purple-400"
+                className="border border-gray-300 rounded-lg px-3 py-1 text-sm focus:ring-2 focus:ring-blue-700"
               >
                 <option value="day">Day</option>
                 <option value="week">Week</option>
@@ -780,7 +868,7 @@ const CalendarView: React.FC = () => {
               </button>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Search</label>
                 <div className="relative">
@@ -792,9 +880,22 @@ const CalendarView: React.FC = () => {
                     placeholder="Search bookings..."
                     value={filters.search}
                     onChange={(e) => handleFilterChange('search', e.target.value)}
-                    className="pl-9 pr-3 py-2 border border-gray-300 rounded-lg w-full text-sm focus:ring-2 focus:ring-purple-400"
+                    className="pl-9 pr-3 py-2 border border-gray-300 rounded-lg w-full text-sm focus:ring-2 focus:ring-blue-700"
                   />
                 </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Booking Type</label>
+                <select
+                  value={filters.type}
+                  onChange={(e) => handleFilterChange('type', e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-700"
+                >
+                  <option value="all">All Types</option>
+                  <option value="package">Packages</option>
+                  <option value="attraction">Attractions</option>
+                </select>
               </div>
               
               {filters.view === 'range' && (
@@ -805,7 +906,7 @@ const CalendarView: React.FC = () => {
                       type="date"
                       value={filters.dateRange.start}
                       onChange={(e) => handleDateRangeChange('start', e.target.value)}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-400"
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-700"
                     />
                   </div>
                   <div>
@@ -814,14 +915,14 @@ const CalendarView: React.FC = () => {
                       type="date"
                       value={filters.dateRange.end}
                       onChange={(e) => handleDateRangeChange('end', e.target.value)}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-400"
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-700"
                     />
                   </div>
                 </>
               )}
             </div>
             
-            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Activities</label>
                 <div className="flex flex-wrap gap-2">
@@ -831,7 +932,7 @@ const CalendarView: React.FC = () => {
                       onClick={() => handleActivityToggle(activity)}
                       className={`px-3 py-1 rounded-full text-xs ${
                         filters.activities.includes(activity)
-                          ? 'bg-purple-100 text-purple-800'
+                          ? 'bg-blue-100 text-blue-800'
                           : 'bg-gray-100 text-gray-800'
                       }`}
                     >
@@ -850,11 +951,30 @@ const CalendarView: React.FC = () => {
                       onClick={() => handlePackageToggle(pkg)}
                       className={`px-3 py-1 rounded-full text-xs ${
                         filters.packages.includes(pkg)
-                          ? 'bg-green-100 text-green-800'
+                          ? 'bg-blue-100 text-blue-800'
                           : 'bg-gray-100 text-gray-800'
                       }`}
                     >
                       {pkg}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Attractions</label>
+                <div className="flex flex-wrap gap-2">
+                  {getUniqueAttractions().map(attraction => (
+                    <button
+                      key={attraction}
+                      onClick={() => handleAttractionToggle(attraction)}
+                      className={`px-3 py-1 rounded-full text-xs ${
+                        filters.attractions.includes(attraction)
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-gray-100 text-gray-800'
+                      }`}
+                    >
+                      {attraction}
                     </button>
                   ))}
                 </div>
@@ -907,14 +1027,24 @@ const CalendarView: React.FC = () => {
                             <p className="text-sm text-gray-500">{booking.email}</p>
                             <p className="text-sm text-gray-500">{booking.phone}</p>
                           </div>
-                          <span className={`px-3 py-1 text-sm font-medium rounded-full ${
-                            booking.status === 'confirmed' ? 'bg-green-100 text-green-800' :
-                            booking.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                            booking.status === 'cancelled' ? 'bg-red-100 text-red-800' :
-                            'bg-purple-100 text-purple-800'
-                          }`}>
-                            {booking.status}
-                          </span>
+                          <div className="flex flex-col items-end gap-2">
+                            <span className={`px-3 py-1 text-sm font-medium rounded-full ${
+                              booking.status === 'confirmed' ? 'bg-green-100 text-green-800' :
+                              booking.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                              booking.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                              booking.status === 'checked-in' ? 'bg-blue-100 text-blue-800' :
+                              'bg-gray-100 text-gray-800'
+                            }`}>
+                              {booking.status}
+                            </span>
+                            <span className={`px-3 py-1 text-sm font-medium rounded-full ${getBookingColor(booking)}`}>
+                              {booking.type === 'package' ? 'Package' : booking.type === 'attraction' ? 'Attraction' : booking.type}
+                            </span>
+                            <span className="text-xs text-gray-500 mt-1">
+                              {booking.type === 'package' && booking.packageName}
+                              {booking.type === 'attraction' && booking.attractionName}
+                            </span>
+                          </div>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                           <div className="flex items-center">
@@ -926,25 +1056,34 @@ const CalendarView: React.FC = () => {
                             <span className="text-sm">{booking.participants} participants</span>
                           </div>
                           <div className="flex items-center">
-                            <PackageIcon className="h-5 w-5 text-gray-400 mr-2" />
-                            <span className="text-sm">{booking.packageName}</span>
+                            {booking.type === 'package' ? (
+                              <PackageIcon className="h-5 w-5 text-gray-400 mr-2" />
+                            ) : (
+                              <Ticket className="h-5 w-5 text-gray-400 mr-2" />
+                            )}
+                            <span className="text-sm">
+                              {booking.type === 'package' && booking.packageName}
+                              {booking.type === 'attraction' && booking.attractionName}
+                            </span>
                           </div>
                           <div className="flex items-center">
                             <Zap className="h-5 w-5 text-gray-400 mr-2" />
                             <span className="text-sm">{booking.activity || 'N/A'}</span>
                           </div>
                         </div>
-                        <div className="mb-4">
-                          <h5 className="font-medium text-gray-700 mb-2">Attractions</h5>
-                          <div className="flex flex-wrap gap-2">
-                            {booking.attractions.map((attraction, index) => (
-                              <span key={index} className="bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded">
-                                {attraction.name} ({attraction.quantity})
-                              </span>
-                            ))}
+                        {booking.attractions && booking.attractions.length > 0 && (
+                          <div className="mb-4">
+                            <h5 className="font-medium text-gray-700 mb-2">Attractions</h5>
+                            <div className="flex flex-wrap gap-2">
+                              {booking.attractions.map((attraction, index) => (
+                                <span key={index} className="bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded">
+                                  {attraction.name} ({attraction.quantity})
+                                </span>
+                              ))}
+                            </div>
                           </div>
-                        </div>
-                        {booking.addOns.length > 0 && (
+                        )}
+                        {booking.addOns && booking.addOns.length > 0 && (
                           <div className="mb-4">
                             <h5 className="font-medium text-gray-700 mb-2 flex items-center">
                               <Gift className="h-4 w-4 mr-1" /> Add-ons
@@ -1010,27 +1149,33 @@ const CalendarView: React.FC = () => {
                   <div className="text-sm text-gray-500">{selectedBooking.email}</div>
                   <div className="text-sm text-gray-500">{selectedBooking.phone}</div>
                   <div className="text-sm text-gray-500">{selectedBooking.date} {selectedBooking.time}</div>
-                  <div className="text-sm text-gray-500">Package: {selectedBooking.packageName}</div>
+                  <div className="text-sm text-gray-500">{getBookingTitle(selectedBooking)}</div>
                   <div className="text-sm text-gray-500">Activity: {selectedBooking.activity || 'N/A'}</div>
                   <div className="text-sm text-gray-500">Participants: {selectedBooking.participants}</div>
                   <div className="text-sm text-gray-500">Status: <span className={`font-semibold ${
                     selectedBooking.status === 'confirmed' ? 'text-green-600' :
                     selectedBooking.status === 'pending' ? 'text-yellow-600' :
                     selectedBooking.status === 'cancelled' ? 'text-red-600' :
-                    'text-purple-600'
+                    selectedBooking.status === 'checked-in' ? 'text-blue-700' :
+                    'text-gray-600'
                   }`}>{selectedBooking.status}</span></div>
+                  <div className="text-sm text-gray-500">Type: <span className={`font-semibold ${selectedBooking.type === 'package' ? 'text-blue-700' : 'text-green-600'}`}>
+                    {selectedBooking.type === 'package' ? 'Package' : 'Attraction'}
+                  </span></div>
                 </div>
-                <div className="mt-4">
-                  <h5 className="font-medium text-gray-700 mb-2">Attractions</h5>
-                  <div className="flex flex-wrap gap-2">
-                    {selectedBooking.attractions.map((attraction, index) => (
-                      <span key={index} className="bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded">
-                        {attraction.name} ({attraction.quantity})
-                      </span>
-                    ))}
+                {selectedBooking.attractions && selectedBooking.attractions.length > 0 && (
+                  <div className="mt-4">
+                    <h5 className="font-medium text-gray-700 mb-2">Attractions</h5>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedBooking.attractions.map((attraction, index) => (
+                        <span key={index} className="bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded">
+                          {attraction.name} ({attraction.quantity})
+                        </span>
+                      ))}
+                    </div>
                   </div>
-                </div>
-                {selectedBooking.addOns.length > 0 && (
+                )}
+                {selectedBooking.addOns && selectedBooking.addOns.length > 0 && (
                   <div className="mt-4">
                     <h5 className="font-medium text-gray-700 mb-2 flex items-center">
                       <Gift className="h-4 w-4 mr-1" /> Add-ons
@@ -1072,7 +1217,6 @@ const CalendarView: React.FC = () => {
           </div>
         )}
       </div>
-    </MainLayout>
   );
 };
 
