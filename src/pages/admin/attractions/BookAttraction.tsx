@@ -465,36 +465,7 @@ const BookingAttraction = () => {
                       </div>
                       <p className="text-sm text-gray-500 mt-1">Pay with your PayPal account</p>
                     </div>
-                    
-                    <div 
-                      className={`border-2 rounded-lg p-4 cursor-pointer ${
-                        paymentMethod === 'cash' 
-                          ? 'border-purple-600 bg-purple-50' 
-                          : 'border-gray-300 hover:border-gray-400'
-                      }`}
-                      onClick={() => setPaymentMethod('cash')}
-                    >
-                      <div className="flex items-center">
-                        <Wallet className="h-6 w-6 mr-2 text-green-600" />
-                        <span className="font-medium">Cash Payment</span>
-                      </div>
-                      <p className="text-sm text-gray-500 mt-1">Pay in person at the venue</p>
-                    </div>
-                    
-                    <div 
-                      className={`border-2 rounded-lg p-4 cursor-pointer ${
-                        paymentMethod === 'e-wallet' 
-                          ? 'border-purple-600 bg-purple-50' 
-                          : 'border-gray-300 hover:border-gray-400'
-                      }`}
-                      onClick={() => setPaymentMethod('e-wallet')}
-                    >
-                      <div className="flex items-center">
-                        <Wallet className="h-6 w-6 mr-2 text-orange-600" />
-                        <span className="font-medium">E-Wallet</span>
-                      </div>
-                      <p className="text-sm text-gray-500 mt-1">Pay with digital wallet</p>
-                    </div>
+                  
                   </div>
                   
                   <div className="flex justify-between">

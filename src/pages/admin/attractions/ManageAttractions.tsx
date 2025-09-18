@@ -615,7 +615,7 @@ const ManageAttractions = () => {
                     <td className="px-4 py-3 whitespace-nowrap text-sm font-medium">
                       <div className="flex items-center gap-2">
                         <Link
-                          to={`/booking-attraction/${attraction.id}`}
+                          to={`/book/attraction/${attraction.id}`}
                           className="p-1 text-blue-700 hover:text-blue-800"
                           title="View Booking Page"
                         >

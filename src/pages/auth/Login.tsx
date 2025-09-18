@@ -16,8 +16,8 @@ export default function Login() {
       password: "password"
     },
     {
-      label: "Attendee",
-      email: "brighton.attendee@example.com",
+      label: "Attendant",
+      email: "brighton.attendant@example.com",
       password: "password"
     }
   ];
@@ -62,8 +62,8 @@ export default function Login() {
             // Find matching demo account
             const account = demoAccounts.find(acc => acc.email === email && acc.password === password);
             if (account) {
-              let role: 'company_admin' | 'location_manager' | 'attendee' = 'attendee';
-              let redirect = '/attendee/dashboard';
+              let role: 'company_admin' | 'location_manager' | 'attendant' = 'attendant';
+              let redirect = '/attendant/dashboard';
               if (account.label === 'Company Admin') {
                 role = 'company_admin';
                 redirect = '/company/dashboard';

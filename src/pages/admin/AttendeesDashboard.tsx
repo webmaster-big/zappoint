@@ -18,7 +18,7 @@ import {
   Star,
 } from 'lucide-react';
 
-const AttendeesDashboard: React.FC = () => {
+const AttendantDashboard: React.FC = () => {
    const [currentWeek, setCurrentWeek] = useState(new Date());
    const [selectedStatus, setSelectedStatus] = useState('all');
    const [calendarFilter, setCalendarFilter] = useState({
@@ -218,7 +218,7 @@ const AttendeesDashboard: React.FC = () => {
          <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-2">
            <div>
              <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2 mb-1">
-                Attendees Dashboard
+                Attendant Dashboard
              </h1>
              <p className="text-base text-gray-700">Weekly overview of bookings and activities</p>
            </div>
@@ -643,4 +643,4 @@ const AttendeesDashboard: React.FC = () => {
    );
 };
 
-export default AttendeesDashboard;
+export default AttendantDashboard;

@@ -68,7 +68,7 @@ const LocationManagerDashboard: React.FC = () => {
       accent: 'bg-blue-100 text-blue-700',
     },
     {
-      title: 'Active Attendees',
+      title: 'Active Attendants',
       value: '87',
       change: '15 new this week',
       trend: 'up',
@@ -93,8 +93,8 @@ const LocationManagerDashboard: React.FC = () => {
     },
     {
       title: 'Issues Requiring Attention',
-      value: '3',
-      change: '2 equipment, 1 staffing',
+      value: '1',
+      change: ' 1 staffing',
       trend: 'neutral',
       icon: AlertCircle,
       accent: 'bg-blue-100 text-blue-700',
@@ -127,8 +127,8 @@ const LocationManagerDashboard: React.FC = () => {
     return weekDates.some(date => date.toDateString() === booking.date.toDateString());
   });
 
-  // Attendee statistics
-  const attendeeStats = {
+  // Attendant statistics
+  const attendantStats = {
     total: 87,
     newThisWeek: 15,
     returning: 72,
@@ -236,27 +236,27 @@ const LocationManagerDashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Attendee Statistics */}
+        {/* Attendant Statistics */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
           <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-            <Users className="w-5 h-5 text-blue-700" /> Attendee Statistics
+            <Users className="w-5 h-5 text-blue-700" /> Attendant Statistics
           </h2>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-blue-50 p-3 rounded-lg">
-                <p className="text-xs text-blue-700">Total Attendees</p>
-                <p className="text-2xl font-bold text-blue-800">{attendeeStats.total}</p>
+                <p className="text-xs text-blue-700">Total Attendants</p>
+                <p className="text-2xl font-bold text-blue-800">{attendantStats.total}</p>
               </div>
               <div className="bg-blue-50 p-3 rounded-lg">
                 <p className="text-xs text-blue-700">New This Week</p>
-                <p className="text-2xl font-bold text-blue-800">+{attendeeStats.newThisWeek}</p>
+                <p className="text-2xl font-bold text-blue-800">+{attendantStats.newThisWeek}</p>
               </div>
             </div>
             
             <div>
               <p className="text-sm font-medium text-gray-700 mb-2">Peak Hours</p>
               <div className="flex flex-wrap gap-2">
-                {attendeeStats.peakHours.map((hour, index) => (
+                {attendantStats.peakHours.map((hour, index) => (
                   <span key={index} className="px-2 py-1 bg-gray-100 text-gray-700 rounded-full text-xs">
                     {hour}
                   </span>
@@ -267,7 +267,7 @@ const LocationManagerDashboard: React.FC = () => {
             <div>
               <p className="text-sm font-medium text-gray-700 mb-2">Age Distribution</p>
               <div className="space-y-1">
-                {Object.entries(attendeeStats.byAgeGroup).map(([ageGroup, count]) => (
+                {Object.entries(attendantStats.byAgeGroup).map(([ageGroup, count]) => (
                   <div key={ageGroup} className="flex items-center justify-between">
                     <span className="text-xs text-gray-600">{ageGroup}</span>
                     <span className="text-xs font-medium text-gray-900">{count}</span>

@@ -8,7 +8,7 @@ interface UserData {
   company: string;
   subcompany?: string;
   position: string;
-  role: 'attendee' | 'location_manager' | 'company_admin';
+  role: 'attendant' | 'location_manager' | 'company_admin';
 }
 
 const MainLayout: React.FC = () => {
@@ -27,7 +27,7 @@ const MainLayout: React.FC = () => {
         name: "John Doe",
         company: "Zap Zone",
         position: "Staff",
-        role: "attendee"
+        role: "attendant"
       });
     }
   }, []);

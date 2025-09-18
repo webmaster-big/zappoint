@@ -33,7 +33,7 @@ interface UserData {
   company: string;
   subcompany?: string;
   position: string;
-  role: 'attendee' | 'location_manager' | 'company_admin';
+  role: 'attendant' | 'location_manager' | 'company_admin';
 }
 
 interface SidebarProps {
@@ -65,9 +65,9 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
   ];
 
   switch(role) {
-    case 'attendee':
+    case 'attendant':
       return [
-        { label: 'Dashboard', icon: Home, href: '/attendee/dashboard' },
+        { label: 'Dashboard', icon: Home, href: '/attendant/dashboard' },
         { label: 'Attractions', icon: Ticket, items: [
           { label: 'Manage Attractions', href: '/attractions', icon: Dot },
           { label: 'Create Attractions', href: '/attractions/create', icon: Dot }
@@ -88,9 +88,9 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
           { label: 'Customer Analytics', href: '/customers/analytics', icon: Dot },
           { label: 'Customers', href: '/customers', icon: Dot }
         ]},
-        // { label: 'Shift Management', icon: Clock, href: '/attendee/shift-management' },
-        { label: 'Profile', icon: User, href: '/attendee/profile' },
-        { label: 'Settings', icon: Settings, href: '/attendee/settings' }
+        // { label: 'Shift Management', icon: Clock, href: '/attendant/shift-management' },
+        { label: 'Profile', icon: User, href: '/attendant/profile' },
+        { label: 'Settings', icon: Settings, href: '/attendant/settings' }
       ];
     case 'location_manager':
       return [
@@ -119,10 +119,10 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
           { label: 'Customer Analytics', href: '/customers/analytics', icon: Dot },
           { label: 'Customers', href: '/customers', icon: Dot }
         ]},
-        { label: 'Attendees Management', icon: Users, items: [
+        { label: 'Attendants Management', icon: Users, items: [
           { label: 'Create Account', href: '/users/create', icon: Dot },
           { label: 'Account Activity Log', href: '/users/activity', icon: Dot },
-          { label: 'Attendees Performance', href: '/users/performance', icon: Dot },
+          { label: 'Attendants Performance', href: '/users/performance', icon: Dot },
           // { label: 'Package Deals', href: '/users/packages', icon: Dot }
         ]},
         // { label: 'Shift Management', icon: Clock, href: '/shift-management' },
@@ -161,7 +161,7 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
         { label: 'User Management', icon: Users, items: [
           { label: 'Create Accounts', href: '/admin/users/create', icon: Dot },
           { label: 'Activity Log', href: '/admin/activity', icon: Dot },
-          { label: 'Attendees Performance', href: '/admin/performance', icon: Dot },
+          { label: 'Attendants Performance', href: '/admin/performance', icon: Dot },
           // { label: 'Package Deals', href: '/admin/packages', icon: Dot }
         ]},
         { label: 'Analytics & Reports', icon: BarChart3, href: '/analytics' },
