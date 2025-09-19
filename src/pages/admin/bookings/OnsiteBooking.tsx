@@ -315,6 +315,7 @@ const OnsiteBooking: React.FC = () => {
 
   const handleAddOnToggle = (addOnName: string, price: number) => {
     setBookingData(prev => {
+      const tempPrice = price;
       const existingIndex = prev.selectedAddOns.findIndex(a => a.name === addOnName);
       if (existingIndex >= 0) {
         // Remove add-on
