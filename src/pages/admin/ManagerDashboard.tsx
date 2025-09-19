@@ -65,7 +65,7 @@ const LocationManagerDashboard: React.FC = () => {
       change: '+12% from last week',
       trend: 'up',
       icon: Calendar,
-      accent: 'bg-blue-100 text-blue-700',
+      accent: 'bg-blue-100 text-blue-800',
     },
     {
       title: 'Active Attendants',
@@ -73,7 +73,7 @@ const LocationManagerDashboard: React.FC = () => {
       change: '15 new this week',
       trend: 'up',
       icon: Users,
-      accent: 'bg-blue-100 text-blue-700',
+      accent: 'bg-blue-100 text-blue-800',
     },
     {
       title: 'Revenue',
@@ -81,7 +81,7 @@ const LocationManagerDashboard: React.FC = () => {
       change: '+8% from last week',
       trend: 'up',
       icon: DollarSign,
-      accent: 'bg-blue-100 text-blue-700',
+      accent: 'bg-blue-100 text-blue-800',
     },
     {
       title: 'Capacity Utilization',
@@ -89,7 +89,7 @@ const LocationManagerDashboard: React.FC = () => {
       change: 'Optimal range',
       trend: 'neutral',
       icon: TrendingUp,
-      accent: 'bg-blue-100 text-blue-700',
+      accent: 'bg-blue-100 text-blue-800',
     },
     {
       title: 'Issues Requiring Attention',
@@ -97,7 +97,7 @@ const LocationManagerDashboard: React.FC = () => {
       change: ' 1 staffing',
       trend: 'neutral',
       icon: AlertCircle,
-      accent: 'bg-blue-100 text-blue-700',
+      accent: 'bg-blue-100 text-blue-800',
     },
   ];
 
@@ -144,24 +144,24 @@ const LocationManagerDashboard: React.FC = () => {
 
   // Quick actions for Location Manager
   const quickActions = [
-    { title: 'New Booking', icon: Plus, accent: 'bg-blue-700 hover:bg-blue-800' },
-    { title: 'Check-in', icon: CheckCircle, accent: 'bg-blue-700 hover:bg-blue-800' },
-    { title: 'Staff Management', icon: Users, accent: 'bg-blue-700 hover:bg-blue-800' },
-    { title: 'Generate Report', icon: Download, accent: 'bg-blue-700 hover:bg-blue-800' },
+    { title: 'New Booking', icon: Plus, accent: 'bg-blue-800 hover:bg-blue-800' },
+    { title: 'Check-in', icon: CheckCircle, accent: 'bg-blue-800 hover:bg-blue-800' },
+    { title: 'Staff Management', icon: Users, accent: 'bg-blue-800 hover:bg-blue-800' },
+    { title: 'Generate Report', icon: Download, accent: 'bg-blue-800 hover:bg-blue-800' },
   ];
 
   // Status colors
   const statusColors = {
-    Confirmed: 'bg-emerald-100 text-emerald-700',
-    Pending: 'bg-blue-100 text-blue-700',
-    Cancelled: 'bg-rose-100 text-rose-700',
+    Confirmed: 'bg-emerald-100 text-emerald-800',
+    Pending: 'bg-blue-100 text-blue-800',
+    Cancelled: 'bg-rose-100 text-rose-800',
   };
 
   // Payment status colors
   const paymentColors = {
-    Paid: 'bg-emerald-100 text-emerald-700',
-    Partial: 'bg-blue-100 text-blue-700',
-    Refunded: 'bg-rose-100 text-rose-700',
+    Paid: 'bg-emerald-100 text-emerald-800',
+    Partial: 'bg-blue-100 text-blue-800',
+    Refunded: 'bg-rose-100 text-rose-800',
   };
 
   // Filter bookings by status for the table
@@ -182,7 +182,7 @@ const LocationManagerDashboard: React.FC = () => {
             <span>{locationInfo.name}</span>
           </div>
         </div>
-        <button className="mt-4 md:mt-0 px-5 py-2.5 bg-blue-700 text-white rounded-xl flex items-center gap-2 hover:bg-blue-700 transition font-semibold shadow-sm">
+        <button className="mt-4 md:mt-0 px-5 py-2.5 bg-blue-800 text-white rounded-xl flex items-center gap-2 hover:bg-blue-800 transition font-semibold shadow-sm">
           <Plus size={20} />
           <Link to="/bookings/create">New Booking</Link>
         </button>
@@ -199,7 +199,7 @@ const LocationManagerDashboard: React.FC = () => {
             >
               <div className="flex items-center gap-2">
                 <div className={`p-2 rounded-lg ${metric.accent}`}><Icon size={20} /></div>
-                <span className="text-base font-semibold text-gray-700">{metric.title}</span>
+                <span className="text-base font-semibold text-gray-800">{metric.title}</span>
               </div>
               <div className="flex items-end gap-2 mt-2">
                 <h3 className="text-2xl font-bold text-gray-900">{metric.value}</h3>
@@ -214,23 +214,23 @@ const LocationManagerDashboard: React.FC = () => {
         {/* Location Info Card */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
           <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-            <MapPin className="w-5 h-5 text-blue-700" /> Location Details
+            <MapPin className="w-5 h-5 text-blue-800" /> Location Details
           </h2>
           <div className="space-y-3">
             <div>
-              <p className="text-sm font-medium text-gray-700">Address</p>
+              <p className="text-sm font-medium text-gray-800">Address</p>
               <p className="text-sm text-gray-600">{locationInfo.address}</p>
             </div>
             <div>
-              <p className="text-sm font-medium text-gray-700">Operating Hours</p>
+              <p className="text-sm font-medium text-gray-800">Operating Hours</p>
               <p className="text-sm text-gray-600">{locationInfo.operatingHours}</p>
             </div>
             <div>
-              <p className="text-sm font-medium text-gray-700">Capacity</p>
+              <p className="text-sm font-medium text-gray-800">Capacity</p>
               <p className="text-sm text-gray-600">{locationInfo.capacity} people</p>
             </div>
             <div>
-              <p className="text-sm font-medium text-gray-700">Contact</p>
+              <p className="text-sm font-medium text-gray-800">Contact</p>
               <p className="text-sm text-gray-600">{locationInfo.contact}</p>
             </div>
           </div>
@@ -239,25 +239,25 @@ const LocationManagerDashboard: React.FC = () => {
         {/* Attendant Statistics */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
           <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-            <Users className="w-5 h-5 text-blue-700" /> Attendant Statistics
+            <Users className="w-5 h-5 text-blue-800" /> Attendant Statistics
           </h2>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-blue-50 p-3 rounded-lg">
-                <p className="text-xs text-blue-700">Total Attendants</p>
+                <p className="text-xs text-blue-800">Total Attendants</p>
                 <p className="text-2xl font-bold text-blue-800">{attendantStats.total}</p>
               </div>
               <div className="bg-blue-50 p-3 rounded-lg">
-                <p className="text-xs text-blue-700">New This Week</p>
+                <p className="text-xs text-blue-800">New This Week</p>
                 <p className="text-2xl font-bold text-blue-800">+{attendantStats.newThisWeek}</p>
               </div>
             </div>
             
             <div>
-              <p className="text-sm font-medium text-gray-700 mb-2">Peak Hours</p>
+              <p className="text-sm font-medium text-gray-800 mb-2">Peak Hours</p>
               <div className="flex flex-wrap gap-2">
                 {attendantStats.peakHours.map((hour, index) => (
-                  <span key={index} className="px-2 py-1 bg-gray-100 text-gray-700 rounded-full text-xs">
+                  <span key={index} className="px-2 py-1 bg-gray-100 text-gray-800 rounded-full text-xs">
                     {hour}
                   </span>
                 ))}
@@ -265,7 +265,7 @@ const LocationManagerDashboard: React.FC = () => {
             </div>
             
             <div>
-              <p className="text-sm font-medium text-gray-700 mb-2">Age Distribution</p>
+              <p className="text-sm font-medium text-gray-800 mb-2">Age Distribution</p>
               <div className="space-y-1">
                 {Object.entries(attendantStats.byAgeGroup).map(([ageGroup, count]) => (
                   <div key={ageGroup} className="flex items-center justify-between">
@@ -281,7 +281,7 @@ const LocationManagerDashboard: React.FC = () => {
         {/* Quick Actions */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 flex flex-col gap-4">
           <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-            <Zap className="w-5 h-5 text-blue-700" /> Quick Actions
+            <Zap className="w-5 h-5 text-blue-800" /> Quick Actions
           </h2>
           <div className="grid grid-cols-2 gap-3">
             {quickActions.map((action, index) => {
@@ -304,7 +304,7 @@ const LocationManagerDashboard: React.FC = () => {
       <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
           <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-            <Calendar className="w-5 h-5 text-blue-700" /> Weekly Calendar
+            <Calendar className="w-5 h-5 text-blue-800" /> Weekly Calendar
           </h2>
           <div className="flex items-center space-x-2 mt-4 md:mt-0">
             <button 
@@ -313,7 +313,7 @@ const LocationManagerDashboard: React.FC = () => {
             >
               <ChevronLeft size={18} />
             </button>
-            <span className="text-sm font-medium text-gray-700">
+            <span className="text-sm font-medium text-gray-800">
               {weekDates[0].toLocaleDateString('en-US', { month: 'long', day: 'numeric' })} - 
               {weekDates[6].toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
             </span>
@@ -323,7 +323,7 @@ const LocationManagerDashboard: React.FC = () => {
             >
               <ChevronRight size={18} />
             </button>
-            <button className="ml-2 px-3 py-2 text-sm bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200" onClick={() => setCurrentWeek(new Date())}>
+            <button className="ml-2 px-3 py-2 text-sm bg-blue-100 text-blue-800 rounded-lg hover:bg-blue-200" onClick={() => setCurrentWeek(new Date())}>
               Today
             </button>
           </div>
@@ -481,7 +481,7 @@ const LocationManagerDashboard: React.FC = () => {
                   <td className="px-4 py-3 font-medium">{booking.amount}</td>
                   <td className="px-4 py-3">
                     <div className="flex space-x-2">
-                      <button className="p-1 text-blue-700 hover:text-blue-800" title="Check-in">
+                      <button className="p-1 text-blue-800 hover:text-blue-800" title="Check-in">
                         <CheckCircle size={16} />
                       </button>
                       <button className="p-1 text-gray-600 hover:text-gray-800" title="Send reminder">

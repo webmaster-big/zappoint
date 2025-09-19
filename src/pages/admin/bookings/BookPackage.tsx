@@ -219,11 +219,11 @@ const BookPackage: React.FC = () => {
             <div className="flex flex-wrap gap-2">
               {pkg.features && Array.isArray(pkg.features)
                 ? <>{pkg.features.map((f: string) => (
-                    <span key={f} className="inline-flex items-center rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">{f}</span>
+                    <span key={f} className="inline-flex items-center rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-800">{f}</span>
                   ))}</>
                 : typeof pkg.features === 'string' && pkg.features.trim() !== ''
                   ? <>{pkg.features.split(',').map((f: string) => (
-                      <span key={f.trim()} className="inline-flex items-center rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">{f.trim()}</span>
+                      <span key={f.trim()} className="inline-flex items-center rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-800">{f.trim()}</span>
                     ))}</>
                   : null}
             </div>
@@ -232,22 +232,22 @@ const BookPackage: React.FC = () => {
           {/* Step Navigation */}
           <div className="flex mb-6 bg-white rounded-xl p-4 shadow-sm border border-gray-100">
             <div className="flex-1 flex items-center">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center mr-3 ${currentStep >= 1 ? 'bg-blue-700 text-white' : 'bg-gray-200 text-gray-500'}`}>
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center mr-3 ${currentStep >= 1 ? 'bg-blue-800 text-white' : 'bg-gray-200 text-gray-500'}`}>
                 1
               </div>
-              <span className={`text-sm font-medium ${currentStep >= 1 ? 'text-blue-700' : 'text-gray-500'}`}>Booking Details</span>
+              <span className={`text-sm font-medium ${currentStep >= 1 ? 'text-blue-800' : 'text-gray-500'}`}>Booking Details</span>
             </div>
             <div className="flex-1 flex items-center">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center mr-3 ${currentStep >= 2 ? 'bg-blue-700 text-white' : 'bg-gray-200 text-gray-500'}`}>
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center mr-3 ${currentStep >= 2 ? 'bg-blue-800 text-white' : 'bg-gray-200 text-gray-500'}`}>
                 2
               </div>
-              <span className={`text-sm font-medium ${currentStep >= 2 ? 'text-blue-700' : 'text-gray-500'}`}>Personal Info</span>
+              <span className={`text-sm font-medium ${currentStep >= 2 ? 'text-blue-800' : 'text-gray-500'}`}>Personal Info</span>
             </div>
             <div className="flex-1 flex items-center">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center mr-3 ${currentStep >= 3 ? 'bg-blue-700 text-white' : 'bg-gray-200 text-gray-500'}`}>
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center mr-3 ${currentStep >= 3 ? 'bg-blue-800 text-white' : 'bg-gray-200 text-gray-500'}`}>
                 3
               </div>
-              <span className={`text-sm font-medium ${currentStep >= 3 ? 'text-blue-700' : 'text-gray-500'}`}>Payment</span>
+              <span className={`text-sm font-medium ${currentStep >= 3 ? 'text-blue-800' : 'text-gray-500'}`}>Payment</span>
             </div>
           </div>
           
@@ -256,11 +256,11 @@ const BookPackage: React.FC = () => {
               <>
                 {/* Date and Time Selection */}
                 <div className="bg-blue-50 p-5 rounded-xl">
-                  <h3 className="font-medium mb-4 text-gray-700 text-sm uppercase tracking-wide">Select Date & Time</h3>
+                  <h3 className="font-medium mb-4 text-gray-800 text-sm uppercase tracking-wide">Select Date & Time</h3>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div>
-                      <label className="block font-medium mb-2 text-gray-700 text-sm">Date</label>
+                      <label className="block font-medium mb-2 text-gray-800 text-sm">Date</label>
                       <select
                         value={selectedDate}
                         onChange={(e) => setSelectedDate(e.target.value)}
@@ -275,7 +275,7 @@ const BookPackage: React.FC = () => {
                     </div>
                     
                     <div>
-                      <label className="block font-medium mb-2 text-gray-700 text-sm">Time</label>
+                      <label className="block font-medium mb-2 text-gray-800 text-sm">Time</label>
                       <select
                         value={selectedTime}
                         onChange={(e) => setSelectedTime(e.target.value)}
@@ -297,20 +297,20 @@ const BookPackage: React.FC = () => {
                 
                 {/* Duration Display */}
                 <div className="bg-blue-50 p-5 rounded-xl">
-                  <label className="block font-medium mb-3 text-gray-700 text-sm uppercase tracking-wide">Duration</label>
+                  <label className="block font-medium mb-3 text-gray-800 text-sm uppercase tracking-wide">Duration</label>
                   <div className="flex items-center">
                     <svg className="w-5 h-5 text-gray-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                     </svg>
-                    <span className="text-gray-700 font-medium">{formatDuration()}</span>
+                    <span className="text-gray-800 font-medium">{formatDuration()}</span>
                   </div>
                 </div>
                 
                 <div className="bg-blue-50 p-5 rounded-xl">
-                  <label className="block font-medium mb-3 text-gray-700 text-sm uppercase tracking-wide">Participants</label>
+                  <label className="block font-medium mb-3 text-gray-800 text-sm uppercase tracking-wide">Participants</label>
                   <div className="flex items-center">
                     <button 
-                      className="w-10 h-10 rounded-lg bg-white border border-gray-300 text-gray-700 flex items-center justify-center shadow-sm"
+                      className="w-10 h-10 rounded-lg bg-white border border-gray-300 text-gray-800 flex items-center justify-center shadow-sm"
                       onClick={() => setParticipants(Math.max(1, participants - 1))}
                     >
                       -
@@ -321,10 +321,10 @@ const BookPackage: React.FC = () => {
                       max={Number(pkg.maxParticipants) + 10} 
                       value={participants} 
                       onChange={e => setParticipants(Math.max(1, Math.min(Number(pkg.maxParticipants) + 10, Number(e.target.value))))} 
-                      className="w-16 text-center mx-3 rounded-lg border border-gray-300 px-2 py-2 text-base font-medium text-gray-700" 
+                      className="w-16 text-center mx-3 rounded-lg border border-gray-300 px-2 py-2 text-base font-medium text-gray-800" 
                     />
                     <button 
-                      className="w-10 h-10 rounded-lg bg-white border border-gray-300 text-gray-700 flex items-center justify-center shadow-sm"
+                      className="w-10 h-10 rounded-lg bg-white border border-gray-300 text-gray-800 flex items-center justify-center shadow-sm"
                       onClick={() => setParticipants(Math.min(Number(pkg.maxParticipants) + 10, participants + 1))}
                     >
                       +
@@ -337,7 +337,7 @@ const BookPackage: React.FC = () => {
                 
                 {pkg.attractions && pkg.attractions.length > 0 && (
                   <div className="border border-gray-200 rounded-xl p-5">
-                    <label className="block font-medium mb-3 text-gray-700 text-sm uppercase tracking-wide">Additional Attractions</label>
+                    <label className="block font-medium mb-3 text-gray-800 text-sm uppercase tracking-wide">Additional Attractions</label>
                     <div className="space-y-4">
                       {pkg.attractions.map((a) => {
                         // If a is an object, use its properties; if string, use all available from attractions array
@@ -366,7 +366,7 @@ const BookPackage: React.FC = () => {
                             </div>
                             <div className="flex items-center gap-2">
                               <button 
-                                className="w-8 h-8 rounded-md bg-white border border-gray-300 text-gray-700 flex items-center justify-center text-sm shadow-sm"
+                                className="w-8 h-8 rounded-md bg-white border border-gray-300 text-gray-800 flex items-center justify-center text-sm shadow-sm"
                                 onClick={() => handleAttractionQty(attraction.name, (selectedAttractions[attraction.name] || 0) - 1)}
                               >
                                 -
@@ -379,7 +379,7 @@ const BookPackage: React.FC = () => {
                                 className="w-12 text-center rounded-md border border-gray-300 px-1 py-1 text-sm" 
                               />
                               <button 
-                                className="w-8 h-8 rounded-md bg-white border border-gray-300 text-gray-700 flex items-center justify-center text-sm shadow-sm"
+                                className="w-8 h-8 rounded-md bg-white border border-gray-300 text-gray-800 flex items-center justify-center text-sm shadow-sm"
                                 onClick={() => handleAttractionQty(attraction.name, (selectedAttractions[attraction.name] || 0) + 1)}
                               >
                                 +
@@ -394,7 +394,7 @@ const BookPackage: React.FC = () => {
                 
                 {pkg.addOns && pkg.addOns.length > 0 && (
                   <div className="border border-gray-200 rounded-xl p-5">
-                    <label className="block font-medium mb-3 text-gray-700 text-sm uppercase tracking-wide">Add-ons</label>
+                    <label className="block font-medium mb-3 text-gray-800 text-sm uppercase tracking-wide">Add-ons</label>
                     <div className="space-y-4">
                       {pkg.addOns.map((a) => {
                         const addOn = typeof a === "string" ? { name: a, price: undefined } : a;
@@ -410,7 +410,7 @@ const BookPackage: React.FC = () => {
                             </div>
                             <div className="flex items-center gap-2">
                               <button 
-                                className="w-8 h-8 rounded-md bg-white border border-gray-300 text-gray-700 flex items-center justify-center text-sm shadow-sm"
+                                className="w-8 h-8 rounded-md bg-white border border-gray-300 text-gray-800 flex items-center justify-center text-sm shadow-sm"
                                 onClick={() => handleAddOnQty(addOn.name, (selectedAddOns[addOn.name] || 0) - 1)}
                               >
                                 -
@@ -423,7 +423,7 @@ const BookPackage: React.FC = () => {
                                 className="w-12 text-center rounded-md border border-gray-300 px-1 py-1 text-sm" 
                               />
                               <button 
-                                className="w-8 h-8 rounded-md bg-white border border-gray-300 text-gray-700 flex items-center justify-center text-sm shadow-sm"
+                                className="w-8 h-8 rounded-md bg-white border border-gray-300 text-gray-800 flex items-center justify-center text-sm shadow-sm"
                                 onClick={() => handleAddOnQty(addOn.name, (selectedAddOns[addOn.name] || 0) + 1)}
                               >
                                 +
@@ -438,7 +438,7 @@ const BookPackage: React.FC = () => {
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div className="border border-gray-200 rounded-xl p-5">
-                    <label className="block font-medium mb-3 text-gray-700 text-sm uppercase tracking-wide">Promo Code</label>
+                    <label className="block font-medium mb-3 text-gray-800 text-sm uppercase tracking-wide">Promo Code</label>
                     <div className="flex gap-2 items-center">
                       <input 
                         type="text" 
@@ -450,20 +450,20 @@ const BookPackage: React.FC = () => {
                       <button 
                         type="button" 
                         onClick={() => handleApplyCode("promo")}
-                        className="px-4 py-2.5 rounded-lg bg-blue-700 text-white font-medium hover:bg-blue-700 transition text-sm shadow-sm"
+                        className="px-4 py-2.5 rounded-lg bg-blue-800 text-white font-medium hover:bg-blue-800 transition text-sm shadow-sm"
                       >
                         Apply
                       </button>
                     </div>
                     {appliedPromo && (
-                      <div className="mt-3 p-2 bg-green-50 text-green-700 rounded-md text-xs border border-green-200">
+                      <div className="mt-3 p-2 bg-green-50 text-green-800 rounded-md text-xs border border-green-200">
                         ✅ Applied: {appliedPromo.name}
                       </div>
                     )}
                   </div>
                   
                   <div className="border border-gray-200 rounded-xl p-5">
-                    <label className="block font-medium mb-3 text-gray-700 text-sm uppercase tracking-wide">Gift Card</label>
+                    <label className="block font-medium mb-3 text-gray-800 text-sm uppercase tracking-wide">Gift Card</label>
                     <div className="flex gap-2 items-center">
                       <input 
                         type="text" 
@@ -475,13 +475,13 @@ const BookPackage: React.FC = () => {
                       <button 
                         type="button" 
                         onClick={() => handleApplyCode("giftcard")}
-                        className="px-4 py-2.5 rounded-lg bg-green-600 text-white font-medium hover:bg-green-700 transition text-sm shadow-sm"
+                        className="px-4 py-2.5 rounded-lg bg-green-600 text-white font-medium hover:bg-green-800 transition text-sm shadow-sm"
                       >
                         Apply
                       </button>
                     </div>
                     {appliedGiftCard && (
-                      <div className="mt-3 p-2 bg-green-50 text-green-700 rounded-md text-xs border border-green-200">
+                      <div className="mt-3 p-2 bg-green-50 text-green-800 rounded-md text-xs border border-green-200">
                         ✅ Applied: {appliedGiftCard.name}
                       </div>
                     )}
@@ -490,7 +490,7 @@ const BookPackage: React.FC = () => {
                 
                 <div className="flex justify-end pt-4">
                   <button 
-                    className="py-3 px-6 rounded-lg bg-blue-700 text-white font-medium hover:bg-blue-700 transition shadow-sm flex items-center"
+                    className="py-3 px-6 rounded-lg bg-blue-800 text-white font-medium hover:bg-blue-800 transition shadow-sm flex items-center"
                     onClick={() => setCurrentStep(2)}
                   >
                     Continue to Personal Info
@@ -505,7 +505,7 @@ const BookPackage: React.FC = () => {
                 <h3 className="text-lg font-medium text-gray-800 mb-6 border-b pb-3">Personal Information</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div>
-                    <label className="block font-medium mb-2 text-gray-700 text-sm">First Name</label>
+                    <label className="block font-medium mb-2 text-gray-800 text-sm">First Name</label>
                     <input 
                       type="text" 
                       placeholder="First Name" 
@@ -515,7 +515,7 @@ const BookPackage: React.FC = () => {
                     />
                   </div>
                   <div>
-                    <label className="block font-medium mb-2 text-gray-700 text-sm">Last Name</label>
+                    <label className="block font-medium mb-2 text-gray-800 text-sm">Last Name</label>
                     <input 
                       type="text" 
                       placeholder="Last Name" 
@@ -525,7 +525,7 @@ const BookPackage: React.FC = () => {
                     />
                   </div>
                   <div className="md:col-span-2">
-                    <label className="block font-medium mb-2 text-gray-700 text-sm">Email</label>
+                    <label className="block font-medium mb-2 text-gray-800 text-sm">Email</label>
                     <input 
                       type="email" 
                       placeholder="Email" 
@@ -535,7 +535,7 @@ const BookPackage: React.FC = () => {
                     />
                   </div>
                   <div className="md:col-span-2">
-                    <label className="block font-medium mb-2 text-gray-700 text-sm">Phone Number</label>
+                    <label className="block font-medium mb-2 text-gray-800 text-sm">Phone Number</label>
                     <input 
                       type="tel" 
                       placeholder="Phone Number" 
@@ -548,7 +548,7 @@ const BookPackage: React.FC = () => {
                 
                 <div className="flex justify-between pt-6">
                   <button 
-                    className="py-3 px-6 rounded-lg bg-gray-200 text-gray-700 font-medium hover:bg-gray-300 transition flex items-center"
+                    className="py-3 px-6 rounded-lg bg-gray-200 text-gray-800 font-medium hover:bg-gray-300 transition flex items-center"
                     onClick={() => setCurrentStep(1)}
                   >
                     <svg className="mr-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -557,7 +557,7 @@ const BookPackage: React.FC = () => {
                     Back
                   </button>
                   <button 
-                    className="py-3 px-6 rounded-lg bg-blue-700 text-white font-medium hover:bg-blue-700 transition shadow-sm flex items-center"
+                    className="py-3 px-6 rounded-lg bg-blue-800 text-white font-medium hover:bg-blue-800 transition shadow-sm flex items-center"
                     onClick={() => setCurrentStep(3)}
                   >
                     Continue to Payment
@@ -615,7 +615,7 @@ const BookPackage: React.FC = () => {
                 </div>
                 {/* Payment Type Selection */}
                 <div className="mt-6 mb-4">
-                  <label className="block font-medium mb-2 text-gray-700 text-sm">Select Payment Type</label>
+                  <label className="block font-medium mb-2 text-gray-800 text-sm">Select Payment Type</label>
                   <div className="flex gap-4">
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input
@@ -624,7 +624,7 @@ const BookPackage: React.FC = () => {
                         value="full"
                         checked={paymentType === 'full'}
                         onChange={() => setPaymentType('full')}
-                        className="accent-blue-700"
+                        className="accent-blue-800"
                       />
                       <span className="text-sm">Full Payment</span>
                     </label>
@@ -635,21 +635,21 @@ const BookPackage: React.FC = () => {
                         value="partial"
                         checked={paymentType === 'partial'}
                         onChange={() => setPaymentType('partial')}
-                        className="accent-blue-700"
+                        className="accent-blue-800"
                       />
                       <span className="text-sm">Partial Payment (20%)</span>
                     </label>
                   </div>
                   {paymentType === 'partial' && (
                     <div className="mt-2 text-xs text-gray-600">
-                      You will pay <span className="font-semibold text-blue-700">${partialAmount.toFixed(2)}</span> now. Remaining balance will be paid on site.
+                      You will pay <span className="font-semibold text-blue-800">${partialAmount.toFixed(2)}</span> now. Remaining balance will be paid on site.
                     </div>
                   )}
                 </div>
                 
                 <div className="flex justify-between pt-6">
                   <button 
-                    className="py-3 px-6 rounded-lg bg-gray-200 text-gray-700 font-medium hover:bg-gray-300 transition flex items-center"
+                    className="py-3 px-6 rounded-lg bg-gray-200 text-gray-800 font-medium hover:bg-gray-300 transition flex items-center"
                     onClick={() => setCurrentStep(2)}
                   >
                     <svg className="mr-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -657,7 +657,7 @@ const BookPackage: React.FC = () => {
                     </svg>
                     Back
                   </button>
-                  <button className="py-3 px-8 rounded-lg bg-blue-700 text-white font-medium hover:bg-blue-700 transition shadow-sm">
+                  <button className="py-3 px-8 rounded-lg bg-blue-800 text-white font-medium hover:bg-blue-800 transition shadow-sm">
                     Pay Now
                   </button>
                 </div>
@@ -709,7 +709,7 @@ const BookPackage: React.FC = () => {
               
               {Object.entries(selectedAttractions).some(([, qty]) => qty > 0) && (
                 <div>
-                  <div className="font-medium text-gray-700 mb-2 text-sm">Attractions</div>
+                  <div className="font-medium text-gray-800 mb-2 text-sm">Attractions</div>
                   {Object.entries(selectedAttractions).filter(([, qty]) => qty > 0).map(([name, qty]) => {
                     let price = 0;
                     let unit = '';
@@ -742,7 +742,7 @@ const BookPackage: React.FC = () => {
               
               {Object.entries(selectedAddOns).some(([, qty]) => qty > 0) && (
                 <div>
-                  <div className="font-medium text-gray-700 mb-2 text-sm">Add-ons</div>
+                  <div className="font-medium text-gray-800 mb-2 text-sm">Add-ons</div>
                   {Object.entries(selectedAddOns).filter(([, qty]) => qty > 0).map(([name, qty]) => {
                     let price = 0;
                     let unit = '';
@@ -786,7 +786,7 @@ const BookPackage: React.FC = () => {
               
               <div className="flex justify-between pt-3 border-t font-semibold text-base">
                 <span>Total</span>
-                <span className="text-blue-700">${total.toFixed(2)}</span>
+                <span className="text-blue-800">${total.toFixed(2)}</span>
               </div>
             </div>
             

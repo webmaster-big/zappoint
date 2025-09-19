@@ -18,7 +18,7 @@ import BookingAttraction from "./pages/admin/attractions/BookAttraction";
 import ManageAttractions from "./pages/admin/attractions/ManageAttractions";
 import LocationManagerDashboard from "./pages/admin/ManagerDashboard";
 import CompanyDashboard from "./pages/admin/CompanyDashboard";
-import AttendantDashboard from "./pages/admin/AttendeesDashboard";
+import AttendantDashboard from "./pages/admin/AttendantDashboard";
 
 
 function App() {

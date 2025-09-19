@@ -211,7 +211,7 @@ const GiftCard: React.FC = () => {
               <p className="text-gray-500 mt-1">Create and manage gift cards for your customers</p>
             </div>
             <button
-              className="bg-blue-600 text-white rounded-lg px-4 py-2.5 flex items-center gap-2 hover:bg-blue-700 transition-colors shadow-sm"
+              className="bg-blue-600 text-white rounded-lg px-4 py-2.5 flex items-center gap-2 hover:bg-blue-800 transition-colors shadow-sm"
               onClick={() => setShowModal(true)}
             >
               <Plus className="w-5 h-5" /> New Gift Card
@@ -302,7 +302,7 @@ const GiftCard: React.FC = () => {
                         <h3 className="font-semibold text-gray-900">Gift Card Code</h3>
                         <button 
                           onClick={() => copyToClipboard(gc.code)}
-                          className="text-blue-700 hover:text-blue-700"
+                          className="text-blue-800 hover:text-blue-800"
                           title="Copy code"
                         >
                           <Copy className="w-4 h-4" />
@@ -355,7 +355,7 @@ const GiftCard: React.FC = () => {
               <div className="text-gray-400 mb-2">No gift cards found</div>
               <p className="text-gray-500 text-sm mb-4">Create your first gift card to get started</p>
               <button
-                className="bg-blue-600 text-white rounded-lg px-4 py-2 flex items-center gap-2 hover:bg-blue-700 transition-colors mx-auto shadow-sm"
+                className="bg-blue-600 text-white rounded-lg px-4 py-2 flex items-center gap-2 hover:bg-blue-800 transition-colors mx-auto shadow-sm"
                 onClick={() => setShowModal(true)}
               >
                 <Plus className="w-4 h-4" /> Create Gift Card
@@ -373,86 +373,84 @@ const GiftCard: React.FC = () => {
               </button>
               <h3 className="text-xl font-semibold mb-4 text-gray-900">Create Gift Card</h3>
               <form className="space-y-4" onSubmit={handleAdd}>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
-                    <select 
-                      name="type" 
-                      value={form.type} 
-                      onChange={handleChange} 
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-700 focus:border-blue-700"
-                    >
-                      <option value="fixed">Fixed Value</option>
-                      <option value="percentage">Percentage</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      {form.type === "fixed" ? "Value ($)" : "Percentage (%)"}
-                    </label>
-                    <input 
-                      type="number" 
-                      name="initial_value" 
-                      value={form.initial_value} 
-                      onChange={handleChange} 
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-700 focus:border-blue-700" 
-                      min="0" 
-                      required 
-                      placeholder={form.type === "fixed" ? "0.00" : "0"}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      {form.type === "fixed" ? "Balance ($)" : "Balance (%)"}
-                    </label>
-                    <input 
-                      type="number" 
-                      name="balance" 
-                      value={form.balance} 
-                      onChange={handleChange} 
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-700 focus:border-blue-700" 
-                      min="0" 
-                      required 
-                      placeholder={form.type === "fixed" ? "0.00" : "0"}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Max Usage</label>
-                    <input 
-                      type="number" 
-                      name="max_usage" 
-                      value={form.max_usage} 
-                      onChange={handleChange} 
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-700 focus:border-blue-700" 
-                      min="1" 
-                      required 
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Expiry Date</label>
-                    <input 
-                      type="date" 
-                      name="expiry_date" 
-                      value={form.expiry_date} 
-                      onChange={handleChange} 
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-700 focus:border-blue-700" 
-                    />
-                  </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-800 mb-1">Type</label>
+                  <select 
+                    name="type" 
+                    value={form.type} 
+                    onChange={handleChange} 
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-800 focus:border-blue-800"
+                  >
+                    <option value="fixed">Fixed Value</option>
+                    <option value="percentage">Percentage</option>
+                  </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                  <label className="block text-sm font-medium text-gray-800 mb-1">
+                    {form.type === "fixed" ? "Value ($)" : "Percentage (%)"}
+                  </label>
+                  <input 
+                    type="number" 
+                    name="initial_value" 
+                    value={form.initial_value} 
+                    onChange={handleChange} 
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-800 focus:border-blue-800" 
+                    min="0" 
+                    required 
+                    placeholder={form.type === "fixed" ? "0.00" : "0"}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-800 mb-1">
+                    {form.type === "fixed" ? "Balance ($)" : "Balance (%)"}
+                  </label>
+                  <input 
+                    type="number" 
+                    name="balance" 
+                    value={form.balance} 
+                    onChange={handleChange} 
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-800 focus:border-blue-800" 
+                    min="0" 
+                    required 
+                    placeholder={form.type === "fixed" ? "0.00" : "0"}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-800 mb-1">Max Usage</label>
+                  <input 
+                    type="number" 
+                    name="max_usage" 
+                    value={form.max_usage} 
+                    onChange={handleChange} 
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-800 focus:border-blue-800" 
+                    min="1" 
+                    required 
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-800 mb-1">Expiry Date</label>
+                  <input 
+                    type="date" 
+                    name="expiry_date" 
+                    value={form.expiry_date} 
+                    onChange={handleChange} 
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-800 focus:border-blue-800" 
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-800 mb-1">Description</label>
                   <textarea 
                     name="description" 
                     value={form.description} 
                     onChange={handleChange} 
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-700 focus:border-blue-700" 
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-800 focus:border-blue-800" 
                     rows={2} 
                     placeholder="Optional description"
                   />
                 </div>
                 <button 
                   type="submit" 
-                  className="w-full bg-blue-600 text-white py-2.5 rounded-lg font-medium mt-2 hover:bg-blue-700 transition-colors"
+                  className="w-full bg-blue-600 text-white py-2.5 rounded-lg font-medium mt-2 hover:bg-blue-800 transition-colors"
                 >
                   Create Gift Card
                 </button>
@@ -472,84 +470,84 @@ const GiftCard: React.FC = () => {
               <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+                    <label className="block text-sm font-medium text-gray-800 mb-1">Type</label>
                     <select 
                       name="type" 
                       value={editForm.type || ''} 
                       onChange={handleEditChange} 
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-700 focus:border-blue-700"
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-800 focus:border-blue-800"
                     >
                       <option value="fixed">Fixed Value</option>
                       <option value="percentage">Percentage</option>
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">{editForm.type === "fixed" ? "Value ($)" : "Percentage (%)"}</label>
+                    <label className="block text-sm font-medium text-gray-800 mb-1">{editForm.type === "fixed" ? "Value ($)" : "Percentage (%)"}</label>
                     <input 
                       type="number" 
                       name="initial_value" 
                       value={editForm.initial_value || ''} 
                       onChange={handleEditChange} 
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-700 focus:border-blue-700" 
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-800 focus:border-blue-800" 
                       min="0" 
                       required 
                       placeholder={editForm.type === "fixed" ? "0.00" : "0"}
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">{editForm.type === "fixed" ? "Balance ($)" : "Balance (%)"}</label>
+                    <label className="block text-sm font-medium text-gray-800 mb-1">{editForm.type === "fixed" ? "Balance ($)" : "Balance (%)"}</label>
                     <input 
                       type="number" 
                       name="balance" 
                       value={editForm.balance || ''} 
                       onChange={handleEditChange} 
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-700 focus:border-blue-700" 
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-800 focus:border-blue-800" 
                       min="0" 
                       required 
                       placeholder={editForm.type === "fixed" ? "0.00" : "0"}
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Max Usage</label>
+                    <label className="block text-sm font-medium text-gray-800 mb-1">Max Usage</label>
                     <input 
                       type="number" 
                       name="max_usage" 
                       value={editForm.max_usage || ''} 
                       onChange={handleEditChange} 
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-700 focus:border-blue-700" 
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-800 focus:border-blue-800" 
                       min="1" 
                       required 
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Expiry Date</label>
+                    <label className="block text-sm font-medium text-gray-800 mb-1">Expiry Date</label>
                     <input 
                       type="date" 
                       name="expiry_date" 
                       value={editForm.expiry_date || ''} 
                       onChange={handleEditChange} 
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-700 focus:border-blue-700" 
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-800 focus:border-blue-800" 
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                  <label className="block text-sm font-medium text-gray-800 mb-1">Description</label>
                   <textarea 
                     name="description" 
                     value={editForm.description || ''} 
                     onChange={handleEditChange} 
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-700 focus:border-blue-700" 
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-800 focus:border-blue-800" 
                     rows={2} 
                     placeholder="Optional description"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                  <label className="block text-sm font-medium text-gray-800 mb-1">Status</label>
                   <select 
                     name="status" 
                     value={editForm.status || ''} 
                     onChange={handleEditChange} 
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-700 focus:border-blue-700"
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-800 focus:border-blue-800"
                   >
                     <option value="active">Active</option>
                     <option value="inactive">Inactive</option>
@@ -562,13 +560,13 @@ const GiftCard: React.FC = () => {
                 <div className="flex gap-3 mt-6">
                   <button 
                     onClick={handleEditSave} 
-                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 rounded-lg transition text-base"
+                    className="flex-1 bg-blue-600 hover:bg-blue-800 text-white font-medium py-2.5 rounded-lg transition text-base"
                   >
                     Save Changes
                   </button>
                   <button 
                     onClick={closeEditModal} 
-                    className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2.5 rounded-lg transition text-base"
+                    className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium py-2.5 rounded-lg transition text-base"
                   >
                     Cancel
                   </button>

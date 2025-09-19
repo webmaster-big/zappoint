@@ -560,7 +560,7 @@ const CalendarView: React.FC = () => {
       <div className="bg-white rounded-lg shadow-sm p-6 h-full overflow-y-auto">
         <div className="grid grid-cols-7 gap-2 mb-4">
           {weekDays.map(day => (
-            <div key={day.toISOString()} className="text-center font-medium text-gray-700 py-2">
+            <div key={day.toISOString()} className="text-center font-medium text-gray-800 py-2">
               {day.toLocaleDateString('en-US', { weekday: 'short' })}
               <div className="text-sm text-gray-500 mt-1">{day.getDate()}</div>
             </div>
@@ -626,7 +626,7 @@ const CalendarView: React.FC = () => {
       <div className="bg-white rounded-lg shadow-sm p-6 h-full overflow-y-auto">
         <div className="grid grid-cols-7 gap-2 mb-4">
           {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-            <div key={day} className="text-center font-medium text-gray-700 py-2">
+            <div key={day} className="text-center font-medium text-gray-800 py-2">
               {day}
             </div>
           ))}
@@ -762,7 +762,7 @@ const CalendarView: React.FC = () => {
   if (loading) {
     return (
         <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-700"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-800"></div>
         </div>
     );
   }
@@ -778,7 +778,7 @@ const CalendarView: React.FC = () => {
           <div className="flex gap-2 mt-4 sm:mt-0">
             <Link
               to="/bookings"
-              className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+              className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-gray-800 hover:bg-gray-50"
             >
               {/* <List className="h-5 w-5 mr-2" /> */}
               List View
@@ -786,14 +786,14 @@ const CalendarView: React.FC = () => {
             <div className="flex gap-2">
               <Link
                 to="/packages"
-                className="inline-flex items-center px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-700"
+                className="inline-flex items-center px-4 py-2 bg-blue-800 text-white rounded-lg hover:bg-blue-800"
               >
                 <PackageIcon className="h-5 w-5 mr-2" />
                 Packages
               </Link>
               <Link
                 to="/book/attractions"
-                className="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+                className="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-800"
               >
                 <Ticket className="h-5 w-5 mr-2" />
                 Attractions
@@ -836,7 +836,7 @@ const CalendarView: React.FC = () => {
               <select
                 value={filters.view}
                 onChange={(e) => handleFilterChange('view', e.target.value as 'day' | 'week' | 'month' | 'range')}
-                className="border border-gray-300 rounded-lg px-3 py-1 text-sm focus:ring-2 focus:ring-blue-700"
+                className="border border-gray-300 rounded-lg px-3 py-1 text-sm focus:ring-2 focus:ring-blue-800"
               >
                 <option value="day">Day</option>
                 <option value="week">Week</option>
@@ -862,7 +862,7 @@ const CalendarView: React.FC = () => {
               <h3 className="font-medium text-lg">Filter Bookings</h3>
               <button
                 onClick={() => setShowFilters(false)}
-                className="text-gray-500 hover:text-gray-700"
+                className="text-gray-500 hover:text-gray-800"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -870,7 +870,7 @@ const CalendarView: React.FC = () => {
             
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Search</label>
+                <label className="block text-sm font-medium text-gray-800 mb-2">Search</label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <Search className="h-4 w-4 text-gray-400" />
@@ -880,17 +880,17 @@ const CalendarView: React.FC = () => {
                     placeholder="Search bookings..."
                     value={filters.search}
                     onChange={(e) => handleFilterChange('search', e.target.value)}
-                    className="pl-9 pr-3 py-2 border border-gray-300 rounded-lg w-full text-sm focus:ring-2 focus:ring-blue-700"
+                    className="pl-9 pr-3 py-2 border border-gray-300 rounded-lg w-full text-sm focus:ring-2 focus:ring-blue-800"
                   />
                 </div>
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Booking Type</label>
+                <label className="block text-sm font-medium text-gray-800 mb-2">Booking Type</label>
                 <select
                   value={filters.type}
                   onChange={(e) => handleFilterChange('type', e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-700"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-800"
                 >
                   <option value="all">All Types</option>
                   <option value="package">Packages</option>
@@ -901,21 +901,21 @@ const CalendarView: React.FC = () => {
               {filters.view === 'range' && (
                 <>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Start Date</label>
+                    <label className="block text-sm font-medium text-gray-800 mb-2">Start Date</label>
                     <input
                       type="date"
                       value={filters.dateRange.start}
                       onChange={(e) => handleDateRangeChange('start', e.target.value)}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-700"
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-800"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">End Date</label>
+                    <label className="block text-sm font-medium text-gray-800 mb-2">End Date</label>
                     <input
                       type="date"
                       value={filters.dateRange.end}
                       onChange={(e) => handleDateRangeChange('end', e.target.value)}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-700"
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-800"
                     />
                   </div>
                 </>
@@ -924,7 +924,7 @@ const CalendarView: React.FC = () => {
             
             <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Activities</label>
+                <label className="block text-sm font-medium text-gray-800 mb-2">Activities</label>
                 <div className="flex flex-wrap gap-2">
                   {getUniqueActivities().map(activity => (
                     <button
@@ -943,7 +943,7 @@ const CalendarView: React.FC = () => {
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Packages</label>
+                <label className="block text-sm font-medium text-gray-800 mb-2">Packages</label>
                 <div className="flex flex-wrap gap-2">
                   {getUniquePackages().map(pkg => (
                     <button
@@ -962,7 +962,7 @@ const CalendarView: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Attractions</label>
+                <label className="block text-sm font-medium text-gray-800 mb-2">Attractions</label>
                 <div className="flex flex-wrap gap-2">
                   {getUniqueAttractions().map(attraction => (
                     <button
@@ -1008,7 +1008,7 @@ const CalendarView: React.FC = () => {
                   </h3>
                   <button
                     onClick={() => setSelectedDate(null)}
-                    className="text-gray-500 hover:text-gray-700"
+                    className="text-gray-500 hover:text-gray-800"
                   >
                     <X className="h-5 w-5" />
                   </button>
@@ -1073,7 +1073,7 @@ const CalendarView: React.FC = () => {
                         </div>
                         {booking.attractions && booking.attractions.length > 0 && (
                           <div className="mb-4">
-                            <h5 className="font-medium text-gray-700 mb-2">Attractions</h5>
+                            <h5 className="font-medium text-gray-800 mb-2">Attractions</h5>
                             <div className="flex flex-wrap gap-2">
                               {booking.attractions.map((attraction, index) => (
                                 <span key={index} className="bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded">
@@ -1085,7 +1085,7 @@ const CalendarView: React.FC = () => {
                         )}
                         {booking.addOns && booking.addOns.length > 0 && (
                           <div className="mb-4">
-                            <h5 className="font-medium text-gray-700 mb-2 flex items-center">
+                            <h5 className="font-medium text-gray-800 mb-2 flex items-center">
                               <Gift className="h-4 w-4 mr-1" /> Add-ons
                             </h5>
                             <ul className="space-y-1">
@@ -1139,7 +1139,7 @@ const CalendarView: React.FC = () => {
                   </h3>
                   <button
                     onClick={() => setSelectedBooking(null)}
-                    className="text-gray-500 hover:text-gray-700"
+                    className="text-gray-500 hover:text-gray-800"
                   >
                     <X className="h-5 w-5" />
                   </button>
@@ -1156,16 +1156,16 @@ const CalendarView: React.FC = () => {
                     selectedBooking.status === 'confirmed' ? 'text-green-600' :
                     selectedBooking.status === 'pending' ? 'text-yellow-600' :
                     selectedBooking.status === 'cancelled' ? 'text-red-600' :
-                    selectedBooking.status === 'checked-in' ? 'text-blue-700' :
+                    selectedBooking.status === 'checked-in' ? 'text-blue-800' :
                     'text-gray-600'
                   }`}>{selectedBooking.status}</span></div>
-                  <div className="text-sm text-gray-500">Type: <span className={`font-semibold ${selectedBooking.type === 'package' ? 'text-blue-700' : 'text-green-600'}`}>
+                  <div className="text-sm text-gray-500">Type: <span className={`font-semibold ${selectedBooking.type === 'package' ? 'text-blue-800' : 'text-green-600'}`}>
                     {selectedBooking.type === 'package' ? 'Package' : 'Attraction'}
                   </span></div>
                 </div>
                 {selectedBooking.attractions && selectedBooking.attractions.length > 0 && (
                   <div className="mt-4">
-                    <h5 className="font-medium text-gray-700 mb-2">Attractions</h5>
+                    <h5 className="font-medium text-gray-800 mb-2">Attractions</h5>
                     <div className="flex flex-wrap gap-2">
                       {selectedBooking.attractions.map((attraction, index) => (
                         <span key={index} className="bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded">
@@ -1177,7 +1177,7 @@ const CalendarView: React.FC = () => {
                 )}
                 {selectedBooking.addOns && selectedBooking.addOns.length > 0 && (
                   <div className="mt-4">
-                    <h5 className="font-medium text-gray-700 mb-2 flex items-center">
+                    <h5 className="font-medium text-gray-800 mb-2 flex items-center">
                       <Gift className="h-4 w-4 mr-1" /> Add-ons
                     </h5>
                     <ul className="space-y-1">

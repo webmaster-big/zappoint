@@ -8,8 +8,11 @@ import {
   Search, 
   Filter, 
   RefreshCcw,
-  Copy,
-  Link as LinkIcon
+  Link as LinkIcon,
+  Users,
+  DollarSign,
+  Zap,
+  Star
 } from 'lucide-react';
 
 // Types
@@ -54,7 +57,7 @@ const ManageAttractions = () => {
 
   // Status colors
   const statusColors = {
-    active: 'bg-green-100 text-green-800',
+    active: 'bg-blue-100 text-blue-800',
     inactive: 'bg-gray-100 text-gray-800',
     maintenance: 'bg-yellow-100 text-yellow-800'
   };
@@ -65,13 +68,15 @@ const ManageAttractions = () => {
       title: 'Total Attractions',
       value: attractions.length.toString(),
       change: `${attractions.filter(a => a.status === 'active').length} active`,
-      accent: 'bg-blue-100 text-blue-700',
+      accent: 'bg-blue-100 text-blue-800',
+      icon: Star,
     },
     {
       title: 'Active Attractions',
       value: attractions.filter(a => a.status === 'active').length.toString(),
       change: `${attractions.filter(a => a.status === 'inactive').length} inactive`,
-      accent: 'bg-green-100 text-green-700',
+      accent: 'bg-blue-100 text-blue-800',
+      icon: Zap,
     },
     {
       title: 'Avg. Price',
@@ -79,13 +84,15 @@ const ManageAttractions = () => {
         ? `$${(attractions.reduce((sum, a) => sum + a.price, 0) / attractions.length).toFixed(2)}` 
         : '$0.00',
       change: 'Per attraction',
-      accent: 'bg-purple-100 text-purple-700',
+      accent: 'bg-blue-100 text-blue-800',
+      icon: DollarSign,
     },
     {
       title: 'Total Capacity',
       value: attractions.reduce((sum, a) => sum + a.maxCapacity, 0).toString(),
       change: 'Across all attractions',
-      accent: 'bg-orange-100 text-orange-700',
+      accent: 'bg-blue-100 text-blue-800',
+      icon: Users,
     }
   ];
 
@@ -314,7 +321,7 @@ const ManageAttractions = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-700"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-800"></div>
       </div>
     );
   }
@@ -329,7 +336,7 @@ const ManageAttractions = () => {
         </div>
         <Link
           to="/create-attraction"
-          className="mt-4 sm:mt-0 inline-flex items-center px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800 transition-colors"
+          className="mt-4 sm:mt-0 inline-flex items-center px-4 py-2 bg-blue-800 text-white rounded-lg hover:bg-blue-800 transition-colors"
         >
           <Plus className="h-5 w-5 mr-2" />
           New Attraction
@@ -338,18 +345,26 @@ const ManageAttractions = () => {
 
       {/* Metrics Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        {metrics.map((metric, index) => (
-          <div
-            key={index}
-            className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 flex flex-col gap-2 hover:shadow-md transition-shadow min-h-[120px]"
-          >
-            <span className="text-base font-semibold text-gray-700">{metric.title}</span>
-            <div className="flex items-end gap-2 mt-2">
-              <h3 className="text-2xl font-bold text-gray-900">{metric.value}</h3>
+        {metrics.map((metric, index) => {
+          const Icon = metric.icon;
+          return (
+            <div
+              key={index}
+              className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 flex flex-col gap-2 hover:shadow-md transition-shadow min-h-[120px]"
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <div className={`p-2 rounded-lg ${metric.accent}`}>
+                  <Icon size={20} />
+                </div>
+                <span className="text-base font-semibold text-gray-800">{metric.title}</span>
+              </div>
+              <div className="flex items-end gap-2 mt-2">
+                <h3 className="text-2xl font-bold text-gray-900">{metric.value}</h3>
+              </div>
+              <p className="text-xs mt-1 text-gray-400">{metric.change}</p>
             </div>
-            <p className="text-xs mt-1 text-gray-400">{metric.change}</p>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Filters and Search */}
@@ -389,7 +404,7 @@ const ManageAttractions = () => {
           <div className="mt-4 p-4 bg-gray-50 rounded-lg">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                <label className="block text-sm font-medium text-gray-800 mb-1">Status</label>
                 <select
                   value={filters.status}
                   onChange={(e) => handleFilterChange('status', e.target.value)}
@@ -402,7 +417,7 @@ const ManageAttractions = () => {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                <label className="block text-sm font-medium text-gray-800 mb-1">Category</label>
                 <select
                   value={filters.category}
                   onChange={(e) => handleFilterChange('category', e.target.value)}
@@ -445,7 +460,7 @@ const ManageAttractions = () => {
             </select>
             <button
               onClick={handleBulkDelete}
-              className="flex items-center px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200"
+              className="flex items-center px-3 py-2 bg-red-100 text-red-800 rounded-lg hover:bg-red-200"
             >
               <Trash2 className="h-4 w-4 mr-1" />
               Delete
@@ -458,14 +473,14 @@ const ManageAttractions = () => {
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
-            <thead className="text-xs text-gray-700 uppercase bg-gray-50 border-b">
+            <thead className="text-xs text-gray-800 uppercase bg-gray-50 border-b">
               <tr>
                 <th scope="col" className="px-6 py-4 font-medium w-12">
                   <input
                     type="checkbox"
                     checked={selectedAttractions.length === currentAttractions.length && currentAttractions.length > 0}
                     onChange={handleSelectAll}
-                    className="rounded border-gray-300 text-blue-700 focus:ring-blue-400"
+                    className="rounded border-gray-300 text-blue-800 focus:ring-blue-400"
                   />
                 </th>
                 <th scope="col" className="px-6 py-4 font-medium">Attraction</th>
@@ -481,7 +496,7 @@ const ManageAttractions = () => {
             <tbody className="divide-y divide-gray-100">
               {currentAttractions.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-6 py-8 text-center text-gray-700">
+                  <td colSpan={9} className="px-6 py-8 text-center text-gray-800">
                     No attractions found
                   </td>
                 </tr>
@@ -493,7 +508,7 @@ const ManageAttractions = () => {
                         type="checkbox"
                         checked={selectedAttractions.includes(attraction.id)}
                         onChange={() => handleSelectAttraction(attraction.id)}
-                        className="rounded border-gray-300 text-blue-700 focus:ring-blue-400"
+                        className="rounded border-gray-300 text-blue-800 focus:ring-blue-400"
                       />
                     </td>
                     <td className="px-6 py-4">
@@ -535,7 +550,7 @@ const ManageAttractions = () => {
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => copyBookingLink(attraction.id)}
-                          className="flex items-center px-3 py-1 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors text-xs"
+                          className="flex items-center px-3 py-1 bg-blue-100 text-blue-800 rounded-lg hover:bg-blue-200 transition-colors text-xs"
                           title="Copy booking link"
                         >
                           <LinkIcon className="h-3 w-3 mr-1" />
@@ -580,7 +595,7 @@ const ManageAttractions = () => {
         {totalPages > 1 && (
           <div className="bg-white px-6 py-4 border-t border-gray-100">
             <div className="flex items-center justify-between">
-              <div className="text-sm text-gray-700">
+              <div className="text-sm text-gray-800">
                 Showing <span className="font-medium">{indexOfFirstItem + 1}</span> to{' '}
                 <span className="font-medium">
                   {Math.min(indexOfLastItem, filteredAttractions.length)}
@@ -591,7 +606,7 @@ const ManageAttractions = () => {
                 <button
                   onClick={() => paginate(Math.max(1, currentPage - 1))}
                   disabled={currentPage === 1}
-                  className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                  className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50"
                 >
                   Previous
                 </button>
@@ -602,8 +617,8 @@ const ManageAttractions = () => {
                     onClick={() => paginate(page)}
                     className={`px-3 py-2 border rounded-lg text-sm font-medium ${
                       currentPage === page
-                        ? 'border-blue-700 bg-blue-700 text-white'
-                        : 'border-gray-200 text-gray-700 hover:bg-gray-50'
+                        ? 'border-blue-800 bg-blue-800 text-white'
+                        : 'border-gray-200 text-gray-800 hover:bg-gray-50'
                     }`}
                   >
                     {page}
@@ -613,7 +628,7 @@ const ManageAttractions = () => {
                 <button
                   onClick={() => paginate(Math.min(totalPages, currentPage + 1))}
                   disabled={currentPage === totalPages}
-                  className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                  className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50"
                 >
                   Next
                 </button>

@@ -226,7 +226,7 @@ const Promo: React.FC = () => {
               <p className="text-gray-500 mt-1">Create and manage promotional codes</p>
             </div>
             <button
-              className="bg-blue-700 text-white rounded-lg px-4 py-2.5 flex items-center gap-2 hover:bg-blue-800 transition-colors shadow-sm"
+              className="bg-blue-800 text-white rounded-lg px-4 py-2.5 flex items-center gap-2 hover:bg-blue-800 transition-colors shadow-sm"
               onClick={() => setShowModal(true)}
             >
               <Plus className="w-5 h-5" /> New Promo Code
@@ -285,7 +285,7 @@ const Promo: React.FC = () => {
                       </div>
                       <div className="flex gap-1">
                         <button 
-                          className="p-1.5 text-gray-500 hover:text-blue-700 hover:bg-blue-50 rounded-md"
+                          className="p-1.5 text-gray-500 hover:text-blue-800 hover:bg-blue-50 rounded-md"
                           onClick={() => openEditModal(i)}
                         >
                           <Edit2 className="w-4 h-4" />
@@ -322,7 +322,7 @@ const Promo: React.FC = () => {
                         <h3 className="font-semibold text-gray-900">Promo Code</h3>
                         <button 
                           onClick={() => copyToClipboard(promo.code)}
-                          className="text-blue-700 hover:text-blue-800"
+                          className="text-blue-800 hover:text-blue-800"
                           title="Copy code"
                         >
                           <Copy className="w-4 h-4" />
@@ -383,7 +383,7 @@ const Promo: React.FC = () => {
               <div className="text-gray-400 mb-2">No promo codes found</div>
               <p className="text-gray-500 text-sm mb-4">Create your first promo code to get started</p>
               <button
-                className="bg-blue-700 text-white rounded-lg px-4 py-2 flex items-center gap-2 hover:bg-blue-800 transition-colors mx-auto shadow-sm"
+                className="bg-blue-800 text-white rounded-lg px-4 py-2 flex items-center gap-2 hover:bg-blue-800 transition-colors mx-auto shadow-sm"
                 onClick={() => setShowModal(true)}
               >
                 <Plus className="w-4 h-4" /> Create Promo Code
@@ -403,19 +403,19 @@ const Promo: React.FC = () => {
               <form onSubmit={handleAdd}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+                    <label className="block text-sm font-medium text-gray-800 mb-1">Type</label>
                     <select 
                       name="type" 
                       value={form.type} 
                       onChange={handleChange} 
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-700 focus:border-blue-700"
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-800 focus:border-blue-800"
                     >
                       <option value="fixed">Fixed Amount</option>
                       <option value="percentage">Percentage</option>
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-800 mb-1">
                       {form.type === "fixed" ? "Discount Value ($)" : "Discount Percentage (%)"}
                     </label>
                     <input 
@@ -423,21 +423,21 @@ const Promo: React.FC = () => {
                       name="value" 
                       value={form.value} 
                       onChange={handleChange} 
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-700 focus:border-blue-700" 
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-800 focus:border-blue-800" 
                       min="0" 
                       required 
                       placeholder={form.type === "fixed" ? "0.00" : "0"}
                     />
                   </div>
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Promo Code</label>
+                    <label className="block text-sm font-medium text-gray-800 mb-1">Promo Code</label>
                     <div className="flex gap-2">
                       <input 
                         type="text" 
                         name="code" 
                         value={form.code} 
                         onChange={handleChange} 
-                        className="flex-1 border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-700 focus:border-blue-700" 
+                        className="flex-1 border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-800 focus:border-blue-800" 
                         placeholder="Leave empty to auto-generate"
                       />
                       <button 
@@ -450,56 +450,56 @@ const Promo: React.FC = () => {
                     </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+                    <label className="block text-sm font-medium text-gray-800 mb-1">Start Date</label>
                     <input 
                       type="date" 
                       name="start_date" 
                       value={form.start_date} 
                       onChange={handleChange} 
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-700 focus:border-blue-700" 
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-800 focus:border-blue-800" 
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+                    <label className="block text-sm font-medium text-gray-800 mb-1">End Date</label>
                     <input 
                       type="date" 
                       name="end_date" 
                       value={form.end_date} 
                       onChange={handleChange} 
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-700 focus:border-blue-700" 
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-800 focus:border-blue-800" 
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Total Usage Limit</label>
+                    <label className="block text-sm font-medium text-gray-800 mb-1">Total Usage Limit</label>
                     <input 
                       type="number" 
                       name="usage_limit_total" 
                       value={form.usage_limit_total} 
                       onChange={handleChange} 
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-700 focus:border-blue-700" 
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-800 focus:border-blue-800" 
                       min="1" 
                       required 
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Usage Limit Per User</label>
+                    <label className="block text-sm font-medium text-gray-800 mb-1">Usage Limit Per User</label>
                     <input 
                       type="number" 
                       name="usage_limit_per_user" 
                       value={form.usage_limit_per_user} 
                       onChange={handleChange} 
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-700 focus:border-blue-700" 
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-800 focus:border-blue-800" 
                       min="1" 
                       required 
                     />
                   </div>
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                    <label className="block text-sm font-medium text-gray-800 mb-1">Description</label>
                     <textarea 
                       name="description" 
                       value={form.description} 
                       onChange={handleChange} 
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-700 focus:border-blue-700" 
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-800 focus:border-blue-800" 
                       rows={2} 
                       placeholder="Optional description"
                     />
@@ -507,7 +507,7 @@ const Promo: React.FC = () => {
                 </div>
                 <button 
                   type="submit" 
-                  className="w-full bg-blue-700 text-white py-2.5 rounded-lg font-medium mt-2 hover:bg-blue-800 transition-colors"
+                  className="w-full bg-blue-800 text-white py-2.5 rounded-lg font-medium mt-2 hover:bg-blue-800 transition-colors"
                 >
                   Create Promo Code
                 </button>
@@ -527,80 +527,80 @@ const Promo: React.FC = () => {
               <form onSubmit={e => { e.preventDefault(); handleEditSave(); }}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+                    <label className="block text-sm font-medium text-gray-800 mb-1">Type</label>
                     <select
                       name="type"
                       value={editForm.type || ''}
                       onChange={handleEditChange}
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-700 focus:border-blue-700"
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-800 focus:border-blue-800"
                     >
                       <option value="fixed">Fixed Amount</option>
                       <option value="percentage">Percentage</option>
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">{editForm.type === "fixed" ? "Discount Value ($)" : "Discount Percentage (%)"}</label>
+                    <label className="block text-sm font-medium text-gray-800 mb-1">{editForm.type === "fixed" ? "Discount Value ($)" : "Discount Percentage (%)"}</label>
                     <input
                       type="number"
                       name="value"
                       value={editForm.value === undefined ? '' : editForm.value}
                       onChange={handleEditChange}
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-700 focus:border-blue-700"
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-800 focus:border-blue-800"
                       min="0"
                       required
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+                    <label className="block text-sm font-medium text-gray-800 mb-1">Start Date</label>
                     <input
                       type="date"
                       name="start_date"
                       value={editForm.start_date || ''}
                       onChange={handleEditChange}
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-700 focus:border-blue-700"
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-800 focus:border-blue-800"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+                    <label className="block text-sm font-medium text-gray-800 mb-1">End Date</label>
                     <input
                       type="date"
                       name="end_date"
                       value={editForm.end_date || ''}
                       onChange={handleEditChange}
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-700 focus:border-blue-700"
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-800 focus:border-blue-800"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Total Usage Limit</label>
+                    <label className="block text-sm font-medium text-gray-800 mb-1">Total Usage Limit</label>
                     <input
                       type="number"
                       name="usage_limit_total"
                       value={editForm.usage_limit_total === undefined ? '' : editForm.usage_limit_total}
                       onChange={handleEditChange}
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-700 focus:border-blue-700"
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-800 focus:border-blue-800"
                       min="1"
                       required
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Usage Limit Per User</label>
+                    <label className="block text-sm font-medium text-gray-800 mb-1">Usage Limit Per User</label>
                     <input
                       type="number"
                       name="usage_limit_per_user"
                       value={editForm.usage_limit_per_user === undefined ? '' : editForm.usage_limit_per_user}
                       onChange={handleEditChange}
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-700 focus:border-blue-700"
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-800 focus:border-blue-800"
                       min="1"
                       required
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                    <label className="block text-sm font-medium text-gray-800 mb-1">Status</label>
                     <select
                       name="status"
                       value={editForm.status || ''}
                       onChange={handleEditChange}
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-700 focus:border-blue-700"
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-800 focus:border-blue-800"
                     >
                       <option value="active">Active</option>
                       <option value="inactive">Inactive</option>
@@ -609,12 +609,12 @@ const Promo: React.FC = () => {
                     </select>
                   </div>
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                    <label className="block text-sm font-medium text-gray-800 mb-1">Description</label>
                     <textarea
                       name="description"
                       value={editForm.description || ''}
                       onChange={handleEditChange}
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-700 focus:border-blue-700"
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-800 focus:border-blue-800"
                       rows={2}
                     />
                   </div>
@@ -622,14 +622,14 @@ const Promo: React.FC = () => {
                 <div className="flex gap-3 mt-6">
                   <button
                     type="submit"
-                    className="flex-1 bg-blue-700 hover:bg-blue-800 text-white font-medium py-2.5 rounded-lg transition text-base"
+                    className="flex-1 bg-blue-800 hover:bg-blue-800 text-white font-medium py-2.5 rounded-lg transition text-base"
                   >
                     Save Changes
                   </button>
                   <button
                     type="button"
                     onClick={closeEditModal}
-                    className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2.5 rounded-lg transition text-base"
+                    className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium py-2.5 rounded-lg transition text-base"
                   >
                     Cancel
                   </button>

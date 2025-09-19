@@ -5,7 +5,6 @@ import {
   Users, 
   MapPin, 
   Calendar, 
-  ArrowLeft,
   CheckCircle,
   Star,
   Shield,
@@ -142,7 +141,7 @@ const BookingAttraction = () => {
 
   const handleBooking = () => {
     if (!attraction) return;
-    
+
     // Create booking object with the correct structure
     const booking = {
       id: `booking_${Date.now()}`,
@@ -166,14 +165,18 @@ const BookingAttraction = () => {
     const existingBookings = JSON.parse(localStorage.getItem('zapzone_bookings') || '[]');
     localStorage.setItem('zapzone_bookings', JSON.stringify([...existingBookings, booking]));
     
-    // Move to confirmation step
-    setCurrentStep(4);
+    setCurrentStep(5); // Move to confirmation step
+
+    // Show confirmation dialog
+    setTimeout(() => {
+      window.alert("Booking confirmed!\nYour booking for " + attraction.name + " is complete.");
+    }, 300); // slight delay to allow UI update
   };
 
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
       </div>
     );
   }
@@ -185,7 +188,7 @@ const BookingAttraction = () => {
           <h2 className="text-2xl font-bold text-gray-900">Attraction not found</h2>
           <button 
             onClick={() => navigate('/attractions')}
-            className="mt-4 text-purple-600 hover:text-purple-800"
+            className="mt-4 text-blue-600 hover:text-blue-800"
           >
             Back to Attractions
           </button>
@@ -196,19 +199,7 @@ const BookingAttraction = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <button 
-            onClick={() => navigate(-1)}
-            className="flex items-center text-purple-600 hover:text-purple-800"
-          >
-            <ArrowLeft className="h-5 w-5 mr-1" />
-            Back
-          </button>
-        </div>
-      </div>
-
+    
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left Column - Booking Form */}
@@ -222,13 +213,13 @@ const BookingAttraction = () => {
                       <div key={step} className="flex items-center">
                         <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
                           currentStep >= step 
-                            ? 'bg-purple-600 text-white' 
+                            ? 'bg-blue-600 text-white' 
                             : 'bg-gray-200 text-gray-500'
                         }`}>
                           {step}
                         </div>
                         {step < 5 && (
-                          <div className={`w-16 h-1 mx-2 ${currentStep > step ? 'bg-purple-600' : 'bg-gray-200'}`}></div>
+                          <div className={`w-16 h-1 mx-2 ${currentStep > step ? 'bg-blue-600' : 'bg-gray-200'}`}></div>
                         )}
                       </div>
                     ))}
@@ -251,13 +242,13 @@ const BookingAttraction = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        <Calendar className="inline h-5 w-5 mr-1 text-purple-600" />
+                        <Calendar className="inline h-5 w-5 mr-1 text-blue-600" />
                         Select Date
                       </label>
                       <select
                         value={selectedDate}
                         onChange={(e) => setSelectedDate(e.target.value)}
-                        className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                        className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         required
                       >
                         {availableDates.map(date => (
@@ -270,13 +261,13 @@ const BookingAttraction = () => {
                     
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        <Clock className="inline h-5 w-5 mr-1 text-purple-600" />
+                        <Clock className="inline h-5 w-5 mr-1 text-blue-600" />
                         Select Time
                       </label>
                       <select
                         value={selectedTime}
                         onChange={(e) => setSelectedTime(e.target.value)}
-                        className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                        className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         required
                         disabled={availableTimes.length === 0}
                       >
@@ -295,7 +286,7 @@ const BookingAttraction = () => {
                     <button
                       onClick={() => setCurrentStep(2)}
                       disabled={!selectedDate || !selectedTime}
-                      className="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       Continue
                     </button>
@@ -310,7 +301,7 @@ const BookingAttraction = () => {
                   
                   <div className="mb-6">
                     <label className="block text-sm font-medium text-gray-700 mb-4">
-                      <Users className="inline h-5 w-5 mr-1 text-purple-600" />
+                      <Users className="inline h-5 w-5 mr-1 text-blue-600" />
                       How many people?
                     </label>
                     <div className="flex items-center justify-center space-x-4">
@@ -342,7 +333,7 @@ const BookingAttraction = () => {
                     </button>
                     <button
                       onClick={() => setCurrentStep(3)}
-                      className="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700"
+                      className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700"
                     >
                       Continue
                     </button>
@@ -365,7 +356,7 @@ const BookingAttraction = () => {
                         name="firstName"
                         value={customerInfo.firstName}
                         onChange={handleInputChange}
-                        className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                        className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         required
                       />
                     </div>
@@ -379,7 +370,7 @@ const BookingAttraction = () => {
                         name="lastName"
                         value={customerInfo.lastName}
                         onChange={handleInputChange}
-                        className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                        className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         required
                       />
                     </div>
@@ -393,7 +384,7 @@ const BookingAttraction = () => {
                         name="email"
                         value={customerInfo.email}
                         onChange={handleInputChange}
-                        className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                        className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         required
                       />
                     </div>
@@ -407,7 +398,7 @@ const BookingAttraction = () => {
                         name="phone"
                         value={customerInfo.phone}
                         onChange={handleInputChange}
-                        className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                        className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       />
                     </div>
                   </div>
@@ -422,7 +413,7 @@ const BookingAttraction = () => {
                     <button
                       onClick={() => setCurrentStep(4)}
                       disabled={!customerInfo.firstName || !customerInfo.lastName || !customerInfo.email}
-                      className="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       Continue to Payment
                     </button>
@@ -439,7 +430,7 @@ const BookingAttraction = () => {
                     <div 
                       className={`border-2 rounded-lg p-4 cursor-pointer ${
                         paymentMethod === 'credit_card' 
-                          ? 'border-purple-600 bg-purple-50' 
+                          ? 'border-blue-600 bg-blue-50' 
                           : 'border-gray-300 hover:border-gray-400'
                       }`}
                       onClick={() => setPaymentMethod('credit_card')}
@@ -454,7 +445,7 @@ const BookingAttraction = () => {
                     <div 
                       className={`border-2 rounded-lg p-4 cursor-pointer ${
                         paymentMethod === 'paypal' 
-                          ? 'border-purple-600 bg-purple-50' 
+                          ? 'border-blue-600 bg-blue-50' 
                           : 'border-gray-300 hover:border-gray-400'
                       }`}
                       onClick={() => setPaymentMethod('paypal')}
@@ -477,7 +468,7 @@ const BookingAttraction = () => {
                     </button>
                     <button
                       onClick={handleBooking}
-                      className="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700"
+                      className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700"
                     >
                       Complete Booking
                     </button>
@@ -512,7 +503,7 @@ const BookingAttraction = () => {
                     </button>
                     <button
                       onClick={() => navigate('/my-bookings')}
-                      className="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700"
+                      className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700"
                     >
                       View My Bookings
                     </button>
@@ -585,7 +576,7 @@ const BookingAttraction = () => {
                   
                   <div className="flex justify-between items-center mt-3 pt-3 border-t border-gray-200">
                     <span className="font-bold text-gray-900">Total</span>
-                    <span className="text-xl font-bold text-purple-600">${calculateTotal().toFixed(2)}</span>
+                    <span className="text-xl font-bold text-blue-600">${calculateTotal().toFixed(2)}</span>
                   </div>
                 </div>
                 

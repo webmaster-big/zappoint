@@ -107,21 +107,21 @@ const Bookings: React.FC = () => {
       value: attractionBookings.length.toString(),
       change: `${attractionBookings.filter(b => b.status === 'confirmed').length} confirmed`,
       icon: Ticket,
-      accent: 'bg-green-100 text-green-800',
+      accent: 'bg-blue-100 text-blue-800',
     },
     {
       title: 'Participants',
       value: bookings.reduce((sum, booking) => sum + booking.participants, 0).toString(),
       change: `${bookings.length} bookings`,
       icon: Users,
-      accent: 'bg-orange-100 text-orange-800',
+      accent: 'bg-blue-100 text-blue-800',
     },
     {
       title: 'Revenue',
       value: `$${Number(bookings.reduce((sum, booking) => sum + booking.totalAmount, 0)).toFixed(2)}`,
       change: 'All bookings',
       icon: DollarSign,
-      accent: 'bg-indigo-100 text-indigo-800',
+      accent: 'bg-blue-100 text-blue-800',
     },
   ];
 
@@ -424,7 +424,7 @@ const Bookings: React.FC = () => {
               >
                 <div className="flex items-center gap-2">
                   <div className={`p-2 rounded-lg ${metric.accent}`}><Icon size={20} /></div>
-                  <span className="text-base font-semibold text-gray-700">{metric.title}</span>
+                  <span className="text-base font-semibold text-gray-800">{metric.title}</span>
                 </div>
                 <div className="flex items-end gap-2 mt-2">
                   <h3 className="text-2xl font-bold text-gray-900">{metric.value}</h3>
@@ -472,7 +472,7 @@ const Bookings: React.FC = () => {
             <div className="mt-3 p-3 bg-gray-50 rounded-lg">
               <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Type</label>
+                  <label className="block text-xs font-medium text-gray-800 mb-1">Type</label>
                   <select
                     value={filters.type}
                     onChange={(e) => handleFilterChange('type', e.target.value)}
@@ -484,7 +484,7 @@ const Bookings: React.FC = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Status</label>
+                  <label className="block text-xs font-medium text-gray-800 mb-1">Status</label>
                   <select
                     value={filters.status}
                     onChange={(e) => handleFilterChange('status', e.target.value)}
@@ -499,7 +499,7 @@ const Bookings: React.FC = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Payment Method</label>
+                  <label className="block text-xs font-medium text-gray-800 mb-1">Payment Method</label>
                   <select
                     value={filters.payment}
                     onChange={(e) => handleFilterChange('payment', e.target.value)}
@@ -513,7 +513,7 @@ const Bookings: React.FC = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">From Date</label>
+                  <label className="block text-xs font-medium text-gray-800 mb-1">From Date</label>
                   <input
                     type="date"
                     value={filters.dateRange.start}
@@ -522,7 +522,7 @@ const Bookings: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">To Date</label>
+                  <label className="block text-xs font-medium text-gray-800 mb-1">To Date</label>
                   <input
                     type="date"
                     value={filters.dateRange.end}
@@ -562,7 +562,7 @@ const Bookings: React.FC = () => {
               </select>
               <button
                 onClick={handleBulkDelete}
-                className="flex items-center px-3 py-1 bg-red-100 text-red-700 rounded-lg hover:bg-red-200"
+                className="flex items-center px-3 py-1 bg-red-100 text-red-800 rounded-lg hover:bg-red-200"
               >
                 <Trash2 className="h-4 w-4 mr-1" />
                 Delete
@@ -708,7 +708,7 @@ const Bookings: React.FC = () => {
           {totalPages > 1 && (
             <div className="bg-white px-6 py-4 border-t border-gray-100">
               <div className="flex items-center justify-between">
-                <div className="text-sm text-gray-700">
+                <div className="text-sm text-gray-800">
                   Showing <span className="font-medium">{indexOfFirstItem + 1}</span> to{' '}
                   <span className="font-medium">
                     {Math.min(indexOfLastItem, filteredBookings.length)}
@@ -719,7 +719,7 @@ const Bookings: React.FC = () => {
                   <button
                     onClick={() => paginate(Math.max(1, currentPage - 1))}
                     disabled={currentPage === 1}
-                    className="px-3 py-1 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                    className="px-3 py-1 border border-gray-200 rounded-lg text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50"
                   >
                     Previous
                   </button>
@@ -731,7 +731,7 @@ const Bookings: React.FC = () => {
                       className={`px-3 py-1 border rounded-lg text-sm font-medium ${
                         currentPage === page
                           ? 'border-blue-500 bg-blue-500 text-white'
-                          : 'border-gray-200 text-gray-700 hover:bg-gray-50'
+                          : 'border-gray-200 text-gray-800 hover:bg-gray-50'
                       }`}
                     >
                       {page}
@@ -741,7 +741,7 @@ const Bookings: React.FC = () => {
                   <button
                     onClick={() => paginate(Math.min(totalPages, currentPage + 1))}
                     disabled={currentPage === totalPages}
-                    className="px-3 py-1 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                    className="px-3 py-1 border border-gray-200 rounded-lg text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50"
                   >
                     Next
                   </button>

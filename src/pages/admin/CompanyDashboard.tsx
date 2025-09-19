@@ -80,7 +80,7 @@ const CompanyDashboard: React.FC = () => {
       change: '+18% from last month',
       trend: 'up',
       icon: Calendar,
-      accent: 'bg-blue-100 text-blue-700',
+      accent: 'bg-blue-100 text-blue-800',
     },
     {
       title: 'Active Locations',
@@ -88,7 +88,7 @@ const CompanyDashboard: React.FC = () => {
       change: 'All locations operational',
       trend: 'stable',
       icon: Building,
-      accent: 'bg-blue-100 text-blue-700',
+      accent: 'bg-blue-100 text-blue-800',
     },
     {
       title: 'Total Revenue',
@@ -96,7 +96,7 @@ const CompanyDashboard: React.FC = () => {
       change: '+15% from last month',
       trend: 'up',
       icon: DollarSign,
-      accent: 'bg-blue-100 text-blue-700',
+      accent: 'bg-blue-100 text-blue-800',
     },
     {
       title: 'Participants',
@@ -104,7 +104,7 @@ const CompanyDashboard: React.FC = () => {
       change: '+12% from last month',
       trend: 'up',
       icon: Users,
-      accent: 'bg-blue-100 text-blue-700',
+      accent: 'bg-blue-100 text-blue-800',
     },
     {
       title: 'Avg. Booking Value',
@@ -112,7 +112,7 @@ const CompanyDashboard: React.FC = () => {
       change: '+3% from last month',
       trend: 'up',
       icon: CreditCard,
-      accent: 'bg-blue-100 text-blue-700',
+      accent: 'bg-blue-100 text-blue-800',
     },
   ];
 
@@ -129,7 +129,7 @@ const CompanyDashboard: React.FC = () => {
     { id: 9, date: new Date('2025-09-17'), time: '10:30 AM', duration: 2, activity: 'Escape Room', package: null, participants: 8, status: 'Confirmed', payment: 'Paid', customer: 'Team Builders Co.', contact: 'Maria Garcia', phone: '(555) 333-4444', email: 'maria@teambuilders.com', amount: '$240', location: 'EscapeRoomZone', specialRequests: 'Beginner level room' },
     { id: 10, date: new Date('2025-09-18'), time: '1:00 PM', duration: 2, activity: 'Laser Tag', package: null, participants: 10, status: 'Confirmed', payment: 'Paid', customer: 'Marketing Pros', contact: 'Tom Wilson', phone: '(555) 555-6666', email: 'tom@marketingpros.com', amount: '$400', location: 'Brighton', specialRequests: 'Marketing team outing' },
     { id: 11, date: new Date('2025-09-19'), time: '5:00 PM', duration: 2, activity: 'Bowling', package: null, participants: 6, status: 'Confirmed', payment: 'Paid', customer: 'Family Smith', contact: 'Robert Smith', phone: '(555) 777-8888', email: 'rsmith@email.com', amount: '$150', location: 'Canton', specialRequests: 'Family night' },
-    { id: 12, date: new Date('2025-09-20'), time: '2:30 PM', duration: 3, activity: null, package: 'Corporate Package', participants: 12, status: 'Confirmed', payment: 'Paid', customer: 'Finance Corp', contact: 'Susan Lee', phone: '(555) 999-0000', email: 'slee@financecorp.com', amount: '$700', location: 'Lansing', specialRequests: 'Board meeting follow-up' },
+    { id: 12, date: new Date('2025-09-20'), time: '2:30 PM', duration: 3, activity: null, package: 'Corporate Package', participants: 12, status: 'Confirmed', payment: 'Paid', customer: 'Finance Corp', contact: 'Susan Lee', phone: '(555) 999-0000', email: 'slee@financecorp.com', amount: '$800', location: 'Lansing', specialRequests: 'Board meeting follow-up' },
     { id: 13, date: new Date('2025-09-21'), time: '6:00 PM', duration: 2, activity: 'Laser Tag', package: null, participants: 8, status: 'Confirmed', payment: 'Paid', customer: 'Gaming Club', contact: 'Mark Taylor', phone: '(555) 123-7890', email: 'mark@gamingclub.com', amount: '$320', location: 'Brighton', specialRequests: 'Monthly tournament' },
     { id: 14, date: new Date('2025-09-22'), time: '1:30 PM', duration: 1.5, activity: 'Bowling', package: null, participants: 5, status: 'Pending', payment: 'Pending', customer: 'Sarah Wilson', contact: 'Sarah Wilson', phone: '(555) 456-1234', email: 'sarahw@email.com', amount: '$125', location: 'Taylor', specialRequests: 'Need bumpers for kids' },
     { id: 15, date: new Date('2025-09-23'), time: '3:30 PM', duration: 2, activity: 'Escape Room', package: null, participants: 6, status: 'Confirmed', payment: 'Paid', customer: 'Tech Team', contact: 'James Brown', phone: '(555) 789-4561', email: 'james@techteam.com', amount: '$180', location: 'EscapeRoomZone', specialRequests: 'Advanced level room' },
@@ -201,25 +201,25 @@ const CompanyDashboard: React.FC = () => {
 
   // Quick actions
   const quickActions = [
-    { title: 'New Booking', icon: Plus, accent: 'bg-blue-500 hover:bg-blue-700' },
-    { title: 'View Reports', icon: BarChart3, accent: 'bg-blue-500 hover:bg-blue-700' },
-    { title: 'Manage Locations', icon: MapPin, accent: 'bg-blue-500 hover:bg-blue-700' },
-    { title: 'Export Data', icon: Download, accent: 'bg-blue-500 hover:bg-blue-700' },
+    { title: 'New Booking', icon: Plus, accent: 'bg-blue-500 hover:bg-blue-800' },
+    { title: 'View Reports', icon: BarChart3, accent: 'bg-blue-500 hover:bg-blue-800' },
+    { title: 'Manage Locations', icon: MapPin, accent: 'bg-blue-500 hover:bg-blue-800' },
+    { title: 'Export Data', icon: Download, accent: 'bg-blue-500 hover:bg-blue-800' },
   ];
 
   // Status colors
   const statusColors = {
-    Confirmed: 'bg-emerald-100 text-emerald-700',
-    Pending: 'bg-amber-100 text-amber-700',
-    Cancelled: 'bg-rose-100 text-rose-700',
+    Confirmed: 'bg-emerald-100 text-emerald-800',
+    Pending: 'bg-amber-100 text-amber-800',
+    Cancelled: 'bg-rose-100 text-rose-800',
   };
 
   // Payment status colors
   const paymentColors = {
-    Paid: 'bg-emerald-100 text-emerald-700',
-    Partial: 'bg-amber-100 text-amber-700',
-    Refunded: 'bg-rose-100 text-rose-700',
-    Pending: 'bg-amber-100 text-amber-700',
+    Paid: 'bg-emerald-100 text-emerald-800',
+    Partial: 'bg-amber-100 text-amber-800',
+    Refunded: 'bg-rose-100 text-rose-800',
+    Pending: 'bg-amber-100 text-amber-800',
   };
 
   // Filter bookings by status, location, and search for the table
@@ -297,7 +297,7 @@ const CompanyDashboard: React.FC = () => {
               <option key={location} value={location}>{location}</option>
             ))}
           </select>
-          <button className="px-3 py-2 md:px-5 md:py-2.5 bg-blue-700 text-white rounded-lg md:rounded-xl flex items-center gap-2 hover:bg-blue-700 transition font-semibold shadow-sm text-sm md:text-base">
+          <button className="px-3 py-2 md:px-5 md:py-2.5 bg-blue-800 text-white rounded-lg md:rounded-xl flex items-center gap-2 hover:bg-blue-800 transition font-semibold shadow-sm text-sm md:text-base">
             <Plus size={16} className="md:size-5" />
             <Link to="/bookings">New Booking</Link>
           </button>
@@ -315,7 +315,7 @@ const CompanyDashboard: React.FC = () => {
             >
               <div className="flex items-center gap-2">
                 <div className={`p-2 rounded-lg ${metric.accent}`}><Icon size={18} className="md:size-5" /></div>
-                <span className="text-sm md:text-base font-semibold text-gray-700">{metric.title}</span>
+                <span className="text-sm md:text-base font-semibold text-gray-800">{metric.title}</span>
               </div>
               <div className="flex items-end gap-2 mt-2">
                 <h3 className="text-xl md:text-2xl font-bold text-gray-900">{metric.value}</h3>
@@ -329,7 +329,7 @@ const CompanyDashboard: React.FC = () => {
       {/* Location Stats */}
       <div className="bg-white rounded-xl shadow-sm p-4 md:p-6 border border-gray-100">
         <h2 className="text-lg md:text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-          <MapPin className="w-5 h-5 md:w-6 md:h-6 text-blue-700" /> Location Performance
+          <MapPin className="w-5 h-5 md:w-6 md:h-6 text-blue-800" /> Location Performance
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
           {Object.entries(locationStats).map(([location, stats]) => (
@@ -337,15 +337,15 @@ const CompanyDashboard: React.FC = () => {
               <h3 className="font-semibold text-gray-900 mb-2 text-sm md:text-base">{location}</h3>
               <div className="grid grid-cols-3 gap-2 text-center">
                 <div>
-                  <div className="text-base md:text-lg font-bold text-blue-700">{stats.bookings}</div>
+                  <div className="text-base md:text-lg font-bold text-blue-800">{stats.bookings}</div>
                   <div className="text-xs text-gray-500">Bookings</div>
                 </div>
                 <div>
-                  <div className="text-base md:text-lg font-bold text-blue-700">${stats.revenue}</div>
+                  <div className="text-base md:text-lg font-bold text-blue-800">${stats.revenue}</div>
                   <div className="text-xs text-gray-500">Revenue</div>
                 </div>
                 <div>
-                  <div className="text-base md:text-lg font-bold text-blue-700">{stats.participants}</div>
+                  <div className="text-base md:text-lg font-bold text-blue-800">{stats.participants}</div>
                   <div className="text-xs text-gray-500">Participants</div>
                 </div>
               </div>
@@ -358,7 +358,7 @@ const CompanyDashboard: React.FC = () => {
       <div className="bg-white rounded-xl shadow-sm p-4 md:p-6 border border-gray-100">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 md:mb-6">
           <h2 className="text-xl md:text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <Calendar className="w-5 h-5 md:w-6 md:h-6 text-blue-700" /> Weekly Calendar
+            <Calendar className="w-5 h-5 md:w-6 md:h-6 text-blue-800" /> Weekly Calendar
           </h2>
           <div className="flex items-center space-x-2 mt-4 md:mt-0">
             <button 
@@ -367,7 +367,7 @@ const CompanyDashboard: React.FC = () => {
             >
               <ChevronLeft size={16} className="md:size-5" />
             </button>
-            <span className="text-sm font-medium text-gray-700">
+            <span className="text-sm font-medium text-gray-800">
               {weekDates[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - 
               {weekDates[6].toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
             </span>
@@ -377,7 +377,7 @@ const CompanyDashboard: React.FC = () => {
             >
               <ChevronRight size={16} className="md:size-5" />
             </button>
-            <button className="ml-2 px-3 py-2 text-sm bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200" onClick={() => setCurrentWeek(new Date())}>
+            <button className="ml-2 px-3 py-2 text-sm bg-blue-100 text-blue-800 rounded-lg hover:bg-blue-200" onClick={() => setCurrentWeek(new Date())}>
               Today
             </button>
             
@@ -386,8 +386,8 @@ const CompanyDashboard: React.FC = () => {
               onClick={() => setShowFilterPanel(!showFilterPanel)}
               className={`ml-2 px-3 py-2 text-sm rounded-lg flex items-center ${
                 calendarFilter.type !== 'all' 
-                  ? 'bg-blue-100 text-blue-700 border border-blue-300' 
-                  : 'bg-gray-100 text-gray-700 border border-gray-200'
+                  ? 'bg-blue-100 text-blue-800 border border-blue-300' 
+                  : 'bg-gray-100 text-gray-800 border border-gray-200'
               }`}
             >
               <Filter size={16} className="mr-1" />
@@ -408,7 +408,7 @@ const CompanyDashboard: React.FC = () => {
               <h3 className="font-medium text-gray-800 text-sm md:text-base">Filter Calendar</h3>
               <button 
                 onClick={() => setShowFilterPanel(false)}
-                className="text-gray-500 hover:text-gray-700"
+                className="text-gray-500 hover:text-gray-800"
               >
                 <X size={16} className="md:size-5" />
               </button>
@@ -424,7 +424,7 @@ const CompanyDashboard: React.FC = () => {
                   onChange={() => setCalendarFilter({ type: 'all', value: '' })}
                   className="mr-2"
                 />
-                <label htmlFor="filter-all" className="text-sm text-gray-700">
+                <label htmlFor="filter-all" className="text-sm text-gray-800">
                   Show All
                 </label>
               </div>
@@ -438,7 +438,7 @@ const CompanyDashboard: React.FC = () => {
                   onChange={() => setCalendarFilter({ type: 'activity', value: allActivities[0] || '' })}
                   className="mr-2"
                 />
-                <label htmlFor="filter-activity" className="text-sm text-gray-700 mr-2">
+                <label htmlFor="filter-activity" className="text-sm text-gray-800 mr-2">
                   By Activity
                 </label>
                 
@@ -464,7 +464,7 @@ const CompanyDashboard: React.FC = () => {
                   onChange={() => setCalendarFilter({ type: 'package', value: allPackages[0] || '' })}
                   className="mr-2"
                 />
-                <label htmlFor="filter-package" className="text-sm text-gray-700 mr-2">
+                <label htmlFor="filter-package" className="text-sm text-gray-800 mr-2">
                   By Package
                 </label>
                 
@@ -484,7 +484,7 @@ const CompanyDashboard: React.FC = () => {
               {calendarFilter.type !== 'all' && (
                 <button
                   onClick={clearCalendarFilter}
-                  className="ml-auto text-sm text-blue-700 hover:text-blue-800 flex items-center"
+                  className="ml-auto text-sm text-blue-800 hover:text-blue-800 flex items-center"
                 >
                   <X size={14} className="mr-1" />
                   Clear Filter
@@ -493,7 +493,7 @@ const CompanyDashboard: React.FC = () => {
             </div>
             
             {calendarFilter.type !== 'all' && (
-              <div className="mt-3 text-sm text-gray-700">
+              <div className="mt-3 text-sm text-gray-800">
                 Showing: {calendarFilter.type === 'activity' ? 'Activity' : 'Package'} - {calendarFilter.value}
               </div>
             )}
@@ -571,7 +571,7 @@ const CompanyDashboard: React.FC = () => {
         {/* Quick Actions */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 md:p-5 flex flex-col gap-3 md:gap-4">
           <h2 className="text-lg md:text-xl font-bold text-gray-900 mb-2 md:mb-4 flex items-center gap-2">
-            <Activity className="w-5 h-5 text-blue-700" /> Quick Actions
+            <Activity className="w-5 h-5 text-blue-800" /> Quick Actions
           </h2>
           <div className="grid grid-cols-2 gap-2 md:gap-3">
             {quickActions.map((action, index) => {
@@ -593,9 +593,9 @@ const CompanyDashboard: React.FC = () => {
         <div className="lg:col-span-2 bg-white rounded-xl border border-gray-100 shadow-sm p-4 md:p-5">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg md:text-xl font-bold text-gray-900 flex items-center gap-2">
-              <Star className="w-5 h-5 text-blue-700" /> Recent Activity
+              <Star className="w-5 h-5 text-blue-800" /> Recent Activity
             </h2>
-            <button className="text-sm text-blue-700 hover:text-blue-800 font-medium flex items-center gap-1">
+            <button className="text-sm text-blue-800 hover:text-blue-800 font-medium flex items-center gap-1">
               <ChevronRight size={16} /> View all
             </button>
           </div>
@@ -610,7 +610,7 @@ const CompanyDashboard: React.FC = () => {
               </div>
               <div className="text-right min-w-[70px] md:min-w-[90px]">
                 <span className="text-xs text-gray-500">Today, 10:30 AM</span>
-                <span className="block text-xs font-semibold text-emerald-700 mt-1">Confirmed</span>
+                <span className="block text-xs font-semibold text-emerald-800 mt-1">Confirmed</span>
               </div>
             </div>
           
@@ -623,7 +623,7 @@ const CompanyDashboard: React.FC = () => {
               </div>
               <div className="text-right min-w-[70px] md:min-w-[90px]">
                 <span className="text-xs text-gray-500">Today, 9:45 AM</span>
-                <span className="block text-xs font-semibold text-emerald-700 mt-1">Paid</span>
+                <span className="block text-xs font-semibold text-emerald-800 mt-1">Paid</span>
               </div>
             </div>
           
@@ -636,7 +636,7 @@ const CompanyDashboard: React.FC = () => {
               </div>
               <div className="text-right min-w-[70px] md:min-w-[90px]">
                 <span className="text-xs text-gray-500">Today, 8:15 AM</span>
-                <span className="block text-xs font-semibold text-blue-700 mt-1">Completed</span>
+                <span className="block text-xs font-semibold text-blue-800 mt-1">Completed</span>
               </div>
             </div>
           </div>
@@ -750,13 +750,13 @@ const CompanyDashboard: React.FC = () => {
                   </td>
                   <td className="px-3 md:px-4 py-2 md:py-3">
                     <div className="flex space-x-2">
-                      <button className="text-blue-700 hover:text-blue-800">
+                      <button className="text-blue-800 hover:text-blue-800">
                         <Eye size={16} />
                       </button>
-                      <button className="text-blue-700 hover:text-blue-800">
+                      <button className="text-blue-800 hover:text-blue-800">
                         <Edit size={16} />
                       </button>
-                      <button className="text-red-700 hover:text-red-800">
+                      <button className="text-red-800 hover:text-red-800">
                         <Trash2 size={16} />
                       </button>
                     </div>
@@ -776,7 +776,7 @@ const CompanyDashboard: React.FC = () => {
         {/* Pagination */}
         {filteredBookings.length > 0 && (
           <div className="flex items-center justify-between mt-4 md:mt-6">
-            <div className="text-sm text-gray-700">
+            <div className="text-sm text-gray-800">
               Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, filteredBookings.length)} of {filteredBookings.length} results
             </div>
             <div className="flex space-x-2">
@@ -806,7 +806,7 @@ const CompanyDashboard: React.FC = () => {
                     onClick={() => paginate(pageNum)}
                     className={`px-3 py-1 border rounded-md text-sm ${
                       currentPage === pageNum
-                        ? 'bg-blue-700 text-white border-blue-700'
+                        ? 'bg-blue-800 text-white border-blue-800'
                         : 'border-gray-300'
                     }`}
                   >

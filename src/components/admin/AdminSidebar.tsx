@@ -224,7 +224,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
         {(() => {
           const Icon = item.icon;
           // @ts-expect-error lucide-react icons accept 'size' prop
-          return <Icon size={18} className={isActive ? 'text-blue-700' : 'stroke-1'} />;
+          return <Icon size={18} className={isActive ? 'text-blue-800' : 'stroke-1'} />;
         })()}
         <span className="ml-3 text-sm flex-1">{item.label}</span>
         {hasItems && (
@@ -245,7 +245,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
       <div>
         {hasItems ? (
           <div
-            className={`flex items-center p-2 rounded-lg cursor-pointer transition-colors ${isActive || isChildActive ? 'bg-blue-100 text-blue-700 font-semibold' : 'hover:bg-gray-100 text-gray-700'} ${depth > 0 ? 'pl-8' : ''}`}
+            className={`flex items-center p-2 rounded-lg cursor-pointer transition-colors ${isActive || isChildActive ? 'bg-blue-100 text-blue-800 font-semibold' : 'hover:bg-gray-100 text-gray-800'} ${depth > 0 ? 'pl-8' : ''}`}
             onClick={() => toggleDropdown(item.label)}
           >
             {content}
@@ -253,7 +253,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
         ) : item.href ? (
           <Link
             to={item.href}
-            className={`flex items-center p-2 rounded-lg transition-colors ${isActive ? 'bg-blue-100 text-blue-700 font-semibold' : 'hover:bg-gray-100 text-gray-700'} ${depth > 0 ? 'pl-8' : ''}`}
+            className={`flex items-center p-2 rounded-lg transition-colors ${isActive ? 'bg-blue-100 text-blue-800 font-semibold' : 'hover:bg-gray-100 text-gray-800'} ${depth > 0 ? 'pl-8' : ''}`}
             onClick={handleNavClick}
           >
             {content}
@@ -282,7 +282,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
       {/* Floating Toggle Button */}
       {!isOpen && (
         <button
-          className="fixed top-4 right-4 z-50 p-2 rounded bg-blue-700 text-white shadow-lg lg:hidden"
+          className="fixed top-4 right-4 z-50 p-2 rounded bg-blue-800 text-white shadow-lg lg:hidden"
           style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.12)' }}
           onClick={() => setIsOpen(true)}
         >
@@ -312,11 +312,11 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
           {/* Search */}
           <div className="p-4">
             <div className="relative">
-              <Search size={18} className="absolute left-3 top-2.5 text-gray-700" />
+              <Search size={18} className="absolute left-3 top-2.5 text-gray-800" />
               <input
                 type="text"
                 placeholder="Search..."
-                className="w-full pl-10 pr-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-700 focus:border-blue-700"
+                className="w-full pl-10 pr-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-800 focus:border-blue-800"
               />
             </div>
           </div>
@@ -332,7 +332,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
             <div className="flex items-center justify-between">
               <div className="flex items-center">
                 <div className="w-10 h-10 bg-blue-200 rounded-full flex items-center justify-center">
-                  <User size={20} className="text-blue-700" />
+                  <User size={20} className="text-blue-800" />
                 </div>
                 <div className="ml-3 text-left">
                   <p className="text-sm font-medium text-gray-900">{user.name}</p>
@@ -350,12 +350,12 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
                   id="profile-dropdown-toggle"
                   type="button"
                 >
-                  <ChevronDown size={18} className="text-blue-700" />
+                  <ChevronDown size={18} className="text-blue-800" />
                 </button>
                 {showProfileDropdown && (
                   <div className="absolute right-0 bottom-0 mb-10 w-40 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
                     <button
-                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 rounded-lg"
+                      className="w-full text-left px-4 py-2 text-sm text-gray-800 hover:bg-blue-50 hover:text-blue-800 rounded-lg"
                       onClick={handleSignOut}
                     >
                       Sign Out

@@ -85,7 +85,7 @@ export default function Login() {
           }}
         >
           <div>
-            <label className="block text-sm font-medium text-zinc-700 mb-1">Email</label>
+            <label className="block text-sm font-medium text-zinc-800 mb-1">Email</label>
             <input
               type="email"
               className="w-full rounded-md border border-zinc-200 px-3 py-2 text-zinc-900 bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-800 focus:border-blue-800 transition text-base sm:text-base"
@@ -96,7 +96,7 @@ export default function Login() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-zinc-700 mb-1">Password</label>
+            <label className="block text-sm font-medium text-zinc-800 mb-1">Password</label>
             <input
               type="password"
               className="w-full rounded-md border border-zinc-200 px-3 py-2 text-zinc-900 bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-800 focus:border-blue-800 transition text-base sm:text-base"
@@ -108,7 +108,7 @@ export default function Login() {
           </div>
           <button
             type="submit"
-            className="mt-2 w-full py-2 rounded-lg font-semibold text-base sm:text-lg shadow-sm transition-all bg-blue-800 text-white hover:bg-blue-700"
+            className="mt-2 w-full py-2 rounded-lg font-semibold text-base sm:text-lg shadow-sm transition-all bg-blue-800 text-white hover:bg-blue-800"
           >
             Sign In
           </button>

@@ -490,7 +490,7 @@ const CreatePackage: React.FC = () => {
                                                     <button
                                                         type="button"
                                                         key={day}
-                                                        className={`px-3 py-1.5 rounded-full border text-sm font-medium transition-all duration-150 hover:bg-primary/10 hover:border-primary/60 focus:outline-none focus:ring-2 focus:ring-primary/30 ${form.availableDays.includes(day) ? "bg-primary/10 border-primary text-primary" : "bg-white border-gray-200 text-neutral-700"}`}
+                                                        className={`px-3 py-1.5 rounded-full border text-sm font-medium transition-all duration-150 hover:bg-primary/10 hover:border-primary/60 focus:outline-none focus:ring-2 focus:ring-primary/30 ${form.availableDays.includes(day) ? "bg-primary/10 border-primary text-primary" : "bg-white border-gray-200 text-neutral-800"}`}
                                                         onClick={() => handleAvailabilityChange("daily", day)}
                                                     >
                                                         {day.substring(0, 3)}
@@ -508,7 +508,7 @@ const CreatePackage: React.FC = () => {
                                                     <button
                                                         type="button"
                                                         key={day}
-                                                        className={`px-3 py-1.5 rounded-full border text-sm font-medium transition-all duration-150 hover:bg-primary/10 hover:border-primary/60 focus:outline-none focus:ring-2 focus:ring-primary/30 ${form.availableWeekDays.includes(day) ? "bg-primary/10 border-primary text-primary" : "bg-white border-gray-200 text-neutral-700"}`}
+                                                        className={`px-3 py-1.5 rounded-full border text-sm font-medium transition-all duration-150 hover:bg-primary/10 hover:border-primary/60 focus:outline-none focus:ring-2 focus:ring-primary/30 ${form.availableWeekDays.includes(day) ? "bg-primary/10 border-primary text-primary" : "bg-white border-gray-200 text-neutral-800"}`}
                                                         onClick={() => handleAvailabilityChange("weekly", day)}
                                                     >
                                                         {day.substring(0, 3)}
@@ -526,7 +526,7 @@ const CreatePackage: React.FC = () => {
                                                     <button
                                                         type="button"
                                                         key={day}
-                                                        className={`px-3 py-1.5 rounded-full border text-sm font-medium transition-all duration-150 hover:bg-primary/10 hover:border-primary/60 focus:outline-none focus:ring-2 focus:ring-primary/30 ${form.availableMonthDays.includes(day) ? "bg-primary/10 border-primary text-primary" : "bg-white border-gray-200 text-neutral-700"}`}
+                                                        className={`px-3 py-1.5 rounded-full border text-sm font-medium transition-all duration-150 hover:bg-primary/10 hover:border-primary/60 focus:outline-none focus:ring-2 focus:ring-primary/30 ${form.availableMonthDays.includes(day) ? "bg-primary/10 border-primary text-primary" : "bg-white border-gray-200 text-neutral-800"}`}
                                                         onClick={() => handleAvailabilityChange("monthly", day)}
                                                     >
                                                         {day === "last" ? "Last" : day}
@@ -550,7 +550,7 @@ const CreatePackage: React.FC = () => {
                                         <button
                                             type="button"
                                             key={act.name}
-                                            className={`px-3 py-1 rounded-full border text-sm font-medium transition-all duration-150 hover:bg-primary/10 hover:border-primary/60 focus:outline-none focus:ring-2 focus:ring-primary/30 ${form.attractions.includes(act.name) ? "bg-primary/10 border-primary text-primary" : "bg-white border-gray-200 text-neutral-700"}`}
+                                            className={`px-3 py-1 rounded-full border text-sm font-medium transition-all duration-150 hover:bg-primary/10 hover:border-primary/60 focus:outline-none focus:ring-2 focus:ring-primary/30 ${form.attractions.includes(act.name) ? "bg-primary/10 border-primary text-primary" : "bg-white border-gray-200 text-neutral-800"}`}
                                             onClick={() => handleMultiSelect("attractions", act.name)}
                                         >
                                             {act.name} <span className="text-xs text-gray-400 ml-1">${act.price}</span>
@@ -603,7 +603,7 @@ const CreatePackage: React.FC = () => {
                                         <button
                                             type="button"
                                             key={add.name}
-                                            className={`px-3 py-1 rounded-full border text-sm font-medium flex items-center gap-2 transition-all duration-150 hover:bg-emerald-50 hover:border-emerald-400/60 focus:outline-none focus:ring-2 focus:ring-emerald-200 ${form.addOns.includes(add.name) ? "bg-emerald-50 border-emerald-400 text-emerald-700" : "bg-white border-gray-200 text-neutral-700"}`}
+                                            className={`px-3 py-1 rounded-full border text-sm font-medium flex items-center gap-2 transition-all duration-150 hover:bg-emerald-50 hover:border-emerald-400/60 focus:outline-none focus:ring-2 focus:ring-emerald-200 ${form.addOns.includes(add.name) ? "bg-emerald-50 border-emerald-400 text-emerald-800" : "bg-white border-gray-200 text-neutral-800"}`}
                                             onClick={() => handleMultiSelect("addOns", add.name)}
                                         >
                                             {add.name} <span className="text-xs text-gray-500">${add.price}</span>
@@ -649,7 +649,7 @@ const CreatePackage: React.FC = () => {
                                         <button
                                             type="button"
                                             onClick={() => navigate('/packages/promos')}
-                                            className="inline-flex items-center gap-2 bg-blue-700 text-xs hover:bg-blue-800 text-white px-4 py-2 rounded-md transition"
+                                            className="inline-flex items-center gap-2 bg-blue-800 text-xs hover:bg-blue-800 text-white px-4 py-2 rounded-md transition"
                                         >
                                             <Plus className="w-4 h-4" />
                                             Create Promo
@@ -658,7 +658,7 @@ const CreatePackage: React.FC = () => {
                                 ) : (
                                     <div className="flex flex-wrap gap-2 items-center mb-2">
                                         {promos.map((promo) => (
-                                            <label key={promo.code} className={`flex items-center gap-2 px-3 py-1 rounded-full border cursor-pointer text-sm font-medium transition-all duration-150 hover:bg-primary/10 hover:border-primary/60 focus-within:ring-2 focus-within:ring-primary/30 ${form.promos.includes(promo.code) ? "bg-primary/10 border-primary text-primary" : "bg-white border-gray-200 text-neutral-700"}`}>
+                                            <label key={promo.code} className={`flex items-center gap-2 px-3 py-1 rounded-full border cursor-pointer text-sm font-medium transition-all duration-150 hover:bg-primary/10 hover:border-primary/60 focus-within:ring-2 focus-within:ring-primary/30 ${form.promos.includes(promo.code) ? "bg-primary/10 border-primary text-primary" : "bg-white border-gray-200 text-neutral-800"}`}>
                                                 <input
                                                     type="checkbox"
                                                     checked={form.promos.includes(promo.code)}
@@ -694,7 +694,7 @@ const CreatePackage: React.FC = () => {
                                         <button
                                             type="button"
                                             onClick={() => navigate('/packages/gift-cards')}
-                                            className="inline-flex items-center gap-2 bg-blue-700 text-xs hover:bg-blue-800 text-white px-4 py-2 rounded-md transition"
+                                            className="inline-flex items-center gap-2 bg-blue-800 text-xs hover:bg-blue-800 text-white px-4 py-2 rounded-md transition"
                                         >
                                             <Plus className="w-4 h-4" />
                                             Create Gift Card
@@ -703,7 +703,7 @@ const CreatePackage: React.FC = () => {
                                 ) : (
                                     <div className="flex flex-wrap gap-2 items-center mb-2">
                                         {giftCards.map((gc) => (
-                                            <label key={gc.code} className={`flex items-center gap-2 px-3 py-1 rounded-full border cursor-pointer text-sm font-medium transition-all duration-150 hover:bg-emerald-50 hover:border-emerald-400/60 focus-within:ring-2 focus-within:ring-emerald-200 ${form.giftCards.includes(gc.code) ? "bg-emerald-50 border-emerald-400 text-emerald-700" : "bg-white border-gray-200 text-neutral-700"}`}>
+                                            <label key={gc.code} className={`flex items-center gap-2 px-3 py-1 rounded-full border cursor-pointer text-sm font-medium transition-all duration-150 hover:bg-emerald-50 hover:border-emerald-400/60 focus-within:ring-2 focus-within:ring-emerald-200 ${form.giftCards.includes(gc.code) ? "bg-emerald-50 border-emerald-400 text-emerald-800" : "bg-white border-gray-200 text-neutral-800"}`}>
                                                 <input
                                                     type="checkbox"
                                                     checked={form.giftCards.includes(gc.code)}
@@ -715,7 +715,7 @@ const CreatePackage: React.FC = () => {
                                                     <span className="text-xs text-gray-400 ml-1">[{gc.code}]</span>
                                                     {gc.description && (
                                                         <span className="ml-1">
-                                                            <Info className="w-4 h-4 text-emerald-400 group-hover:text-emerald-700 transition" />
+                                                            <Info className="w-4 h-4 text-emerald-400 group-hover:text-emerald-800 transition" />
                                                             <span className="absolute z-20 left-1/2 -translate-x-1/2 bottom-full mb-2 min-w-[180px] max-w-xs bg-white border border-gray-200 shadow-lg text-gray-900 text-xs rounded-md px-3 py-2 opacity-0 group-hover:opacity-100 pointer-events-none transition-all whitespace-pre-line text-left content-fit">
                                                                 {gc.description}
                                                             </span>
@@ -749,13 +749,13 @@ const CreatePackage: React.FC = () => {
                             <div className="flex gap-2 mt-6">
                                 <button
                                     type="submit"
-                                    className="flex-1 bg-blue-700 hover:bg-blue-800 text-white font-semibold py-2 rounded-md transition text-base flex items-center justify-center gap-2 visible"
+                                    className="flex-1 bg-blue-800 hover:bg-blue-800 text-white font-semibold py-2 rounded-md transition text-base flex items-center justify-center gap-2 visible"
                                 >
                                     <Plus className="w-5 h-5" /> Submit
                                 </button>
                                 <button
                                     type="button"
-                                    className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-2 rounded-md transition text-base flex items-center justify-center gap-2"
+                                    className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-800 font-semibold py-2 rounded-md transition text-base flex items-center justify-center gap-2"
                                     onClick={() => setForm({
                                         name: "",
                                         description: "",
@@ -800,7 +800,7 @@ const CreatePackage: React.FC = () => {
                             <div className="mb-2 flex items-center gap-2">
                                 <Clock className="w-4 h-4 text-gray-500" />
                                 <span className="font-semibold">Duration:</span> 
-                                <span className="text-neutral-700 text-sm">
+                                <span className="text-neutral-800 text-sm">
                                     {formatDuration()}
                                 </span>
                             </div>
@@ -809,7 +809,7 @@ const CreatePackage: React.FC = () => {
                             <div className="mb-2 flex items-center gap-2">
                                 <Calendar className="w-4 h-4 text-gray-500" />
                                 <span className="font-semibold">Available:</span> 
-                                <span className="text-neutral-700 text-sm">
+                                <span className="text-neutral-800 text-sm">
                                     {formatAvailability()}
                                 </span>
                             </div>
@@ -818,7 +818,7 @@ const CreatePackage: React.FC = () => {
                             {(form.pricePerAdditional30min || form.pricePerAdditional1hr) && (
                                 <div className="mb-2">
                                     <span className="font-semibold">Extension Pricing:</span>
-                                    <div className="text-neutral-700 text-sm">
+                                    <div className="text-neutral-800 text-sm">
                                         {form.pricePerAdditional30min && (
                                             <div>+30 min: ${form.pricePerAdditional30min}</div>
                                         )}
@@ -829,15 +829,15 @@ const CreatePackage: React.FC = () => {
                                 </div>
                             )}
                             
-                            <div className="mb-4 text-neutral-700 text-base min-h-[48px]">{form.description || <span className='text-gray-300'>Description</span>}</div>
+                            <div className="mb-4 text-neutral-800 text-base min-h-[48px]">{form.description || <span className='text-gray-300'>Description</span>}</div>
                             <div className="mb-2">
-                                <span className="font-semibold">Attractions:</span> <span className="text-neutral-700 text-sm">{(form.attractions || []).length ? form.attractions.map((act: string) => {
+                                <span className="font-semibold">Attractions:</span> <span className="text-neutral-800 text-sm">{(form.attractions || []).length ? form.attractions.map((act: string) => {
                                     const found = attractions.find(a => a.name === act);
                                     return found ? `${found.name} ($${found.price}${found.unit ? `, ${found.unit}` : ''})` : act;
                                 }).join(", ") : <span className='text-gray-300'>None</span>}</span>
                             </div>
                             <div className="mb-2">
-                                <span className="font-semibold">Add-ons:</span> <span className="text-neutral-700 text-sm">{(form.addOns || []).length ? (form.addOns || []).map((add: string) => {
+                                <span className="font-semibold">Add-ons:</span> <span className="text-neutral-800 text-sm">{(form.addOns || []).length ? (form.addOns || []).map((add: string) => {
                                     const found = addOns.find(a => a.name === add);
                                     return found ? `${found.name} ($${found.price})` : add;
                                 }).join(", ") : <span className='text-gray-300'>None</span>}</span>
@@ -867,12 +867,12 @@ const CreatePackage: React.FC = () => {
                                 {(form.giftCards || []).length ? (form.giftCards || []).map((code: string) => {
                                     const found = giftCards.find(g => g.code === code);
                                     return found ? (
-                                        <span key={code} className="relative group cursor-pointer text-emerald-700 flex items-center gap-1">
+                                        <span key={code} className="relative group cursor-pointer text-emerald-800 flex items-center gap-1">
                                             {found.name}
                                             {found.code && <span className="ml-1 text-gray-400">[{found.code}]</span>}
                                             {found.description && (
                                                 <span className="ml-1">
-                                                    <Info className="w-4 h-4 text-emerald-400 group-hover:text-emerald-700 transition" />
+                                                    <Info className="w-4 h-4 text-emerald-400 group-hover:text-emerald-800 transition" />
                                                     <span className="absolute z-20 left-1/2 -translate-x-1/2 bottom-full mb-2 min-w-[180px] max-w-xs bg-white border border-gray-200 shadow-lg text-gray-900 text-xs rounded-md px-3 py-2 opacity-0 group-hover:opacity-100 pointer-events-none transition-all whitespace-pre-line text-left content-fit">
                                                         {found.description}
                                                     </span>
@@ -884,7 +884,7 @@ const CreatePackage: React.FC = () => {
                             </div>
                             {form.maxParticipants && form.pricePerAdditional && (
                                 <div className="mb-2">
-                                    <span className="font-semibold">Price per Additional Participant:</span> <span className="text-neutral-700 text-sm">${form.pricePerAdditional}</span>
+                                    <span className="font-semibold">Price per Additional Participant:</span> <span className="text-neutral-800 text-sm">${form.pricePerAdditional}</span>
                                 </div>
                             )}
                         </div>

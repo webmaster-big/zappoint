@@ -270,8 +270,8 @@ const CheckIn: React.FC = () => {
             onClick={scanning ? stopScanning : startScanning}
             className={`mt-4 sm:mt-0 flex items-center px-4 py-2 rounded-lg ${
               scanning 
-                ? 'bg-red-100 text-red-700 hover:bg-red-200' 
-                : 'bg-blue-700 text-white hover:bg-blue-800'
+                ? 'bg-red-100 text-red-800 hover:bg-red-200' 
+                : 'bg-blue-800 text-white hover:bg-blue-800'
             }`}
           >
             <QrCode className="h-5 w-5 mr-2" />
@@ -301,7 +301,7 @@ const CheckIn: React.FC = () => {
               <p className="text-gray-600 mb-4">Position the QR code within the frame</p>
               <button
                 onClick={handleScan}
-                className="bg-blue-700 text-white px-6 py-2 rounded-lg hover:bg-blue-800"
+                className="bg-blue-800 text-white px-6 py-2 rounded-lg hover:bg-blue-800"
               >
                 Simulate Scan (Demo)
               </button>
@@ -313,7 +313,7 @@ const CheckIn: React.FC = () => {
         <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100 mb-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-800 mb-2">
                 <Calendar className="inline mr-2 h-4 w-4" />
                 Date
               </label>
@@ -325,7 +325,7 @@ const CheckIn: React.FC = () => {
               />
             </div>
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-800 mb-2">
                 <Search className="inline mr-2 h-4 w-4" />
                 Search Bookings
               </label>
@@ -418,7 +418,7 @@ const CheckIn: React.FC = () => {
                           )}
                           <button
                             onClick={() => viewDetails(booking)}
-                            className="text-blue-700 hover:text-blue-800 flex items-center"
+                            className="text-blue-800 hover:text-blue-800 flex items-center"
                             title="View Details"
                           >
                             <Eye className="h-5 w-5 mr-1" />
@@ -443,7 +443,7 @@ const CheckIn: React.FC = () => {
                   <h3 className="text-lg font-semibold">Booking Details</h3>
                   <button
                     onClick={closeModal}
-                    className="text-gray-500 hover:text-gray-700"
+                    className="text-gray-500 hover:text-gray-800"
                   >
                     <XCircle className="h-5 w-5" />
                   </button>

@@ -227,7 +227,7 @@ const CreateAttraction = () => {
   const LivePreview: React.FC<{ formData: FormData; imagePreviews: string[] }> = ({ formData, imagePreviews }) => {
     return (
       <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
-        <h2 className="text-xl font-bold mb-4 text-blue-700 border-b pb-2">Live Preview</h2>
+        <h2 className="text-xl font-bold mb-4 text-blue-800 border-b pb-2">Live Preview</h2>
         
         {imagePreviews.length > 0 && (
           <div className="mb-4">
@@ -246,11 +246,11 @@ const CreateAttraction = () => {
           </div>
           
           <div>
-            <p className="text-gray-700 text-sm">{formData.description || "No description provided"}</p>
+            <p className="text-gray-800 text-sm">{formData.description || "No description provided"}</p>
           </div>
           
           <div className="flex justify-between items-center">
-            <span className="font-bold text-lg text-blue-700">
+            <span className="font-bold text-lg text-blue-800">
               {formData.price ? `$${formData.price}` : "$0.00"}
               <span className="text-xs font-normal text-gray-500 ml-1">
                 {formData.pricingType === 'per_person' ? '/person' : 
@@ -274,12 +274,12 @@ const CreateAttraction = () => {
           </div>
           
           <div className="pt-2 border-t border-gray-100">
-            <h4 className="font-medium text-gray-700 mb-2">Available Days:</h4>
+            <h4 className="font-medium text-gray-800 mb-2">Available Days:</h4>
             <div className="flex flex-wrap gap-1">
               {Object.entries(formData.availability)
                 .filter(([_, v]) => v)
                 .map(([day]) => (
-                  <span key={day} className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs">
+                  <span key={day} className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">
                     {day.slice(0, 3)}
                   </span>
                 ))}
@@ -288,10 +288,10 @@ const CreateAttraction = () => {
           
           {formData.timeSlots.length > 0 && (
             <div className="pt-2 border-t border-gray-100">
-              <h4 className="font-medium text-gray-700 mb-2">Available Times:</h4>
+              <h4 className="font-medium text-gray-800 mb-2">Available Times:</h4>
               <div className="flex flex-wrap gap-1">
                 {formData.timeSlots.slice(0, 4).map(slot => (
-                  <span key={slot} className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs">
+                  <span key={slot} className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">
                     {slot}
                   </span>
                 ))}
@@ -330,7 +330,7 @@ const CreateAttraction = () => {
                 
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                   <div className="sm:col-span-2">
-                    <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
+                    <label htmlFor="name" className="block text-sm font-medium text-gray-800 mb-2">
                       Attraction Name *
                     </label>
                     <input
@@ -346,7 +346,7 @@ const CreateAttraction = () => {
                   </div>
 
                   <div className="sm:col-span-2">
-                    <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
+                    <label htmlFor="description" className="block text-sm font-medium text-gray-800 mb-2">
                       Description *
                     </label>
                     <textarea
@@ -362,7 +362,7 @@ const CreateAttraction = () => {
                   </div>
 
                   <div>
-                    <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-2">
+                    <label htmlFor="category" className="block text-sm font-medium text-gray-800 mb-2">
                       Category *
                     </label>
                     <select
@@ -395,7 +395,7 @@ const CreateAttraction = () => {
                   </div>
 
                   <div>
-                    <label htmlFor="location" className="block text-sm font-medium text-gray-700 mb-2">
+                    <label htmlFor="location" className="block text-sm font-medium text-gray-800 mb-2">
                       Location *
                     </label>
                     <select
@@ -436,7 +436,7 @@ const CreateAttraction = () => {
                 
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                   <div>
-                    <label htmlFor="price" className="block text-sm font-medium text-gray-700 mb-2">
+                    <label htmlFor="price" className="block text-sm font-medium text-gray-800 mb-2">
                       Price *
                     </label>
                     <div className="relative">
@@ -459,7 +459,7 @@ const CreateAttraction = () => {
                   </div>
 
                   <div>
-                    <label htmlFor="pricingType" className="block text-sm font-medium text-gray-700 mb-2">
+                    <label htmlFor="pricingType" className="block text-sm font-medium text-gray-800 mb-2">
                       Pricing Type *
                     </label>
                     <select
@@ -479,7 +479,7 @@ const CreateAttraction = () => {
                   </div>
 
                   <div>
-                    <label htmlFor="maxCapacity" className="block text-sm font-medium text-gray-700 mb-2">
+                    <label htmlFor="maxCapacity" className="block text-sm font-medium text-gray-800 mb-2">
                       Maximum Capacity *
                     </label>
                     <input
@@ -496,7 +496,7 @@ const CreateAttraction = () => {
                   </div>
 
                   <div>
-                    <label htmlFor="duration" className="block text-sm font-medium text-gray-700 mb-2">
+                    <label htmlFor="duration" className="block text-sm font-medium text-gray-800 mb-2">
                       Duration *
                     </label>
                     <div className="flex rounded-lg overflow-hidden border border-gray-200 focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent">
@@ -515,7 +515,7 @@ const CreateAttraction = () => {
                         name="durationUnit"
                         value={formData.durationUnit}
                         onChange={handleInputChange}
-                        className="px-3 py-3 bg-gray-50 text-gray-700 border-l border-gray-200 focus:outline-none"
+                        className="px-3 py-3 bg-gray-50 text-gray-800 border-l border-gray-200 focus:outline-none"
                       >
                         <option value="minutes">Minutes</option>
                         <option value="hours">Hours</option>
@@ -532,7 +532,7 @@ const CreateAttraction = () => {
                 </h2>
                 
                 <div className="mb-8">
-                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                  <label className="block text-sm font-medium text-gray-800 mb-3">
                     Available Days
                   </label>
                   <div className="flex flex-wrap gap-2">
@@ -543,8 +543,8 @@ const CreateAttraction = () => {
                         onClick={() => handleAvailabilityChange(day.key)}
                         className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                           formData.availability[day.key] 
-                            ? 'bg-blue-500 text-white shadow-md' 
-                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            ? 'bg-blue-800 text-white shadow-md' 
+                            : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
                         }`}
                       >
                         {day.label}
@@ -554,7 +554,7 @@ const CreateAttraction = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                  <label className="block text-sm font-medium text-gray-800 mb-3">
                     Available Time Slots
                   </label>
                   <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
@@ -565,8 +565,8 @@ const CreateAttraction = () => {
                         onClick={() => handleTimeSlotToggle(slot)}
                         className={`px-2 py-2 rounded-lg text-xs font-medium transition-colors ${
                           formData.timeSlots.includes(slot) 
-                            ? 'bg-green-500 text-white shadow-md' 
-                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            ? 'bg-blue-800 text-white shadow-md' 
+                            : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
                         }`}
                       >
                         {slot}
@@ -583,7 +583,7 @@ const CreateAttraction = () => {
                 </h2>
                 
                 <div className="mb-6">
-                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                  <label className="block text-sm font-medium text-gray-800 mb-3">
                     Upload Images (Max 5)
                   </label>
                   <div className="mt-1 flex justify-center px-6 pt-8 pb-8 border-2 border-dashed border-gray-300 rounded-xl hover:border-blue-400 transition-colors">
@@ -612,7 +612,7 @@ const CreateAttraction = () => {
 
                 {imagePreviews.length > 0 && (
                   <div className="mt-6">
-                    <label className="block text-sm font-medium text-gray-700 mb-3">
+                    <label className="block text-sm font-medium text-gray-800 mb-3">
                       Image Previews
                     </label>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
@@ -642,13 +642,13 @@ const CreateAttraction = () => {
                 <button
                   type="button"
                   onClick={() => navigate('/manage-attractions')}
-                  className="px-5 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                  className="px-5 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-800 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white hover:from-blue-700 hover:to-blue-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all"
+                  className="px-5 py-2.5 bg-blue-800 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white hover:from-blue-800 hover:to-blue-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all"
                 >
                   Create Attraction
                 </button>

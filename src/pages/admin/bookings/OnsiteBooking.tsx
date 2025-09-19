@@ -470,7 +470,7 @@ const OnsiteBooking: React.FC = () => {
           className="border rounded-xl p-8 flex flex-col items-center justify-center bg-blue-50 hover:bg-blue-100 transition cursor-pointer"
           onClick={() => setBookingType('package')}
         >
-          <span className="text-3xl font-bold text-blue-700 mb-2">Package</span>
+          <span className="text-3xl font-bold text-blue-800 mb-2">Package</span>
           <span className="text-gray-600 text-base text-center">Book a bundled package deal with multiple activities and add-ons.</span>
         </button>
         <button
@@ -478,7 +478,7 @@ const OnsiteBooking: React.FC = () => {
           className="border rounded-xl p-8 flex flex-col items-center justify-center bg-green-50 hover:bg-green-100 transition cursor-pointer"
           onClick={() => setBookingType('attraction')}
         >
-          <span className="text-3xl font-bold text-green-700 mb-2">Attraction</span>
+          <span className="text-3xl font-bold text-green-800 mb-2">Attraction</span>
           <span className="text-gray-600 text-base text-center">Book a single attraction directly (e.g. Laser Tag, Bowling).</span>
         </button>
       </div>
@@ -505,9 +505,9 @@ const OnsiteBooking: React.FC = () => {
               onClick={() => handlePackageSelect(pkg)}
             >
               <h3 className="text-xl font-semibold text-gray-900">{pkg.name}</h3>
-              <p className="text-gray-700 mt-2">{pkg.description}</p>
+              <p className="text-gray-800 mt-2">{pkg.description}</p>
               <div className="mt-4">
-                <p className="text-2xl font-bold text-blue-700">${pkg.price}</p>
+                <p className="text-2xl font-bold text-blue-800">${pkg.price}</p>
                 <p className="text-sm text-gray-600">Max {pkg.maxParticipants} participants</p>
                 <p className="text-sm text-gray-600 mt-1">
                   <Clock className="inline mr-1 h-4 w-4" />
@@ -535,15 +535,15 @@ const OnsiteBooking: React.FC = () => {
               }}
             >
               <h4 className="text-lg font-semibold text-gray-900">{attraction.name}</h4>
-              <p className="text-gray-700 mt-2">{attraction.description}</p>
+              <p className="text-gray-800 mt-2">{attraction.description}</p>
               <div className="mt-4">
-                <p className="text-lg font-bold text-blue-700">${attraction.price}</p>
+                <p className="text-lg font-bold text-blue-800">${attraction.price}</p>
                 <p className="text-sm text-gray-600">Category: {attraction.category}</p>
                 <p className="text-sm text-gray-600">Max {attraction.maxCapacity} participants</p>
               </div>
               <button
                 type="button"
-                className="mt-4 w-full bg-blue-700 text-white px-4 py-2 rounded-lg hover:bg-blue-800"
+                className="mt-4 w-full bg-blue-800 text-white px-4 py-2 rounded-lg hover:bg-blue-800"
               >
                 Book This Attraction
               </button>
@@ -556,7 +556,7 @@ const OnsiteBooking: React.FC = () => {
             <button
               type="button"
               onClick={() => setStep(2)}
-              className="w-full md:w-auto bg-blue-700 text-white px-6 py-3 rounded-lg hover:bg-blue-700"
+              className="w-full md:w-auto bg-blue-800 text-white px-6 py-3 rounded-lg hover:bg-blue-800"
             >
               Continue to Attractions & Add-ons
             </button>
@@ -608,8 +608,8 @@ const OnsiteBooking: React.FC = () => {
                   <div className="flex justify-between items-start">
                     <div>
                       <h4 className="font-medium text-gray-900">{attraction.name}</h4>
-                      <p className="text-sm text-gray-700">{attraction.description}</p>
-                      <p className="text-sm text-gray-700 mt-1">
+                      <p className="text-sm text-gray-800">{attraction.description}</p>
+                      <p className="text-sm text-gray-800 mt-1">
                         ${attraction.price} {attraction.pricingType === 'per_person' ? 'per person' : 'per unit'}
                       </p>
                     </div>
@@ -618,8 +618,8 @@ const OnsiteBooking: React.FC = () => {
                       onClick={() => handleAttractionToggle(attraction.id)}
                       className={`px-3 py-1 rounded text-sm ${
                         isSelected
-                          ? 'bg-red-100 text-red-700 hover:bg-red-200'
-                          : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                          ? 'bg-red-100 text-red-800 hover:bg-red-200'
+                          : 'bg-blue-100 text-blue-800 hover:bg-blue-200'
                       }`}
                     >
                       {isSelected ? 'Remove' : 'Add'}
@@ -628,7 +628,7 @@ const OnsiteBooking: React.FC = () => {
                   
                   {isSelected && (
                     <div className="mt-3 flex items-center">
-                      <span className="text-sm text-gray-700 mr-3">Quantity:</span>
+                      <span className="text-sm text-gray-800 mr-3">Quantity:</span>
                       <div className="flex items-center">
                         <button
                           type="button"
@@ -674,15 +674,15 @@ const OnsiteBooking: React.FC = () => {
                   <div className="flex justify-between items-start">
                     <div>
                       <h4 className="font-medium text-gray-900">{addOn.name}</h4>
-                      <p className="text-sm text-gray-700">${addOn.price}</p>
+                      <p className="text-sm text-gray-800">${addOn.price}</p>
                     </div>
                     <button
                       type="button"
                       onClick={() => handleAddOnToggle(addOn.name, addOn.price)}
                       className={`px-3 py-1 rounded text-sm ${
                         isSelected
-                          ? 'bg-red-100 text-red-700 hover:bg-red-200'
-                          : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                          ? 'bg-red-100 text-red-800 hover:bg-red-200'
+                          : 'bg-blue-100 text-blue-800 hover:bg-blue-200'
                       }`}
                     >
                       {isSelected ? 'Remove' : 'Add'}
@@ -691,7 +691,7 @@ const OnsiteBooking: React.FC = () => {
                   
                   {isSelected && (
                     <div className="mt-3 flex items-center">
-                      <span className="text-sm text-gray-700 mr-3">Quantity:</span>
+                      <span className="text-sm text-gray-800 mr-3">Quantity:</span>
                       <div className="flex items-center">
                         <button
                           type="button"
@@ -729,7 +729,7 @@ const OnsiteBooking: React.FC = () => {
         <button
           type="button"
           onClick={() => setStep(3)}
-          className="bg-blue-700 text-white px-6 py-3 rounded-lg hover:bg-blue-700"
+          className="bg-blue-800 text-white px-6 py-3 rounded-lg hover:bg-blue-800"
         >
           Continue to Date & Time
         </button>
@@ -744,7 +744,7 @@ const OnsiteBooking: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Date Selection */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-medium text-gray-800 mb-2">
             <Calendar className="inline mr-2 h-4 w-4" />
             Select Date
           </label>
@@ -766,7 +766,7 @@ const OnsiteBooking: React.FC = () => {
         
         {/* Time Selection */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-medium text-gray-800 mb-2">
             <Clock className="inline mr-2 h-4 w-4" />
             Select Time
           </label>
@@ -786,7 +786,7 @@ const OnsiteBooking: React.FC = () => {
         
         {/* Participants */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-medium text-gray-800 mb-2">
             <Users className="inline mr-2 h-4 w-4" />
             Number of Participants
           </label>
@@ -805,12 +805,12 @@ const OnsiteBooking: React.FC = () => {
         {/* Duration Display */}
         {selectedPackage && (
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-800 mb-2">
               <Clock className="inline mr-2 h-4 w-4" />
               Duration
             </label>
             <div className="w-full border border-gray-300 rounded-lg px-3 py-2 bg-gray-50">
-              <span className="text-gray-700">{formatDuration(selectedPackage)}</span>
+              <span className="text-gray-800">{formatDuration(selectedPackage)}</span>
             </div>
           </div>
         )}
@@ -827,7 +827,7 @@ const OnsiteBooking: React.FC = () => {
         <button
           type="button"
           onClick={() => setStep(4)}
-          className="bg-blue-700 text-white px-6 py-3 rounded-lg hover:bg-blue-700"
+          className="bg-blue-800 text-white px-6 py-3 rounded-lg hover:bg-blue-800"
         >
           Continue to Customer Details
         </button>
@@ -841,7 +841,7 @@ const OnsiteBooking: React.FC = () => {
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">First Name</label>
+          <label className="block text-sm font-medium text-gray-800 mb-2">First Name</label>
           <input
             type="text"
             name="customer.firstName"
@@ -853,7 +853,7 @@ const OnsiteBooking: React.FC = () => {
         </div>
         
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Last Name</label>
+          <label className="block text-sm font-medium text-gray-800 mb-2">Last Name</label>
           <input
             type="text"
             name="customer.lastName"
@@ -865,7 +865,7 @@ const OnsiteBooking: React.FC = () => {
         </div>
         
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+          <label className="block text-sm font-medium text-gray-800 mb-2">Email</label>
           <input
             type="email"
             name="customer.email"
@@ -877,7 +877,7 @@ const OnsiteBooking: React.FC = () => {
         </div>
         
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
+          <label className="block text-sm font-medium text-gray-800 mb-2">Phone Number</label>
           <input
             type="tel"
             name="customer.phone"
@@ -891,7 +891,7 @@ const OnsiteBooking: React.FC = () => {
       
       {/* Gift Card */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+        <label className="block text-sm font-medium text-gray-800 mb-2">
           <Gift className="inline mr-2 h-4 w-4" />
           Gift Card Code (Optional)
         </label>
@@ -907,7 +907,7 @@ const OnsiteBooking: React.FC = () => {
       
       {/* Promo Code */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+        <label className="block text-sm font-medium text-gray-800 mb-2">
           <Tag className="inline mr-2 h-4 w-4" />
           Promo Code (Optional)
         </label>
@@ -923,7 +923,7 @@ const OnsiteBooking: React.FC = () => {
       
       {/* Notes */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">Additional Notes</label>
+        <label className="block text-sm font-medium text-gray-800 mb-2">Additional Notes</label>
         <textarea
           name="notes"
           value={bookingData.notes}
@@ -945,7 +945,7 @@ const OnsiteBooking: React.FC = () => {
         <button
           type="button"
           onClick={() => setStep(5)}
-          className="bg-blue-700 text-white px-6 py-3 rounded-lg hover:bg-blue-700"
+          className="bg-blue-800 text-white px-6 py-3 rounded-lg hover:bg-blue-800"
         >
           Continue to Payment
         </button>
@@ -1029,7 +1029,7 @@ const OnsiteBooking: React.FC = () => {
       </div>
       
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+        <label className="block text-sm font-medium text-gray-800 mb-2">
           <CreditCard className="inline mr-2 h-4 w-4" />
           Payment Method
         </label>
@@ -1057,7 +1057,7 @@ const OnsiteBooking: React.FC = () => {
         </button>
         <button
           type="submit"
-          className="bg-green-700 text-white px-6 py-3 rounded-lg hover:bg-green-700"
+          className="bg-green-800 text-white px-6 py-3 rounded-lg hover:bg-green-800"
         >
           Confirm Booking
         </button>
@@ -1079,12 +1079,12 @@ const OnsiteBooking: React.FC = () => {
             <div
               key={stepNum}
               className={`flex-1 h-2 mx-1 rounded-full ${
-                step >= stepNum ? 'bg-blue-700' : 'bg-gray-300'
+                step >= stepNum ? 'bg-blue-800' : 'bg-gray-300'
               }`}
             />
           ))}
         </div>
-        <div className="flex justify-between text-xs text-gray-700">
+        <div className="flex justify-between text-xs text-gray-800">
           <span>{bookingType === 'package' ? 'Package' : 'Attraction'}</span>
           <span>{selectedPackage ? 'Add-ons' : 'Details'}</span>
           <span>Date & Time</span>

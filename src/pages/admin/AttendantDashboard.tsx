@@ -66,7 +66,7 @@ const AttendantDashboard: React.FC = () => {
        change: '+12% from last week',
        trend: 'up',
        icon: Calendar,
-       accent: 'bg-blue-100 text-blue-700',
+       accent: 'bg-blue-100 text-blue-800',
      },
      {
        title: 'Pending Approvals',
@@ -74,7 +74,7 @@ const AttendantDashboard: React.FC = () => {
        change: '2 require urgent attention',
        trend: 'neutral',
        icon: AlertTriangle,
-       accent: 'bg-blue-100 text-blue-700',
+       accent: 'bg-blue-100 text-blue-800',
      },
      {
        title: 'Activities Scheduled',
@@ -82,7 +82,7 @@ const AttendantDashboard: React.FC = () => {
        change: 'Laser Tag most popular',
        trend: 'up',
        icon: Zap,
-       accent: 'bg-blue-100 text-blue-700',
+       accent: 'bg-blue-100 text-blue-800',
      },
      {
        title: 'Packages Booked',
@@ -90,7 +90,7 @@ const AttendantDashboard: React.FC = () => {
        change: 'Corporate leading',
        trend: 'up',
        icon: Package,
-       accent: 'bg-blue-100 text-blue-700',
+       accent: 'bg-blue-100 text-blue-800',
      },
      {
        title: 'Weekly Revenue',
@@ -98,7 +98,7 @@ const AttendantDashboard: React.FC = () => {
        change: '+8% from last week',
        trend: 'up',
        icon: DollarSign,
-       accent: 'bg-blue-100 text-blue-700',
+       accent: 'bg-blue-100 text-blue-800',
      },
    ];
 
@@ -109,7 +109,7 @@ const AttendantDashboard: React.FC = () => {
      { id: 3, date: new Date('2025-09-18'), time: '12:00 PM', duration: 2, activity: 'Bowling', package: null, participants: 4, status: 'Pending', payment: 'Partial', customer: 'Mike Thompson', contact: 'Mike Thompson', phone: '(555) 456-7890', email: 'mike.t@email.com', amount: '$180', specialRequests: 'First time visitors' },
      { id: 4, date: new Date('2025-09-16'), time: '2:00 PM', duration: 3, activity: null, package: 'Birthday Package', participants: 15, status: 'Confirmed', payment: 'Paid', customer: 'Lisa Williams', contact: 'Lisa Williams', phone: '(555) 234-5678', email: 'lisa.w@email.com', amount: '$450', specialRequests: 'Birthday cake will be brought in' },
      { id: 5, date: new Date('2025-09-17'), time: '4:30 PM', duration: 2, activity: 'Bowling', package: null, participants: 8, status: 'Cancelled', payment: 'Refunded', customer: 'David Miller', contact: 'David Miller', phone: '(555) 876-5432', email: 'davidm@email.com', amount: '$200', specialRequests: 'Need two lanes' },
-     { id: 6, date: new Date('2025-09-20'), time: '11:00 AM', duration: 1.5, activity: null, package: 'Corporate Package', participants: 10, status: 'Confirmed', payment: 'Paid', customer: 'XYZ Corp', contact: 'Robert Brown', phone: '(555) 345-6789', email: 'rbrown@xyz.com', amount: '$700', specialRequests: 'Executive team' },
+     { id: 6, date: new Date('2025-09-20'), time: '11:00 AM', duration: 1.5, activity: null, package: 'Corporate Package', participants: 10, status: 'Confirmed', payment: 'Paid', customer: 'XYZ Corp', contact: 'Robert Brown', phone: '(555) 345-6789', email: 'rbrown@xyz.com', amount: '$800', specialRequests: 'Executive team' },
      { id: 7, date: new Date('2025-09-19'), time: '3:00 PM', duration: 2, activity: 'Arcade', package: null, participants: 6, status: 'Confirmed', payment: 'Partial', customer: 'Jennifer Lee', contact: 'Jennifer Lee', phone: '(555) 765-4321', email: 'jennifer@email.com', amount: '$150', specialRequests: 'Family outing' },
      // Additional bookings to demonstrate same time slots
      { id: 8, date: new Date('2025-09-16'), time: '9:00 AM', duration: 1, activity: 'VR Experience', package: null, participants: 4, status: 'Confirmed', payment: 'Paid', customer: 'Innovate Tech', contact: 'Alex Johnson', phone: '(555) 111-2222', email: 'alex@innovatetech.com', amount: '$120', specialRequests: 'VR setup needed' },
@@ -182,24 +182,24 @@ const AttendantDashboard: React.FC = () => {
 
    // Quick actions
    const quickActions = [
-     { title: 'New Booking', icon: Plus, accent: 'bg-blue-700 hover:bg-blue-800' },
-     { title: 'Check-in', icon: CheckCircle, accent: 'bg-blue-700 hover:bg-blue-800' },
-     { title: 'Send Reminders', icon: Mail, accent: 'bg-blue-700 hover:bg-blue-800' },
-     { title: 'Export Data', icon: Download, accent: 'bg-blue-700 hover:bg-blue-800' },
+     { title: 'New Booking', icon: Plus, accent: 'bg-blue-800 hover:bg-blue-800' },
+     { title: 'Check-in', icon: CheckCircle, accent: 'bg-blue-800 hover:bg-blue-800' },
+     { title: 'Send Reminders', icon: Mail, accent: 'bg-blue-800 hover:bg-blue-800' },
+     { title: 'Export Data', icon: Download, accent: 'bg-blue-800 hover:bg-blue-800' },
    ];
 
    // Status colors
    const statusColors = {
-     Confirmed: 'bg-emerald-100 text-emerald-700',
-     Pending: 'bg-amber-100 text-amber-700',
-     Cancelled: 'bg-rose-100 text-rose-700',
+     Confirmed: 'bg-emerald-100 text-emerald-800',
+     Pending: 'bg-amber-100 text-amber-800',
+     Cancelled: 'bg-rose-100 text-rose-800',
    };
 
    // Payment status colors
    const paymentColors = {
-     Paid: 'bg-emerald-100 text-emerald-700',
-     Partial: 'bg-amber-100 text-amber-700',
-     Refunded: 'bg-rose-100 text-rose-700',
+     Paid: 'bg-emerald-100 text-emerald-800',
+     Partial: 'bg-amber-100 text-amber-800',
+     Refunded: 'bg-rose-100 text-rose-800',
    };
 
    // Filter bookings by status for the table
@@ -220,9 +220,9 @@ const AttendantDashboard: React.FC = () => {
              <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2 mb-1">
                 Attendant Dashboard
              </h1>
-             <p className="text-base text-gray-700">Weekly overview of bookings and activities</p>
+             <p className="text-base text-gray-800">Weekly overview of bookings and activities</p>
            </div>
-           <button className="mt-4 md:mt-0 px-5 py-2.5 bg-blue-700 text-white rounded-xl flex items-center gap-2 hover:bg-blue-700 transition font-semibold shadow-sm">
+           <button className="mt-4 md:mt-0 px-5 py-2.5 bg-blue-800 text-white rounded-xl flex items-center gap-2 hover:bg-blue-900 transition font-semibold shadow-sm">
              <Plus size={20} />
              <span>New Booking</span>
            </button>
@@ -239,7 +239,7 @@ const AttendantDashboard: React.FC = () => {
                >
                  <div className="flex items-center gap-2">
                    <div className={`p-2 rounded-lg ${metric.accent}`}><Icon size={20} /></div>
-                   <span className="text-base font-semibold text-gray-700">{metric.title}</span>
+                   <span className="text-base font-semibold text-gray-800">{metric.title}</span>
                  </div>
                  <div className="flex items-end gap-2 mt-2">
                    <h3 className="text-2xl font-bold text-gray-900">{metric.value}</h3>
@@ -254,7 +254,7 @@ const AttendantDashboard: React.FC = () => {
          <div className="bg-white rounded-xl shadow-sm p-4 md:p-6 border border-gray-100">
            <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
              <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-               <Calendar className="w-6 h-6 text-blue-700" /> Weekly Calendar
+               <Calendar className="w-6 h-6 text-blue-800" /> Weekly Calendar
              </h2>
              <div className="flex items-center space-x-2 mt-4 md:mt-0">
                <button 
@@ -263,7 +263,7 @@ const AttendantDashboard: React.FC = () => {
                >
                  <ChevronLeft size={18} />
                </button>
-               <span className="text-sm font-medium text-gray-700">
+               <span className="text-sm font-medium text-gray-800">
                  {weekDates[0].toLocaleDateString('en-US', { month: 'long', day: 'numeric' })} - 
                  {weekDates[6].toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
                </span>
@@ -273,7 +273,7 @@ const AttendantDashboard: React.FC = () => {
                >
                  <ChevronRight size={18} />
                </button>
-               <button className="ml-2 px-3 py-2 text-sm bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-400" onClick={() => setCurrentWeek(new Date())}>
+               <button className="ml-2 px-3 py-2 text-sm bg-blue-100 text-blue-800 rounded-lg hover:bg-blue-400" onClick={() => setCurrentWeek(new Date())}>
                  Today
                </button>
                
@@ -282,14 +282,14 @@ const AttendantDashboard: React.FC = () => {
                  onClick={() => setShowFilterPanel(!showFilterPanel)}
                  className={`ml-2 px-3 py-2 text-sm rounded-lg flex items-center ${
                    calendarFilter.type !== 'all' 
-                     ? 'bg-blue-100 text-blue-700 border border-blue-300' 
-                     : 'bg-gray-100 text-gray-700 border border-gray-200'
+                     ? 'bg-blue-100 text-blue-800 border border-blue-300' 
+                     : 'bg-gray-100 text-gray-800 border border-gray-200'
                  }`}
                >
                  <Filter size={16} className="mr-1" />
                  Filter
                  {calendarFilter.type !== 'all' && (
-                   <span className="ml-1 bg-blue-700 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs">
+                   <span className="ml-1 bg-blue-800 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs">
                      !
                    </span>
                  )}
@@ -301,10 +301,10 @@ const AttendantDashboard: React.FC = () => {
            {showFilterPanel && (
              <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
                <div className="flex justify-between items-center mb-3">
-                 <h3 className="font-medium text-gray-700">Filter Calendar</h3>
+                 <h3 className="font-medium text-gray-800">Filter Calendar</h3>
                  <button 
                    onClick={() => setShowFilterPanel(false)}
-                   className="text-gray-700 hover:text-gray-700"
+                   className="text-gray-800 hover:text-gray-800"
                  >
                    <X size={18} />
                  </button>
@@ -320,7 +320,7 @@ const AttendantDashboard: React.FC = () => {
                      onChange={() => setCalendarFilter({ type: 'all', value: '' })}
                      className="mr-2"
                    />
-                   <label htmlFor="filter-all" className="text-sm text-gray-700">
+                   <label htmlFor="filter-all" className="text-sm text-gray-800">
                      Show All
                    </label>
                  </div>
@@ -334,7 +334,7 @@ const AttendantDashboard: React.FC = () => {
                      onChange={() => setCalendarFilter({ type: 'activity', value: allActivities[0] || '' })}
                      className="mr-2"
                    />
-                   <label htmlFor="filter-activity" className="text-sm text-gray-700 mr-2">
+                   <label htmlFor="filter-activity" className="text-sm text-gray-800 mr-2">
                      By Activity
                    </label>
                    
@@ -360,7 +360,7 @@ const AttendantDashboard: React.FC = () => {
                      onChange={() => setCalendarFilter({ type: 'package', value: allPackages[0] || '' })}
                      className="mr-2"
                    />
-                   <label htmlFor="filter-package" className="text-sm text-gray-700 mr-2">
+                   <label htmlFor="filter-package" className="text-sm text-gray-800 mr-2">
                      By Package
                    </label>
                    
@@ -380,7 +380,7 @@ const AttendantDashboard: React.FC = () => {
                  {calendarFilter.type !== 'all' && (
                    <button
                      onClick={clearCalendarFilter}
-                     className="ml-auto text-sm text-blue-700 hover:text-blue-700 flex items-center"
+                     className="ml-auto text-sm text-blue-800 hover:text-blue-800 flex items-center"
                    >
                      <X size={14} className="mr-1" />
                      Clear Filter
@@ -401,11 +401,11 @@ const AttendantDashboard: React.FC = () => {
              <table className="w-full">
                <thead className="bg-gray-50">
                  <tr>
-                   <th className="w-24 px-3 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider border-r border-gray-200">
+                   <th className="w-24 px-3 py-3 text-left text-xs font-medium text-gray-800 uppercase tracking-wider border-r border-gray-200">
                      Time
                    </th>
                    {weekDates.map((date, index) => (
-                     <th key={index} className="px-3 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider border-r border-gray-200 last:border-r-0">
+                     <th key={index} className="px-3 py-3 text-left text-xs font-medium text-gray-800 uppercase tracking-wider border-r border-gray-200 last:border-r-0">
                        <div>{date.toLocaleDateString('en-US', { weekday: 'short' })}</div>
                        <div className="text-xs text-gray-400">{date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
                      </th>
@@ -423,7 +423,7 @@ const AttendantDashboard: React.FC = () => {
                        const bookingsForCell = groupedBookings[time]?.[dateStr] || [];
                        
                        return (
-                         <td key={dateIndex} className="px-3 py-2 text-sm text-gray-700 border-r border-gray-200 last:border-r-0 align-top min-w-[180px]">
+                         <td key={dateIndex} className="px-3 py-2 text-sm text-gray-800 border-r border-gray-200 last:border-r-0 align-top min-w-[180px]">
                            {bookingsForCell.length > 0 ? (
                              <div className="space-y-2">
                                {bookingsForCell.map((booking, bookingIndex) => (
@@ -440,10 +440,10 @@ const AttendantDashboard: React.FC = () => {
                                    <div className="font-medium text-gray-900 text-xs">
                                      {booking.activity || booking.package}
                                    </div>
-                                   <div className="text-xs text-gray-700 mt-1">
+                                   <div className="text-xs text-gray-800 mt-1">
                                      {booking.customer}
                                    </div>
-                                   <div className="text-xs text-gray-700">
+                                   <div className="text-xs text-gray-800">
                                      {booking.participants} participants
                                    </div>
                                  </div>
@@ -467,7 +467,7 @@ const AttendantDashboard: React.FC = () => {
            {/* Quick Actions */}
            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 flex flex-col gap-4">
              <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-               <Zap className="w-5 h-5 text-blue-700" /> Quick Actions
+               <Zap className="w-5 h-5 text-blue-800" /> Quick Actions
              </h2>
              <div className="grid grid-cols-2 gap-3">
                {quickActions.map((action, index) => {
@@ -489,9 +489,9 @@ const AttendantDashboard: React.FC = () => {
            <div className="lg:col-span-2 bg-white rounded-xl border border-gray-100 shadow-sm p-5">
              <div className="flex items-center justify-between mb-4">
                <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                 <Activity className="w-5 h-5 text-blue-700" /> Recent Activity
+                 <Activity className="w-5 h-5 text-blue-800" /> Recent Activity
                </h2>
-               <button className="text-sm text-blue-700 hover:text-blue-700 font-medium flex items-center gap-1">
+               <button className="text-sm text-blue-800 hover:text-blue-800 font-medium flex items-center gap-1">
                  <ChevronRight size={16} /> View all
                </button>
              </div>
@@ -501,37 +501,37 @@ const AttendantDashboard: React.FC = () => {
                  <Star className="w-6 h-6 text-yellow-400" />
                  <div className="flex-1">
                    <h4 className="font-semibold text-gray-900 text-base">New Booking</h4>
-                   <p className="text-sm text-gray-700">Laser Tag - Corporate Event</p>
+                   <p className="text-sm text-gray-800">Laser Tag - Corporate Event</p>
                    <p className="text-xs text-gray-400 mt-1">Tech Solutions Inc.</p>
                  </div>
                  <div className="text-right min-w-[90px]">
-                   <span className="text-xs text-gray-700">Today, 10:30 AM</span>
+                   <span className="text-xs text-gray-800">Today, 10:30 AM</span>
                    <span className="block text-xs font-semibold text-emerald-600 mt-1">Confirmed</span>
                  </div>
                </div>
               
                <div className="p-4 border border-gray-100 rounded-lg flex gap-4 items-center bg-gray-50">
-                 <DollarSign className="w-6 h-6 text-green-700" />
+                 <DollarSign className="w-6 h-6 text-green-800" />
                  <div className="flex-1">
                    <h4 className="font-semibold text-gray-900 text-base">Payment Received</h4>
-                   <p className="text-sm text-gray-700">Birthday Package - $450</p>
+                   <p className="text-sm text-gray-800">Birthday Package - $450</p>
                    <p className="text-xs text-gray-400 mt-1">Lisa Williams</p>
                  </div>
                  <div className="text-right min-w-[90px]">
-                   <span className="text-xs text-gray-700">Today, 9:45 AM</span>
+                   <span className="text-xs text-gray-800">Today, 9:45 AM</span>
                    <span className="block text-xs font-semibold text-emerald-600 mt-1">Paid</span>
                  </div>
                </div>
               
                <div className="p-4 border border-gray-100 rounded-lg flex gap-4 items-center bg-gray-50">
-                 <AlertTriangle className="w-6 h-6 text-amber-700" />
+                 <AlertTriangle className="w-6 h-6 text-amber-800" />
                  <div className="flex-1">
                    <h4 className="font-semibold text-gray-900 text-base">Booking Updated</h4>
-                   <p className="text-sm text-gray-700">VR Experience - Time change</p>
+                   <p className="text-sm text-gray-800">VR Experience - Time change</p>
                    <p className="text-xs text-gray-400 mt-1">Mike Thompson</p>
                  </div>
                  <div className="text-right min-w-[90px]">
-                   <span className="text-xs text-gray-700">Today, 8:15 AM</span>
+                   <span className="text-xs text-gray-800">Today, 8:15 AM</span>
                    <span className="block text-xs font-semibold text-amber-600 mt-1">Pending</span>
                  </div>
                </div>
@@ -571,7 +571,7 @@ const AttendantDashboard: React.FC = () => {
           
            <div className="overflow-x-auto">
              <table className="w-full text-sm text-left">
-               <thead className="text-xs text-gray-700 uppercase bg-gray-50 border-b">
+               <thead className="text-xs text-gray-800 uppercase bg-gray-50 border-b">
                  <tr>
                    <th className="px-4 py-3 font-medium w-32">Date & Time</th>
                    <th className="px-4 py-3 font-medium w-48">Customer</th>
@@ -591,12 +591,12 @@ const AttendantDashboard: React.FC = () => {
                        <div className="font-medium text-gray-900">
                          {booking.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                        </div>
-                       <div className="text-xs text-gray-700">{booking.time}</div>
+                       <div className="text-xs text-gray-800">{booking.time}</div>
                      </td>
                      <td className="px-4 py-3">
                        <div>
                          <div className="font-medium text-gray-900">{booking.customer}</div>
-                         <div className="text-xs text-gray-700">{booking.contact}</div>
+                         <div className="text-xs text-gray-800">{booking.contact}</div>
                        </div>
                      </td>
                      <td className="px-4 py-3">
@@ -619,10 +619,10 @@ const AttendantDashboard: React.FC = () => {
                      <td className="px-4 py-3 font-medium">{booking.amount}</td>
                      <td className="px-4 py-3">
                        <div className="flex space-x-2">
-                         <button className="p-1 text-blue-700 hover:text-blue-700" title="Check-in">
+                         <button className="p-1 text-blue-800 hover:text-blue-800" title="Check-in">
                            <CheckCircle size={16} />
                          </button>
-                         <button className="p-1 text-gray-600 hover:text-gray-700" title="Send reminder">
+                         <button className="p-1 text-gray-600 hover:text-gray-800" title="Send reminder">
                            <Mail size={16} />
                          </button>
                        </div>
@@ -630,7 +630,7 @@ const AttendantDashboard: React.FC = () => {
                    </tr>
                  )) : (
                    <tr>
-                     <td colSpan={9} className="px-4 py-3 text-center text-gray-700">
+                     <td colSpan={9} className="px-4 py-3 text-center text-gray-800">
                        No bookings found.
                      </td>
                    </tr>
