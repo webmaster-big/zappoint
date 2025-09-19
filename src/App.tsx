@@ -19,6 +19,7 @@ import LocationManagerDashboard from "./pages/admin/ManagerDashboard";
 import CompanyDashboard from "./pages/admin/CompanyDashboard";
 import AttendantDashboard from "./pages/admin/AttendantDashboard";
 import PurchaseAttraction from "./pages/admin/attractions/PurchaseAttraction";
+import ManagePurchases from "./pages/admin/attractions/AttractionPurchases";
 
 
 function App() {
@@ -35,6 +36,7 @@ function App() {
         <Route path="/company/dashboard" element={<CompanyDashboard />} />
         <Route path="/attractions/create" element={<CreateAttraction />} />
         <Route path="/attractions/" element={<ManageAttractions />} />
+        <Route path="/attractions/purchases" element={<ManagePurchases />} />
         <Route path="/packages/create" element={<CreatePackage />} />
         <Route path="/packages" element={<Packages />} />
         <Route path="/packages/promos" element={<Promo />} />
