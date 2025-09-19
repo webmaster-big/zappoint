@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import Toast from "../../../components/ui/Toast";
-import { Info, Plus, RefreshCcw, Calendar, Clock, Gift, Tag } from "lucide-react";
+import { Info, Plus, RefreshCcw, Calendar, Clock, Gift, Tag, Home } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 // Mock data tables (simulate fetch)
@@ -11,6 +11,13 @@ const initialAddOns = [
     { name: "Extra Game", price: 100 }
 ];
 const initialCategories = ["Birthday", "Special", "Event", "Arcade Party", "Corporate", "Other"];
+const initialRooms = [
+    { name: "Main Hall", capacity: 50, price: 1000 },
+    { name: "VIP Room", capacity: 20, price: 1500 },
+    { name: "Party Room A", capacity: 30, price: 800 },
+    { name: "Party Room B", capacity: 25, price: 700 },
+    { name: "Conference Room", capacity: 40, price: 1200 }
+];
 
 // Get active promos and gift cards from localStorage
 const getActivePromos = () => {
@@ -47,6 +54,7 @@ const CreatePackage: React.FC = () => {
     });
     const [addOns, setAddOns] = useState<{ name: string; price: number }[]>(() => JSON.parse(localStorage.getItem("zapzone_addons") || JSON.stringify(initialAddOns)));
     const [categories, setCategories] = useState<string[]>(() => JSON.parse(localStorage.getItem("zapzone_categories") || JSON.stringify(initialCategories)));
+    const [rooms, setRooms] = useState<{ name: string; capacity: number; price: number }[]>(() => JSON.parse(localStorage.getItem("zapzone_rooms") || JSON.stringify(initialRooms)));
     const [promos, setPromos] = useState<{ name: string; code: string; description: string }[]>(getActivePromos);
     const [giftCards, setGiftCards] = useState<{ name: string; code: string; description: string }[]>(getActiveGiftCards);
 
@@ -57,6 +65,7 @@ const CreatePackage: React.FC = () => {
         category: "",
         features: "",
         attractions: [] as string[],
+        rooms: [] as string[],
         price: "",
         maxParticipants: "",
         pricePerAdditional: "",
@@ -166,6 +175,16 @@ const CreatePackage: React.FC = () => {
                     showToast("Category added!", "success");
                 }
                 break;
+            case 'room':
+                if (!rooms.some(r => r.name === value)) {
+                    const capacity = Number(extra) || 0;
+                    const price = Number(code) || 0;
+                    const updated = [...rooms, { name: value, capacity, price }];
+                    setRooms(updated);
+                    localStorage.setItem("zapzone_rooms", JSON.stringify(updated));
+                    showToast("Room added!", "success");
+                }
+                break;
             case 'promo':
                 if (!promos.some(p => p.name === value)) {
                     const description = extra || '';
@@ -196,6 +215,7 @@ const CreatePackage: React.FC = () => {
         const promoObjs = form.promos.map(code => promos.find(p => p.code === code)).filter(Boolean);
         const giftCardObjs = form.giftCards.map(code => giftCards.find(g => g.code === code)).filter(Boolean);
         const addOnObjs = form.addOns.map(name => addOns.find(a => a.name === name)).filter(Boolean);
+        const roomObjs = form.rooms.map(name => rooms.find(r => r.name === name)).filter(Boolean);
 
         // Generate a temporary unique id
         const tempId = `pkg_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
@@ -206,6 +226,7 @@ const CreatePackage: React.FC = () => {
             promos: promoObjs,
             giftCards: giftCardObjs,
             addOns: addOnObjs,
+            rooms: roomObjs,
             pricePerAdditional: form.pricePerAdditional,
             pricePerAdditional30min: form.pricePerAdditional30min,
             pricePerAdditional1hr: form.pricePerAdditional1hr,
@@ -220,6 +241,7 @@ const CreatePackage: React.FC = () => {
             category: "",
             features: "",
             attractions: [],
+            rooms: [],
             price: "",
             maxParticipants: "",
             pricePerAdditional: "",
@@ -593,6 +615,60 @@ const CreatePackage: React.FC = () => {
                                 </div>
                             </div>
                             
+                            {/* Rooms Section */}
+                            <div>
+                                <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2">
+                                    <Home className="w-5 h-5 text-primary" /> Rooms
+                                </h3>
+                                <div className="flex flex-wrap gap-2 mb-2">
+                                    {rooms.map((room) => (
+                                        <button
+                                            type="button"
+                                            key={room.name}
+                                            className={`px-3 py-1 rounded-full border text-sm font-medium transition-all duration-150 hover:bg-blue-50 hover:border-blue-400/60 focus:outline-none focus:ring-2 focus:ring-blue-200 ${form.rooms.includes(room.name) ? "bg-blue-50 border-blue-400 text-blue-800" : "bg-white border-gray-200 text-neutral-800"}`}
+                                            onClick={() => handleMultiSelect("rooms", room.name)}
+                                        >
+                                            {room.name} <span className="text-xs text-gray-400 ml-1">${room.price} (Cap: {room.capacity})</span>
+                                        </button>
+                                    ))}
+                                    <input
+                                        type="text"
+                                        placeholder="Room name"
+                                        className="rounded-md border border-gray-200 px-2 py-1 w-24 bg-white text-sm transition-all placeholder:text-gray-400"
+                                        id="room-name"
+                                    />
+                                    <input
+                                        type="number"
+                                        placeholder="Capacity"
+                                        className="rounded-md border border-gray-200 px-2 py-1 w-20 bg-white text-sm transition-all placeholder:text-gray-400"
+                                        id="room-capacity"
+                                        min="1"
+                                    />
+                                    <input
+                                        type="number"
+                                        placeholder="Price"
+                                        className="rounded-md border border-gray-200 px-2 py-1 w-16 bg-white text-sm transition-all placeholder:text-gray-400"
+                                        id="room-price"
+                                        min="0"
+                                    />
+                                    <button type="button" className="p-2 rounded-md hover:bg-blue-50 transition" title="Add room"
+                                        onClick={() => {
+                                            const nameInput = document.getElementById('room-name') as HTMLInputElement;
+                                            const capacityInput = document.getElementById('room-capacity') as HTMLInputElement;
+                                            const priceInput = document.getElementById('room-price') as HTMLInputElement;
+                                            if (nameInput.value) {
+                                                handleAddOption('room', nameInput.value, priceInput.value, capacityInput.value);
+                                                nameInput.value = '';
+                                                capacityInput.value = '';
+                                                priceInput.value = '';
+                                            }
+                                        }}
+                                    >
+                                        <Plus className="w-4 h-4 text-blue-600" />
+                                    </button>
+                                </div>
+                            </div>
+                            
                             {/* Add-ons Section */}
                             <div>
                                 <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2">
@@ -762,6 +838,7 @@ const CreatePackage: React.FC = () => {
                                         category: "",
                                         features: "",
                                         attractions: [],
+                                        rooms: [],
                                         price: "",
                                         maxParticipants: "",
                                         pricePerAdditional: "",
@@ -780,7 +857,7 @@ const CreatePackage: React.FC = () => {
                                 >
                                     <RefreshCcw className="w-5 h-5" /> Reset
                                 </button>
-                            </div>
+                                </div>
                         </form>
                     </div>
                 </div>
@@ -834,6 +911,12 @@ const CreatePackage: React.FC = () => {
                                 <span className="font-semibold">Attractions:</span> <span className="text-neutral-800 text-sm">{(form.attractions || []).length ? form.attractions.map((act: string) => {
                                     const found = attractions.find(a => a.name === act);
                                     return found ? `${found.name} ($${found.price}${found.unit ? `, ${found.unit}` : ''})` : act;
+                                }).join(", ") : <span className='text-gray-300'>None</span>}</span>
+                            </div>
+                            <div className="mb-2">
+                                <span className="font-semibold">Rooms:</span> <span className="text-neutral-800 text-sm">{(form.rooms || []).length ? form.rooms.map((room: string) => {
+                                    const found = rooms.find(r => r.name === room);
+                                    return found ? `${found.name} ($${found.price}, Cap: ${found.capacity})` : room;
                                 }).join(", ") : <span className='text-gray-300'>None</span>}</span>
                             </div>
                             <div className="mb-2">
