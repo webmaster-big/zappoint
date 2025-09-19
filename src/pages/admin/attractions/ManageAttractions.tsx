@@ -331,7 +331,7 @@ const ManageAttractions = () => {
           <p className="text-gray-600 mt-2">View and manage all attractions in your facility</p>
         </div>
         <Link
-          to="/create-attraction"
+          to="/attractions/create"
           className="mt-4 sm:mt-0 inline-flex items-center px-4 py-2 bg-blue-800 text-white rounded-lg hover:bg-blue-800 transition-colors"
         >
           <Plus className="h-5 w-5 mr-2" />

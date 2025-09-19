@@ -117,7 +117,8 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
         { label: 'Attractions', icon: Ticket, items: [
           { label: 'Manage Attractions', href: '/attractions', icon: Dot },
           { label: 'Create Attractions', href: '/attractions/create', icon: Dot },
-          { label: 'Purchases', href: '/attractions/purchases', icon: Dot }
+          { label: 'Purchases', href: '/attractions/purchases', icon: Dot },
+          { label: 'Create Purchase', href: '/attractions/purchases/create', icon: Dot }
         ]},
         { label: 'Bookings', icon: Calendar, items: [
           { label: 'Calendar View', href: '/bookings/calendar', icon: Dot },
@@ -145,7 +146,8 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
         { label: 'Attractions', icon: Ticket, items: [
           { label: 'Manage Attractions', href: '/attractions', icon: Dot },
           { label: 'Create Attractions', href: '/attractions/create', icon: Dot },
-          { label: 'Purchases', href: '/attractions/purchases', icon: Dot }
+          { label: 'Purchases', href: '/attractions/purchases', icon: Dot },
+          { label: 'Create Purchase', href: '/attractions/purchases/create', icon: Dot }
         ]},
         { label: 'Bookings', icon: Calendar, items: [
           { label: 'Calendar View', href: '/bookings/calendar', icon: Dot },
@@ -180,7 +182,8 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
         { label: 'Attractions', icon: Ticket, items: [
           { label: 'Manage Attractions', href: '/attractions', icon: Dot },
           { label: 'Create Attractions', href: '/attractions/create', icon: Dot },
-          { label: 'Purchases', href: '/attractions/purchases', icon: Dot }
+          { label: 'Purchases', href: '/attractions/purchases', icon: Dot },
+          { label: 'Create Purchase', href: '/attractions/purchases/create', icon: Dot }
         ]},
         { label: 'Bookings', icon: Calendar, items: [
           { label: 'Calendar View', href: '/bookings/calendar', icon: Dot },

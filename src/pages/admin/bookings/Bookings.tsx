@@ -11,16 +11,14 @@ import {
   Calendar,
   Package,
   DollarSign,
-  Users,
-  Ticket
+  Users
 } from 'lucide-react';
 
 // Types
 interface Booking {
   id: string;
-  type: 'package' | 'attraction';
-  packageName?: string;
-  attractionName?: string;
+  type: 'package';
+  packageName: string;
   customerName: string;
   email: string;
   phone: string;
@@ -45,7 +43,6 @@ interface FilterOptions {
   };
   search: string;
   payment: string;
-  type: string;
 }
 
 const Bookings: React.FC = () => {
@@ -60,8 +57,7 @@ const Bookings: React.FC = () => {
       end: ''
     },
     search: '',
-    payment: 'all',
-    type: 'all'
+    payment: 'all'
   });
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
@@ -84,9 +80,6 @@ const Bookings: React.FC = () => {
   };
 
   // Calculate metrics data
-  const packageBookings = bookings.filter(b => b.type === 'package');
-  const attractionBookings = bookings.filter(b => b.type === 'attraction');
-  
   const metrics = [
     {
       title: 'Total Bookings',
@@ -97,16 +90,9 @@ const Bookings: React.FC = () => {
     },
     {
       title: 'Package Bookings',
-      value: packageBookings.length.toString(),
-      change: `${packageBookings.filter(b => b.status === 'confirmed').length} confirmed`,
+      value: bookings.length.toString(),
+      change: `${bookings.filter(b => b.status === 'confirmed').length} confirmed`,
       icon: Package,
-      accent: 'bg-blue-100 text-blue-800',
-    },
-    {
-      title: 'Attraction Bookings',
-      value: attractionBookings.length.toString(),
-      change: `${attractionBookings.filter(b => b.status === 'confirmed').length} confirmed`,
-      icon: Ticket,
       accent: 'bg-blue-100 text-blue-800',
     },
     {
@@ -140,9 +126,11 @@ const Bookings: React.FC = () => {
       const storedBookings = localStorage.getItem('zapzone_bookings');
       if (storedBookings) {
         const parsedBookings = JSON.parse(storedBookings);
-        setBookings(parsedBookings);
+        // Filter out attraction bookings, keep only packages
+        const packageBookings = parsedBookings.filter((booking: any) => booking.type === 'package');
+        setBookings(packageBookings);
       } else {
-        // Sample data for demonstration
+        // Sample data for demonstration - only packages
         const sampleBookings: Booking[] = [
           {
             id: '1',
@@ -191,40 +179,6 @@ const Bookings: React.FC = () => {
             activity: 'Team Building'
           },
           {
-            id: '3',
-            type: 'attraction',
-            attractionName: 'Laser Tag',
-            customerName: 'Mike Johnson',
-            email: 'mike@example.com',
-            phone: '555-9012',
-            date: '2024-01-18',
-            time: '3:00 PM',
-            participants: 8,
-            status: 'completed',
-            totalAmount: 120.00,
-            createdAt: '2024-01-05T09:15:00Z',
-            paymentMethod: 'cash',
-            duration: '1 hour',
-            activity: 'Laser Tag'
-          },
-          {
-            id: '4',
-            type: 'attraction',
-            attractionName: 'Bowling',
-            customerName: 'Sarah Wilson',
-            email: 'sarah@example.com',
-            phone: '555-3456',
-            date: '2024-01-22',
-            time: '7:00 PM',
-            participants: 6,
-            status: 'confirmed',
-            totalAmount: 90.00,
-            createdAt: '2024-01-15T16:20:00Z',
-            paymentMethod: 'e-wallet',
-            duration: '2 hours',
-            activity: 'Bowling'
-          },
-          {
             id: '5',
             type: 'package',
             packageName: 'Birthday Party',
@@ -269,8 +223,7 @@ const Bookings: React.FC = () => {
       result = result.filter(booking =>
         booking.customerName.toLowerCase().includes(searchTerm) ||
         booking.email.toLowerCase().includes(searchTerm) ||
-        (booking.packageName && booking.packageName.toLowerCase().includes(searchTerm)) ||
-        (booking.attractionName && booking.attractionName.toLowerCase().includes(searchTerm)) ||
+        booking.packageName.toLowerCase().includes(searchTerm) ||
         booking.phone.includes(searchTerm)
       );
     }
@@ -283,11 +236,6 @@ const Bookings: React.FC = () => {
     // Apply payment filter
     if (filters.payment !== 'all') {
       result = result.filter(booking => booking.paymentMethod === filters.payment);
-    }
-
-    // Apply type filter
-    if (filters.type !== 'all') {
-      result = result.filter(booking => booking.type === filters.type);
     }
 
     // Apply date range filter
@@ -326,8 +274,7 @@ const Bookings: React.FC = () => {
         end: ''
       },
       search: '',
-      payment: 'all',
-      type: 'all'
+      payment: 'all'
     });
   };
 
@@ -347,7 +294,7 @@ const Bookings: React.FC = () => {
     }
   };
 
-    const handleCheckIn = (id: string, checkInStatus: 'checked-in') => {
+  const handleCheckIn = (id: string, checkInStatus: 'checked-in') => {
     const updatedBookings = bookings.map(booking =>
       booking.id === id ? { ...booking, status: checkInStatus } : booking
     );
@@ -362,8 +309,6 @@ const Bookings: React.FC = () => {
     setBookings(updatedBookings);
     localStorage.setItem('zapzone_bookings', JSON.stringify(updatedBookings));
   };
-
-
 
   const handleBulkDelete = () => {
     if (selectedBookings.length === 0) return;
@@ -408,13 +353,13 @@ const Bookings: React.FC = () => {
         {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Bookings Management</h1>
-            <p className="text-gray-800 mt-2">Manage all package and attraction bookings</p>
+            <h1 className="text-3xl font-bold text-gray-900">Package Bookings</h1>
+            <p className="text-gray-800 mt-2">Manage all package bookings with attraction options</p>
           </div> 
         </div>
 
         {/* Metrics Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           {metrics.map((metric, index) => {
             const Icon = metric.icon;
             return (
@@ -444,7 +389,7 @@ const Bookings: React.FC = () => {
               </div>
               <input
                 type="text"
-                placeholder="Search bookings..."
+                placeholder="Search package bookings..."
                 value={filters.search}
                 onChange={(e) => handleFilterChange('search', e.target.value)}
                 className="pl-9 pr-3 py-1.5 border border-gray-200 rounded-lg w-full text-sm focus:ring-2 focus:ring-blue-600  focus:border-blue-600 "
@@ -470,19 +415,7 @@ const Bookings: React.FC = () => {
           {/* Advanced Filters */}
           {showFilters && (
             <div className="mt-3 p-3 bg-gray-50 rounded-lg">
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-800 mb-1">Type</label>
-                  <select
-                    value={filters.type}
-                    onChange={(e) => handleFilterChange('type', e.target.value)}
-                    className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-blue-600  focus:border-blue-600 "
-                  >
-                    <option value="all">All Types</option>
-                    <option value="package">Packages</option>
-                    <option value="attraction">Attractions</option>
-                  </select>
-                </div>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-800 mb-1">Status</label>
                   <select
@@ -585,10 +518,9 @@ const Bookings: React.FC = () => {
                       className="rounded border-gray-300 text-blue-800 focus:ring-blue-600 "
                     />
                   </th>
-                  <th scope="col" className="px-4 py-3 font-medium w-20">Type</th>
                   <th scope="col" className="px-4 py-3 font-medium w-40">Date & Time</th>
                   <th scope="col" className="px-4 py-3 font-medium w-48">Customer</th>
-                  <th scope="col" className="px-4 py-3 font-medium w-48">Booking Details</th>
+                  <th scope="col" className="px-4 py-3 font-medium w-48">Package Details</th>
                   <th scope="col" className="px-4 py-3 font-medium w-40">Duration</th>
                   <th scope="col" className="px-4 py-3 font-medium w-20">Participants</th>
                   <th scope="col" className="px-4 py-3 font-medium w-24">Status</th>
@@ -600,8 +532,8 @@ const Bookings: React.FC = () => {
               <tbody className="divide-y divide-gray-100">
                 {currentBookings.length === 0 ? (
                   <tr>
-                    <td colSpan={11} className="px-6 py-8 text-center text-gray-500">
-                      No bookings found
+                    <td colSpan={10} className="px-6 py-8 text-center text-gray-500">
+                      No package bookings found
                     </td>
                   </tr>
                 ) : (
@@ -616,16 +548,6 @@ const Bookings: React.FC = () => {
                         />
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <span className={`text-xs font-medium px-2 py-1 rounded-full ${
-                          
-                          booking.type === 'package' 
-                            ? 'bg-blue-100 text-blue-800' 
-                            : 'bg-green-100 text-green-800'
-                        }`}>
-                          {booking.type === 'package' ? 'Package' : 'Attraction'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
                         <div className="font-medium text-gray-900">
                           {new Date(booking.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                         </div>
@@ -637,10 +559,13 @@ const Bookings: React.FC = () => {
                         <div className="text-xs text-gray-500">{booking.phone}</div>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <div className="font-medium text-gray-900">
-                          {booking.type === 'package' ? booking.packageName : booking.attractionName}
-                        </div>
+                        <div className="font-medium text-gray-900">{booking.packageName}</div>
                         <div className="text-xs text-gray-500">{booking.activity}</div>
+                        {booking.attractions && booking.attractions.length > 0 && (
+                          <div className="text-xs text-gray-500 mt-1">
+                            Includes: {booking.attractions.map(a => `${a.name} (${a.quantity})`).join(', ')}
+                          </div>
+                        )}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
                         {booking.duration || <span className="text-gray-600 ">-</span>}
@@ -694,7 +619,6 @@ const Bookings: React.FC = () => {
                           >
                             <Pencil className="h-4 w-4" />
                           </button>
-                         
                         </div>
                       </td>
                     </tr>
