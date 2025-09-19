@@ -313,9 +313,9 @@ const OnsiteBooking: React.FC = () => {
     }));
   };
 
-  const handleAddOnToggle = (addOnName: string, price: number) => {
+  const handleAddOnToggle = (addOnName: string) => {
     setBookingData(prev => {
-      const tempPrice = price;
+      
       const existingIndex = prev.selectedAddOns.findIndex(a => a.name === addOnName);
       if (existingIndex >= 0) {
         // Remove add-on
@@ -679,7 +679,7 @@ const OnsiteBooking: React.FC = () => {
                     </div>
                     <button
                       type="button"
-                      onClick={() => handleAddOnToggle(addOn.name, addOn.price)}
+                      onClick={() => handleAddOnToggle(addOn.name)}
                       className={`px-3 py-1 rounded text-sm ${
                         isSelected
                           ? 'bg-red-100 text-red-800 hover:bg-red-200'
