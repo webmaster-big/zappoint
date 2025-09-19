@@ -12,7 +12,6 @@ import {
   ChevronDown,
   Search,
   Bell,
-  // X,
   Dot,
   Settings,
   Menu
@@ -25,7 +24,8 @@ interface NavItem {
   icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
   href?: string;
   items?: NavItem[];
-  section?: string; // Add section for grouping
+  section?: string;
+  description?: string; // Add description for search results
 }
 
 interface UserData {
@@ -42,6 +42,52 @@ interface SidebarProps {
   setIsOpen: (isOpen: boolean) => void;
   handleSignOut: () => void;
 }
+
+// Helper function to add descriptions to navigation items
+const addDescriptions = (navItems: NavItem[]): NavItem[] => {
+  const descriptions: Record<string, string> = {
+    'Dashboard': 'Overview of your account and recent activity',
+    'Manage Attractions': 'View and edit all available attractions',
+    'Create Attractions': 'Add new attractions to your offerings',
+    'Calendar View': 'See all bookings in a calendar format',
+    'Bookings': 'Manage existing bookings and reservations',
+    'Create Bookings': 'Create new bookings for customers',
+    'Check-in with QR Scanner': 'Scan QR codes for customer check-ins',
+    'Packages': 'View and manage package offerings',
+    'Create Package': 'Create new package deals',
+    'Promos': 'Manage promotional offers and discounts',
+    'Gift Cards': 'Handle gift card sales and redemptions',
+    'Customer Analytics': 'Analytics and insights about your customers',
+    'Customers': 'View and manage customer information',
+    'Profile': 'Update your personal profile information',
+    'Settings': 'Configure application settings',
+    'Attendants Management': 'Manage attendant accounts and permissions',
+    'Create Account': 'Create new user accounts',
+    'Account Activity Log': 'View user activity history',
+    'Attendants Performance': 'Monitor attendant performance metrics',
+    'Analytics & Reports': 'Business intelligence and reporting',
+    'Accounting': 'Financial management and reporting',
+    'Activity Logs': 'System-wide activity tracking',
+    'Notifications': 'Manage your notification preferences',
+    'User Management': 'Administer user accounts and permissions'
+  };
+
+  return navItems.map(item => {
+    const newItem = { ...item };
+    
+    // Add description if available
+    if (descriptions[item.label]) {
+      newItem.description = descriptions[item.label];
+    }
+    
+    // Recursively process nested items
+    if (item.items && item.items.length > 0) {
+      newItem.items = addDescriptions(item.items);
+    }
+    
+    return newItem;
+  });
+};
 
 // Grouped navigation for sidebar sections
 const getNavigation = (role: UserData['role']): NavItem[] => {
@@ -60,12 +106,13 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
       { label: 'Customer Analytics', href: '/customers/analytics', icon: Dot },
       { label: 'Customers', href: '/customers', icon: Dot }
     ]},
-    // { label: 'Shift Management', icon: Clock, href: '/shift-management' }
   ];
 
+  let roleNavigation: NavItem[] = [];
+  
   switch(role) {
     case 'attendant':
-      return [
+      roleNavigation = [
         { label: 'Dashboard', icon: Home, href: '/attendant/dashboard' },
         { label: 'Attractions', icon: Ticket, items: [
           { label: 'Manage Attractions', href: '/attractions', icon: Dot },
@@ -87,21 +134,17 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
           { label: 'Customer Analytics', href: '/customers/analytics', icon: Dot },
           { label: 'Customers', href: '/customers', icon: Dot }
         ]},
-        // { label: 'Shift Management', icon: Clock, href: '/attendant/shift-management' },
         { label: 'Profile', icon: User, href: '/attendant/profile' },
         { label: 'Settings', icon: Settings, href: '/attendant/settings' }
       ];
+      break;
     case 'location_manager':
-      return [
+      roleNavigation = [
         { label: 'Dashboard', icon: Home, href: '/manager/dashboard' },
         { label: 'Attractions', icon: Ticket, items: [
           { label: 'Manage Attractions', href: '/attractions', icon: Dot },
           { label: 'Create Attractions', href: '/attractions/create', icon: Dot }
         ]},
-        // { label: 'Resources', icon: Calendar, items: [
-        //   { label: 'Occupancy Reports', href: '/occupancy', icon: Dot },
-        //   { label: 'Resource Management', href: '/resources', icon: Dot }
-        // ]},
         { label: 'Bookings', icon: Calendar, items: [
           { label: 'Calendar View', href: '/bookings/calendar', icon: Dot },
           { label: 'Bookings', href: '/bookings', icon: Dot },
@@ -122,25 +165,20 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
           { label: 'Create Account', href: '/users/create', icon: Dot },
           { label: 'Account Activity Log', href: '/users/activity', icon: Dot },
           { label: 'Attendants Performance', href: '/users/performance', icon: Dot },
-          // { label: 'Package Deals', href: '/users/packages', icon: Dot }
         ]},
-        // { label: 'Shift Management', icon: Clock, href: '/shift-management' },
         { label: 'Analytics & Reports', icon: BarChart3, href: '/analytics' },
         { label: 'Notifications', icon: Bell, href: '/notifications' },
         { label: 'Profile', icon: User, href: '/profile' },
         { label: 'Settings', icon: Settings, href: '/manager/settings' }
       ];
+      break;
     case 'company_admin':
-      return [
+      roleNavigation = [
         { label: 'Dashboard', icon: Home, href: '/company/dashboard' },
         { label: 'Attractions', icon: Ticket, items: [
           { label: 'Manage Attractions', href: '/attractions', icon: Dot },
           { label: 'Create Attractions', href: '/attractions/create', icon: Dot }
         ]},
-        // { label: 'Resources', icon: Calendar, items: [
-        //   { label: 'Occupancy Reports', href: '/occupancy', icon: Dot },
-        //   { label: 'Resource Management', href: '/resources', icon: Dot }
-        // ]},
         { label: 'Bookings', icon: Calendar, items: [
           { label: 'Calendar View', href: '/bookings/calendar', icon: Dot },
           { label: 'Bookings', href: '/bookings', icon: Dot },
@@ -161,7 +199,6 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
           { label: 'Create Accounts', href: '/admin/users/create', icon: Dot },
           { label: 'Activity Log', href: '/admin/activity', icon: Dot },
           { label: 'Attendants Performance', href: '/admin/performance', icon: Dot },
-          // { label: 'Package Deals', href: '/admin/packages', icon: Dot }
         ]},
         { label: 'Analytics & Reports', icon: BarChart3, href: '/analytics' },
         { label: 'Accounting', icon: DollarSign, href: '/accounting' },
@@ -170,12 +207,15 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
         { label: 'Profile', icon: User, href: '/profile' },
         { label: 'Settings', icon: Settings, href: '/admin/settings' }
       ];
+      break;
     default:
-      return [
+      roleNavigation = [
         ...commonItems,
         { label: 'Settings', icon: Settings, href: '/settings' }
       ];
   }
+  
+  return addDescriptions(roleNavigation);
 };
 
 const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOut }) => {
@@ -183,6 +223,11 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
   const [openDropdowns, setOpenDropdowns] = useState<Record<string, boolean>>({});
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
   const profileDropdownRef = useRef<HTMLDivElement>(null);
+  const [searchValue, setSearchValue] = useState('');
+  const [searchSuggestions, setSearchSuggestions] = useState<{ label: string; href: string; description?: string }[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const searchRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     // Close sidebar when clicking outside on mobile
     const handleClickOutside = (event: MouseEvent) => {
@@ -195,14 +240,57 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
           !profileDropdownRef.current.contains(event.target as Node)) {
         setShowProfileDropdown(false);
       }
+      // Close search suggestions when clicking outside
+      if (showSuggestions && searchRef.current && 
+          !searchRef.current.contains(event.target as Node)) {
+        setShowSuggestions(false);
+      }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isOpen, setIsOpen, showProfileDropdown]);
+  }, [isOpen, setIsOpen, showProfileDropdown, showSuggestions]);
 
   if (!user) return null;
   const navigation = getNavigation(user.role);
+
+  // Flatten all links for search (role-based)
+  const getAllLinks = (nav: NavItem[]): { label: string; href: string; description?: string }[] => {
+    const links: { label: string; href: string; description?: string }[] = [];
+    nav.forEach(item => {
+      if (item.href) links.push({ label: item.label, href: item.href, description: item.description });
+      if (item.items) links.push(...getAllLinks(item.items));
+    });
+    return links;
+  };
+  const allLinks = getAllLinks(navigation);
+
+  // Handle search input changes
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSearchValue(value);
+
+    // Show suggestions matching input
+    if (value.trim()) {
+      const suggestions = allLinks
+        .filter(link => link.label.toLowerCase().includes(value.toLowerCase()))
+        .slice(0, 5); // Show up to 5 suggestions
+      setSearchSuggestions(suggestions);
+      setShowSuggestions(true);
+    } else {
+      setSearchSuggestions([]);
+      setShowSuggestions(false);
+    }
+  };
+
+  // Handle search selection
+  const handleSearchSelect = (suggestion: { label: string; href: string }) => {
+    window.location.href = suggestion.href;
+    setSearchValue('');
+    setSearchSuggestions([]);
+    setShowSuggestions(false);
+    setIsOpen(false);
+  };
 
   const toggleDropdown = (label: string) => {
     setOpenDropdowns(prev => ({
@@ -210,8 +298,6 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
       [label]: !prev[label]
     }));
   };
-
-
 
   const NavItemComponent: React.FC<{ item: NavItem; depth?: number }> = ({ item, depth = 0 }) => {
     const hasItems = item.items && item.items.length > 0;
@@ -301,23 +387,37 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
             <div className="flex items-center justify-center w-full ">
               <img src="\Zap-Zone.png" alt="Logo" className="w-3/5 mr-2"/>
             </div>
-            {/* <button
-              className="lg:hidden p-1 rounded-md hover:bg-gray-100"
-              onClick={() => setIsOpen(false)}
-              style={{ position: 'absolute', top: 16, right: 16, zIndex: 60 }}
-            >
-              <X size={20} />
-            </button> */}
           </div>
           {/* Search */}
-          <div className="p-4">
+          <div className="p-4" ref={searchRef}>
             <div className="relative">
               <Search size={18} className="absolute left-3 top-2.5 text-gray-800" />
               <input
                 type="text"
                 placeholder="Search..."
                 className="w-full pl-10 pr-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-800 focus:border-blue-800"
+                value={searchValue}
+                onChange={handleSearchChange}
+                onFocus={() => searchValue.trim() && setShowSuggestions(true)}
+                autoComplete="off"
               />
+              {/* Custom search suggestions dropdown */}
+              {showSuggestions && searchSuggestions.length > 0 && (
+                <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded shadow-lg z-50 max-h-60 overflow-y-auto">
+                  {searchSuggestions.map(suggestion => (
+                    <button
+                      key={suggestion.href}
+                      className="w-full text-left px-4 py-2 text-sm hover:bg-blue-50 transition-colors"
+                      onClick={() => handleSearchSelect(suggestion)}
+                    >
+                      <div className="font-medium text-gray-900">{suggestion.label}</div>
+                      {suggestion.description && (
+                        <div className="text-xs text-gray-500 mt-1">{suggestion.description}</div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
           {/* Navigation */}
