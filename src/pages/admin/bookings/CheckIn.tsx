@@ -5,6 +5,7 @@ import { QrCode, Search, Calendar, CheckCircle, XCircle, Eye } from 'lucide-reac
 // Types
 interface Booking {
   id: string;
+  type: 'package';
   packageName: string;
   customerName: string;
   email: string;
@@ -17,8 +18,8 @@ interface Booking {
   amountPaid: number;
   createdAt: string;
   paymentMethod: string;
-  attractions: { name: string; quantity: number }[];
-  addOns: { name: string; quantity: number; price: number }[];
+  attractions?: { name: string; quantity: number }[];
+  addOns?: { name: string; quantity: number; price: number }[];
   duration?: string;
   activity?: string;
   notes?: string;
@@ -67,12 +68,15 @@ const CheckIn: React.FC = () => {
       const storedBookings = localStorage.getItem('zapzone_bookings');
       if (storedBookings) {
         const parsedBookings = JSON.parse(storedBookings);
-        setBookings(parsedBookings);
-        if (parsedBookings.length === 0) {
+        // Filter out any non-package bookings (shouldn't exist but just in case)
+        const packageBookings = parsedBookings.filter((booking: any) => booking.type === 'package');
+        setBookings(packageBookings);
+        if (packageBookings.length === 0) {
           // Add dummy data if empty
           const dummyBookings: Booking[] = [
             {
               id: 'booking_001',
+              type: 'package',
               packageName: 'Birthday Bash',
               customerName: 'Alice Smith',
               email: 'alice@example.com',
@@ -93,6 +97,7 @@ const CheckIn: React.FC = () => {
             },
             {
               id: 'booking_002',
+              type: 'package',
               packageName: 'Family Fun',
               customerName: 'Bob Johnson',
               email: 'bob@example.com',
@@ -121,6 +126,7 @@ const CheckIn: React.FC = () => {
         const dummyBookings: Booking[] = [
           {
             id: 'booking_001',
+            type: 'package',
             packageName: 'Birthday Bash',
             customerName: 'Alice Smith',
             email: 'alice@example.com',
@@ -141,6 +147,7 @@ const CheckIn: React.FC = () => {
           },
           {
             id: 'booking_002',
+            type: 'package',
             packageName: 'Family Fun',
             customerName: 'Bob Johnson',
             email: 'bob@example.com',
@@ -199,7 +206,7 @@ const CheckIn: React.FC = () => {
   const handleScan = () => {
     // Simulate QR code scanning for demo purposes
     // In a real app, you would use a library like jsQR to decode the QR code
-    const simulatedData = `booking_${Date.now()}`;
+    const simulatedData = `booking_001`; // Use existing demo booking ID
     setScannedData(simulatedData);
     
     // Find the booking with this ID
@@ -263,8 +270,8 @@ const CheckIn: React.FC = () => {
         {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">On-site Check-in</h1>
-            <p className="text-gray-600 mt-2">Check in customers using QR codes or manual search</p>
+            <h1 className="text-3xl font-bold text-gray-900">Package Check-in</h1>
+            <p className="text-gray-600 mt-2">Check in customers for package bookings using QR codes or manual search</p>
           </div>
           <button
             onClick={scanning ? stopScanning : startScanning}
@@ -327,7 +334,7 @@ const CheckIn: React.FC = () => {
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-800 mb-2">
                 <Search className="inline mr-2 h-4 w-4" />
-                Search Bookings
+                Search Package Bookings
               </label>
               <div className="relative">
                 <input
@@ -373,7 +380,7 @@ const CheckIn: React.FC = () => {
                 {filteredBookings.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
-                      No bookings found for selected date
+                      No package bookings found for selected date
                     </td>
                   </tr>
                 ) : (
@@ -386,6 +393,11 @@ const CheckIn: React.FC = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900">{booking.packageName}</div>
+                        {booking.attractions && booking.attractions.length > 0 && (
+                          <div className="text-xs text-gray-500">
+                            Includes: {booking.attractions.map(a => a.name).join(', ')}
+                          </div>
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900">{formatTime(booking.time)}</div>
@@ -440,7 +452,7 @@ const CheckIn: React.FC = () => {
             <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full max-h-[80vh] overflow-y-auto">
               <div className="p-6">
                 <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-lg font-semibold">Booking Details</h3>
+                  <h3 className="text-lg font-semibold">Package Booking Details</h3>
                   <button
                     onClick={closeModal}
                     className="text-gray-500 hover:text-gray-800"
@@ -474,9 +486,9 @@ const CheckIn: React.FC = () => {
                   </div>
                 </div>
                 
-                {selectedBooking.attractions.length > 0 && (
+                {selectedBooking.attractions && selectedBooking.attractions.length > 0 && (
                   <div className="mb-4">
-                    <h4 className="font-medium text-gray-900">Attractions</h4>
+                    <h4 className="font-medium text-gray-900">Included Attractions</h4>
                     <ul className="text-sm text-gray-600">
                       {selectedBooking.attractions.map((attraction, index) => (
                         <li key={index}>• {attraction.name} (x{attraction.quantity})</li>
@@ -485,7 +497,7 @@ const CheckIn: React.FC = () => {
                   </div>
                 )}
                 
-                {selectedBooking.addOns.length > 0 && (
+                {selectedBooking.addOns && selectedBooking.addOns.length > 0 && (
                   <div className="mb-4">
                     <h4 className="font-medium text-gray-900">Add-ons</h4>
                     <ul className="text-sm text-gray-600">
