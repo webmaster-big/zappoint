@@ -2,29 +2,6 @@ import React, { useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-const generateTimeSlots = (duration: number, unit: string) => {
-  const slots: string[] = [];
-  let hour = 13; // 1 PM
-  let minute = 0;
-  // Calculate duration in minutes
-  const durationMinutes = unit === "hours" ? duration * 60 : duration;
-  // Last possible start time is 12:00 AM minus duration
-  const closingHour = 24, closingMinute = 0;
-  let lastStart = closingHour * 60 + closingMinute - durationMinutes;
-  // Only allow slots that end by 12:00 AM
-  while ((hour * 60 + minute) <= lastStart) {
-    const ampm = hour < 12 ? "AM" : "PM";
-    const displayHour = ((hour - 1) % 12) + 1;
-    slots.push(`${displayHour}:${minute === 0 ? "00" : "30"} ${ampm}`);
-    minute += 30;
-    if (minute === 60) {
-      minute = 0;
-      hour++;
-    }
-  }
-  return slots;
-};
-
 interface FormData {
   name: string;
   description: string;
@@ -47,7 +24,6 @@ interface FormData {
     saturday: boolean;
     sunday: boolean;
   };
-  timeSlots: string[];
   id?: string;
 }
 
@@ -75,30 +51,18 @@ const CreateAttraction = () => {
       saturday: true,
       sunday: true
     },
-    timeSlots: generateTimeSlots(60, 'minutes'), // default 60 minutes
   });
 
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [customCategory, setCustomCategory] = useState('');
   const [customLocation, setCustomLocation] = useState('');
-  // const [showAdditionalOptions, setShowAdditionalOptions] = useState(false);
 
   const handleInputChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => {
-      let updated = { ...prev, [name]: value };
-      // If duration or durationUnit changes, update timeSlots
-      if (name === 'duration' || name === 'durationUnit') {
-        const durationVal = name === 'duration' ? Number(value) : Number(updated.duration);
-        const unitVal = name === 'durationUnit' ? value : updated.durationUnit;
-        if (durationVal > 0) {
-          updated.timeSlots = generateTimeSlots(durationVal, unitVal);
-        } else {
-          updated.timeSlots = [];
-        }
-      }
-      return updated;
-    });
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
   };
 
   const handleAvailabilityChange = (day: keyof FormData['availability']) => {
@@ -139,23 +103,6 @@ const CreateAttraction = () => {
     
     setFormData(prev => ({ ...prev, images: newImages }));
     setImagePreviews(newPreviews);
-  };
-
-  const handleTimeSlotToggle = (slot: string) => {
-    setFormData(prev => {
-      const currentSlots = prev.timeSlots;
-      if (currentSlots.includes(slot)) {
-        return {
-          ...prev,
-          timeSlots: currentSlots.filter(s => s !== slot)
-        };
-      } else {
-        return {
-          ...prev,
-          timeSlots: [...currentSlots, slot]
-        };
-      }
-    });
   };
 
   const handleCategoryChange = (e: ChangeEvent<HTMLSelectElement>) => {
@@ -210,8 +157,6 @@ const CreateAttraction = () => {
     alert('Attraction created successfully!');
     navigate('/manage-attractions');
   };
-
-  const allTimeSlots = formData.timeSlots;
 
   const daysOfWeek = [
     { key: 'monday', label: 'Mon' },
@@ -285,24 +230,6 @@ const CreateAttraction = () => {
                 ))}
             </div>
           </div>
-          
-          {formData.timeSlots.length > 0 && (
-            <div className="pt-2 border-t border-gray-100">
-              <h4 className="font-medium text-gray-800 mb-2">Available Times:</h4>
-              <div className="flex flex-wrap gap-1">
-                {formData.timeSlots.slice(0, 4).map(slot => (
-                  <span key={slot} className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">
-                    {slot}
-                  </span>
-                ))}
-                {formData.timeSlots.length > 4 && (
-                  <span className="text-xs text-gray-500">
-                    +{formData.timeSlots.length - 4} more
-                  </span>
-                )}
-              </div>
-            </div>
-          )}
         </div>
       </div>
     );
@@ -314,7 +241,7 @@ const CreateAttraction = () => {
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-800">Create New Attraction</h1>
           <p className="mt-2 text-gray-600">
-            Set up a new attraction that customers can book directly
+            Set up a new attraction that customers can purchase tickets for
           </p>
         </div>
 
@@ -497,7 +424,7 @@ const CreateAttraction = () => {
 
                   <div>
                     <label htmlFor="duration" className="block text-sm font-medium text-gray-800 mb-2">
-                      Duration *
+                      Duration
                     </label>
                     <div className="flex rounded-lg overflow-hidden border border-gray-200 focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent">
                       <input
@@ -505,7 +432,6 @@ const CreateAttraction = () => {
                         name="duration"
                         id="duration"
                         min="1"
-                        required
                         value={formData.duration}
                         onChange={handleInputChange}
                         className="flex-1 px-4 py-3 focus:outline-none"
@@ -548,28 +474,6 @@ const CreateAttraction = () => {
                         }`}
                       >
                         {day.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-800 mb-3">
-                    Available Time Slots
-                  </label>
-                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
-                    {allTimeSlots.map(slot => (
-                      <button
-                        key={slot}
-                        type="button"
-                        onClick={() => handleTimeSlotToggle(slot)}
-                        className={`px-2 py-2 rounded-lg text-xs font-medium transition-colors ${
-                          formData.timeSlots.includes(slot) 
-                            ? 'bg-blue-800 text-white shadow-md' 
-                            : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
-                        }`}
-                      >
-                        {slot}
                       </button>
                     ))}
                   </div>

@@ -1,16 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
-  Clock, 
   Users, 
   MapPin, 
-  Calendar, 
   CheckCircle,
   Star,
   Shield,
   Zap,
   CreditCard,
-  Wallet
+  Wallet,
+  ShoppingCart
 } from 'lucide-react';
 
 // Define interfaces for our data structures
@@ -19,14 +18,13 @@ interface Attraction {
   name: string;
   description: string;
   location: string;
-  duration: number;
+  duration: string;
   durationUnit: string;
   maxCapacity: number;
   price: number;
-  pricingType: 'per_person' | 'fixed' | 'group';
-  availability: Record<string, boolean>;
-  timeSlots: string[];
+  pricingType: 'per_person' | 'fixed' | 'per_group' | 'per_hour' | 'per_game';
   images: string[];
+  purchaseLink: string;
 }
 
 interface CustomerInfo {
@@ -36,14 +34,12 @@ interface CustomerInfo {
   phone: string;
 }
 
-const BookingAttraction = () => {
+const PurchaseAttraction = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [attraction, setAttraction] = useState<Attraction | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selectedDate, setSelectedDate] = useState('');
-  const [selectedTime, setSelectedTime] = useState('');
-  const [participants, setParticipants] = useState(1);
+  const [quantity, setQuantity] = useState(1);
   const [customerInfo, setCustomerInfo] = useState<CustomerInfo>({
     firstName: '',
     lastName: '',
@@ -52,8 +48,7 @@ const BookingAttraction = () => {
   });
   const [paymentMethod, setPaymentMethod] = useState('credit_card');
   const [currentStep, setCurrentStep] = useState(1);
-  const [availableDates, setAvailableDates] = useState<string[]>([]);
-  const [availableTimes, setAvailableTimes] = useState<string[]>([]);
+  const [purchaseComplete, setPurchaseComplete] = useState(false);
 
   // Load attraction data
   useEffect(() => {
@@ -64,26 +59,6 @@ const BookingAttraction = () => {
         
         if (foundAttraction) {
           setAttraction(foundAttraction);
-          
-          // Generate available dates (next 30 days)
-          const dates: string[] = [];
-          const today = new Date();
-          for (let i = 0; i < 30; i++) {
-            const date = new Date();
-            date.setDate(today.getDate() + i);
-            
-            // Check if the attraction is available on this day
-            const dayName = date.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
-            if (foundAttraction.availability[dayName]) {
-              dates.push(date.toISOString().split('T')[0]);
-            }
-          }
-          setAvailableDates(dates);
-          
-          // Set default selected date to first available date
-          if (dates.length > 0 && !selectedDate) {
-            setSelectedDate(dates[0]);
-          }
         } else {
           navigate('/attractions');
         }
@@ -95,28 +70,7 @@ const BookingAttraction = () => {
     };
 
     loadAttraction();
-  }, [id, navigate, selectedDate]);
-
-  // Update available times when date changes
-  useEffect(() => {
-    if (attraction && selectedDate) {
-      // Filter times based on selected date's day of week
-      const dateObj = new Date(selectedDate);
-      const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
-      
-      if (attraction.availability[dayName]) {
-        setAvailableTimes(attraction.timeSlots || []);
-        
-        // Set default selected time to first available time
-        if (attraction.timeSlots.length > 0 && !selectedTime) {
-          setSelectedTime(attraction.timeSlots[0]);
-        }
-      } else {
-        setAvailableTimes([]);
-        setSelectedTime('');
-      }
-    }
-  }, [selectedDate, attraction, selectedTime]);
+  }, [id, navigate]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -133,26 +87,25 @@ const BookingAttraction = () => {
     
     // Apply pricing logic based on pricing type
     if (attraction.pricingType === 'per_person') {
-      total = total * participants;
+      total = total * quantity;
     }
+    // For other pricing types, the price is fixed regardless of quantity
     
     return total;
   };
 
-  const handleBooking = () => {
+  const handlePurchase = () => {
     if (!attraction) return;
 
-    // Create booking object with the correct structure
-    const booking = {
-      id: `booking_${Date.now()}`,
+    // Create purchase object
+    const purchase = {
+      id: `purchase_${Date.now()}`,
       type: 'attraction' as const,
       attractionName: attraction.name,
       customerName: `${customerInfo.firstName} ${customerInfo.lastName}`,
       email: customerInfo.email,
       phone: customerInfo.phone,
-      date: selectedDate,
-      time: selectedTime,
-      participants: participants,
+      quantity: quantity,
       status: 'confirmed' as const,
       totalAmount: calculateTotal(),
       createdAt: new Date().toISOString(),
@@ -162,15 +115,16 @@ const BookingAttraction = () => {
     };
     
     // Save to localStorage
-    const existingBookings = JSON.parse(localStorage.getItem('zapzone_bookings') || '[]');
-    localStorage.setItem('zapzone_bookings', JSON.stringify([...existingBookings, booking]));
+    const existingPurchases = JSON.parse(localStorage.getItem('zapzone_purchases') || '[]');
+    localStorage.setItem('zapzone_purchases', JSON.stringify([...existingPurchases, purchase]));
     
-    setCurrentStep(5); // Move to confirmation step
+    setPurchaseComplete(true);
+    setCurrentStep(4); // Move to confirmation step
 
-    // Show confirmation dialog
+    // Show confirmation message
     setTimeout(() => {
-      window.alert("Booking confirmed!\nYour booking for " + attraction.name + " is complete.");
-    }, 300); // slight delay to allow UI update
+      window.alert("Purchase confirmed!\nYour tickets for " + attraction.name + " have been purchased.");
+    }, 300);
   };
 
   if (loading) {
@@ -199,17 +153,16 @@ const BookingAttraction = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-    
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left Column - Booking Form */}
+          {/* Left Column - Purchase Form */}
           <div className="lg:col-span-2">
             <div className="bg-white shadow-sm rounded-lg overflow-hidden">
               {/* Progress Steps */}
               <div className="border-b border-gray-200">
                 <div className="px-6 py-4">
                   <div className="flex items-center justify-between mb-2">
-                    {[1, 2, 3, 4, 5].map(step => (
+                    {[1, 2, 3, 4].map(step => (
                       <div key={step} className="flex items-center">
                         <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
                           currentStep >= step 
@@ -218,15 +171,14 @@ const BookingAttraction = () => {
                         }`}>
                           {step}
                         </div>
-                        {step < 5 && (
+                        {step < 4 && (
                           <div className={`w-16 h-1 mx-2 ${currentStep > step ? 'bg-blue-600' : 'bg-gray-200'}`}></div>
                         )}
                       </div>
                     ))}
                   </div>
                   <div className="flex justify-between text-xs text-gray-500">
-                    <span>Date & Time</span>
-                    <span>Participants</span>
+                    <span>Quantity</span>
                     <span>Your Info</span>
                     <span>Payment</span>
                     <span>Confirmation</span>
@@ -234,105 +186,39 @@ const BookingAttraction = () => {
                 </div>
               </div>
 
-              {/* Step 1: Date & Time Selection */}
+              {/* Step 1: Quantity Selection */}
               {currentStep === 1 && (
                 <div className="p-6">
-                  <h2 className="text-xl font-semibold text-gray-900 mb-6">Select Date & Time</h2>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        <Calendar className="inline h-5 w-5 mr-1 text-blue-600" />
-                        Select Date
-                      </label>
-                      <select
-                        value={selectedDate}
-                        onChange={(e) => setSelectedDate(e.target.value)}
-                        className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        required
-                      >
-                        {availableDates.map(date => (
-                          <option key={date} value={date}>
-                            {new Date(date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        <Clock className="inline h-5 w-5 mr-1 text-blue-600" />
-                        Select Time
-                      </label>
-                      <select
-                        value={selectedTime}
-                        onChange={(e) => setSelectedTime(e.target.value)}
-                        className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        required
-                        disabled={availableTimes.length === 0}
-                      >
-                        {availableTimes.length === 0 ? (
-                          <option>No available times</option>
-                        ) : (
-                          availableTimes.map(time => (
-                            <option key={time} value={time}>{time}</option>
-                          ))
-                        )}
-                      </select>
-                    </div>
-                  </div>
-                  
-                  <div className="flex justify-end">
-                    <button
-                      onClick={() => setCurrentStep(2)}
-                      disabled={!selectedDate || !selectedTime}
-                      className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      Continue
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Step 2: Participants */}
-              {currentStep === 2 && (
-                <div className="p-6">
-                  <h2 className="text-xl font-semibold text-gray-900 mb-6">Number of Participants</h2>
+                  <h2 className="text-xl font-semibold text-gray-900 mb-6">Select Quantity</h2>
                   
                   <div className="mb-6">
                     <label className="block text-sm font-medium text-gray-700 mb-4">
-                      <Users className="inline h-5 w-5 mr-1 text-blue-600" />
-                      How many people?
+                      <ShoppingCart className="inline h-5 w-5 mr-1 text-blue-600" />
+                      How many tickets?
                     </label>
                     <div className="flex items-center justify-center space-x-4">
                       <button
-                        onClick={() => setParticipants(Math.max(1, participants - 1))}
+                        onClick={() => setQuantity(Math.max(1, quantity - 1))}
                         className="w-12 h-12 rounded-full bg-gray-100 text-gray-700 flex items-center justify-center text-xl hover:bg-gray-200"
                       >
                         -
                       </button>
-                      <span className="text-2xl font-bold w-12 text-center">{participants}</span>
+                      <span className="text-2xl font-bold w-12 text-center">{quantity}</span>
                       <button
-                        onClick={() => setParticipants(Math.min(attraction.maxCapacity, participants + 1))}
+                        onClick={() => setQuantity(Math.min(attraction.maxCapacity, quantity + 1))}
                         className="w-12 h-12 rounded-full bg-gray-100 text-gray-700 flex items-center justify-center text-xl hover:bg-gray-200"
                       >
                         +
                       </button>
                     </div>
                     <p className="text-center text-sm text-gray-500 mt-2">
-                      Maximum: {attraction.maxCapacity} participants
+                      Max participants per activity: {attraction.maxCapacity}
                     </p>
                   </div>
                   
-                  <div className="flex justify-between">
+                  <div className="flex justify-end">
                     <button
-                      onClick={() => setCurrentStep(1)}
-                      className="bg-gray-200 text-gray-800 px-6 py-2 rounded-lg hover:bg-gray-300"
-                    >
-                      Back
-                    </button>
-                    <button
-                      onClick={() => setCurrentStep(3)}
+                      onClick={() => setCurrentStep(2)}
                       className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700"
                     >
                       Continue
@@ -341,8 +227,8 @@ const BookingAttraction = () => {
                 </div>
               )}
 
-              {/* Step 3: Customer Information */}
-              {currentStep === 3 && (
+              {/* Step 2: Customer Information */}
+              {currentStep === 2 && (
                 <div className="p-6">
                   <h2 className="text-xl font-semibold text-gray-900 mb-6">Your Information</h2>
                   
@@ -405,13 +291,13 @@ const BookingAttraction = () => {
                   
                   <div className="flex justify-between">
                     <button
-                      onClick={() => setCurrentStep(2)}
+                      onClick={() => setCurrentStep(1)}
                       className="bg-gray-200 text-gray-800 px-6 py-2 rounded-lg hover:bg-gray-300"
                     >
                       Back
                     </button>
                     <button
-                      onClick={() => setCurrentStep(4)}
+                      onClick={() => setCurrentStep(3)}
                       disabled={!customerInfo.firstName || !customerInfo.lastName || !customerInfo.email}
                       className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
@@ -421,8 +307,8 @@ const BookingAttraction = () => {
                 </div>
               )}
 
-              {/* Step 4: Payment Method */}
-              {currentStep === 4 && (
+              {/* Step 3: Payment Method */}
+              {currentStep === 3 && (
                 <div className="p-6">
                   <h2 className="text-xl font-semibold text-gray-900 mb-6">Payment Method</h2>
                   
@@ -456,40 +342,38 @@ const BookingAttraction = () => {
                       </div>
                       <p className="text-sm text-gray-500 mt-1">Pay with your PayPal account</p>
                     </div>
-                  
                   </div>
                   
                   <div className="flex justify-between">
                     <button
-                      onClick={() => setCurrentStep(3)}
+                      onClick={() => setCurrentStep(2)}
                       className="bg-gray-200 text-gray-800 px-6 py-2 rounded-lg hover:bg-gray-300"
                     >
                       Back
                     </button>
                     <button
-                      onClick={handleBooking}
+                      onClick={handlePurchase}
                       className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700"
                     >
-                      Complete Booking
+                      Complete Purchase
                     </button>
                   </div>
                 </div>
               )}
 
-              {/* Step 5: Confirmation */}
-              {currentStep === 5 && (
+              {/* Step 4: Confirmation */}
+              {currentStep === 4 && purchaseComplete && (
                 <div className="p-6 text-center">
                   <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
-                  <h2 className="text-2xl font-bold text-gray-900 mb-2">Booking Confirmed!</h2>
+                  <h2 className="text-2xl font-bold text-gray-900 mb-2">Purchase Confirmed!</h2>
                   <p className="text-gray-600 mb-6">
-                    Your booking for {attraction.name} has been confirmed. A confirmation email has been sent to {customerInfo.email}.
+                    Your tickets for {attraction.name} have been confirmed. A confirmation email has been sent to {customerInfo.email}.
                   </p>
                   
                   <div className="bg-gray-50 rounded-lg p-4 mb-6 text-left">
-                    <h3 className="font-semibold text-gray-900 mb-2">Booking Details</h3>
-                    <p><strong>Date:</strong> {new Date(selectedDate).toLocaleDateString()}</p>
-                    <p><strong>Time:</strong> {selectedTime}</p>
-                    <p><strong>Participants:</strong> {participants}</p>
+                    <h3 className="font-semibold text-gray-900 mb-2">Purchase Details</h3>
+                    <p><strong>Attraction:</strong> {attraction.name}</p>
+                    <p><strong>Quantity:</strong> {quantity}</p>
                     <p><strong>Payment Method:</strong> {paymentMethod.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}</p>
                     <p><strong>Total:</strong> ${calculateTotal().toFixed(2)}</p>
                   </div>
@@ -502,10 +386,10 @@ const BookingAttraction = () => {
                       Home
                     </button>
                     <button
-                      onClick={() => navigate('/my-bookings')}
+                      onClick={() => navigate('/my-purchases')}
                       className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700"
                     >
-                      View My Bookings
+                      View My Purchases
                     </button>
                   </div>
                 </div>
@@ -535,16 +419,9 @@ const BookingAttraction = () => {
                   </div>
                   
                   <div className="flex items-center">
-                    <Clock className="h-5 w-5 text-gray-400 mr-2" />
-                    <span className="text-sm text-gray-600">
-                      {attraction.duration} {attraction.durationUnit}
-                    </span>
-                  </div>
-                  
-                  <div className="flex items-center">
                     <Users className="h-5 w-5 text-gray-400 mr-2" />
                     <span className="text-sm text-gray-600">
-                      Up to {attraction.maxCapacity} participants
+                      Duration: {attraction.duration} {attraction.durationUnit}
                     </span>
                   </div>
                 </div>
@@ -553,22 +430,25 @@ const BookingAttraction = () => {
                   <h3 className="font-semibold text-gray-900 mb-2">Pricing</h3>
                   <div className="flex justify-between items-center mb-1">
                     <span className="text-sm text-gray-600">
-                      {attraction.pricingType === 'per_person' ? 'Per person' : 'Fixed price'}
+                      {attraction.pricingType === 'per_person' ? 'Per person' : 
+                       attraction.pricingType === 'per_group' ? 'Per group' :
+                       attraction.pricingType === 'per_hour' ? 'Per hour' :
+                       attraction.pricingType === 'per_game' ? 'Per game' : 'Fixed price'}
                     </span>
-                    <span className="font-semibold">${attraction.price.toFixed(2)}</span>
+                <span className="font-semibold">${Number(attraction.price).toFixed(2)}</span>
                   </div>
                   
-                  {currentStep >= 2 && (
+                  {currentStep >= 1 && (
                     <>
                       <div className="flex justify-between items-center mb-1">
-                        <span className="text-sm text-gray-600">Participants</span>
-                        <span className="font-semibold">{participants}</span>
+                        <span className="text-sm text-gray-600">Quantity</span>
+                        <span className="font-semibold">{quantity}</span>
                       </div>
                       
                       {attraction.pricingType === 'per_person' && (
                         <div className="flex justify-between items-center mb-1">
                           <span className="text-sm text-gray-600">Subtotal</span>
-                          <span className="font-semibold">${(attraction.price * participants).toFixed(2)}</span>
+                          <span className="font-semibold">${(attraction.price * quantity).toFixed(2)}</span>
                         </div>
                       )}
                     </>
@@ -606,4 +486,4 @@ const BookingAttraction = () => {
   );
 };
 
-export default BookingAttraction;
+export default PurchaseAttraction;

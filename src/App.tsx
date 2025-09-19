@@ -14,11 +14,11 @@ import CalendarView from "./pages/admin/bookings/CalendarView"
 import OnsiteBooking from "./pages/admin/bookings/OnsiteBooking"
 import CheckIn from "./pages/admin/bookings/CheckIn"
 import CreateAttraction from "./pages/admin/attractions/CreateAttractions";
-import BookingAttraction from "./pages/admin/attractions/BookAttraction";
 import ManageAttractions from "./pages/admin/attractions/ManageAttractions";
 import LocationManagerDashboard from "./pages/admin/ManagerDashboard";
 import CompanyDashboard from "./pages/admin/CompanyDashboard";
 import AttendantDashboard from "./pages/admin/AttendantDashboard";
+import PurchaseAttraction from "./pages/admin/attractions/PurchaseAttraction";
 
 
 function App() {
@@ -27,7 +27,7 @@ function App() {
       <Route path="/" element={<Login />} />
       <Route path="/home" element={<Home />} />
       <Route path="/book/package/:id" element={<BookPackage />} />
-      <Route path="/book/attraction/:id" element={<BookingAttraction />} />
+      <Route path="/purchase/attraction/:id" element={<PurchaseAttraction />} />
       
   <Route element={<MainLayout />}>
         <Route path="/attendant/dashboard" element={<AttendantDashboard />} />

@@ -8,11 +8,11 @@ import {
   Search, 
   Filter, 
   RefreshCcw,
-  Link as LinkIcon,
   Users,
   DollarSign,
   Zap,
-  Star
+  Star,
+  ShoppingCart
 } from 'lucide-react';
 
 // Types
@@ -31,7 +31,6 @@ interface Attraction {
   status: 'active' | 'inactive' | 'maintenance';
   createdAt: string;
   availability: Record<string, boolean>;
-  timeSlots: string[];
 }
 
 interface FilterOptions {
@@ -137,8 +136,7 @@ const ManageAttractions = () => {
               friday: true,
               saturday: true,
               sunday: true
-            },
-            timeSlots: ['10:00 AM', '11:00 AM', '12:00 PM', '1:00 PM', '2:00 PM', '3:00 PM', '4:00 PM', '5:00 PM', '6:00 PM', '7:00 PM', '8:00 PM']
+            },          
           },
           {
             id: 'attr_2',
@@ -163,7 +161,6 @@ const ManageAttractions = () => {
               saturday: true,
               sunday: true
             },
-            timeSlots: ['11:00 AM', '12:00 PM', '1:00 PM', '2:00 PM', '3:00 PM', '4:00 PM', '5:00 PM', '6:00 PM', '7:00 PM', '9:00 PM']
           },
           {
             id: 'attr_3',
@@ -188,7 +185,6 @@ const ManageAttractions = () => {
               saturday: true,
               sunday: true
             },
-            timeSlots: ['12:00 PM', '1:00 PM', '2:00 PM', '3:00 PM', '4:00 PM', '5:00 PM', '6:00 PM', '7:00 PM']
           }
         ];
         setAttractions(sampleAttractions);
@@ -297,9 +293,9 @@ const ManageAttractions = () => {
     localStorage.setItem('zapzone_attractions', JSON.stringify(updatedAttractions));
   };
 
-  const copyBookingLink = (id: string) => {
-    const bookingLink = `${window.location.origin}/book/attraction/${id}`;
-    navigator.clipboard.writeText(bookingLink);
+  const copyPurchaseLink = (id: string) => {
+    const fullPurchaseLink = `${window.location.origin}/purchase/attraction/${id}`;
+    navigator.clipboard.writeText(fullPurchaseLink);
     setCopiedLink(id);
     setTimeout(() => setCopiedLink(null), 2000);
   };
@@ -489,7 +485,7 @@ const ManageAttractions = () => {
                 <th scope="col" className="px-6 py-4 font-medium">Capacity</th>
                 <th scope="col" className="px-6 py-4 font-medium">Duration</th>
                 <th scope="col" className="px-6 py-4 font-medium">Status</th>
-                <th scope="col" className="px-6 py-4 font-medium">Booking Link</th>
+                <th scope="col" className="px-6 py-4 font-medium">Purchase Link</th>
                 <th scope="col" className="px-6 py-4 font-medium">Actions</th>
               </tr>
             </thead>
@@ -549,11 +545,11 @@ const ManageAttractions = () => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-2">
                         <button
-                          onClick={() => copyBookingLink(attraction.id)}
+                          onClick={() => copyPurchaseLink(attraction.id)}
                           className="flex items-center px-3 py-1 bg-blue-100 text-blue-800 rounded-lg hover:bg-blue-200 transition-colors text-xs"
-                          title="Copy booking link"
+                          title="Copy purchase link"
                         >
-                          <LinkIcon className="h-3 w-3 mr-1" />
+                          <ShoppingCart className="h-3 w-3 mr-1" />
                           {copiedLink === attraction.id ? 'Copied!' : 'Copy Link'}
                         </button>
                       </div>
@@ -561,9 +557,9 @@ const ManageAttractions = () => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-3">
                         <Link
-                          to={`/book/attraction/${attraction.id}`}
+                          to={`${window.location.origin}/purchase/attraction/${attraction.id}`}
                           className="text-blue-600 hover:text-blue-800"
-                          title="View Booking Page"
+                          title="View Purchase Page"
                           target="_blank"
                         >
                           <Eye className="h-4 w-4" />
