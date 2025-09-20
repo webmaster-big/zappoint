@@ -88,7 +88,7 @@ const BookPackage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const [pkg, setPkg] = useState<Package | null>(null);
   const [attractions, setAttractions] = useState<Attraction[]>([]);
-  const [rooms, setRooms] = useState<Room[]>([]);
+  // Removed unused rooms state
   const [selectedAddOns, setSelectedAddOns] = useState<{ [name: string]: number }>({});
   const [selectedAttractions, setSelectedAttractions] = useState<{ [name: string]: number }>({});
   const [selectedRoom, setSelectedRoom] = useState<string>("");
@@ -119,7 +119,6 @@ const BookPackage: React.FC = () => {
     const found = packages.find((p: Package) => p.id === id);
     setPkg(found || null);
     setAttractions(JSON.parse(localStorage.getItem("zapzone_attractions") || "[]"));
-    setRooms(JSON.parse(localStorage.getItem("zapzone_rooms") || "[]"));
   }, [id]);
 
   // Calculate available dates based on package availability
