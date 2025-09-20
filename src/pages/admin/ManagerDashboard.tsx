@@ -13,18 +13,14 @@ import {
   Zap,
   MapPin,
   TrendingUp,
-  AlertCircle
+  AlertCircle,
+  Ticket
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const LocationManagerDashboard: React.FC = () => {
   const [currentWeek, setCurrentWeek] = useState(new Date());
   const [selectedStatus, setSelectedStatus] = useState('all');
-//   const [calendarFilter, setCalendarFilter] = useState({
-//     type: 'all',
-//     value: ''
-//   });
-//   const [showFilterPanel, setShowFilterPanel] = useState(false);
 
   // Get dates for the current week
   const getWeekDates = (date: Date): Date[] => {
@@ -57,22 +53,22 @@ const LocationManagerDashboard: React.FC = () => {
     setCurrentWeek(newDate);
   };
 
-  // Metrics data for Location Manager
+  // Metrics data for Location Manager with customer focus
   const metrics = [
     {
-      title: 'Total Bookings',
-      value: '142',
-      change: '+12% from last week',
+      title: 'Total Customers',
+      value: '542',
+      change: '+15% from last week',
       trend: 'up',
-      icon: Calendar,
+      icon: Users,
       accent: 'bg-blue-100 text-blue-800',
     },
     {
-      title: 'Active Attendants',
+      title: 'New Customers',
       value: '87',
-      change: '15 new this week',
+      change: '23% conversion rate',
       trend: 'up',
-      icon: Users,
+      icon: TrendingUp,
       accent: 'bg-blue-100 text-blue-800',
     },
     {
@@ -84,17 +80,17 @@ const LocationManagerDashboard: React.FC = () => {
       accent: 'bg-blue-100 text-blue-800',
     },
     {
-      title: 'Capacity Utilization',
-      value: '78%',
-      change: 'Optimal range',
+      title: 'Repeat Customers',
+      value: '65%',
+      change: 'High loyalty rate',
       trend: 'neutral',
-      icon: TrendingUp,
+      icon: Users,
       accent: 'bg-blue-100 text-blue-800',
     },
     {
-      title: 'Issues Requiring Attention',
-      value: '1',
-      change: ' 1 staffing',
+      title: 'Customer Satisfaction',
+      value: '4.8/5',
+      change: 'Based on 142 reviews',
       trend: 'neutral',
       icon: AlertCircle,
       accent: 'bg-blue-100 text-blue-800',
@@ -113,13 +109,13 @@ const LocationManagerDashboard: React.FC = () => {
 
   // Bookings data
   const weeklyBookings = [
-    { id: 1, date: new Date('2025-09-16'), time: '9:00 AM', duration: 2, activity: 'Laser Tag', package: null, participants: 12, status: 'Confirmed', payment: 'Paid', customer: 'Tech Solutions Inc.', contact: 'John Smith', phone: '(555) 123-4567', email: 'john@techsolutions.com', amount: '$480', specialRequests: 'Team building event' },
-    { id: 2, date: new Date('2025-09-17'), time: '10:30 AM', duration: 1.5, activity: null, package: 'Adventure Package', participants: 6, status: 'Confirmed', payment: 'Paid', customer: 'Sarah Johnson', contact: 'Sarah Johnson', phone: '(555) 987-6543', email: 'sarahj@email.com', amount: '$180', specialRequests: 'Celebrating birthday' },
-    { id: 3, date: new Date('2025-09-18'), time: '12:00 PM', duration: 2, activity: 'Bowling', package: null, participants: 4, status: 'Pending', payment: 'Partial', customer: 'Mike Thompson', contact: 'Mike Thompson', phone: '(555) 456-7890', email: 'mike.t@email.com', amount: '$180', specialRequests: 'First time visitors' },
-    { id: 4, date: new Date('2025-09-16'), time: '2:00 PM', duration: 3, activity: null, package: 'Birthday Package', participants: 15, status: 'Confirmed', payment: 'Paid', customer: 'Lisa Williams', contact: 'Lisa Williams', phone: '(555) 234-5678', email: 'lisa.w@email.com', amount: '$450', specialRequests: 'Birthday cake will be brought in' },
-    { id: 5, date: new Date('2025-09-17'), time: '4:30 PM', duration: 2, activity: 'Bowling', package: null, participants: 8, status: 'Cancelled', payment: 'Refunded', customer: 'David Miller', contact: 'David Miller', phone: '(555) 876-5432', email: 'davidm@email.com', amount: '$200', specialRequests: 'Need two lanes' },
-    { id: 6, date: new Date('2025-09-20'), time: '11:00 AM', duration: 1.5, activity: null, package: 'Corporate Package', participants: 10, status: 'Confirmed', payment: 'Paid', customer: 'XYZ Corp', contact: 'Robert Brown', phone: '(555) 345-6789', email: 'rbrown@xyz.com', amount: '$500', specialRequests: 'Executive team' },
-    { id: 7, date: new Date('2025-09-19'), time: '3:00 PM', duration: 2, activity: 'Arcade', package: null, participants: 6, status: 'Confirmed', payment: 'Partial', customer: 'Jennifer Lee', contact: 'Jennifer Lee', phone: '(555) 765-4321', email: 'jennifer@email.com', amount: '$150', specialRequests: 'Family outing' },
+    { id: 1, date: new Date('2025-09-16'), time: '9:00 AM', duration: 2, package: 'Corporate Package', participants: 12, status: 'Confirmed', payment: 'Paid', customer: 'Tech Solutions Inc.', contact: 'John Smith', phone: '(555) 123-4567', email: 'john@techsolutions.com', amount: '$480', specialRequests: 'Team building event' },
+    { id: 2, date: new Date('2025-09-17'), time: '10:30 AM', duration: 1.5, package: 'Adventure Package', participants: 6, status: 'Confirmed', payment: 'Paid', customer: 'Sarah Johnson', contact: 'Sarah Johnson', phone: '(555) 987-6543', email: 'sarahj@email.com', amount: '$180', specialRequests: 'Celebrating birthday' },
+    { id: 3, date: new Date('2025-09-18'), time: '12:00 PM', duration: 2, package: 'Family Package', participants: 4, status: 'Pending', payment: 'Partial', customer: 'Mike Thompson', contact: 'Mike Thompson', phone: '(555) 456-7890', email: 'mike.t@email.com', amount: '$180', specialRequests: 'First time visitors' },
+    { id: 4, date: new Date('2025-09-16'), time: '2:00 PM', duration: 3, package: 'Birthday Package', participants: 15, status: 'Confirmed', payment: 'Paid', customer: 'Lisa Williams', contact: 'Lisa Williams', phone: '(555) 234-5678', email: 'lisa.w@email.com', amount: '$450', specialRequests: 'Birthday cake will be brought in' },
+    { id: 5, date: new Date('2025-09-17'), time: '4:30 PM', duration: 2, package: 'Group Package', participants: 8, status: 'Cancelled', payment: 'Refunded', customer: 'David Miller', contact: 'David Miller', phone: '(555) 876-5432', email: 'davidm@email.com', amount: '$200', specialRequests: 'Need two lanes' },
+    { id: 6, date: new Date('2025-09-20'), time: '11:00 AM', duration: 1.5, package: 'Corporate Package', participants: 10, status: 'Confirmed', payment: 'Paid', customer: 'XYZ Corp', contact: 'Robert Brown', phone: '(555) 345-6789', email: 'rbrown@xyz.com', amount: '$500', specialRequests: 'Executive team' },
+    { id: 7, date: new Date('2025-09-19'), time: '3:00 PM', duration: 2, package: 'Family Package', participants: 6, status: 'Confirmed', payment: 'Partial', customer: 'Jennifer Lee', contact: 'Jennifer Lee', phone: '(555) 765-4321', email: 'jennifer@email.com', amount: '$150', specialRequests: 'Family outing' },
   ];
 
   // Only show bookings for the current week in the calendar and table
@@ -127,26 +123,36 @@ const LocationManagerDashboard: React.FC = () => {
     return weekDates.some(date => date.toDateString() === booking.date.toDateString());
   });
 
-  // Attendant statistics
-  const attendantStats = {
-    total: 87,
-    newThisWeek: 15,
-    returning: 72,
+  // Customer statistics
+  const customerStats = {
+    total: 542,
+    newThisWeek: 87,
+    returning: 355,
     byAgeGroup: {
-      'Under 18': 25,
-      '18-25': 32,
-      '26-40': 20,
-      '41-60': 8,
-      'Over 60': 2
+      'Under 18': 125,
+      '18-25': 192,
+      '26-40': 135,
+      '41-60': 68,
+      'Over 60': 22
     },
     peakHours: ['10:00 AM', '2:00 PM', '6:00 PM']
   };
+
+  // Ticket purchases data
+  const ticketPurchases = [
+    { id: 1, customer: 'John Smith', attraction: 'Laser Tag', date: new Date('2025-09-16'), quantity: 3, amount: '$45', status: 'Completed', payment: 'Credit Card' },
+    { id: 2, customer: 'Sarah Johnson', attraction: 'VR Experience', date: new Date('2025-09-17'), quantity: 2, amount: '$30', status: 'Completed', payment: 'PayPal' },
+    { id: 3, customer: 'Mike Thompson', attraction: 'Bowling', date: new Date('2025-09-18'), quantity: 4, amount: '$60', status: 'Pending', payment: 'Credit Card' },
+    { id: 4, customer: 'Lisa Williams', attraction: 'Arcade', date: new Date('2025-09-16'), quantity: 5, amount: '$75', status: 'Completed', payment: 'Cash' },
+    { id: 5, customer: 'David Miller', attraction: 'Mini Golf', date: new Date('2025-09-17'), quantity: 2, amount: '$30', status: 'Cancelled', payment: 'Credit Card' },
+    { id: 6, customer: 'Jennifer Lee', attraction: 'Escape Room', date: new Date('2025-09-19'), quantity: 6, amount: '$120', status: 'Completed', payment: 'Credit Card' },
+  ];
 
   // Quick actions for Location Manager
   const quickActions = [
     { title: 'New Booking', icon: Plus, accent: 'bg-blue-800 hover:bg-blue-800' },
     { title: 'Check-in', icon: CheckCircle, accent: 'bg-blue-800 hover:bg-blue-800' },
-    { title: 'Staff Management', icon: Users, accent: 'bg-blue-800 hover:bg-blue-800' },
+    { title: 'Customer Insights', icon: Users, accent: 'bg-blue-800 hover:bg-blue-800' },
     { title: 'Generate Report', icon: Download, accent: 'bg-blue-800 hover:bg-blue-800' },
   ];
 
@@ -155,6 +161,7 @@ const LocationManagerDashboard: React.FC = () => {
     Confirmed: 'bg-emerald-100 text-emerald-800',
     Pending: 'bg-blue-100 text-blue-800',
     Cancelled: 'bg-rose-100 text-rose-800',
+    Completed: 'bg-emerald-100 text-emerald-800',
   };
 
   // Payment status colors
@@ -162,10 +169,13 @@ const LocationManagerDashboard: React.FC = () => {
     Paid: 'bg-emerald-100 text-emerald-800',
     Partial: 'bg-blue-100 text-blue-800',
     Refunded: 'bg-rose-100 text-rose-800',
+    'Credit Card': 'bg-blue-100 text-blue-800',
+    PayPal: 'bg-blue-100 text-blue-800',
+    Cash: 'bg-gray-100 text-gray-800',
   };
 
   // Filter bookings by status for the table
-  const filteblueBookings = selectedStatus === 'all' 
+  const filteredBookings = selectedStatus === 'all' 
     ? bookingsThisWeek 
     : bookingsThisWeek.filter(booking => booking.status === selectedStatus);
 
@@ -236,27 +246,27 @@ const LocationManagerDashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Attendant Statistics */}
+        {/* Customer Statistics */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
           <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-            <Users className="w-5 h-5 text-blue-800" /> Attendant Statistics
+            <Users className="w-5 h-5 text-blue-800" /> Customer Statistics
           </h2>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-blue-50 p-3 rounded-lg">
-                <p className="text-xs text-blue-800">Total Attendants</p>
-                <p className="text-2xl font-bold text-blue-800">{attendantStats.total}</p>
+                <p className="text-xs text-blue-800">Total Customers</p>
+                <p className="text-2xl font-bold text-blue-800">{customerStats.total}</p>
               </div>
               <div className="bg-blue-50 p-3 rounded-lg">
                 <p className="text-xs text-blue-800">New This Week</p>
-                <p className="text-2xl font-bold text-blue-800">+{attendantStats.newThisWeek}</p>
+                <p className="text-2xl font-bold text-blue-800">+{customerStats.newThisWeek}</p>
               </div>
             </div>
             
             <div>
               <p className="text-sm font-medium text-gray-800 mb-2">Peak Hours</p>
               <div className="flex flex-wrap gap-2">
-                {attendantStats.peakHours.map((hour, index) => (
+                {customerStats.peakHours.map((hour, index) => (
                   <span key={index} className="px-2 py-1 bg-gray-100 text-gray-800 rounded-full text-xs">
                     {hour}
                   </span>
@@ -267,7 +277,7 @@ const LocationManagerDashboard: React.FC = () => {
             <div>
               <p className="text-sm font-medium text-gray-800 mb-2">Age Distribution</p>
               <div className="space-y-1">
-                {Object.entries(attendantStats.byAgeGroup).map(([ageGroup, count]) => (
+                {Object.entries(customerStats.byAgeGroup).map(([ageGroup, count]) => (
                   <div key={ageGroup} className="flex items-center justify-between">
                     <span className="text-xs text-gray-600">{ageGroup}</span>
                     <span className="text-xs font-medium text-gray-900">{count}</span>
@@ -380,7 +390,7 @@ const LocationManagerDashboard: React.FC = () => {
                                   }`}
                                 >
                                   <div className="font-medium text-gray-900 text-xs">
-                                    {booking.activity || booking.package}
+                                    {booking.package}
                                   </div>
                                   <div className="text-xs text-gray-500 mt-1">
                                     {booking.customer}
@@ -400,6 +410,68 @@ const LocationManagerDashboard: React.FC = () => {
                   </tr>
                 );
               })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Ticket Purchases Table */}
+      <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
+          <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+            <Ticket className="w-5 h-5 text-blue-800" /> Recent Ticket Purchases
+          </h2>
+          <div className="flex flex-wrap gap-2 mt-4 md:mt-0">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
+              <input
+                type="text"
+                placeholder="Search purchases..."
+                className="pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+              />
+            </div>
+          </div>
+        </div>
+      
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm text-left">
+            <thead className="text-xs text-gray-500 uppercase bg-gray-50 border-b">
+              <tr>
+                <th className="px-4 py-3 font-medium">Customer</th>
+                <th className="px-4 py-3 font-medium">Attraction</th>
+                <th className="px-4 py-3 font-medium">Date</th>
+                <th className="px-4 py-3 font-medium">Quantity</th>
+                <th className="px-4 py-3 font-medium">Amount</th>
+                <th className="px-4 py-3 font-medium">Status</th>
+                <th className="px-4 py-3 font-medium">Payment</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {ticketPurchases.map(purchase => (
+                <tr key={purchase.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-3">
+                    <div className="font-medium text-gray-900">{purchase.customer}</div>
+                  </td>
+                  <td className="px-4 py-3">
+                    {purchase.attraction}
+                  </td>
+                  <td className="px-4 py-3">
+                    {purchase.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  </td>
+                  <td className="px-4 py-3">{purchase.quantity}</td>
+                  <td className="px-4 py-3 font-medium">{purchase.amount}</td>
+                  <td className="px-4 py-3">
+                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusColors[purchase.status as keyof typeof statusColors]}`}>
+                      {purchase.status}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${paymentColors[purchase.payment as keyof typeof paymentColors]}`}>
+                      {purchase.payment}
+                    </span>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
@@ -437,7 +509,6 @@ const LocationManagerDashboard: React.FC = () => {
               <tr>
                 <th className="px-4 py-3 font-medium w-32">Date & Time</th>
                 <th className="px-4 py-3 font-medium w-48">Customer</th>
-                <th className="px-4 py-3 font-medium w-32">Activity</th>
                 <th className="px-4 py-3 font-medium w-40">Package</th>
                 <th className="px-4 py-3 font-medium w-20">Participants</th>
                 <th className="px-4 py-3 font-medium w-24">Status</th>
@@ -447,7 +518,7 @@ const LocationManagerDashboard: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {filteblueBookings.length > 0 ? filteblueBookings.map(booking => (
+              {filteredBookings.length > 0 ? filteredBookings.map(booking => (
                 <tr key={booking.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3">
                     <div className="font-medium text-gray-900">
@@ -460,9 +531,6 @@ const LocationManagerDashboard: React.FC = () => {
                       <div className="font-medium text-gray-900">{booking.customer}</div>
                       <div className="text-xs text-gray-500">{booking.contact}</div>
                     </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    {booking.activity || <span className="text-gray-400">-</span>}
                   </td>
                   <td className="px-4 py-3">
                     {booking.package || <span className="text-gray-400">-</span>}
@@ -492,7 +560,7 @@ const LocationManagerDashboard: React.FC = () => {
                 </tr>
               )) : (
                 <tr>
-                  <td colSpan={9} className="px-4 py-3 text-center text-gray-500">
+                  <td colSpan={8} className="px-4 py-3 text-center text-gray-500">
                     No bookings found.
                   </td>
                 </tr>

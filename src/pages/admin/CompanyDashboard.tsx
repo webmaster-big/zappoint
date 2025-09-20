@@ -18,7 +18,9 @@ import {
   CreditCard,
   Eye,
   Edit,
-  Trash2
+  Trash2,
+  TrendingUp,
+  Target
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -126,7 +128,7 @@ const CompanyDashboard: React.FC = () => {
     { id: 6, date: new Date('2025-09-20'), time: '11:00 AM', duration: 1.5, activity: null, package: 'Corporate Package', participants: 10, status: 'Confirmed', payment: 'Paid', customer: 'XYZ Corp', contact: 'Robert Brown', phone: '(555) 345-6789', email: 'rbrown@xyz.com', amount: '$500', location: 'Sterling Heights', specialRequests: 'Executive team' },
     { id: 7, date: new Date('2025-09-19'), time: '3:00 PM', duration: 2, activity: 'Arcade', package: null, participants: 6, status: 'Confirmed', payment: 'Partial', customer: 'Jennifer Lee', contact: 'Jennifer Lee', phone: '(555) 765-4321', email: 'jennifer@email.com', amount: '$150', location: 'Ann Arbor', specialRequests: 'Family outing' },
     { id: 8, date: new Date('2025-09-16'), time: '9:00 AM', duration: 1, activity: 'VR Experience', package: null, participants: 4, status: 'Confirmed', payment: 'Paid', customer: 'Innovate Tech', contact: 'Alex Johnson', phone: '(555) 111-2222', email: 'alex@innovatetech.com', amount: '$120', location: 'Bowlero', specialRequests: 'VR setup needed' },
-    { id: 9, date: new Date('2025-09-17'), time: '10:30 AM', duration: 2, activity: 'Escape Room', package: null, participants: 8, status: 'Confirmed', payment: 'Paid', customer: 'Team Builders Co.', contact: 'Maria Garcia', phone: '(555) 333-4444', email: 'maria@teambuilders.com', amount: '$240', location: 'EscapeRoomZone', specialRequests: 'Beginner level room' },
+    { id: 9, date: new Date('2025-09-17'), time: '10:30 AM', duration: 2, activity: 'Escape Room', package: null, participants: 8, status: 'Confirmed', payment: 'Paid', customer: 'Team Builders Co.', contact: 'Maria Garcia', phone: '(555) 333-4444', email: 'maria@teambuilders.com', amount: '$240', location: 'EescapeRoomZone', specialRequests: 'Beginner level room' },
     { id: 10, date: new Date('2025-09-18'), time: '1:00 PM', duration: 2, activity: 'Laser Tag', package: null, participants: 10, status: 'Confirmed', payment: 'Paid', customer: 'Marketing Pros', contact: 'Tom Wilson', phone: '(555) 555-6666', email: 'tom@marketingpros.com', amount: '$400', location: 'Brighton', specialRequests: 'Marketing team outing' },
     { id: 11, date: new Date('2025-09-19'), time: '5:00 PM', duration: 2, activity: 'Bowling', package: null, participants: 6, status: 'Confirmed', payment: 'Paid', customer: 'Family Smith', contact: 'Robert Smith', phone: '(555) 777-8888', email: 'rsmith@email.com', amount: '$150', location: 'Canton', specialRequests: 'Family night' },
     { id: 12, date: new Date('2025-09-20'), time: '2:30 PM', duration: 3, activity: null, package: 'Corporate Package', participants: 12, status: 'Confirmed', payment: 'Paid', customer: 'Finance Corp', contact: 'Susan Lee', phone: '(555) 999-0000', email: 'slee@financecorp.com', amount: '$800', location: 'Lansing', specialRequests: 'Board meeting follow-up' },
@@ -249,10 +251,10 @@ const CompanyDashboard: React.FC = () => {
 
   // Get location stats
   const getLocationStats = () => {
-    const stats: {[key: string]: {bookings: number, revenue: number, participants: number}} = {};
+    const stats: {[key: string]: {bookings: number, revenue: number, participants: number, utilization: number}} = {};
     
     locations.forEach(location => {
-      stats[location] = { bookings: 0, revenue: 0, participants: 0 };
+      stats[location] = { bookings: 0, revenue: 0, participants: 0, utilization: 0 };
     });
     
     bookingsThisWeek.forEach(booking => {
@@ -262,11 +264,26 @@ const CompanyDashboard: React.FC = () => {
         stats[booking.location].participants += booking.participants;
       }
     });
+
+    // Calculate utilization (percentage of max capacity)
+    Object.keys(stats).forEach(location => {
+      const maxCapacity = 200; // Assuming each location has a max capacity of 200
+      stats[location].utilization = Math.min(100, Math.round((stats[location].participants / maxCapacity) * 100));
+    });
     
     return stats;
   };
 
   const locationStats = getLocationStats();
+
+  // Get top performing locations
+  const getTopLocations = () => {
+    return Object.entries(locationStats)
+      .sort(([, a], [, b]) => b.revenue - a.revenue)
+      .slice(0, 3);
+  };
+
+  const topLocations = getTopLocations();
 
   // Pagination controls
   const paginate = (pageNumber: number) => setCurrentPage(pageNumber);
@@ -326,31 +343,94 @@ const CompanyDashboard: React.FC = () => {
         })}
       </div>
 
-      {/* Location Stats */}
+      {/* Location Performance - Redesigned */}
       <div className="bg-white rounded-xl shadow-sm p-4 md:p-6 border border-gray-100">
-        <h2 className="text-lg md:text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-          <MapPin className="w-5 h-5 md:w-6 md:h-6 text-blue-800" /> Location Performance
-        </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
-          {Object.entries(locationStats).map(([location, stats]) => (
-            <div key={location} className="border border-gray-200 rounded-lg p-3 md:p-4">
-              <h3 className="font-semibold text-gray-900 mb-2 text-sm md:text-base">{location}</h3>
-              <div className="grid grid-cols-3 gap-2 text-center">
-                <div>
-                  <div className="text-base md:text-lg font-bold text-blue-800">{stats.bookings}</div>
-                  <div className="text-xs text-gray-500">Bookings</div>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 md:mb-6">
+          <h2 className="text-lg md:text-xl font-bold text-gray-900 flex items-center gap-2">
+            <Target className="w-5 h-5 md:w-6 md:h-6 text-blue-800" /> Location Performance
+          </h2>
+          <div className="flex items-center gap-2 mt-2 md:mt-0">
+            <span className="text-sm text-gray-500">Week of {weekDates[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Top Performing Locations */}
+          <div>
+            <h3 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-green-600" /> Top Performing Locations
+            </h3>
+            <div className="space-y-4">
+              {topLocations.map(([location, stats], index) => (
+                <div key={location} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold ${
+                      index === 0 ? 'bg-gradient-to-r from-yellow-400 to-yellow-500' :
+                      index === 1 ? 'bg-gradient-to-r from-gray-400 to-gray-500' :
+                      'bg-gradient-to-r from-amber-600 to-amber-700'
+                    }`}>
+                      {index + 1}
+                    </div>
+                    <div>
+                      <div className="font-medium text-gray-900">{location}</div>
+                      <div className="text-sm text-gray-500">{stats.bookings} bookings</div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-bold text-gray-900">${stats.revenue}</div>
+                    <div className="text-sm text-green-600">{stats.utilization}% utilization</div>
+                  </div>
                 </div>
-                <div>
-                  <div className="text-base md:text-lg font-bold text-blue-800">${stats.revenue}</div>
-                  <div className="text-xs text-gray-500">Revenue</div>
-                </div>
-                <div>
-                  <div className="text-base md:text-lg font-bold text-blue-800">{stats.participants}</div>
-                  <div className="text-xs text-gray-500">Participants</div>
-                </div>
-              </div>
+              ))}
             </div>
-          ))}
+          </div>
+
+          {/* Location Metrics Grid */}
+          <div>
+            <h3 className="font-semibold text-gray-800 mb-4">All Locations Overview</h3>
+            <div className="grid grid-cols-2 gap-4">
+              {Object.entries(locationStats).map(([location, stats]) => (
+                <div key={location} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-medium text-gray-900 text-sm">{location}</span>
+                    <div className={`w-3 h-3 rounded-full ${
+                      stats.utilization >= 80 ? 'bg-green-500' :
+                      stats.utilization >= 50 ? 'bg-yellow-500' : 'bg-red-500'
+                    }`} title={`${stats.utilization}% utilization`}></div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <div>
+                      <div className="text-lg font-bold text-blue-800">{stats.bookings}</div>
+                      <div className="text-xs text-gray-500">Bookings</div>
+                    </div>
+                    <div>
+                      <div className="text-lg font-bold text-blue-800">${stats.revenue}</div>
+                      <div className="text-xs text-gray-500">Revenue</div>
+                    </div>
+                    <div>
+                      <div className="text-lg font-bold text-blue-800">{stats.participants}</div>
+                      <div className="text-xs text-gray-500">Guests</div>
+                    </div>
+                  </div>
+                  <div className="mt-3">
+                    <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
+                      <span>Capacity Utilization</span>
+                      <span>{stats.utilization}%</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div 
+                        className={`h-2 rounded-full ${
+                          stats.utilization >= 80 ? 'bg-green-500' :
+                          stats.utilization >= 50 ? 'bg-yellow-500' : 'bg-red-500'
+                        }`}
+                        style={{ width: `${stats.utilization}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
 
