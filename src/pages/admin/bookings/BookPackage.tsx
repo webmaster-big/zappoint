@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 
 // Types
 interface Attraction { name: string; price: number; unit?: string; }
+interface Room { name: string; capacity: number; price: number; }
 interface PromoOrGiftCard { name: string; code: string; description?: string; }
 interface Package {
   id: string;
@@ -11,6 +12,7 @@ interface Package {
   category: string;
   features: string;
   attractions: (string | { name: string; price: number; unit?: string })[];
+  rooms: (string | Room)[];
   price: string;
   maxParticipants: string;
   pricePerAdditional: string;
@@ -35,11 +37,40 @@ const TIME_SLOTS = [
 ];
 
 const BookPackage: React.FC = () => {
+  // Save booking to localStorage
+  const handlePayNow = () => {
+    if (!pkg) return;
+    const booking = {
+      packageId: pkg.id,
+      packageName: pkg.name,
+      participants,
+      date: selectedDate,
+      time: selectedTime,
+      duration: formatDuration(),
+      attractions: Object.entries(selectedAttractions).filter(([, qty]) => qty > 0).map(([name, qty]) => ({ name, qty })),
+      room: selectedRoom,
+      addOns: Object.entries(selectedAddOns).filter(([, qty]) => qty > 0).map(([name, qty]) => ({ name, qty })),
+      promo: appliedPromo ? appliedPromo.code : null,
+      giftCard: appliedGiftCard ? appliedGiftCard.code : null,
+      paymentMethod,
+      paymentType,
+      total,
+      customer: { ...form },
+      createdAt: new Date().toISOString(),
+    };
+    const bookings = JSON.parse(localStorage.getItem("zapzone_bookings") || "[]");
+    bookings.push(booking);
+    localStorage.setItem("zapzone_bookings", JSON.stringify(bookings));
+    // Optionally, show a confirmation or redirect
+    alert("Booking saved!");
+  };
   const { id } = useParams<{ id: string }>();
   const [pkg, setPkg] = useState<Package | null>(null);
   const [attractions, setAttractions] = useState<Attraction[]>([]);
+  const [rooms, setRooms] = useState<Room[]>([]);
   const [selectedAddOns, setSelectedAddOns] = useState<{ [name: string]: number }>({});
   const [selectedAttractions, setSelectedAttractions] = useState<{ [name: string]: number }>({});
+  const [selectedRoom, setSelectedRoom] = useState<string>("");
   const [promoCode, setPromoCode] = useState("");
   const [giftCardCode, setGiftCardCode] = useState("");
   const [appliedPromo, setAppliedPromo] = useState<PromoOrGiftCard | null>(null);
@@ -67,6 +98,7 @@ const BookPackage: React.FC = () => {
     const found = packages.find((p: Package) => p.id === id);
     setPkg(found || null);
     setAttractions(JSON.parse(localStorage.getItem("zapzone_attractions") || "[]"));
+    setRooms(JSON.parse(localStorage.getItem("zapzone_rooms") || "[]"));
   }, [id]);
 
   // Calculate available dates based on package availability
@@ -194,13 +226,15 @@ const BookPackage: React.FC = () => {
     }
     return sum + price * qty;
   }, 0);
+  // Rooms have no price/capacity, so no total
+  const roomsTotal = 0;
   
   // Promo and gift card discounts (simplified for demo)
   const promoDiscount = appliedPromo ? 10 : 0;
   const giftCardDiscount = appliedGiftCard ? 10 : 0;
   
   // Calculate subtotal and tax (Michigan tax rate: 6%)
-  const subtotal = basePrice + addOnsTotal + attractionsTotal;
+  const subtotal = basePrice + addOnsTotal + attractionsTotal + roomsTotal;
   const taxRate = 0.06; // Michigan tax
   const tax = (subtotal - promoDiscount - giftCardDiscount) * taxRate;
   const total = Math.max(0, subtotal - promoDiscount - giftCardDiscount + tax);
@@ -386,6 +420,36 @@ const BookPackage: React.FC = () => {
                               </button>
                             </div>
                           </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+                
+                {pkg.rooms && pkg.rooms.length > 0 && (
+                  <div className="border border-gray-200 rounded-xl p-5">
+                    <label className="block font-medium mb-3 text-gray-800 text-sm uppercase tracking-wide">Room Selection</label>
+                    <div className="space-y-2">
+                      {pkg.rooms.map((r) => {
+                        let room: { name: string };
+                        if (typeof r === "string") {
+                          room = { name: r };
+                        } else {
+                          const { name } = r as Room;
+                          room = { name };
+                        }
+                        return (
+                          <label key={room.name} className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg cursor-pointer">
+                            <input
+                              type="radio"
+                              name="roomSelection"
+                              value={room.name}
+                              checked={selectedRoom === room.name}
+                              onChange={() => setSelectedRoom(room.name)}
+                              className="accent-blue-800"
+                            />
+                            <span className="font-medium text-gray-800 text-sm">{room.name}</span>
+                          </label>
                         );
                       })}
                     </div>
@@ -657,7 +721,7 @@ const BookPackage: React.FC = () => {
                     </svg>
                     Back
                   </button>
-                  <button className="py-3 px-8 rounded-lg bg-blue-800 text-white font-medium hover:bg-blue-800 transition shadow-sm">
+                  <button className="py-3 px-8 rounded-lg bg-blue-800 text-white font-medium hover:bg-blue-800 transition shadow-sm" onClick={handlePayNow}>
                     Pay Now
                   </button>
                 </div>
@@ -737,6 +801,15 @@ const BookPackage: React.FC = () => {
                       </div>
                     );
                   })}
+                </div>
+              )}
+              
+              {selectedRoom && (
+                <div>
+                  <div className="font-medium text-gray-800 mb-2 text-sm">Room</div>
+                  <div className="flex justify-between text-gray-600 pl-2 text-xs mb-1">
+                    <span>{selectedRoom}</span>
+                  </div>
                 </div>
               )}
               

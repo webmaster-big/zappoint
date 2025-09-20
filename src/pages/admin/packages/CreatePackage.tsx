@@ -12,11 +12,11 @@ const initialAddOns = [
 ];
 const initialCategories = ["Birthday", "Special", "Event", "Arcade Party", "Corporate", "Other"];
 const initialRooms = [
-    { name: "Main Hall", capacity: 50, price: 1000 },
-    { name: "VIP Room", capacity: 20, price: 1500 },
-    { name: "Party Room A", capacity: 30, price: 800 },
-    { name: "Party Room B", capacity: 25, price: 700 },
-    { name: "Conference Room", capacity: 40, price: 1200 }
+    { name: "Main Hall" },
+    { name: "VIP Room" },
+    { name: "Party Room A" },
+    { name: "Party Room B" },
+    { name: "Conference Room" }
 ];
 
 // Get active promos and gift cards from localStorage
@@ -54,7 +54,7 @@ const CreatePackage: React.FC = () => {
     });
     const [addOns, setAddOns] = useState<{ name: string; price: number }[]>(() => JSON.parse(localStorage.getItem("zapzone_addons") || JSON.stringify(initialAddOns)));
     const [categories, setCategories] = useState<string[]>(() => JSON.parse(localStorage.getItem("zapzone_categories") || JSON.stringify(initialCategories)));
-    const [rooms, setRooms] = useState<{ name: string; capacity: number; price: number }[]>(() => JSON.parse(localStorage.getItem("zapzone_rooms") || JSON.stringify(initialRooms)));
+    const [rooms, setRooms] = useState<{ name: string }[]>(() => JSON.parse(localStorage.getItem("zapzone_rooms") || JSON.stringify(initialRooms)));
     const [promos, setPromos] = useState<{ name: string; code: string; description: string }[]>(getActivePromos);
     const [giftCards, setGiftCards] = useState<{ name: string; code: string; description: string }[]>(getActiveGiftCards);
 
@@ -177,9 +177,7 @@ const CreatePackage: React.FC = () => {
                 break;
             case 'room':
                 if (!rooms.some(r => r.name === value)) {
-                    const capacity = Number(extra) || 0;
-                    const price = Number(code) || 0;
-                    const updated = [...rooms, { name: value, capacity, price }];
+                    const updated = [...rooms, { name: value }];
                     setRooms(updated);
                     localStorage.setItem("zapzone_rooms", JSON.stringify(updated));
                     showToast("Room added!", "success");
@@ -628,7 +626,7 @@ const CreatePackage: React.FC = () => {
                                             className={`px-3 py-1 rounded-full border text-sm font-medium transition-all duration-150 hover:bg-blue-50 hover:border-blue-400/60 focus:outline-none focus:ring-2 focus:ring-blue-200 ${form.rooms.includes(room.name) ? "bg-blue-50 border-blue-400 text-blue-800" : "bg-white border-gray-200 text-neutral-800"}`}
                                             onClick={() => handleMultiSelect("rooms", room.name)}
                                         >
-                                            {room.name} <span className="text-xs text-gray-400 ml-1">${room.price} (Cap: {room.capacity})</span>
+                                            {room.name}
                                         </button>
                                     ))}
                                     <input
@@ -637,30 +635,12 @@ const CreatePackage: React.FC = () => {
                                         className="rounded-md border border-gray-200 px-2 py-1 w-24 bg-white text-sm transition-all placeholder:text-gray-400"
                                         id="room-name"
                                     />
-                                    <input
-                                        type="number"
-                                        placeholder="Capacity"
-                                        className="rounded-md border border-gray-200 px-2 py-1 w-20 bg-white text-sm transition-all placeholder:text-gray-400"
-                                        id="room-capacity"
-                                        min="1"
-                                    />
-                                    <input
-                                        type="number"
-                                        placeholder="Price"
-                                        className="rounded-md border border-gray-200 px-2 py-1 w-16 bg-white text-sm transition-all placeholder:text-gray-400"
-                                        id="room-price"
-                                        min="0"
-                                    />
                                     <button type="button" className="p-2 rounded-md hover:bg-blue-50 transition" title="Add room"
                                         onClick={() => {
                                             const nameInput = document.getElementById('room-name') as HTMLInputElement;
-                                            const capacityInput = document.getElementById('room-capacity') as HTMLInputElement;
-                                            const priceInput = document.getElementById('room-price') as HTMLInputElement;
                                             if (nameInput.value) {
-                                                handleAddOption('room', nameInput.value, priceInput.value, capacityInput.value);
+                                                handleAddOption('room', nameInput.value);
                                                 nameInput.value = '';
-                                                capacityInput.value = '';
-                                                priceInput.value = '';
                                             }
                                         }}
                                     >
@@ -916,7 +896,7 @@ const CreatePackage: React.FC = () => {
                             <div className="mb-2">
                                 <span className="font-semibold">Rooms:</span> <span className="text-neutral-800 text-sm">{(form.rooms || []).length ? form.rooms.map((room: string) => {
                                     const found = rooms.find(r => r.name === room);
-                                    return found ? `${found.name} ($${found.price}, Cap: ${found.capacity})` : room;
+                                    return found ? found.name : room;
                                 }).join(", ") : <span className='text-gray-300'>None</span>}</span>
                             </div>
                             <div className="mb-2">
