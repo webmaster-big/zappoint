@@ -211,7 +211,7 @@ const GiftCard: React.FC = () => {
               <p className="text-gray-500 mt-1">Create and manage gift cards for your customers</p>
             </div>
             <button
-              className="bg-blue-600 text-white rounded-lg px-4 py-2.5 flex items-center gap-2 hover:bg-blue-800 transition-colors shadow-sm"
+              className="bg-blue-800 text-white rounded-lg px-4 py-2.5 flex items-center gap-2 hover:bg-blue-800 transition-colors shadow-sm"
               onClick={() => setShowModal(true)}
             >
               <Plus className="w-5 h-5" /> New Gift Card
@@ -221,25 +221,25 @@ const GiftCard: React.FC = () => {
           {/* Filter Section */}
           <div className="mb-6 flex flex-wrap gap-2">
             <button 
-              className={`px-3 py-1.5 rounded-full text-sm ${filterStatus === "all" ? "bg-blue-100 text-blue-800" : "bg-gray-100 text-gray-600"}`}
+              className={`px-3 py-1.5 rounded-full text-sm ${filterStatus === "all" ? "bg-blue-100 text-blue-800" : "bg-gray-100 text-gray-800"}`}
               onClick={() => setFilterStatus("all")}
             >
               All
             </button>
             <button 
-              className={`px-3 py-1.5 rounded-full text-sm ${filterStatus === "active" ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-600"}`}
+              className={`px-3 py-1.5 rounded-full text-sm ${filterStatus === "active" ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"}`}
               onClick={() => setFilterStatus("active")}
             >
               Active
             </button>
             <button 
-              className={`px-3 py-1.5 rounded-full text-sm ${filterStatus === "inactive" ? "bg-gray-100 text-gray-800" : "bg-gray-100 text-gray-600"}`}
+              className={`px-3 py-1.5 rounded-full text-sm ${filterStatus === "inactive" ? "bg-gray-100 text-gray-800" : "bg-gray-100 text-gray-800"}`}
               onClick={() => setFilterStatus("inactive")}
             >
               Inactive
             </button>
             <button 
-              className={`px-3 py-1.5 rounded-full text-sm ${filterStatus === "expired" ? "bg-red-100 text-red-800" : "bg-gray-100 text-gray-600"}`}
+              className={`px-3 py-1.5 rounded-full text-sm ${filterStatus === "expired" ? "bg-red-100 text-red-800" : "bg-gray-100 text-gray-800"}`}
               onClick={() => setFilterStatus("expired")}
             >
               Expired
@@ -265,14 +265,14 @@ const GiftCard: React.FC = () => {
                       </div>
                       <div className="flex gap-1">
                         <button 
-                          className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-md"
+                          className="p-1.5 text-gray-500 hover:text-blue-800 hover:bg-blue-50 rounded-md"
                           onClick={() => openEditModal(originalIndex)}
                         >
                           <Edit2 className="w-4 h-4" />
                         </button>
                         {status === 'active' ? (
                           <button 
-                            className="p-1.5 text-gray-500 hover:text-yellow-600 hover:bg-yellow-50 rounded-md"
+                            className="p-1.5 text-gray-500 hover:text-yellow-800 hover:bg-yellow-50 rounded-md"
                             onClick={() => handleDeactivate(originalIndex)}
                             title="Deactivate"
                           >
@@ -280,7 +280,7 @@ const GiftCard: React.FC = () => {
                           </button>
                         ) : (
                           <button 
-                            className="p-1.5 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded-md"
+                            className="p-1.5 text-gray-500 hover:text-green-800 hover:bg-green-50 rounded-md"
                             onClick={() => handleActivate(originalIndex)}
                             title="Activate"
                           >
@@ -288,7 +288,7 @@ const GiftCard: React.FC = () => {
                           </button>
                         )}
                         <button 
-                          className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-md"
+                          className="p-1.5 text-gray-500 hover:text-red-800 hover:bg-red-50 rounded-md"
                           onClick={() => handleDelete(originalIndex)}
                           title="Delete"
                         >
@@ -355,7 +355,7 @@ const GiftCard: React.FC = () => {
               <div className="text-gray-400 mb-2">No gift cards found</div>
               <p className="text-gray-500 text-sm mb-4">Create your first gift card to get started</p>
               <button
-                className="bg-blue-600 text-white rounded-lg px-4 py-2 flex items-center gap-2 hover:bg-blue-800 transition-colors mx-auto shadow-sm"
+                className="bg-blue-800 text-white rounded-lg px-4 py-2 flex items-center gap-2 hover:bg-blue-800 transition-colors mx-auto shadow-sm"
                 onClick={() => setShowModal(true)}
               >
                 <Plus className="w-4 h-4" /> Create Gift Card
@@ -363,7 +363,6 @@ const GiftCard: React.FC = () => {
             </div>
           )}
         </div>
-
         {/* Create Modal */}
         {showModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 ">
@@ -450,7 +449,7 @@ const GiftCard: React.FC = () => {
                 </div>
                 <button 
                   type="submit" 
-                  className="w-full bg-blue-600 text-white py-2.5 rounded-lg font-medium mt-2 hover:bg-blue-800 transition-colors"
+                  className="w-full bg-blue-800 text-white py-2.5 rounded-lg font-medium mt-2 hover:bg-blue-800 transition-colors"
                 >
                   Create Gift Card
                 </button>
@@ -560,7 +559,7 @@ const GiftCard: React.FC = () => {
                 <div className="flex gap-3 mt-6">
                   <button 
                     onClick={handleEditSave} 
-                    className="flex-1 bg-blue-600 hover:bg-blue-800 text-white font-medium py-2.5 rounded-lg transition text-base"
+                    className="flex-1 bg-blue-800 hover:bg-blue-800 text-white font-medium py-2.5 rounded-lg transition text-base"
                   >
                     Save Changes
                   </button>
