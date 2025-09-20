@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Calendar,
   AlertTriangle,
@@ -16,16 +16,79 @@ import {
   X,
   Activity,
   Star,
+  Ticket,
 } from 'lucide-react';
 
 const AttendantDashboard: React.FC = () => {
    const [currentWeek, setCurrentWeek] = useState(new Date());
    const [selectedStatus, setSelectedStatus] = useState('all');
    const [calendarFilter, setCalendarFilter] = useState({
-     type: 'all', // 'all', 'package', 'activity'
-     value: '' // specific package/activity name
+     type: 'all', // 'all', 'package'
+     value: '' // specific package name
    });
    const [showFilterPanel, setShowFilterPanel] = useState(false);
+   const [recentPurchases, setRecentPurchases] = useState<any[]>([]);
+
+   // Load recent purchases from localStorage on component mount
+   useEffect(() => {
+     const loadPurchases = () => {
+       try {
+         // In a real app, this would come from your API or localStorage
+         const purchases = [
+           {
+             activity: "Cooper Zamora",
+             attractionName: "Cooper Zamora",
+             createdAt: "2025-09-19T21:47:35.564Z",
+             customerName: "Clark Raven Dalauta",
+             duration: "18 hours",
+             email: "dalautaclarkraven@gmail.com",
+             id: "purchase_1758318455563",
+             paymentMethod: "credit_card",
+             phone: "",
+             quantity: 3,
+             status: "confirmed",
+             totalAmount: 2304,
+             type: "attraction"
+           },
+           {
+             activity: "Laser Tag",
+             attractionName: "Laser Tag Arena",
+             createdAt: "2025-09-20T10:30:25.123Z",
+             customerName: "Sarah Johnson",
+             duration: "1 hour",
+             email: "sarahj@email.com",
+             id: "purchase_1758405025123",
+             paymentMethod: "paypal",
+             phone: "(555) 987-6543",
+             quantity: 2,
+             status: "confirmed",
+             totalAmount: 1200,
+             type: "attraction"
+           },
+           {
+             activity: "VR Experience",
+             attractionName: "Virtual Reality Zone",
+             createdAt: "2025-09-19T15:20:10.789Z",
+             customerName: "Mike Thompson",
+             duration: "45 minutes",
+             email: "mike.t@email.com",
+             id: "purchase_1758352810789",
+             paymentMethod: "credit_card",
+             phone: "(555) 456-7890",
+             quantity: 4,
+             status: "pending",
+             totalAmount: 1800,
+             type: "attraction"
+           }
+         ];
+         setRecentPurchases(purchases);
+       } catch (error) {
+         console.error('Error loading purchases:', error);
+       }
+     };
+
+     loadPurchases();
+   }, []);
 
    // Get dates for the current week
    const getWeekDates = (date: Date): Date[] => {
@@ -77,14 +140,6 @@ const AttendantDashboard: React.FC = () => {
        accent: 'bg-blue-100 text-blue-800',
      },
      {
-       title: 'Activities Scheduled',
-       value: '87',
-       change: 'Laser Tag most popular',
-       trend: 'up',
-       icon: Zap,
-       accent: 'bg-blue-100 text-blue-800',
-     },
-     {
        title: 'Packages Booked',
        value: '55',
        change: 'Corporate leading',
@@ -100,20 +155,25 @@ const AttendantDashboard: React.FC = () => {
        icon: DollarSign,
        accent: 'bg-blue-100 text-blue-800',
      },
+     {
+       title: 'Ticket Sales',
+       value: '87',
+       change: 'Laser Tag most popular',
+       trend: 'up',
+       icon: Ticket,
+       accent: 'bg-blue-100 text-blue-800',
+     },
    ];
 
-   // Bookings have real, fixed dates
+   // Bookings have real, fixed dates (only packages, no activities)
    const weeklyBookings = [
-     { id: 1, date: new Date('2025-09-16'), time: '9:00 AM', duration: 2, activity: 'Laser Tag', package: null, participants: 12, status: 'Confirmed', payment: 'Paid', customer: 'Tech Solutions Inc.', contact: 'John Smith', phone: '(555) 123-4567', email: 'john@techsolutions.com', amount: '$480', specialRequests: 'Team building event' },
-     { id: 2, date: new Date('2025-09-17'), time: '10:30 AM', duration: 1.5, activity: null, package: 'Adventure Package', participants: 6, status: 'Confirmed', payment: 'Paid', customer: 'Sarah Johnson', contact: 'Sarah Johnson', phone: '(555) 987-6543', email: 'sarahj@email.com', amount: '$180', specialRequests: 'Celebrating birthday' },
-     { id: 3, date: new Date('2025-09-18'), time: '12:00 PM', duration: 2, activity: 'Bowling', package: null, participants: 4, status: 'Pending', payment: 'Partial', customer: 'Mike Thompson', contact: 'Mike Thompson', phone: '(555) 456-7890', email: 'mike.t@email.com', amount: '$180', specialRequests: 'First time visitors' },
-     { id: 4, date: new Date('2025-09-16'), time: '2:00 PM', duration: 3, activity: null, package: 'Birthday Package', participants: 15, status: 'Confirmed', payment: 'Paid', customer: 'Lisa Williams', contact: 'Lisa Williams', phone: '(555) 234-5678', email: 'lisa.w@email.com', amount: '$450', specialRequests: 'Birthday cake will be brought in' },
-     { id: 5, date: new Date('2025-09-17'), time: '4:30 PM', duration: 2, activity: 'Bowling', package: null, participants: 8, status: 'Cancelled', payment: 'Refunded', customer: 'David Miller', contact: 'David Miller', phone: '(555) 876-5432', email: 'davidm@email.com', amount: '$200', specialRequests: 'Need two lanes' },
-     { id: 6, date: new Date('2025-09-20'), time: '11:00 AM', duration: 1.5, activity: null, package: 'Corporate Package', participants: 10, status: 'Confirmed', payment: 'Paid', customer: 'XYZ Corp', contact: 'Robert Brown', phone: '(555) 345-6789', email: 'rbrown@xyz.com', amount: '$800', specialRequests: 'Executive team' },
-     { id: 7, date: new Date('2025-09-19'), time: '3:00 PM', duration: 2, activity: 'Arcade', package: null, participants: 6, status: 'Confirmed', payment: 'Partial', customer: 'Jennifer Lee', contact: 'Jennifer Lee', phone: '(555) 765-4321', email: 'jennifer@email.com', amount: '$150', specialRequests: 'Family outing' },
-     // Additional bookings to demonstrate same time slots
-     { id: 8, date: new Date('2025-09-16'), time: '9:00 AM', duration: 1, activity: 'VR Experience', package: null, participants: 4, status: 'Confirmed', payment: 'Paid', customer: 'Innovate Tech', contact: 'Alex Johnson', phone: '(555) 111-2222', email: 'alex@innovatetech.com', amount: '$120', specialRequests: 'VR setup needed' },
-     { id: 9, date: new Date('2025-09-17'), time: '10:30 AM', duration: 2, activity: 'Escape Room', package: null, participants: 8, status: 'Confirmed', payment: 'Paid', customer: 'Team Builders Co.', contact: 'Maria Garcia', phone: '(555) 333-4444', email: 'maria@teambuilders.com', amount: '$240', specialRequests: 'Beginner level room' },
+     { id: 1, date: new Date('2025-09-16'), time: '9:00 AM', duration: 2, package: 'Corporate Package', participants: 12, status: 'Confirmed', payment: 'Paid', customer: 'Tech Solutions Inc.', contact: 'John Smith', phone: '(555) 123-4567', email: 'john@techsolutions.com', amount: '$480', specialRequests: 'Team building event' },
+     { id: 2, date: new Date('2025-09-17'), time: '10:30 AM', duration: 1.5, package: 'Adventure Package', participants: 6, status: 'Confirmed', payment: 'Paid', customer: 'Sarah Johnson', contact: 'Sarah Johnson', phone: '(555) 987-6543', email: 'sarahj@email.com', amount: '$180', specialRequests: 'Celebrating birthday' },
+     { id: 3, date: new Date('2025-09-18'), time: '12:00 PM', duration: 2, package: 'Family Package', participants: 4, status: 'Pending', payment: 'Partial', customer: 'Mike Thompson', contact: 'Mike Thompson', phone: '(555) 456-7890', email: 'mike.t@email.com', amount: '$180', specialRequests: 'First time visitors' },
+     { id: 4, date: new Date('2025-09-16'), time: '2:00 PM', duration: 3, package: 'Birthday Package', participants: 15, status: 'Confirmed', payment: 'Paid', customer: 'Lisa Williams', contact: 'Lisa Williams', phone: '(555) 234-5678', email: 'lisa.w@email.com', amount: '$450', specialRequests: 'Birthday cake will be brought in' },
+     { id: 5, date: new Date('2025-09-17'), time: '4:30 PM', duration: 2, package: 'Group Package', participants: 8, status: 'Cancelled', payment: 'Refunded', customer: 'David Miller', contact: 'David Miller', phone: '(555) 876-5432', email: 'davidm@email.com', amount: '$200', specialRequests: 'Need two lanes' },
+     { id: 6, date: new Date('2025-09-20'), time: '11:00 AM', duration: 1.5, package: 'Corporate Package', participants: 10, status: 'Confirmed', payment: 'Paid', customer: 'XYZ Corp', contact: 'Robert Brown', phone: '(555) 345-6789', email: 'rbrown@xyz.com', amount: '$800', specialRequests: 'Executive team' },
+     { id: 7, date: new Date('2025-09-19'), time: '3:00 PM', duration: 2, package: 'Family Package', participants: 6, status: 'Confirmed', payment: 'Partial', customer: 'Jennifer Lee', contact: 'Jennifer Lee', phone: '(555) 765-4321', email: 'jennifer@email.com', amount: '$150', specialRequests: 'Family outing' },
    ];
 
    // Only show bookings for the current week in the calendar and table
@@ -121,11 +181,7 @@ const AttendantDashboard: React.FC = () => {
      return weekDates.some(date => date.toDateString() === booking.date.toDateString());
    });
 
-   // Get unique activities and packages for filter options
-   const allActivities = Array.from(new Set(weeklyBookings
-     .map(booking => booking.activity)
-     .filter(activity => activity !== null))) as string[];
-   
+   // Get unique packages for filter options
    const allPackages = Array.from(new Set(weeklyBookings
      .map(booking => booking.package)
      .filter(pkg => pkg !== null))) as string[];
@@ -133,7 +189,6 @@ const AttendantDashboard: React.FC = () => {
    // Apply calendar filter
    const filteredCalendarBookings = bookingsThisWeek.filter(booking => {
      if (calendarFilter.type === 'all') return true;
-     if (calendarFilter.type === 'activity' && booking.activity === calendarFilter.value) return true;
      if (calendarFilter.type === 'package' && booking.package === calendarFilter.value) return true;
      return false;
    });
@@ -193,6 +248,9 @@ const AttendantDashboard: React.FC = () => {
      Confirmed: 'bg-emerald-100 text-emerald-800',
      Pending: 'bg-amber-100 text-amber-800',
      Cancelled: 'bg-rose-100 text-rose-800',
+     confirmed: 'bg-emerald-100 text-emerald-800',
+     pending: 'bg-amber-100 text-amber-800',
+     cancelled: 'bg-rose-100 text-rose-800',
    };
 
    // Payment status colors
@@ -200,6 +258,9 @@ const AttendantDashboard: React.FC = () => {
      Paid: 'bg-emerald-100 text-emerald-800',
      Partial: 'bg-amber-100 text-amber-800',
      Refunded: 'bg-rose-100 text-rose-800',
+     credit_card: 'bg-blue-100 text-blue-800',
+     paypal: 'bg-blue-100 text-blue-800',
+     cash: 'bg-gray-100 text-gray-800',
    };
 
    // Filter bookings by status for the table
@@ -210,6 +271,18 @@ const AttendantDashboard: React.FC = () => {
    // Clear calendar filter
    const clearCalendarFilter = () => {
      setCalendarFilter({ type: 'all', value: '' });
+   };
+
+   // Format date for display
+   const formatDate = (dateString: string) => {
+     const date = new Date(dateString);
+     return date.toLocaleDateString('en-US', { 
+       year: 'numeric', 
+       month: 'short', 
+       day: 'numeric',
+       hour: '2-digit',
+       minute: '2-digit'
+     });
    };
 
    return (
@@ -328,32 +401,6 @@ const AttendantDashboard: React.FC = () => {
                  <div className="flex items-center">
                    <input
                      type="radio"
-                     id="filter-activity"
-                     name="calendar-filter"
-                     checked={calendarFilter.type === 'activity'}
-                     onChange={() => setCalendarFilter({ type: 'activity', value: allActivities[0] || '' })}
-                     className="mr-2"
-                   />
-                   <label htmlFor="filter-activity" className="text-sm text-gray-800 mr-2">
-                     By Activity
-                   </label>
-                   
-                   {calendarFilter.type === 'activity' && (
-                     <select
-                       value={calendarFilter.value}
-                       onChange={(e) => setCalendarFilter({ type: 'activity', value: e.target.value })}
-                       className="px-2 py-1 border border-gray-300 rounded text-sm"
-                     >
-                       {allActivities.map(activity => (
-                         <option key={activity} value={activity}>{activity}</option>
-                       ))}
-                     </select>
-                   )}
-                 </div>
-                 
-                 <div className="flex items-center">
-                   <input
-                     type="radio"
                      id="filter-package"
                      name="calendar-filter"
                      checked={calendarFilter.type === 'package'}
@@ -390,7 +437,7 @@ const AttendantDashboard: React.FC = () => {
                
                {calendarFilter.type !== 'all' && (
                  <div className="mt-3 text-sm text-gray-600">
-                   Showing: {calendarFilter.type === 'activity' ? 'Activity' : 'Package'} - {calendarFilter.value}
+                   Showing: Package - {calendarFilter.value}
                  </div>
                )}
              </div>
@@ -438,7 +485,7 @@ const AttendantDashboard: React.FC = () => {
                                    }`}
                                  >
                                    <div className="font-medium text-gray-900 text-xs">
-                                     {booking.activity || booking.package}
+                                     {booking.package}
                                    </div>
                                    <div className="text-xs text-gray-800 mt-1">
                                      {booking.customer}
@@ -501,7 +548,7 @@ const AttendantDashboard: React.FC = () => {
                  <Star className="w-6 h-6 text-yellow-400" />
                  <div className="flex-1">
                    <h4 className="font-semibold text-gray-900 text-base">New Booking</h4>
-                   <p className="text-sm text-gray-800">Laser Tag - Corporate Event</p>
+                   <p className="text-sm text-gray-800">Corporate Package - Team Event</p>
                    <p className="text-xs text-gray-400 mt-1">Tech Solutions Inc.</p>
                  </div>
                  <div className="text-right min-w-[90px]">
@@ -527,7 +574,7 @@ const AttendantDashboard: React.FC = () => {
                  <AlertTriangle className="w-6 h-6 text-amber-800" />
                  <div className="flex-1">
                    <h4 className="font-semibold text-gray-900 text-base">Booking Updated</h4>
-                   <p className="text-sm text-gray-800">VR Experience - Time change</p>
+                   <p className="text-sm text-gray-800">Family Package - Time change</p>
                    <p className="text-xs text-gray-400 mt-1">Mike Thompson</p>
                  </div>
                  <div className="text-right min-w-[90px]">
@@ -536,6 +583,95 @@ const AttendantDashboard: React.FC = () => {
                  </div>
                </div>
              </div>
+           </div>
+         </div>
+
+         {/* Recent Attraction Ticket Purchases */}
+         <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+           <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
+             <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+               <Ticket className="w-5 h-5 text-blue-800" /> Recent Attraction Ticket Purchases
+             </h2>
+             <div className="flex flex-wrap gap-2 mt-4 md:mt-0">
+               <div className="relative">
+                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
+                 <input
+                   type="text"
+                   placeholder="Search purchases..."
+                   className="pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+                 />
+               </div>
+               <select 
+                 value={selectedStatus}
+                 onChange={(e) => setSelectedStatus(e.target.value)}
+                 className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+               >
+                 <option value="all">All Statuses</option>
+                 <option value="confirmed">Confirmed</option>
+                 <option value="pending">Pending</option>
+                 <option value="cancelled">Cancelled</option>
+               </select>
+               <button className="px-3 py-2 border border-gray-200 rounded-lg text-sm flex items-center">
+                 <Filter size={16} className="mr-1" />
+                 Filter
+               </button>
+             </div>
+           </div>
+          
+           <div className="overflow-x-auto">
+             <table className="w-full text-sm text-left">
+               <thead className="text-xs text-gray-800 uppercase bg-gray-50 border-b">
+                 <tr>
+                   <th className="px-4 py-3 font-medium">Customer</th>
+                   <th className="px-4 py-3 font-medium">Attraction</th>
+                   <th className="px-4 py-3 font-medium">Date</th>
+                   <th className="px-4 py-3 font-medium">Duration</th>
+                   <th className="px-4 py-3 font-medium">Quantity</th>
+                   <th className="px-4 py-3 font-medium">Payment Method</th>
+                   <th className="px-4 py-3 font-medium">Status</th>
+                   <th className="px-4 py-3 font-medium">Amount</th>
+                 </tr>
+               </thead>
+               <tbody className="divide-y divide-gray-100">
+                 {recentPurchases.length > 0 ? recentPurchases.map((purchase, index) => (
+                   <tr key={purchase.id || index} className="hover:bg-gray-50">
+                     <td className="px-4 py-3">
+                       <div>
+                         <div className="font-medium text-gray-900">{purchase.customerName}</div>
+                         <div className="text-xs text-gray-800">{purchase.email}</div>
+                         {purchase.phone && <div className="text-xs text-gray-800">{purchase.phone}</div>}
+                       </div>
+                     </td>
+                     <td className="px-4 py-3">
+                       <div className="font-medium text-gray-900">{purchase.attractionName}</div>
+                       <div className="text-xs text-gray-800">{purchase.activity}</div>
+                     </td>
+                     <td className="px-4 py-3">
+                       {formatDate(purchase.createdAt)}
+                     </td>
+                     <td className="px-4 py-3">{purchase.duration}</td>
+                     <td className="px-4 py-3">{purchase.quantity}</td>
+                     <td className="px-4 py-3">
+                       <span className={`px-2 py-1 text-xs font-medium rounded-full ${paymentColors[purchase.paymentMethod as keyof typeof paymentColors] || 'bg-gray-100 text-gray-800'}`}>
+                         {purchase.paymentMethod.replace('_', ' ').toUpperCase()}
+                       </span>
+                     </td>
+                     <td className="px-4 py-3">
+                       <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusColors[purchase.status as keyof typeof statusColors]}`}>
+                         {purchase.status.toUpperCase()}
+                       </span>
+                     </td>
+                     <td className="px-4 py-3 font-medium">${purchase.totalAmount}</td>
+                   </tr>
+                 )) : (
+                   <tr>
+                     <td colSpan={8} className="px-4 py-3 text-center text-gray-800">
+                       No recent purchases found.
+                     </td>
+                   </tr>
+                 )}
+               </tbody>
+             </table>
            </div>
          </div>
 
@@ -575,7 +711,6 @@ const AttendantDashboard: React.FC = () => {
                  <tr>
                    <th className="px-4 py-3 font-medium w-32">Date & Time</th>
                    <th className="px-4 py-3 font-medium w-48">Customer</th>
-                   <th className="px-4 py-3 font-medium w-32">Activity</th>
                    <th className="px-4 py-3 font-medium w-40">Package</th>
                    <th className="px-4 py-3 font-medium w-20">Participants</th>
                    <th className="px-4 py-3 font-medium w-24">Status</th>
@@ -598,9 +733,6 @@ const AttendantDashboard: React.FC = () => {
                          <div className="font-medium text-gray-900">{booking.customer}</div>
                          <div className="text-xs text-gray-800">{booking.contact}</div>
                        </div>
-                     </td>
-                     <td className="px-4 py-3">
-                       {booking.activity || <span className="text-gray-400">-</span>}
                      </td>
                      <td className="px-4 py-3">
                        {booking.package || <span className="text-gray-400">-</span>}
@@ -630,7 +762,7 @@ const AttendantDashboard: React.FC = () => {
                    </tr>
                  )) : (
                    <tr>
-                     <td colSpan={9} className="px-4 py-3 text-center text-gray-800">
+                     <td colSpan={8} className="px-4 py-3 text-center text-gray-800">
                        No bookings found.
                      </td>
                    </tr>
