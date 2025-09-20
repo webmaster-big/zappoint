@@ -29,12 +29,32 @@ interface Package {
   availableMonthDays: string[];
 }
 
-// Time slots for booking
-const TIME_SLOTS = [
-  "9:00 AM", "10:00 AM", "11:00 AM", "12:00 PM", 
-  "1:00 PM", "2:00 PM", "3:00 PM", "4:00 PM", 
-  "5:00 PM", "6:00 PM", "7:00 PM", "8:00 PM"
-];
+interface Booking {
+  packageId: string;
+  date: string;
+  time: string;
+  duration: string;
+  room: string;
+  status?: string;
+}
+
+// Generate time slots from 8am to 12am (midnight) in 1-hour increments
+const generateTimeSlots = () => {
+  const slots = [];
+  for (let hour = 8; hour <= 23; hour++) {
+    for (let min = 0; min < 60; min += 30) {
+      // End at 11:40 PM
+      if (hour === 23 && min > 40) break;
+      const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+      const period = hour < 12 ? "AM" : "PM";
+      const displayMin = min.toString().padStart(2, '0');
+      slots.push(`${displayHour}:${displayMin} ${period}`);
+    }
+  }
+  return slots;
+};
+
+const TIME_SLOTS = generateTimeSlots();
 
 const BookPackage: React.FC = () => {
   // Save booking to localStorage
@@ -57,6 +77,7 @@ const BookPackage: React.FC = () => {
       total,
       customer: { ...form },
       createdAt: new Date().toISOString(),
+      status: "booked" // Add status to booking
     };
     const bookings = JSON.parse(localStorage.getItem("zapzone_bookings") || "[]");
     bookings.push(booking);
@@ -146,19 +167,82 @@ const BookPackage: React.FC = () => {
     }
   }, [pkg, selectedDate]);
 
-  // Set available times when date is selected
+  // Calculate available times when date or room is selected
   useEffect(() => {
-    if (selectedDate) {
-      // For demo purposes, all time slots are available
-      // In a real app, you might check against existing bookings
-      setAvailableTimes(TIME_SLOTS);
+    if (!pkg || !selectedDate || !selectedRoom) return;
+    
+    // Get all existing bookings
+    const existingBookings: Booking[] = JSON.parse(localStorage.getItem("zapzone_bookings") || "[]");
+    
+    // Filter bookings for the same date and room with status not "checked-in"
+    const conflictingBookings = existingBookings.filter(booking => 
+      booking.date === selectedDate && 
+      booking.room === selectedRoom && 
+      booking.status !== "checked-in"
+    );
+    
+    // Calculate package duration in minutes
+    const durationMinutes = pkg.durationUnit === "hours" 
+      ? parseInt(pkg.duration) * 60 
+      : parseInt(pkg.duration);
+    
+    // Check each time slot for availability
+    const availableSlots = TIME_SLOTS.filter(timeSlot => {
+      // Convert time slot to minutes since start of day
+      const [time, period] = timeSlot.split(" ");
+      const [hoursStr] = time.split(":");
+      let hours = parseInt(hoursStr);
       
-      // Set default selected time to first available time
-      if (TIME_SLOTS.length > 0 && !selectedTime) {
-        setSelectedTime(TIME_SLOTS[0]);
-      }
+      if (period === "PM" && hours !== 12) hours += 12;
+      if (period === "AM" && hours === 12) hours = 0;
+      
+      const slotStartMinutes = hours * 60;
+      const slotEndMinutes = slotStartMinutes + durationMinutes;
+      
+      // Check if this slot conflicts with any existing booking
+      const hasConflict = conflictingBookings.some(booking => {
+        // Parse booking time
+        const [bookingTime, bookingPeriod] = booking.time.split(" ");
+        const [bookingHoursStr] = bookingTime.split(":");
+        let bookingHours = parseInt(bookingHoursStr);
+        
+        if (bookingPeriod === "PM" && bookingHours !== 12) bookingHours += 12;
+        if (bookingPeriod === "AM" && bookingHours === 12) bookingHours = 0;
+        
+        const bookingStartMinutes = bookingHours * 60;
+        
+        // Parse booking duration
+        const bookingDurationMatch = booking.duration.match(/(\d+)\s*(hours|minutes|hrs|hr)/i);
+        let bookingDurationMinutes = 60; // Default to 1 hour if parsing fails
+        
+        if (bookingDurationMatch) {
+          const value = parseInt(bookingDurationMatch[1]);
+          const unit = bookingDurationMatch[2].toLowerCase();
+          bookingDurationMinutes = unit.includes("hour") ? value * 60 : value;
+        }
+        
+        const bookingEndMinutes = bookingStartMinutes + bookingDurationMinutes;
+        
+        // Check for time overlap
+        return (
+          (slotStartMinutes >= bookingStartMinutes && slotStartMinutes < bookingEndMinutes) ||
+          (slotEndMinutes > bookingStartMinutes && slotEndMinutes <= bookingEndMinutes) ||
+          (slotStartMinutes <= bookingStartMinutes && slotEndMinutes >= bookingEndMinutes)
+        );
+      });
+      
+      return !hasConflict;
+    });
+    
+    setAvailableTimes(availableSlots);
+    
+    // If current selected time is not available, reset it
+    if (selectedTime && !availableSlots.includes(selectedTime)) {
+      setSelectedTime(availableSlots[0] || "");
+    } else if (!selectedTime && availableSlots.length > 0) {
+      setSelectedTime(availableSlots[0]);
     }
-  }, [selectedDate, selectedTime]);
+  }, [selectedDate, selectedRoom, pkg, selectedTime]);
 
   // Handle add-on/attraction quantity change
   const handleAddOnQty = (name: string, qty: number) => {
@@ -288,6 +372,37 @@ const BookPackage: React.FC = () => {
           <div className="space-y-6 bg-white rounded-xl shadow-sm p-6 border border-gray-100">
             {currentStep === 1 ? (
               <>
+                {/* Room Selection - Moved to top */}
+                {pkg.rooms && pkg.rooms.length > 0 && (
+                  <div className="border border-gray-200 rounded-xl p-5">
+                    <label className="block font-medium mb-3 text-gray-800 text-sm uppercase tracking-wide">Room Selection</label>
+                    <div className="space-y-2">
+                      {pkg.rooms.map((r) => {
+                        let room: { name: string };
+                        if (typeof r === "string") {
+                          room = { name: r };
+                        } else {
+                          const { name } = r as Room;
+                          room = { name };
+                        }
+                        return (
+                          <label key={room.name} className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg cursor-pointer">
+                            <input
+                              type="radio"
+                              name="roomSelection"
+                              value={room.name}
+                              checked={selectedRoom === room.name}
+                              onChange={() => setSelectedRoom(room.name)}
+                              className="accent-blue-800"
+                            />
+                            <span className="font-medium text-gray-800 text-sm">{room.name}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+                
                 {/* Date and Time Selection */}
                 <div className="bg-blue-50 p-5 rounded-xl">
                   <h3 className="font-medium mb-4 text-gray-800 text-sm uppercase tracking-wide">Select Date & Time</h3>
@@ -314,11 +429,22 @@ const BookPackage: React.FC = () => {
                         value={selectedTime}
                         onChange={(e) => setSelectedTime(e.target.value)}
                         className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                        disabled={!selectedRoom || availableTimes.length === 0}
                       >
-                        {availableTimes.map((time) => (
-                          <option key={time} value={time}>{time}</option>
-                        ))}
+                        {availableTimes.length > 0 ? (
+                          availableTimes.map((time) => (
+                            <option key={time} value={time}>{time}</option>
+                          ))
+                        ) : (
+                          <option value="">Select a room first</option>
+                        )}
                       </select>
+                      {!selectedRoom && (
+                        <p className="text-xs text-red-500 mt-1">Please select a room to see available times</p>
+                      )}
+                      {selectedRoom && availableTimes.length === 0 && (
+                        <p className="text-xs text-red-500 mt-1">No available times for this room on the selected date</p>
+                      )}
                     </div>
                   </div>
                   
@@ -426,36 +552,6 @@ const BookPackage: React.FC = () => {
                   </div>
                 )}
                 
-                {pkg.rooms && pkg.rooms.length > 0 && (
-                  <div className="border border-gray-200 rounded-xl p-5">
-                    <label className="block font-medium mb-3 text-gray-800 text-sm uppercase tracking-wide">Room Selection</label>
-                    <div className="space-y-2">
-                      {pkg.rooms.map((r) => {
-                        let room: { name: string };
-                        if (typeof r === "string") {
-                          room = { name: r };
-                        } else {
-                          const { name } = r as Room;
-                          room = { name };
-                        }
-                        return (
-                          <label key={room.name} className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg cursor-pointer">
-                            <input
-                              type="radio"
-                              name="roomSelection"
-                              value={room.name}
-                              checked={selectedRoom === room.name}
-                              onChange={() => setSelectedRoom(room.name)}
-                              className="accent-blue-800"
-                            />
-                            <span className="font-medium text-gray-800 text-sm">{room.name}</span>
-                          </label>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-                
                 {pkg.addOns && pkg.addOns.length > 0 && (
                   <div className="border border-gray-200 rounded-xl p-5">
                     <label className="block font-medium mb-3 text-gray-800 text-sm uppercase tracking-wide">Add-ons</label>
@@ -556,6 +652,7 @@ const BookPackage: React.FC = () => {
                   <button 
                     className="py-3 px-6 rounded-lg bg-blue-800 text-white font-medium hover:bg-blue-800 transition shadow-sm flex items-center"
                     onClick={() => setCurrentStep(2)}
+                    disabled={!selectedRoom || !selectedTime}
                   >
                     Continue to Personal Info
                     <svg className="ml-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
