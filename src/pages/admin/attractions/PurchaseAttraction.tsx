@@ -205,15 +205,13 @@ const PurchaseAttraction = () => {
                       </button>
                       <span className="text-2xl font-bold w-12 text-center">{quantity}</span>
                       <button
-                        onClick={() => setQuantity(Math.min(attraction.maxCapacity, quantity + 1))}
+                        onClick={() => setQuantity(quantity + 1)}
                         className="w-12 h-12 rounded-full bg-gray-100 text-gray-800 flex items-center justify-center text-xl hover:bg-gray-200"
                       >
                         +
                       </button>
                     </div>
-                    <p className="text-center text-sm text-gray-500 mt-2">
-                      Max participants per activity: {attraction.maxCapacity}
-                    </p>
+                    {/* No max participants limit */}
                   </div>
                   
                   <div className="flex justify-end">

@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Calendar, Clock, Users, CreditCard, Gift, Tag, Plus, Minus } from 'lucide-react';
 
-// Types
+// Types (unchanged)
 interface Package {
   id: string;
   name: string;
@@ -279,7 +279,7 @@ const OnsiteBooking: React.FC = () => {
       selectedAttractions: [],
       selectedAddOns: []
     }));
-    setStep(2); // Move directly to step 2 after selecting a package
+    setStep(2); // Move directly to step 2 (Date & Time) after selecting a package
   };
 
   const handleAttractionToggle = (attractionId: string) => {
@@ -491,7 +491,107 @@ const OnsiteBooking: React.FC = () => {
     </div>
   );
 
+  // STEP 2: Date & Time (swapped with add-ons)
   const renderStep2 = () => (
+    <div className="space-y-6">
+      <h2 className="text-2xl font-bold text-gray-900">Select Date & Time</h2>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Date Selection */}
+        <div>
+          <label className="block text-sm font-medium text-gray-800 mb-2">
+            <Calendar className="inline mr-2 h-4 w-4" />
+            Select Date
+          </label>
+          <select
+            name="date"
+            value={bookingData.date}
+            onChange={handleInputChange}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400"
+            required
+          >
+            <option value="">Select a date</option>
+            {availableDates.map(date => (
+              <option key={date.toISOString()} value={date.toISOString().split('T')[0]}>
+                {date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+              </option>
+            ))}
+          </select>
+        </div>
+        
+        {/* Time Selection */}
+        <div>
+          <label className="block text-sm font-medium text-gray-800 mb-2">
+            <Clock className="inline mr-2 h-4 w-4" />
+            Select Time
+          </label>
+          <select
+            name="time"
+            value={bookingData.time}
+            onChange={handleInputChange}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400"
+            required
+          >
+            <option value="">Select a time</option>
+            {availableTimes.map(time => (
+              <option key={time} value={time}>{time}</option>
+            ))}
+          </select>
+        </div>
+        
+        {/* Participants */}
+        <div>
+          <label className="block text-sm font-medium text-gray-800 mb-2">
+            <Users className="inline mr-2 h-4 w-4" />
+            Number of Participants
+          </label>
+          <input
+            type="number"
+            name="participants"
+            min="1"
+            max={selectedPackage?.maxParticipants || 50}
+            value={bookingData.participants}
+            onChange={handleInputChange}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400"
+            required
+          />
+        </div>
+
+        {/* Duration Display */}
+        {selectedPackage && (
+          <div>
+            <label className="block text-sm font-medium text-gray-800 mb-2">
+              <Clock className="inline mr-2 h-4 w-4" />
+              Duration
+            </label>
+            <div className="w-full border border-gray-300 rounded-lg px-3 py-2 bg-gray-50">
+              <span className="text-gray-800">{formatDuration(selectedPackage)}</span>
+            </div>
+          </div>
+        )}
+      </div>
+      
+      <div className="flex justify-between">
+        <button
+          type="button"
+          onClick={() => setStep(1)}
+          className="bg-gray-200 text-gray-800 px-6 py-3 rounded-lg hover:bg-gray-300"
+        >
+          Back to Packages
+        </button>
+        <button
+          type="button"
+          onClick={() => setStep(3)}
+          className="bg-blue-800 text-white px-6 py-3 rounded-lg hover:bg-blue-800"
+        >
+          Continue to Attractions & Add-ons
+        </button>
+      </div>
+    </div>
+  );
+
+  // STEP 3: Attractions & Add-ons (swapped with date & time)
+  const renderStep3 = () => (
     <div className="space-y-8">
       <h2 className="text-2xl font-bold text-gray-900">Add Attractions & Add-ons</h2>
       
@@ -626,108 +726,10 @@ const OnsiteBooking: React.FC = () => {
       <div className="flex justify-between">
         <button
           type="button"
-          onClick={() => setStep(1)}
-          className="bg-gray-200 text-gray-800 px-6 py-3 rounded-lg hover:bg-gray-300"
-        >
-          Back to Packages
-        </button>
-        <button
-          type="button"
-          onClick={() => setStep(3)}
-          className="bg-blue-800 text-white px-6 py-3 rounded-lg hover:bg-blue-800"
-        >
-          Continue to Date & Time
-        </button>
-      </div>
-    </div>
-  );
-
-  const renderStep3 = () => (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-gray-900">Select Date & Time</h2>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Date Selection */}
-        <div>
-          <label className="block text-sm font-medium text-gray-800 mb-2">
-            <Calendar className="inline mr-2 h-4 w-4" />
-            Select Date
-          </label>
-          <select
-            name="date"
-            value={bookingData.date}
-            onChange={handleInputChange}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400"
-            required
-          >
-            <option value="">Select a date</option>
-            {availableDates.map(date => (
-              <option key={date.toISOString()} value={date.toISOString().split('T')[0]}>
-                {date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
-              </option>
-            ))}
-          </select>
-        </div>
-        
-        {/* Time Selection */}
-        <div>
-          <label className="block text-sm font-medium text-gray-800 mb-2">
-            <Clock className="inline mr-2 h-4 w-4" />
-            Select Time
-          </label>
-          <select
-            name="time"
-            value={bookingData.time}
-            onChange={handleInputChange}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400"
-            required
-          >
-            <option value="">Select a time</option>
-            {availableTimes.map(time => (
-              <option key={time} value={time}>{time}</option>
-            ))}
-          </select>
-        </div>
-        
-        {/* Participants */}
-        <div>
-          <label className="block text-sm font-medium text-gray-800 mb-2">
-            <Users className="inline mr-2 h-4 w-4" />
-            Number of Participants
-          </label>
-          <input
-            type="number"
-            name="participants"
-            min="1"
-            max={selectedPackage?.maxParticipants || 50}
-            value={bookingData.participants}
-            onChange={handleInputChange}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400"
-            required
-          />
-        </div>
-
-        {/* Duration Display */}
-        {selectedPackage && (
-          <div>
-            <label className="block text-sm font-medium text-gray-800 mb-2">
-              <Clock className="inline mr-2 h-4 w-4" />
-              Duration
-            </label>
-            <div className="w-full border border-gray-300 rounded-lg px-3 py-2 bg-gray-50">
-              <span className="text-gray-800">{formatDuration(selectedPackage)}</span>
-            </div>
-          </div>
-        )}
-      </div>
-      
-      <div className="flex justify-between">
-        <button
-          type="button"
           onClick={() => setStep(2)}
           className="bg-gray-200 text-gray-800 px-6 py-3 rounded-lg hover:bg-gray-300"
         >
-          Back to Attractions & Add-ons
+          Back to Date & Time
         </button>
         <button
           type="button"
@@ -845,7 +847,7 @@ const OnsiteBooking: React.FC = () => {
           onClick={() => setStep(3)}
           className="bg-gray-200 text-gray-800 px-6 py-3 rounded-lg hover:bg-gray-300"
         >
-          Back to Date & Time
+          Back to Attractions & Add-ons
         </button>
         <button
           type="button"
@@ -977,7 +979,7 @@ const OnsiteBooking: React.FC = () => {
         <h1 className="text-3xl font-bold text-gray-900 ml-4">On-site Booking</h1>
       </div>
       
-      {/* Progress Steps */}
+      {/* Progress Steps - Updated labels */}
       <div className="mb-8 px-4">
         <div className="flex justify-between mb-2">
           {[1, 2, 3, 4, 5].map(stepNum => (
@@ -991,8 +993,8 @@ const OnsiteBooking: React.FC = () => {
         </div>
         <div className="flex justify-between text-xs text-gray-800">
           <span>Package</span>
-          <span>Add-ons</span>
           <span>Date & Time</span>
+          <span>Add-ons</span>
           <span>Customer</span>
           <span>Payment</span>
         </div>
@@ -1001,8 +1003,8 @@ const OnsiteBooking: React.FC = () => {
       {/* Form */}
       <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-sm p-6">
         {step === 1 && renderStep1()}
-        {step === 2 && renderStep2()}
-        {step === 3 && renderStep3()}
+        {step === 2 && renderStep2()} {/* Now Date & Time */}
+        {step === 3 && renderStep3()} {/* Now Attractions & Add-ons */}
         {step === 4 && renderStep4()}
         {step === 5 && renderStep5()}
       </form>

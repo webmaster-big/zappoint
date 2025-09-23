@@ -53,7 +53,7 @@ const ManagePurchases = () => {
 
   // Status colors and icons
   const statusConfig = {
-    confirmed: { color: 'bg-green-100 text-green-800', icon: CheckCircle },
+    confirmed: { color: 'bg-blue-100 text-blue-800', icon: CheckCircle },
     pending: { color: 'bg-yellow-100 text-yellow-800', icon: Clock },
     cancelled: { color: 'bg-red-100 text-red-800', icon: XCircle },
     refunded: { color: 'bg-blue-100 text-blue-800', icon: CheckCircle }
@@ -72,7 +72,7 @@ const ManagePurchases = () => {
       title: 'Total Revenue',
       value: `$${purchases.reduce((sum, p) => sum + p.totalAmount, 0).toFixed(2)}`,
       change: 'All time revenue',
-      accent: 'bg-green-100 text-green-800',
+      accent: 'bg-blue-100 text-blue-800',
       icon: CheckCircle,
     },
     {
@@ -81,14 +81,14 @@ const ManagePurchases = () => {
         ? `$${(purchases.reduce((sum, p) => sum + p.totalAmount, 0) / purchases.length).toFixed(2)}` 
         : '$0.00',
       change: 'Per transaction',
-      accent: 'bg-purple-100 text-purple-800',
+      accent: 'bg-blue-100 text-blue-800',
       icon: Download,
     },
     {
       title: 'Unique Customers',
       value: new Set(purchases.map(p => p.email)).size.toString(),
       change: 'Total customers',
-      accent: 'bg-orange-100 text-orange-800',
+      accent: 'bg-blue-100 text-blue-800',
       icon: User,
     }
   ];
@@ -392,7 +392,7 @@ const ManagePurchases = () => {
         <div className="mt-4 sm:mt-0 flex gap-2">
           <button
             onClick={exportToCSV}
-            className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
           >
             <Download className="h-5 w-5 mr-2" />
             Export CSV

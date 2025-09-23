@@ -316,11 +316,9 @@ const BookPackage: React.FC = () => {
   const promoDiscount = appliedPromo ? 10 : 0;
   const giftCardDiscount = appliedGiftCard ? 10 : 0;
   
-  // Calculate subtotal and tax (Michigan tax rate: 6%)
+  // Calculate subtotal and total (no tax)
   const subtotal = basePrice + addOnsTotal + attractionsTotal + roomsTotal;
-  const taxRate = 0.06; // Michigan tax
-  const tax = (subtotal - promoDiscount - giftCardDiscount) * taxRate;
-  const total = Math.max(0, subtotal - promoDiscount - giftCardDiscount + tax);
+  const total = Math.max(0, subtotal - promoDiscount - giftCardDiscount);
   const partialAmount = Math.round(total * 0.2 * 100) / 100;
 
   if (!pkg) return <div className="p-8 text-center text-gray-500">Package not found.</div>;
@@ -947,11 +945,6 @@ const BookPackage: React.FC = () => {
                   <span>-${giftCardDiscount.toFixed(2)}</span>
                 </div>
               )}
-              
-              <div className="flex justify-between text-gray-600 pt-2 border-t">
-                <span>Tax (6%)</span>
-                <span>${tax.toFixed(2)}</span>
-              </div>
               
               <div className="flex justify-between pt-3 border-t font-semibold text-base">
                 <span>Total</span>

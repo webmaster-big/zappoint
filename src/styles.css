@@ -1,9 +1,409 @@
+/* Label styles for dark mode */
+html.dark label {
+  color: #eeeeee !important;
+}
 @import "tailwindcss";
 
+/* Dark/Light Mode CSS Variables and Base Styles */
+html.dark {
+  --bg-main: #1a1a1a;
+  --bg-card: #242426;
+  --bg-input: #2a2a2c;
+  --bg-secondary: #313134;
+  --text-main: #e8e8e8;
+  --text-muted: #b4b4b8;
+  --text-subtle: #8a8a8e;
+  --border-main: #383838;
+  --border-subtle: #2f2f2f;
+  --nav-bg: #1f1f21;
+  --nav-active: #4f8ae6;
+  --accent-primary: #5b9bd5;
+  --accent-secondary: #9bb3d9;
+}
+html.light {
+  --bg-main: #ffffff;
+  --bg-card: #ffffff;
+  --bg-input: #ffffff;
+  --bg-secondary: #f8fafc;
+  --text-main: #0f172a;
+  --text-muted: #64748b;
+  --text-subtle: #94a3b8;
+  --border-main: #e2e8f0;
+  --border-subtle: #f1f5f9;
+  --nav-bg: #ffffff;
+  --nav-active: #2563eb;
+  --accent-primary: #3b82f6;
+  --accent-secondary: #8b5cf6;
+}
+
 body {
+  background: var(--bg-main);
+  color: var(--text-main);
+  transition: all 0.3s ease;
   font-family: "Poppins", sans-serif !important;
   font-optical-sizing: auto;
   font-style: normal;
+}
+
+/* Comfortable Dark Mode - Easy on the Eyes */
+/* Main background containers with softer colors */
+html.dark .bg-white {
+  background: #242426 !important;
+  color: #e8e8e8 !important;
+  border: 1px solid #383838 !important;
+}
+
+html.dark .bg-gray-50 {
+  background: #2a2a2c !important;
+  color: #e8e8e8 !important;
+  border: 1px solid #383838 !important;
+}
+
+html.dark .bg-gray-100 {
+  background: #313134 !important;
+  color: #e8e8e8 !important;
+  border: 1px solid #424245 !important;
+}
+
+html.dark .bg-blue-50 {
+  background: #2d3748 !important;
+  color: #cbd5e0 !important;
+  border: 1px solid #4a5568 !important;
+}
+
+html.dark .bg-blue-100 {
+  background: #4a5568 !important;
+  color: #e2e8f0 !important;
+  border: 1px solid #5a6578 !important;
+}
+
+/* Additional gray variations for comfortable viewing */
+html.dark .bg-gray-200 {
+  background: #3a3a3d !important;
+  color: #e8e8e8 !important;
+  border: 1px solid #484848 !important;
+}
+
+html.dark .bg-gray-300 {
+  background: #4a4a4d !important;
+  color: #e8e8e8 !important;
+  border: 1px solid #5a5a5d !important;
+}
+
+html.dark .bg-gray-400 {
+  background: #6a6a6d !important;
+  color: #f5f5f5 !important;
+  border: 1px solid #7a7a7d !important;
+}
+
+html.dark .bg-gray-500 {
+  background: #8a8a8d !important;
+  color: #1a1a1a !important;
+  border: 1px solid #9a9a9d !important;
+}
+
+html.dark .bg-gray-600 {
+  background: #5a5a5d !important;
+  color: #e8e8e8 !important;
+  border: 1px solid #6a6a6d !important;
+}
+
+html.dark .bg-gray-700 {
+  background: #3a3a3d !important;
+  color: #e8e8e8 !important;
+  border: 1px solid #4a4a4d !important;
+}
+
+html.dark .bg-gray-800 {
+  background: #2a2a2d !important;
+  color: #e8e8e8 !important;
+  border: 1px solid #3a3a3d !important;
+}
+
+html.dark .bg-gray-900 {
+  background: #1f1f21 !important;
+  color: #e8e8e8 !important;
+  border: 1px solid #2f2f31 !important;
+}
+
+/* Softer blue variations - easier on the eyes */
+html.dark .bg-blue-800 {
+  background: #4f8ae6 !important;
+  color: #ffffff !important;
+  border: 1px solid #5b9bd5 !important;
+  box-shadow: 0 4px 12px rgba(79, 138, 230, 0.2) !important;
+}
+
+html.dark .bg-blue-700 {
+  background: #5b9bd5 !important;
+  color: #ffffff !important;
+  border: 1px solid #6ba8da !important;
+  box-shadow: 0 3px 10px rgba(91, 155, 213, 0.2) !important;
+}
+
+html.dark .bg-blue-900 {
+  background: #3d7bd1 !important;
+  color: #ffffff !important;
+  border: 1px solid #4f8ae6 !important;
+  box-shadow: 0 2px 8px rgba(61, 123, 209, 0.2) !important;
+}
+
+html.dark .text-blue-800 {
+  color: #7eb3f0 !important;
+}
+
+html.dark .text-blue-700 {
+  color: #5b9bd5 !important;
+}
+
+html.dark .text-blue-900 {
+  color: #9bb3d9 !important;
+}
+
+html.dark .border-blue-800 {
+  border-color: #1e40af !important;
+}
+
+html.dark .border-blue-700 {
+  border-color: #1d4ed8 !important;
+}
+
+/* Card and panel containers - comfortable and easy on eyes */
+html.dark .rounded-lg,
+html.dark .rounded-xl {
+  background: #242426 !important;
+  border: 1px solid #383838 !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
+}
+
+html.dark .shadow,
+html.dark .shadow-sm,
+html.dark .shadow-lg {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2) !important;
+}
+
+/* Border colors for comfortable viewing */
+html.dark .border-gray-100 {
+  border-color: #383838 !important;
+}
+
+html.dark .border-gray-200 {
+  border-color: #424245 !important;
+}
+
+html.dark .border-gray-300 {
+  border-color: #484848 !important;
+}
+
+html.dark .border-zinc-200 {
+  border-color: #383838 !important;
+}
+
+html.dark .border-zinc-800 {
+  border-color: #424245 !important;
+}
+
+/* Text colors for comfortable reading */
+html.dark .text-gray-800,
+html.dark .text-gray-900 {
+  color: #e8e8e8 !important;
+}
+
+html.dark .text-gray-500,
+html.dark .text-gray-600 {
+  color: #b4b4b8 !important;
+}
+
+html.dark .text-gray-400 {
+  color: #9a9a9e !important;
+}
+
+html.dark .text-zinc-900 {
+  color: #e8e8e8 !important;
+}
+
+html.dark .text-zinc-500 {
+  color: #b4b4b8 !important;
+}
+
+html.dark .text-zinc-400 {
+  color: #9a9a9e !important;
+}
+
+/* Additional softer text colors */
+html.dark .text-gray-100 {
+  color: #f0f0f0 !important;
+}
+
+html.dark .text-gray-200 {
+  color: #e8e8e8 !important;
+}
+
+html.dark .text-gray-300 {
+  color: #d8d8d8 !important;
+}
+
+html.dark .text-gray-700 {
+  color: #c0c0c4 !important;
+}
+
+/* Button and interactive elements */
+html.dark .bg-blue-800 {
+  background-color: #1e40af !important;
+  color: #ffffff !important;
+}
+
+html.dark .hover\:bg-blue-800:hover {
+  background-color: #1d4ed8 !important;
+}
+
+html.dark .bg-yellow-400 {
+  background-color: #fbbf24 !important;
+  color: #1f2937 !important;
+}
+
+html.dark .text-blue-800 {
+  color: #60a5fa !important;
+}
+
+html.dark .text-blue-100 {
+  color: #dbeafe !important;
+}
+
+/* Gradient backgrounds for dark mode */
+html.dark .bg-gradient-to-br {
+  background: linear-gradient(to bottom right, #1e1e1e, #2a2a2a) !important;
+}
+
+html.dark .bg-gradient-to-r {
+  background: linear-gradient(to right, #1e40af, #7c3aed) !important;
+}
+
+/* Form elements - comfortable and easy to read */
+html.dark input,
+html.dark textarea,
+html.dark select {
+  background: #2a2a2c !important;
+  color: #e8e8e8 !important;
+  border: 1px solid #424245 !important;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.1) !important;
+}
+
+html.dark input:focus,
+html.dark textarea:focus,
+html.dark select:focus {
+  outline: none !important;
+  border-color: #5b9bd5 !important;
+  box-shadow: 0 0 0 2px rgba(91, 155, 213, 0.2) !important;
+}
+
+/* Modal and overlay backgrounds */
+html.dark .bg-black\/50 {
+  background-color: rgba(0, 0, 0, 0.8) !important;
+}
+
+/* Table styles for dark mode */
+html.dark table {
+  background-color: #2a2a2a !important;
+}
+
+html.dark thead th {
+  background-color: #333333 !important;
+  color: #e5e5e5 !important;
+}
+
+html.dark tbody tr:hover {
+  background-color: #404040 !important;
+}
+
+/* Status and accent colors */
+html.dark .text-emerald-800 {
+  color: #10b981 !important;
+}
+
+html.dark .text-emerald-700 {
+  color: #059669 !important;
+}
+
+html.dark .text-rose-700 {
+  color: #e11d48 !important;
+}
+
+html.dark .text-purple-700 {
+  color: #a855f7 !important;
+}
+
+/* Navigation specific */
+html.dark .bg-white\/80 {
+  background-color: rgba(30, 30, 30, 0.9) !important;
+  backdrop-filter: blur(12px);
+}
+
+/* Hover states */
+html.dark .hover\:bg-gray-100:hover {
+  background-color: #404040 !important;
+}
+
+html.dark .hover\:bg-gray-200:hover {
+  background-color: #4a4a4a !important;
+}
+
+html.dark .hover\:bg-blue-50:hover {
+  background-color: #1e293b !important;
+}
+
+/* Additional hover states for grays and blues */
+html.dark .hover\:bg-gray-300:hover {
+  background-color: #525252 !important;
+}
+
+html.dark .hover\:bg-gray-400:hover {
+  background-color: #6b7280 !important;
+}
+
+html.dark .hover\:bg-blue-100:hover {
+  background-color: #334155 !important;
+}
+
+html.dark .hover\:bg-blue-700:hover {
+  background-color: #1d4ed8 !important;
+}
+
+html.dark .hover\:bg-blue-900:hover {
+  background-color: #1e3a8a !important;
+}
+
+/* Focus states for blue elements */
+html.dark .focus\:ring-blue-800:focus {
+  box-shadow: 0 0 0 2px rgba(30, 64, 175, 0.3) !important;
+}
+
+html.dark .focus\:border-blue-800:focus {
+  border-color: #1e40af !important;
+}
+
+/* Toast/notification styles */
+html.dark .toast,
+html.dark .notification {
+  background-color: #2a2a2a !important;
+  color: #e5e5e5 !important;
+  border-color: #404040 !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* Selection highlight */
+::selection {
+  background: #2563eb;
+  color: #fff;
+}
+html.dark ::selection {
+  background: #60a5fa;
+  color: #18181b;
+}
+
+/* Header styles for dark mode */
+html.dark h1, html.dark h2, html.dark h3, html.dark h4, html.dark h5, html.dark h6 {
+  color: #e8e8e8 !important;
 }
 
 /* Hide scrollbar but keep scrolling enabled */

@@ -1,5 +1,7 @@
 
 import { Route, Routes } from "react-router-dom"
+import { ThemeProvider } from "./contexts/ThemeContext";
+import PageTitleSetter from "./components/PageTitleSetter";
 import MainLayout from "./layouts/AdminMainLayout";
 import Home from "./pages/Home"
 import Login from "./pages/auth/Login"
@@ -25,37 +27,38 @@ import CreatePurchase from "./pages/admin/attractions/CreatePurchase";
 
 function App() {
   return (
-    <Routes>
-      <Route path="/" element={<Login />} />
-      <Route path="/home" element={<Home />} />
-      <Route path="/book/package/:id" element={<BookPackage />} />
-      <Route path="/purchase/attraction/:id" element={<PurchaseAttraction />} />
-      
-  <Route element={<MainLayout />}>
-        <Route path="/attendant/dashboard" element={<AttendantDashboard />} />
-        <Route path="/manager/dashboard" element={<LocationManagerDashboard />} />
-        <Route path="/company/dashboard" element={<CompanyDashboard />} />
-        <Route path="/attractions/create" element={<CreateAttraction />} />
-        <Route path="/attractions/" element={<ManageAttractions />} />
-        <Route path="/attractions/purchases" element={<ManagePurchases />} />
-        <Route path="/attractions/purchases/create" element={<CreatePurchase />} />
-        <Route path="/packages/create" element={<CreatePackage />} />
-        <Route path="/packages" element={<Packages />} />
-        <Route path="/packages/promos" element={<Promo />} />
-        <Route path="/packages/gift-cards" element={<GiftCard />} />
-        <Route path="/bookings" element={<Bookings />} />
-        <Route path="/bookings/calendar" element={<CalendarView />} />
-        <Route path="/bookings/create" element={<OnsiteBooking />} />
-        <Route path="/bookings/check-in" element={<CheckIn />} />
+    <ThemeProvider>
+      <PageTitleSetter />
+      <Routes>
+        <Route path="/" element={<Login />} />
+        <Route path="/home" element={<Home />} />
+        <Route path="/book/package/:id" element={<BookPackage />} />
+        <Route path="/purchase/attraction/:id" element={<PurchaseAttraction />} />
+        <Route element={<MainLayout />}> 
+          <Route path="/attendant/dashboard" element={<AttendantDashboard />} />
+          <Route path="/manager/dashboard" element={<LocationManagerDashboard />} />
+          <Route path="/company/dashboard" element={<CompanyDashboard />} />
+          <Route path="/attractions/create" element={<CreateAttraction />} />
+          <Route path="/attractions/" element={<ManageAttractions />} />
+          <Route path="/attractions/purchases" element={<ManagePurchases />} />
+          <Route path="/attractions/purchases/create" element={<CreatePurchase />} />
+          <Route path="/packages/create" element={<CreatePackage />} />
+          <Route path="/packages" element={<Packages />} />
+          <Route path="/packages/promos" element={<Promo />} />
+          <Route path="/packages/gift-cards" element={<GiftCard />} />
+          <Route path="/bookings" element={<Bookings />} />
+          <Route path="/bookings/calendar" element={<CalendarView />} />
+          <Route path="/bookings/create" element={<OnsiteBooking />} />
+          <Route path="/bookings/check-in" element={<CheckIn />} />
         </Route>
-
-           {/* Add embed route */}
+        {/* Add embed route */}
         <Route path="/embed/booking/:packageId" element={
           <div className="container mx-auto p-4">
             <BookingWidget packageId="{packageId}" />
           </div>
         } />
-    </Routes>
+      </Routes>
+    </ThemeProvider>
   );
 }
 

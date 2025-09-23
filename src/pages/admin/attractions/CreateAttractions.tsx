@@ -11,7 +11,7 @@ interface FormData {
   maxCapacity: string;
   duration: string;
   durationUnit: string;
-  location: string;
+  // location: string; // Removed
   images: string[];
   bookingLink: string;
   embedCode: string;
@@ -38,7 +38,7 @@ const CreateAttraction = () => {
     maxCapacity: '',
     duration: '',
     durationUnit: 'minutes',
-    location: '',
+  // location: '',
     images: [],
     bookingLink: '',
     embedCode: '',
@@ -55,7 +55,7 @@ const CreateAttraction = () => {
 
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [customCategory, setCustomCategory] = useState('');
-  const [customLocation, setCustomLocation] = useState('');
+  // const [customLocation, setCustomLocation] = useState('');
 
   const handleInputChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -122,22 +122,7 @@ const CreateAttraction = () => {
     }));
   };
 
-  const handleLocationChange = (e: ChangeEvent<HTMLSelectElement>) => {
-    const value = e.target.value;
-    setFormData(prev => ({
-      ...prev,
-      location: value === 'other' ? customLocation : value
-    }));
-  };
-
-  const handleCustomLocationChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setCustomLocation(value);
-    setFormData(prev => ({
-      ...prev,
-      location: value
-    }));
-  };
+  // Location handlers removed
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -210,9 +195,7 @@ const CreateAttraction = () => {
             )}
           </div>
           
-          <div className="text-sm text-gray-600">
-            <span className="font-medium">Location:</span> {formData.location || "Not specified"}
-          </div>
+          {/* Location preview removed */}
           
           <div className="text-sm text-gray-600">
             <span className="font-medium">Capacity:</span> {formData.maxCapacity ? `Up to ${formData.maxCapacity} people` : "Not specified"}
@@ -222,7 +205,7 @@ const CreateAttraction = () => {
             <h4 className="font-medium text-gray-800 mb-2">Available Days:</h4>
             <div className="flex flex-wrap gap-1">
               {Object.entries(formData.availability)
-                .filter(([_, v]) => v)
+                .filter(([, v]) => v)
                 .map(([day]) => (
                   <span key={day} className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">
                     {day.slice(0, 3)}
@@ -236,14 +219,9 @@ const CreateAttraction = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 py-8 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-800">Create New Attraction</h1>
-          <p className="mt-2 text-gray-600">
-            Set up a new attraction that customers can purchase tickets for
-          </p>
-        </div>
+        
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Form Container - 2/3 width */}
@@ -251,6 +229,12 @@ const CreateAttraction = () => {
             <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-lg overflow-hidden">
               {/* Basic Information Section */}
               <div className="p-6 border-b border-gray-100">
+                <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold text-gray-800">Create New Attraction</h1>
+          <p className="mt-2 text-gray-600">
+            Set up a new attraction that customers can purchase tickets for
+          </p>
+        </div>
                 <h2 className="text-xl font-semibold text-gray-800 mb-6 pb-2 border-b border-gray-100">
                   Basic Information
                 </h2>
@@ -288,7 +272,7 @@ const CreateAttraction = () => {
                     />
                   </div>
 
-                  <div>
+                  <div className="sm:col-span-2">
                     <label htmlFor="category" className="block text-sm font-medium text-gray-800 mb-2">
                       Category *
                     </label>
@@ -321,37 +305,7 @@ const CreateAttraction = () => {
                     ) : null}
                   </div>
 
-                  <div>
-                    <label htmlFor="location" className="block text-sm font-medium text-gray-800 mb-2">
-                      Location *
-                    </label>
-                    <select
-                      name="location"
-                      id="location"
-                      required
-                      value={formData.location === customLocation ? 'other' : formData.location}
-                      onChange={handleLocationChange}
-                      className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                    >
-                      <option value="">Select a location</option>
-                      <option value="main_arena">Main Arena</option>
-                      <option value="zone_a">Zone A</option>
-                      <option value="zone_b">Zone B</option>
-                      <option value="arcade_floor">Arcade Floor</option>
-                      <option value="party_room">Party Room</option>
-                      <option value="outdoor">Outdoor</option>
-                      <option value="other">Other</option>
-                    </select>
-                    {formData.location === customLocation || formData.location === 'other' ? (
-                      <input
-                        type="text"
-                        placeholder="Enter custom location"
-                        className="mt-2 w-full px-4 py-2 border border-gray-200 rounded-lg"
-                        value={customLocation}
-                        onChange={handleCustomLocationChange}
-                      />
-                    ) : null}
-                  </div>
+                  {/* Location input removed */}
                 </div>
               </div>
 
@@ -545,7 +499,7 @@ const CreateAttraction = () => {
               <div className="px-6 py-5 bg-gray-50 text-right space-x-3">
                 <button
                   type="button"
-                  onClick={() => navigate('/manage-attractions')}
+                  onClick={() => navigate('/attractions')}
                   className="px-5 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-800 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
                 >
                   Cancel

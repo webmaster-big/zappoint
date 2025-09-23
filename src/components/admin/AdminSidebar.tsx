@@ -14,9 +14,13 @@ import {
   Bell,
   Dot,
   Settings,
-  Menu
+  Menu,
+  Moon,
+  Sun,
+  LogOut
 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
+import { useTheme } from '../../contexts/ThemeContext';
 
 // Types
 interface NavItem {
@@ -225,6 +229,7 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
 };
 
 const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOut }) => {
+  const { theme, toggleTheme } = useTheme();
   const location = useLocation();
   const [openDropdowns, setOpenDropdowns] = useState<Record<string, boolean>>({});
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
@@ -459,13 +464,38 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
                   <ChevronDown size={18} className="text-blue-800" />
                 </button>
                 {showProfileDropdown && (
-                  <div className="absolute right-0 bottom-0 mb-10 w-40 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
-                    <button
-                      className="w-full text-left px-4 py-2 text-sm text-gray-800 hover:bg-blue-50 hover:text-blue-800 rounded-lg"
-                      onClick={handleSignOut}
-                    >
-                      Sign Out
-                    </button>
+                  <div className="absolute right-0 bottom-0 mb-10 w-48 bg-white border border-gray-200 rounded-xl shadow-lg z-50 overflow-hidden">
+                    <div className="p-2">
+                      {/* Theme Toggle */}
+                      <button
+                        onClick={toggleTheme}
+                        className="w-full flex items-center gap-3 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
+                      >
+                        {theme === 'light' ? (
+                          <>
+                            <Moon size={16} className="text-gray-600" />
+                            <span>Dark Mode</span>
+                          </>
+                        ) : (
+                          <>
+                            <Sun size={16} className="text-gray-600" />
+                            <span>Light Mode</span>
+                          </>
+                        )}
+                      </button>
+                      
+                      {/* Divider */}
+                      <div className="border-t border-gray-100 my-2"></div>
+                      
+                      {/* Sign Out */}
+                      <button
+                        onClick={handleSignOut}
+                        className="w-full flex items-center gap-3 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      >
+                        <LogOut size={16} className="text-red-600" />
+                        <span>Sign Out</span>
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>

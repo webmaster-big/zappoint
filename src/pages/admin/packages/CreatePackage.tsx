@@ -71,8 +71,6 @@ const CreatePackage: React.FC = () => {
         pricePerAdditional: "",
         duration: "",
         durationUnit: "hours" as "hours" | "minutes",
-        pricePerAdditional30min: "",
-        pricePerAdditional1hr: "",
         promos: [] as string[], // will store promo.code
         giftCards: [] as string[], // will store giftCard.code
         addOns: [] as string[],
@@ -226,8 +224,6 @@ const CreatePackage: React.FC = () => {
             addOns: addOnObjs,
             rooms: roomObjs,
             pricePerAdditional: form.pricePerAdditional,
-            pricePerAdditional30min: form.pricePerAdditional30min,
-            pricePerAdditional1hr: form.pricePerAdditional1hr,
         };
 
         // Append and save
@@ -245,8 +241,6 @@ const CreatePackage: React.FC = () => {
             pricePerAdditional: "",
             duration: "",
             durationUnit: "hours",
-            pricePerAdditional30min: "",
-            pricePerAdditional1hr: "",
             promos: [],
             giftCards: [],
             addOns: [],
@@ -367,34 +361,6 @@ const CreatePackage: React.FC = () => {
                                             </div>
                                         </div>
                                     )}
-                                    
-                                    {/* Additional Time Pricing Section */}
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="block font-semibold mb-2 text-base text-neutral-800">Price for Additional 30 Minutes</label>
-                                            <input
-                                                type="number"
-                                                name="pricePerAdditional30min"
-                                                value={form.pricePerAdditional30min}
-                                                onChange={handleChange}
-                                                className="w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-primary focus:border-primary bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400"
-                                                min="0"
-                                                placeholder="Enter price for 30 min extension"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block font-semibold mb-2 text-base text-neutral-800">Price for Additional 1 Hour</label>
-                                            <input
-                                                type="number"
-                                                name="pricePerAdditional1hr"
-                                                value={form.pricePerAdditional1hr}
-                                                onChange={handleChange}
-                                                className="w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-primary focus:border-primary bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400"
-                                                min="0"
-                                                placeholder="Enter price for 1 hr extension"
-                                            />
-                                        </div>
-                                    </div>
                                     
                                     <div>
                                         <label className="block font-semibold mb-2 text-base text-neutral-800">Category</label>
@@ -824,8 +790,6 @@ const CreatePackage: React.FC = () => {
                                         pricePerAdditional: "",
                                         duration: "",
                                         durationUnit: "hours",
-                                        pricePerAdditional30min: "",
-                                        pricePerAdditional1hr: "",
                                         promos: [],
                                         giftCards: [],
                                         addOns: [],
@@ -872,19 +836,6 @@ const CreatePackage: React.FC = () => {
                             </div>
                             
                             {/* Additional Time Pricing in Preview */}
-                            {(form.pricePerAdditional30min || form.pricePerAdditional1hr) && (
-                                <div className="mb-2">
-                                    <span className="font-semibold">Extension Pricing:</span>
-                                    <div className="text-neutral-800 text-sm">
-                                        {form.pricePerAdditional30min && (
-                                            <div>+30 min: ${form.pricePerAdditional30min}</div>
-                                        )}
-                                        {form.pricePerAdditional1hr && (
-                                            <div>+1 hr: ${form.pricePerAdditional1hr}</div>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
                             
                             <div className="mb-4 text-neutral-800 text-base min-h-[48px]">{form.description || <span className='text-gray-300'>Description</span>}</div>
                             <div className="mb-2">
