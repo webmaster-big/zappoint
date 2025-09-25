@@ -289,14 +289,11 @@ const CreatePurchase = () => {
                         </button>
                         <span className="mx-3 font-semibold">{quantity}</span>
                         <button
-                          onClick={() => setQuantity(Math.min(selectedAttraction.maxCapacity, quantity + 1))}
+                          onClick={() => setQuantity(quantity + 1)}
                           className="w-8 h-8 rounded-lg bg-gray-100 text-gray-700 flex items-center justify-center hover:bg-gray-200"
                         >
                           <Plus className="h-4 w-4" />
                         </button>
-                        <span className="text-sm text-gray-500 ml-2">
-                          Max: {selectedAttraction.maxCapacity}
-                        </span>
                       </div>
                     </div>
 

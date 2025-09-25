@@ -10,7 +10,7 @@ import Packages from "./pages/admin/packages/Packages"
 import BookPackage from "./pages/admin/bookings/BookPackage"
 import GiftCard from "./pages/admin/packages/GiftCard"
 import Promo from "./pages/admin/packages/Promo"
-import BookingWidget from "./components/embed/BookingWidget"
+import EmbedBookingRoute from "./components/embed/EmbedBookingRoute";
 import Bookings from "./pages/admin/bookings/Bookings"
 import CalendarView from "./pages/admin/bookings/CalendarView"
 import OnsiteBooking from "./pages/admin/bookings/OnsiteBooking"
@@ -23,6 +23,8 @@ import AttendantDashboard from "./pages/admin/AttendantDashboard";
 import PurchaseAttraction from "./pages/admin/attractions/PurchaseAttraction";
 import ManagePurchases from "./pages/admin/attractions/AttractionPurchases";
 import CreatePurchase from "./pages/admin/attractions/CreatePurchase";
+import CustomerAnalytics from "./pages/admin/customer/CustomerAnalytics";
+import CustomerListing from "./pages/admin/customer/Customers";
 
 
 function App() {
@@ -50,13 +52,11 @@ function App() {
           <Route path="/bookings/calendar" element={<CalendarView />} />
           <Route path="/bookings/create" element={<OnsiteBooking />} />
           <Route path="/bookings/check-in" element={<CheckIn />} />
+          <Route path="/customers/analytics" element={<CustomerAnalytics />} />
+          <Route path="/customers" element={<CustomerListing />} />
         </Route>
         {/* Add embed route */}
-        <Route path="/embed/booking/:packageId" element={
-          <div className="container mx-auto p-4">
-            <BookingWidget packageId="{packageId}" />
-          </div>
-        } />
+        <Route path="/embed/booking/:packageId" element={<EmbedBookingRoute />} />
       </Routes>
     </ThemeProvider>
   );
