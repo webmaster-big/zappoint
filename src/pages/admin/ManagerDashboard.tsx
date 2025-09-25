@@ -109,13 +109,13 @@ const LocationManagerDashboard: React.FC = () => {
 
   // Bookings data
   const weeklyBookings = [
-    { id: 1, date: new Date('2025-09-16'), time: '9:00 AM', duration: 2, package: 'Corporate Package', participants: 12, status: 'Confirmed', payment: 'Paid', customer: 'Tech Solutions Inc.', contact: 'John Smith', phone: '(555) 123-4567', email: 'john@techsolutions.com', amount: '$480', specialRequests: 'Team building event' },
-    { id: 2, date: new Date('2025-09-17'), time: '10:30 AM', duration: 1.5, package: 'Adventure Package', participants: 6, status: 'Confirmed', payment: 'Paid', customer: 'Sarah Johnson', contact: 'Sarah Johnson', phone: '(555) 987-6543', email: 'sarahj@email.com', amount: '$180', specialRequests: 'Celebrating birthday' },
-    { id: 3, date: new Date('2025-09-18'), time: '12:00 PM', duration: 2, package: 'Family Package', participants: 4, status: 'Pending', payment: 'Partial', customer: 'Mike Thompson', contact: 'Mike Thompson', phone: '(555) 456-7890', email: 'mike.t@email.com', amount: '$180', specialRequests: 'First time visitors' },
-    { id: 4, date: new Date('2025-09-16'), time: '2:00 PM', duration: 3, package: 'Birthday Package', participants: 15, status: 'Confirmed', payment: 'Paid', customer: 'Lisa Williams', contact: 'Lisa Williams', phone: '(555) 234-5678', email: 'lisa.w@email.com', amount: '$450', specialRequests: 'Birthday cake will be brought in' },
-    { id: 5, date: new Date('2025-09-17'), time: '4:30 PM', duration: 2, package: 'Group Package', participants: 8, status: 'Cancelled', payment: 'Refunded', customer: 'David Miller', contact: 'David Miller', phone: '(555) 876-5432', email: 'davidm@email.com', amount: '$200', specialRequests: 'Need two lanes' },
-    { id: 6, date: new Date('2025-09-20'), time: '11:00 AM', duration: 1.5, package: 'Corporate Package', participants: 10, status: 'Confirmed', payment: 'Paid', customer: 'XYZ Corp', contact: 'Robert Brown', phone: '(555) 345-6789', email: 'rbrown@xyz.com', amount: '$500', specialRequests: 'Executive team' },
-    { id: 7, date: new Date('2025-09-19'), time: '3:00 PM', duration: 2, package: 'Family Package', participants: 6, status: 'Confirmed', payment: 'Partial', customer: 'Jennifer Lee', contact: 'Jennifer Lee', phone: '(555) 765-4321', email: 'jennifer@email.com', amount: '$150', specialRequests: 'Family outing' },
+  { id: 1, date: new Date('2025-09-25'), time: '9:00 AM', duration: 2, package: 'Corporate Package', participants: 12, status: 'Confirmed', payment: 'Paid', customer: 'Tech Solutions Inc.', contact: 'John Smith', phone: '(555) 123-4567', email: 'john@techsolutions.com', amount: '$480', specialRequests: 'Team building event' },
+  { id: 2, date: new Date('2025-09-25'), time: '9:00 AM', duration: 1.5, package: 'Adventure Package', participants: 6, status: 'Confirmed', payment: 'Paid', customer: 'Sarah Johnson', contact: 'Sarah Johnson', phone: '(555) 987-6543', email: 'sarahj@email.com', amount: '$180', specialRequests: 'Celebrating birthday' },
+  { id: 3, date: new Date('2025-09-26'), time: '12:00 PM', duration: 2, package: 'Family Package', participants: 4, status: 'Pending', payment: 'Partial', customer: 'Mike Thompson', contact: 'Mike Thompson', phone: '(555) 456-7890', email: 'mike.t@email.com', amount: '$180', specialRequests: 'First time visitors' },
+  { id: 4, date: new Date('2025-09-26'), time: '2:00 PM', duration: 3, package: 'Birthday Package', participants: 15, status: 'Confirmed', payment: 'Paid', customer: 'Lisa Williams', contact: 'Lisa Williams', phone: '(555) 234-5678', email: 'lisa.w@email.com', amount: '$450', specialRequests: 'Birthday cake will be brought in' },
+  { id: 5, date: new Date('2025-09-27'), time: '4:30 PM', duration: 2, package: 'Group Package', participants: 8, status: 'Cancelled', payment: 'Refunded', customer: 'David Miller', contact: 'David Miller', phone: '(555) 876-5432', email: 'davidm@email.com', amount: '$200', specialRequests: 'Need two lanes' },
+  { id: 6, date: new Date('2025-09-27'), time: '11:00 AM', duration: 1.5, package: 'Corporate Package', participants: 10, status: 'Confirmed', payment: 'Paid', customer: 'XYZ Corp', contact: 'Robert Brown', phone: '(555) 345-6789', email: 'rbrown@xyz.com', amount: '$500', specialRequests: 'Executive team' },
+  { id: 7, date: new Date('2025-09-27'), time: '11:00 AM', duration: 2, package: 'Family Package', participants: 6, status: 'Confirmed', payment: 'Partial', customer: 'Jennifer Lee', contact: 'Jennifer Lee', phone: '(555) 765-4321', email: 'jennifer@email.com', amount: '$150', specialRequests: 'Family outing' },
   ];
 
   // Only show bookings for the current week in the calendar and table
@@ -127,15 +127,8 @@ const LocationManagerDashboard: React.FC = () => {
   const customerStats = {
     total: 542,
     newThisWeek: 87,
-    returning: 355,
-    byAgeGroup: {
-      'Under 18': 125,
-      '18-25': 192,
-      '26-40': 135,
-      '41-60': 68,
-      'Over 60': 22
-    },
-    peakHours: ['10:00 AM', '2:00 PM', '6:00 PM']
+    returning: 455, // total - newThisWeek
+    satisfaction: 4.8, // out of 5
   };
 
   // Ticket purchases data
@@ -150,10 +143,12 @@ const LocationManagerDashboard: React.FC = () => {
 
   // Quick actions for Location Manager
   const quickActions = [
-    { title: 'New Booking', icon: Plus, accent: 'bg-blue-800 hover:bg-blue-800' },
-    { title: 'Check-in', icon: CheckCircle, accent: 'bg-blue-800 hover:bg-blue-800' },
-    { title: 'Customer Insights', icon: Users, accent: 'bg-blue-800 hover:bg-blue-800' },
-    { title: 'Generate Report', icon: Download, accent: 'bg-blue-800 hover:bg-blue-800' },
+  { title: 'New Booking', icon: Plus, accent: 'bg-blue-800 hover:bg-blue-800' },
+  { title: 'Check-in', icon: CheckCircle, accent: 'bg-blue-800 hover:bg-blue-800' },
+  { title: 'Customer Insights', icon: Users, accent: 'bg-blue-800 hover:bg-blue-800' },
+  { title: 'Generate Report', icon: Download, accent: 'bg-blue-800 hover:bg-blue-800' },
+  { title: 'View Calendar', icon: Calendar, accent: 'bg-blue-800 hover:bg-blue-800' },
+  { title: 'Manage Attendants', icon: Users, accent: 'bg-blue-800 hover:bg-blue-800' },
   ];
 
   // Status colors
@@ -226,22 +221,34 @@ const LocationManagerDashboard: React.FC = () => {
           <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
             <MapPin className="w-5 h-5 text-blue-800" /> Location Details
           </h2>
-          <div className="space-y-3">
-            <div>
-              <p className="text-sm font-medium text-gray-800">Address</p>
-              <p className="text-sm text-gray-600">{locationInfo.address}</p>
+          <div className="grid grid-cols-1 gap-4">
+            <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg">
+              <MapPin className="w-5 h-5 text-blue-800" />
+              <div>
+                <p className="text-xs font-semibold text-blue-800">Address</p>
+                <p className="text-sm text-gray-900">{locationInfo.address}</p>
+              </div>
             </div>
-            <div>
-              <p className="text-sm font-medium text-gray-800">Operating Hours</p>
-              <p className="text-sm text-gray-600">{locationInfo.operatingHours}</p>
+            <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg">
+              <Calendar className="w-5 h-5 text-blue-800" />
+              <div>
+                <p className="text-xs font-semibold text-blue-800">Operating Hours</p>
+                <p className="text-sm text-gray-900">{locationInfo.operatingHours}</p>
+              </div>
             </div>
-            <div>
-              <p className="text-sm font-medium text-gray-800">Capacity</p>
-              <p className="text-sm text-gray-600">{locationInfo.capacity} people</p>
+            <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg">
+              <Users className="w-5 h-5 text-blue-800" />
+              <div>
+                <p className="text-xs font-semibold text-blue-800">Capacity</p>
+                <p className="text-sm text-gray-900">{locationInfo.capacity} people</p>
+              </div>
             </div>
-            <div>
-              <p className="text-sm font-medium text-gray-800">Contact</p>
-              <p className="text-sm text-gray-600">{locationInfo.contact}</p>
+            <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg">
+              <Mail className="w-5 h-5 text-blue-800" />
+              <div>
+                <p className="text-xs font-semibold text-blue-800">Contact</p>
+                <p className="text-sm text-gray-900">{locationInfo.contact}</p>
+              </div>
             </div>
           </div>
         </div>
@@ -261,30 +268,18 @@ const LocationManagerDashboard: React.FC = () => {
                 <p className="text-xs text-blue-800">New This Week</p>
                 <p className="text-2xl font-bold text-blue-800">+{customerStats.newThisWeek}</p>
               </div>
-            </div>
-            
-            <div>
-              <p className="text-sm font-medium text-gray-800 mb-2">Peak Hours</p>
-              <div className="flex flex-wrap gap-2">
-                {customerStats.peakHours.map((hour, index) => (
-                  <span key={index} className="px-2 py-1 bg-gray-100 text-gray-800 rounded-full text-xs">
-                    {hour}
-                  </span>
-                ))}
+              <div className="bg-blue-50 p-3 rounded-lg col-span-2">
+                <p className="text-xs text-blue-800">Returning Customers</p>
+                <p className="text-2xl font-bold text-blue-800">{customerStats.returning}</p>
+              </div>
+              <div className="bg-blue-50 p-3 rounded-lg col-span-2">
+                <p className="text-xs text-blue-800">Avg. Satisfaction</p>
+                <p className="text-2xl font-bold text-blue-800">{customerStats.satisfaction}/5</p>
               </div>
             </div>
             
-            <div>
-              <p className="text-sm font-medium text-gray-800 mb-2">Age Distribution</p>
-              <div className="space-y-1">
-                {Object.entries(customerStats.byAgeGroup).map(([ageGroup, count]) => (
-                  <div key={ageGroup} className="flex items-center justify-between">
-                    <span className="text-xs text-gray-600">{ageGroup}</span>
-                    <span className="text-xs font-medium text-gray-900">{count}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+         
+           
           </div>
         </div>
 

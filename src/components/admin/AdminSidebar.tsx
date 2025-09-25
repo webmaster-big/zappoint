@@ -7,7 +7,6 @@ import {
   User,
   Ticket,
   BarChart3,
-  DollarSign,
   FileText,
   ChevronDown,
   Search,
@@ -19,7 +18,7 @@ import {
   Sun,
   LogOut
 } from 'lucide-react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext';
 
 // Types
@@ -30,6 +29,7 @@ interface NavItem {
   items?: NavItem[];
   section?: string;
   description?: string; // Add description for search results
+    // ...existing code...
 }
 
 interface UserData {
@@ -53,6 +53,7 @@ const addDescriptions = (navItems: NavItem[]): NavItem[] => {
     'Dashboard': 'Overview of your account and recent activity',
     'Manage Attractions': 'View and edit all available attractions',
     'Create Attractions': 'Add new attractions to your offerings',
+  'Create Purchase': 'Add a new purchase for attractions',
     'Calendar View': 'See all bookings in a calendar format',
     'Bookings': 'Manage existing bookings and reservations',
     'Create Bookings': 'Create new bookings for customers',
@@ -70,7 +71,7 @@ const addDescriptions = (navItems: NavItem[]): NavItem[] => {
     'Account Activity Log': 'View user activity history',
     'Attendants Performance': 'Monitor attendant performance metrics',
     'Analytics & Reports': 'Business intelligence and reporting',
-    'Accounting': 'Financial management and reporting',
+    // 'Accounting': 'Financial management and reporting',
     'Activity Logs': 'System-wide activity tracking',
     'Notifications': 'Manage your notification preferences',
     'User Management': 'Administer user accounts and permissions'
@@ -78,17 +79,15 @@ const addDescriptions = (navItems: NavItem[]): NavItem[] => {
 
   return navItems.map(item => {
     const newItem = { ...item };
-    
     // Add description if available
     if (descriptions[item.label]) {
       newItem.description = descriptions[item.label];
     }
-    
+  // ...existing code...
     // Recursively process nested items
     if (item.items && item.items.length > 0) {
       newItem.items = addDescriptions(item.items);
     }
-    
     return newItem;
   });
 };
@@ -211,7 +210,7 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
           { label: 'Attendants Performance', href: '/admin/performance', icon: Dot },
         ]},
         { label: 'Analytics & Reports', icon: BarChart3, href: '/analytics' },
-        { label: 'Accounting', icon: DollarSign, href: '/accounting' },
+        // { label: 'Accounting', icon: DollarSign, href: '/accounting' },
         { label: 'Activity Logs', icon: FileText, href: '/admin/activity-logs' },
         { label: 'Notifications', icon: Bell, href: '/notifications' },
         { label: 'Profile', icon: User, href: '/profile' },
@@ -229,13 +228,14 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
 };
 
 const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOut }) => {
+  const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
   const location = useLocation();
   const [openDropdowns, setOpenDropdowns] = useState<Record<string, boolean>>({});
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
   const profileDropdownRef = useRef<HTMLDivElement>(null);
   const [searchValue, setSearchValue] = useState('');
-  const [searchSuggestions, setSearchSuggestions] = useState<{ label: string; href: string; description?: string }[]>([]);
+  const [searchSuggestions, setSearchSuggestions] = useState<{ label: string; href: string; description?: string; fragmentId?: string }[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
 
@@ -266,14 +266,14 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
   const navigation = getNavigation(user.role);
 
   // Flatten all links for search (role-based)
-  const getAllLinks = (nav: NavItem[]): { label: string; href: string; description?: string }[] => {
-    const links: { label: string; href: string; description?: string }[] = [];
-    nav.forEach(item => {
-      if (item.href) links.push({ label: item.label, href: item.href, description: item.description });
-      if (item.items) links.push(...getAllLinks(item.items));
-    });
-    return links;
-  };
+  const getAllLinks = (nav: NavItem[]): { label: string; href: string; description?: string; fragmentId?: string }[] => {
+    const links: { label: string; href: string; description?: string; fragmentId?: string }[] = [];
+      nav.forEach(item => {
+        if (item.href) links.push({ label: item.label, href: item.href, description: item.description });
+        if (item.items) links.push(...getAllLinks(item.items));
+      });
+      return links;
+    };
   const allLinks = getAllLinks(navigation);
 
   // Handle search input changes
@@ -281,10 +281,13 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
     const value = e.target.value;
     setSearchValue(value);
 
-    // Show suggestions matching input
+    // Show suggestions matching input (label or fragmentId)
     if (value.trim()) {
       const suggestions = allLinks
-        .filter(link => link.label.toLowerCase().includes(value.toLowerCase()))
+        .filter(link =>
+          link.label.toLowerCase().includes(value.toLowerCase()) ||
+          (link.fragmentId && link.fragmentId.toLowerCase().includes(value.toLowerCase()))
+        )
         .slice(0, 5); // Show up to 5 suggestions
       setSearchSuggestions(suggestions);
       setShowSuggestions(true);
@@ -295,13 +298,6 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
   };
 
   // Handle search selection
-  const handleSearchSelect = (suggestion: { label: string; href: string }) => {
-    window.location.href = suggestion.href;
-    setSearchValue('');
-    setSearchSuggestions([]);
-    setShowSuggestions(false);
-    setIsOpen(false);
-  };
 
   const toggleDropdown = (label: string) => {
     setOpenDropdowns(prev => ({
@@ -419,7 +415,13 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
                     <button
                       key={suggestion.href}
                       className="w-full text-left px-4 py-2 text-sm hover:bg-blue-50 transition-colors"
-                      onClick={() => handleSearchSelect(suggestion)}
+                      onClick={() => {
+                        navigate(suggestion.href);
+                        setSearchValue('');
+                        setSearchSuggestions([]);
+                        setShowSuggestions(false);
+                        setIsOpen(false);
+                      }}
                     >
                       <div className="font-medium text-gray-900">{suggestion.label}</div>
                       {suggestion.description && (

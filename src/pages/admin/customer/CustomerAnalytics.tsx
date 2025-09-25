@@ -166,7 +166,7 @@ const CustomerAnalytics: React.FC = () => {
   // COLORS removed
 
   return (
-  <div className="min-h-screen bg-gray-50 p-2 sm:p-4 md:p-6 space-y-6">
+    <div className="min-h-screen bg-gray-50 p-2 sm:p-4 md:p-6 space-y-6">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between">
         <div>
@@ -407,8 +407,8 @@ const CustomerAnalytics: React.FC = () => {
 
       {/* Top 5 Most Purchased Activities by Customer */}
       {/* Top 5 Tables in grid-2 */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
-        <div className="bg-white rounded-xl shadow-sm p-3 sm:p-6 border border-gray-100">
+  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+  <div className="bg-white rounded-xl shadow-sm p-3 sm:p-6 border border-gray-100">
           <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
             <Activity className="w-5 h-5 text-blue-600" />
             Top 5 Most Purchased Activities by Customer
@@ -451,7 +451,7 @@ const CustomerAnalytics: React.FC = () => {
             </tbody>
           </table>
         </div>
-        <div className="bg-white rounded-xl shadow-sm p-3 sm:p-6 border border-gray-100">
+  <div className="bg-white rounded-xl shadow-sm p-3 sm:p-6 border border-gray-100">
           <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
             <DollarSign className="w-5 h-5 text-green-600" />
             Top 5 Most Booked Packages by Customer
