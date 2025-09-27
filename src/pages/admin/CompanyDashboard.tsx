@@ -276,14 +276,19 @@ const CompanyDashboard: React.FC = () => {
 
   const locationStats = getLocationStats();
 
-  // Get top performing locations
+
+  // Get top performing locations (top 3)
   const getTopLocations = () => {
     return Object.entries(locationStats)
       .sort(([, a], [, b]) => b.revenue - a.revenue)
       .slice(0, 3);
   };
-
   const topLocations = getTopLocations();
+
+  // For All Locations Overview: show top 6 by revenue, with expand/collapse
+  const [showAllLocations, setShowAllLocations] = useState(false);
+  const sortedLocations = Object.entries(locationStats).sort(([, a], [, b]) => b.revenue - a.revenue);
+  const displayedLocations = showAllLocations ? sortedLocations : sortedLocations.slice(0, 4);
 
   // Pagination controls
   const paginate = (pageNumber: number) => setCurrentPage(pageNumber);
@@ -343,93 +348,99 @@ const CompanyDashboard: React.FC = () => {
         })}
       </div>
 
-      {/* Location Performance - Redesigned */}
+      {/* Location Performance - Modern Leaderboard & Grid */}
       <div className="bg-white rounded-xl shadow-sm p-4 md:p-6 border border-gray-100">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 md:mb-6">
           <h2 className="text-lg md:text-xl font-bold text-gray-900 flex items-center gap-2">
             <Target className="w-5 h-5 md:w-6 md:h-6 text-blue-800" /> Location Performance
           </h2>
           <div className="flex items-center gap-2 mt-2 md:mt-0">
-            <span className="text-sm text-gray-500">Week of {weekDates[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+            <span className="text-sm text-gray-500">Week of {weekDates[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} to {weekDates[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
           </div>
         </div>
-        
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Top Performing Locations */}
-          <div>
+
+        <div className="flex flex-col lg:flex-row gap-8">
+          {/* Modern Leaderboard for Top Locations */}
+          <div className="flex-1">
             <h3 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-green-600" /> Top Performing Locations
+              <TrendingUp className="w-4 h-4 text-blue-800" /> Top Performing Locations
             </h3>
             <div className="space-y-4">
               {topLocations.map(([location, stats], index) => (
-                <div key={location} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold ${
-                      index === 0 ? 'bg-gradient-to-r from-yellow-400 to-yellow-500' :
-                      index === 1 ? 'bg-gradient-to-r from-gray-400 to-gray-500' :
-                      'bg-gradient-to-r from-amber-600 to-amber-700'
-                    }`}>
+                <div key={location} className={
+                  `flex items-center justify-between p-4 rounded-xl shadow-sm border-2 transition-all bg-gradient-to-r from-blue-100 to-blue-50 border-blue-400`
+                }>
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-lg bg-gradient-to-r from-blue-500 to-blue-700">
                       {index + 1}
                     </div>
                     <div>
-                      <div className="font-medium text-gray-900">{location}</div>
-                      <div className="text-sm text-gray-500">{stats.bookings} bookings</div>
+                      <div className="font-bold text-gray-900 text-lg">{location}</div>
+                      <div className="text-xs text-gray-500">{stats.bookings} bookings • {stats.participants} guests</div>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <div className="font-bold text-gray-900">${stats.revenue}</div>
-                    <div className="text-sm text-green-600">{stats.utilization}% utilization</div>
+                  <div className="text-right min-w-[120px]">
+                    <div className="font-bold text-blue-800 text-lg">${stats.revenue}</div>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-xs text-blue-800 font-semibold">{stats.utilization}%</span>
+                      <div className="w-24 h-2 bg-blue-100 rounded-full overflow-hidden">
+                        <div className="h-2 rounded-full bg-blue-500" style={{ width: `${stats.utilization}%` }}></div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Location Metrics Grid */}
-          <div>
+          {/* Compact Grid for All Locations (limit to 6, expandable) */}
+          <div className="flex-1">
             <h3 className="font-semibold text-gray-800 mb-4">All Locations Overview</h3>
-            <div className="grid grid-cols-2 gap-4">
-              {Object.entries(locationStats).map(([location, stats]) => (
-                <div key={location} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {displayedLocations.map(([location, stats]) => (
+                <div key={location} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow bg-gray-50">
                   <div className="flex items-center justify-between mb-2">
                     <span className="font-medium text-gray-900 text-sm">{location}</span>
-                    <div className={`w-3 h-3 rounded-full ${
-                      stats.utilization >= 80 ? 'bg-green-500' :
-                      stats.utilization >= 50 ? 'bg-yellow-500' : 'bg-red-500'
-                    }`} title={`${stats.utilization}% utilization`}></div>
+                    <div className="w-3 h-3 rounded-full bg-blue-500" title={`${stats.utilization}% utilization`}></div>
                   </div>
-                  <div className="grid grid-cols-3 gap-2 text-center">
-                    <div>
-                      <div className="text-lg font-bold text-blue-800">{stats.bookings}</div>
+                  <div className="flex items-center gap-4 mb-2">
+                    <div className="flex-1">
                       <div className="text-xs text-gray-500">Bookings</div>
+                      <div className="font-bold text-blue-800 text-lg">{stats.bookings}</div>
                     </div>
-                    <div>
-                      <div className="text-lg font-bold text-blue-800">${stats.revenue}</div>
+                    <div className="flex-1">
                       <div className="text-xs text-gray-500">Revenue</div>
-                    </div>
-                    <div>
-                      <div className="text-lg font-bold text-blue-800">{stats.participants}</div>
-                      <div className="text-xs text-gray-500">Guests</div>
+                      <div className="font-bold text-blue-800 text-lg">${stats.revenue}</div>
                     </div>
                   </div>
-                  <div className="mt-3">
-                    <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
-                      <span>Capacity Utilization</span>
-                      <span>{stats.utilization}%</span>
+                  <div className="flex items-center gap-4 mb-2">
+                    <div className="flex-1">
+                      <div className="text-xs text-gray-500">Guests</div>
+                      <div className="font-bold text-blue-800 text-lg">{stats.participants}</div>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div 
-                        className={`h-2 rounded-full ${
-                          stats.utilization >= 80 ? 'bg-green-500' :
-                          stats.utilization >= 50 ? 'bg-yellow-500' : 'bg-red-500'
-                        }`}
-                        style={{ width: `${stats.utilization}%` }}
-                      ></div>
+                    <div className="flex-1">
+                      <div className="text-xs text-gray-500">Utilization</div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-blue-800 font-semibold">{stats.utilization}%</span>
+                        <div className="w-16 h-2 bg-blue-100 rounded-full overflow-hidden">
+                          <div className="h-2 rounded-full bg-blue-500" style={{ width: `${stats.utilization}%` }}></div>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
               ))}
             </div>
+            {sortedLocations.length > 4 && (
+              <div className="flex justify-center mt-4">
+                <button
+                  className="px-4 py-2 text-sm rounded-lg bg-blue-100 text-blue-800 hover:bg-blue-200 font-medium"
+                  onClick={() => setShowAllLocations(v => !v)}
+                >
+                  {showAllLocations ? 'Show Less' : `Show All (${sortedLocations.length})`}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>

@@ -74,7 +74,7 @@ export default function Login() {
               }
               localStorage.setItem('zapzone_user', JSON.stringify({
                 name: account.label,
-                company: account.label === 'Zap Zone' ? 'Brighton' : 'Brighton',
+                company: account.label === 'Company Admin' ? 'Zap Zone' : 'Brighton',
                 position: account.label,
                 role
               }));

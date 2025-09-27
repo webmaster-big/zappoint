@@ -169,13 +169,14 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
           { label: 'Customers', href: '/customers', icon: Dot }
         ]},
         { label: 'Attendants Management', icon: Users, items: [
-          { label: 'Create Account', href: '/users/create', icon: Dot },
-          { label: 'Account Activity Log', href: '/users/activity', icon: Dot },
-          { label: 'Attendants Performance', href: '/users/performance', icon: Dot },
+          { label: 'Attendants', href: '/manager/attendants', icon: Dot },
+          { label: 'Create Attendant', href: '/manager/attendant/create', icon: Dot },
+          { label: 'Attendants Activity Log', href: '/manager/attendants/activity', icon: Dot },
+          { label: 'Attendants Performance', href: '/manager/attendants/performance', icon: Dot },
         ]},
-        { label: 'Analytics & Reports', icon: BarChart3, href: '/analytics' },
+        { label: 'Analytics & Reports', icon: BarChart3, href: '/manager/analytics' },
         { label: 'Notifications', icon: Bell, href: '/notifications' },
-        { label: 'Profile', icon: User, href: '/profile' },
+        { label: 'Profile', icon: User, href: '/manager/profile' },
         { label: 'Settings', icon: Settings, href: '/manager/settings' }
       ];
       break;
@@ -205,6 +206,7 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
           { label: 'Customers', href: '/customers', icon: Dot }
         ]},
         { label: 'User Management', icon: Users, items: [
+          { label: 'Accounts', href: '/admin/users', icon: Dot },
           { label: 'Create Accounts', href: '/admin/users/create', icon: Dot },
           { label: 'Activity Log', href: '/admin/activity', icon: Dot },
           { label: 'Attendants Performance', href: '/admin/performance', icon: Dot },
@@ -213,7 +215,7 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
         // { label: 'Accounting', icon: DollarSign, href: '/accounting' },
         { label: 'Activity Logs', icon: FileText, href: '/admin/activity-logs' },
         { label: 'Notifications', icon: Bell, href: '/notifications' },
-        { label: 'Profile', icon: User, href: '/profile' },
+        { label: 'Profile', icon: User, href: '/admin/profile' },
         { label: 'Settings', icon: Settings, href: '/admin/settings' }
       ];
       break;
@@ -346,14 +348,14 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
         ) : item.href ? (
           <Link
             to={item.href}
-            className={`flex items-center p-2 rounded-lg transition-colors ${isActive ? 'bg-blue-100 text-blue-800 font-semibold' : 'hover:bg-gray-100 text-gray-800'} ${depth > 0 ? 'pl-8' : ''}`}
+            className={`flex items-center p-2 rounded-lg transition-colors ${isActive ? 'bg-blue-100 text-blue-800 font-semibold' : 'hover:bg-gray-100 text-gray-800'} ${depth > 0 ? 'pl-5' : ''}`}
             onClick={handleNavClick}
           >
             {content}
           </Link>
         ) : null}
         {hasItems && isDropdownOpen && (
-          <div className="mt-1 ml-2 space-y-1 border-l border-gray-200">
+          <div className="mt-1 space-y-1  border-gray-200">
             {(item.items ?? []).map((subItem, index) => (
               <NavItemComponent key={index} item={subItem} depth={depth + 1} />
             ))}

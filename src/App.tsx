@@ -1,5 +1,6 @@
 
 import { Route, Routes } from "react-router-dom"
+import NotFound from "./pages/NotFound";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import PageTitleSetter from "./components/PageTitleSetter";
 import MainLayout from "./layouts/AdminMainLayout";
@@ -25,6 +26,12 @@ import ManagePurchases from "./pages/admin/attractions/AttractionPurchases";
 import CreatePurchase from "./pages/admin/attractions/CreatePurchase";
 import CustomerAnalytics from "./pages/admin/customer/CustomerAnalytics";
 import CustomerListing from "./pages/admin/customer/Customers";
+import CompanyAdminRegistration from "./pages/auth/Register";
+import CompanyAdminProfile from "./pages/admin/profile/CompanyAdminProfile";
+import LocationManagerProfile from "./pages/admin/profile/LocationManagerProfile";
+import AttendantProfile from "./pages/admin/profile/AttendantProfile";
+import CreateAttendant from "./pages/admin/users/CreateAttendant";
+import ManageAttendants from "./pages/admin/Attendants/ManageAttendants";
 
 
 function App() {
@@ -33,6 +40,7 @@ function App() {
       <PageTitleSetter />
       <Routes>
         <Route path="/" element={<Login />} />
+        <Route path="/register" element={<CompanyAdminRegistration />} />
         <Route path="/home" element={<Home />} />
         <Route path="/book/package/:id" element={<BookPackage />} />
         <Route path="/purchase/attraction/:id" element={<PurchaseAttraction />} />
@@ -54,9 +62,16 @@ function App() {
           <Route path="/bookings/check-in" element={<CheckIn />} />
           <Route path="/customers/analytics" element={<CustomerAnalytics />} />
           <Route path="/customers" element={<CustomerListing />} />
+          <Route path="/admin/profile" element={<CompanyAdminProfile />} />
+          <Route path="/manager/profile" element={<LocationManagerProfile />} />
+          <Route path="/attendant/profile" element={<AttendantProfile />} />
+          <Route path="/manager/attendant/create" element={<CreateAttendant />} />
+          <Route path="/manager/attendants" element={<ManageAttendants />} />
         </Route>
         {/* Add embed route */}
         <Route path="/embed/booking/:packageId" element={<EmbedBookingRoute />} />
+        {/* 404 Not Found Route */}
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </ThemeProvider>
   );
