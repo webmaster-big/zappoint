@@ -65,7 +65,7 @@ const ManageAttendants = () => {
     'Guest Services': 'bg-blue-100 text-blue-800',
     'Entertainment': 'bg-blue-100 text-blue-800',
     'Food & Beverage': 'bg-blue-100 text-blue-800',
-    'Maintenance': 'bg-yellow-100 text-yellow-800',
+    'Maintenance': 'bg-blue-100 text-blue-800',
     'Security': 'bg-red-100 text-red-800',
     'Administration': 'bg-blue-100 text-blue-800'
   };

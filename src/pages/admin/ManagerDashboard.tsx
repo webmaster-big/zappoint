@@ -175,7 +175,7 @@ const LocationManagerDashboard: React.FC = () => {
     : bookingsThisWeek.filter(booking => booking.status === selectedStatus);
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-8 space-y-8">
+    <div className="min-h-screen p-4 md:p-8 space-y-8">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-2">
         <div>

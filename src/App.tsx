@@ -32,6 +32,11 @@ import LocationManagerProfile from "./pages/admin/profile/LocationManagerProfile
 import AttendantProfile from "./pages/admin/profile/AttendantProfile";
 import CreateAttendant from "./pages/admin/users/CreateAttendant";
 import ManageAttendants from "./pages/admin/Attendants/ManageAttendants";
+import AttendantActivityLogs from "./pages/admin/Attendants/AttendantActivityLogs";
+import AttendantsPerformance from "./pages/admin/Attendants/AttendantsPerformance";
+import Notifications from "./pages/admin/Notifications";
+import CompanyAnalytics from "./pages/admin/Analytics/CompanyAnalytics";
+import LocationAnalytics from "./pages/admin/Analytics/LocationBasedAnalytics";
 
 
 function App() {
@@ -67,6 +72,11 @@ function App() {
           <Route path="/attendant/profile" element={<AttendantProfile />} />
           <Route path="/manager/attendant/create" element={<CreateAttendant />} />
           <Route path="/manager/attendants" element={<ManageAttendants />} />
+          <Route path="/manager/attendants/activity" element={<AttendantActivityLogs />} />
+          <Route path="/manager/attendants/performance" element={<AttendantsPerformance />} />
+          <Route path="/notifications" element={<Notifications />} />
+          <Route path="/admin/analytics" element={<CompanyAnalytics />} />
+          <Route path="/manager/analytics" element={<LocationAnalytics />} />
         </Route>
         {/* Add embed route */}
         <Route path="/embed/booking/:packageId" element={<EmbedBookingRoute />} />

@@ -211,7 +211,7 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
           { label: 'Activity Log', href: '/admin/activity', icon: Dot },
           { label: 'Attendants Performance', href: '/admin/performance', icon: Dot },
         ]},
-        { label: 'Analytics & Reports', icon: BarChart3, href: '/analytics' },
+        { label: 'Analytics & Reports', icon: BarChart3, href: '/admin/analytics' },
         // { label: 'Accounting', icon: DollarSign, href: '/accounting' },
         { label: 'Activity Logs', icon: FileText, href: '/admin/activity-logs' },
         { label: 'Notifications', icon: Bell, href: '/notifications' },
@@ -240,6 +240,40 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
   const [searchSuggestions, setSearchSuggestions] = useState<{ label: string; href: string; description?: string; fragmentId?: string }[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
+
+  // Unread notifications count from localStorage (zapzone_notifications)
+  const [unreadNotifications, setUnreadNotifications] = useState<number>(0);
+
+  // Helper to get unread count from localStorage
+  const getUnreadCount = () => {
+    try {
+      const stored = localStorage.getItem('zapzone_notifications');
+      if (!stored) return 0;
+      const notifications = JSON.parse(stored);
+      if (!Array.isArray(notifications)) return 0;
+      return notifications.filter((n: any) => n && n.read === false).length;
+    } catch {
+      return 0;
+    }
+  };
+
+
+  // Sync unread count on mount, when localStorage changes, and when custom event is dispatched
+  useEffect(() => {
+    const updateUnread = () => setUnreadNotifications(getUnreadCount());
+    updateUnread();
+    window.addEventListener('storage', updateUnread);
+    window.addEventListener('zapzone_notifications_updated', updateUnread);
+    return () => {
+      window.removeEventListener('storage', updateUnread);
+      window.removeEventListener('zapzone_notifications_updated', updateUnread);
+    };
+  }, []);
+
+  // Optionally, update unread count when sidebar opens (for SPA navigation)
+  useEffect(() => {
+    if (isOpen) setUnreadNotifications(getUnreadCount());
+  }, [isOpen]);
 
   useEffect(() => {
     // Close sidebar when clicking outside on mobile
@@ -270,12 +304,22 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
   // Flatten all links for search (role-based)
   const getAllLinks = (nav: NavItem[]): { label: string; href: string; description?: string; fragmentId?: string }[] => {
     const links: { label: string; href: string; description?: string; fragmentId?: string }[] = [];
-      nav.forEach(item => {
-        if (item.href) links.push({ label: item.label, href: item.href, description: item.description });
-        if (item.items) links.push(...getAllLinks(item.items));
-      });
-      return links;
-    };
+    nav.forEach(item => {
+      // Add badge for Notifications link
+      if (item.label === 'Notifications' && item.href) {
+        links.push({
+          label: item.label,
+          href: item.href,
+          description: item.description,
+          fragmentId: undefined
+        });
+      } else if (item.href) {
+        links.push({ label: item.label, href: item.href, description: item.description });
+      }
+      if (item.items) links.push(...getAllLinks(item.items));
+    });
+    return links;
+  };
   const allLinks = getAllLinks(navigation);
 
   // Handle search input changes
@@ -321,7 +365,24 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
           // @ts-expect-error lucide-react icons accept 'size' prop
           return <Icon size={18} className={isActive ? 'text-blue-800' : 'stroke-1'} />;
         })()}
-        <span className="ml-3 text-sm flex-1">{item.label}</span>
+        <span className="ml-3 text-sm flex-1 relative">
+          {item.label}
+          {/* Modern notification badge for Notifications link */}
+          {item.label === 'Notifications' && unreadNotifications > 0 && (
+            <span
+              className="absolute -top-2 -right-5 min-w-[22px] h-5 flex items-center justify-center px-1 text-xs font-semibold text-white bg-blue-800 shadow-md rounded-full border-2 border-white animate-bounce-slow"
+              style={{
+                boxShadow: '0 2px 8px rgba(30, 64, 175, 0.15)',
+                letterSpacing: '0.02em',
+                fontVariantNumeric: 'tabular-nums',
+                transition: 'background 0.2s',
+              }}
+              aria-label={`${unreadNotifications} unread notifications`}
+            >
+              {unreadNotifications > 99 ? '99+' : unreadNotifications}
+            </span>
+          )}
+        </span>
         {hasItems && (
           <ChevronDown
             size={16}
@@ -364,6 +425,15 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
       </div>
     );
   };
+
+// Custom animation for badge (add to global CSS if not present)
+// .animate-bounce-slow {
+//   animation: bounce 1.5s infinite cubic-bezier(0.28, 0.84, 0.42, 1);
+// }
+// @keyframes bounce {
+//   0%, 100% { transform: translateY(0); }
+//   50% { transform: translateY(-4px); }
+// }
 
   return (
     <>
