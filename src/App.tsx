@@ -31,18 +31,18 @@ import CompanyAdminProfile from "./pages/admin/profile/CompanyAdminProfile";
 import LocationManagerProfile from "./pages/admin/profile/LocationManagerProfile";
 import AttendantProfile from "./pages/admin/profile/AttendantProfile";
 import CreateAttendant from "./pages/admin/users/CreateAttendant";
-import ManageAttendants from "./pages/admin/Attendants/ManageAttendants";
-import AttendantActivityLogs from "./pages/admin/Attendants/AttendantActivityLogs";
-import AttendantsPerformance from "./pages/admin/Attendants/AttendantsPerformance";
 import Notifications from "./pages/admin/Notifications";
-import CompanyAnalytics from "./pages/admin/analytics/CompanyAnalytics";
-import LocationAnalytics from "./pages/admin/analytics/LocationManagerAnalytics";
 import LocationActivityLogs from "./pages/admin/LocationActivityLogs";
 import ManageAccounts from "./pages/admin/users/ManageAccounts";
 import CreateAccount from "./pages/admin/users/CreateAccounts";
 import EntertainmentLandingPage from "./pages/customer/Home";
 import CustomerLogin from "./pages/customer/CustomerLogin";
 import CustomerRegister from "./pages/customer/CustomerRegister";
+import AttendantsPerformance from "./pages/admin/attendants/AttendantsPerformance";
+import LocationAnalytics from "./pages/admin/analytics/LocationManagerAnalytics";
+import CompanyAnalytics from "./pages/admin/analytics/CompanyAnalytics";
+import AttendantActivityLogs from "./pages/admin/attendants/AttendantActivityLogs";
+import ManageAttendants from "./pages/admin/attendants/ManageAttendants";
 
 
 function App() {
