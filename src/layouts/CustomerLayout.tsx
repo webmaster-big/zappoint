@@ -3,7 +3,6 @@ import {
   MapPin, 
   Menu,
   X,
-  User,
   ChevronRight,
   LogOut,
   Settings,

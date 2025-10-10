@@ -9,15 +9,12 @@ import {
   Filter, 
   RefreshCcw,
   Users,
-  Clock,
-  User,
   Mail,
   Phone,
   MapPin,
   Send,
   X,
   Copy,
-  Building,
   Shield,
   UserCheck
 } from 'lucide-react';
@@ -608,24 +605,24 @@ const ManageAccounts = () => {
     return [...new Set(departments)];
   };
 
-  const getUniqueUserTypes = () => {
-    const userTypes = accounts.map(account => account.userType);
-    return [...new Set(userTypes)];
-  };
+  // const getUniqueUserTypes = () => {
+  //   const userTypes = accounts.map(account => account.userType);
+  //   return [...new Set(userTypes)];
+  // };
 
-  // Calculate experience in months
-  const getExperience = (hireDate: string) => {
-    const hire = new Date(hireDate);
-    const today = new Date();
-    const months = (today.getFullYear() - hire.getFullYear()) * 12 + (today.getMonth() - hire.getMonth());
-    return Math.max(0, months);
-  };
+  // // Calculate experience in months
+  // const getExperience = (hireDate: string) => {
+  //   const hire = new Date(hireDate);
+  //   const today = new Date();
+  //   const months = (today.getFullYear() - hire.getFullYear()) * 12 + (today.getMonth() - hire.getMonth());
+  //   return Math.max(0, months);
+  // };
 
-  // Check if invitation is expired
-  const isInvitationExpired = (expiryDate?: string) => {
-    if (!expiryDate) return true;
-    return new Date(expiryDate) < new Date();
-  };
+  // // Check if invitation is expired
+  // const isInvitationExpired = (expiryDate?: string) => {
+  //   if (!expiryDate) return true;
+  //   return new Date(expiryDate) < new Date();
+  // };
 
   // Format last login date
   const formatLastLogin = (lastLogin?: string) => {

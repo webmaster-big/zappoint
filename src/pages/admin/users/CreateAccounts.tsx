@@ -1,21 +1,16 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft,
   Save,
   User,
   Shield,
-  MapPin,
   Building,
-  Clock,
-  Mail,
-  Phone,
+
   UserCheck,
-  Calendar,
-  IdCard,
-  Users,
-  Package,
-  Star
+
+  Users
+
 } from 'lucide-react';
 
 // Types

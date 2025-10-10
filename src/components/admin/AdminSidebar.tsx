@@ -7,7 +7,6 @@ import {
   User,
   Ticket,
   BarChart3,
-  FileText,
   ChevronDown,
   Search,
   Bell,
