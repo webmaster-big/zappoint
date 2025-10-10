@@ -831,6 +831,7 @@ const CreatePackage: React.FC = () => {
                                         availableDays: [],
                                         availableWeekDays: [],
                                         availableMonthDays: [],
+                                        image: "",
                                     })}
                                 >
                                     <RefreshCcw className="w-5 h-5" /> Reset
