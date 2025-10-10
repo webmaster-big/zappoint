@@ -31,12 +31,18 @@ import CompanyAdminProfile from "./pages/admin/profile/CompanyAdminProfile";
 import LocationManagerProfile from "./pages/admin/profile/LocationManagerProfile";
 import AttendantProfile from "./pages/admin/profile/AttendantProfile";
 import CreateAttendant from "./pages/admin/users/CreateAttendant";
-import ManageAttendants from "./pages/admin/Attendants/ManageAttendants";
-import AttendantActivityLogs from "./pages/admin/Attendants/AttendantActivityLogs";
-import AttendantsPerformance from "./pages/admin/Attendants/AttendantsPerformance";
+import ManageAttendants from "./pages/admin/attendants/ManageAttendants";
+import AttendantActivityLogs from "./pages/admin/attendants/AttendantActivityLogs";
+import AttendantsPerformance from "./pages/admin/attendants/AttendantsPerformance";
 import Notifications from "./pages/admin/Notifications";
-import CompanyAnalytics from "./pages/admin/Analytics/CompanyAnalytics";
-import LocationAnalytics from "./pages/admin/Analytics/LocationBasedAnalytics";
+import CompanyAnalytics from "./pages/admin/analytics/CompanyAnalytics";
+import LocationAnalytics from "./pages/admin/analytics/LocationManagerAnalytics";
+import LocationActivityLogs from "./pages/admin/LocationActivityLogs";
+import ManageAccounts from "./pages/admin/users/ManageAccounts";
+import CreateAccount from "./pages/admin/users/CreateAccounts";
+import EntertainmentLandingPage from "./pages/customer/Home";
+import CustomerLogin from "./pages/customer/CustomerLogin";
+import CustomerRegister from "./pages/customer/CustomerRegister";
 
 
 function App() {
@@ -44,9 +50,12 @@ function App() {
     <ThemeProvider>
       <PageTitleSetter />
       <Routes>
-        <Route path="/" element={<Login />} />
+        <Route path="/admin" element={<Login />} />
         <Route path="/register" element={<CompanyAdminRegistration />} />
         <Route path="/home" element={<Home />} />
+        <Route path="/customer/login" element={<CustomerLogin />} />
+        <Route path="/customer/register" element={<CustomerRegister />} />
+        <Route path="/" element={<EntertainmentLandingPage />} />
         <Route path="/book/package/:id" element={<BookPackage />} />
         <Route path="/purchase/attraction/:id" element={<PurchaseAttraction />} />
         <Route element={<MainLayout />}> 
@@ -77,6 +86,10 @@ function App() {
           <Route path="/notifications" element={<Notifications />} />
           <Route path="/admin/analytics" element={<CompanyAnalytics />} />
           <Route path="/manager/analytics" element={<LocationAnalytics />} />
+          <Route path="/admin/activity" element={<LocationActivityLogs />} />
+          <Route path="/admin/attendants/performance" element={<AttendantsPerformance />} />
+          <Route path="/admin/users" element={<ManageAccounts />} />
+          <Route path="/admin/users/create" element={<CreateAccount />} />
         </Route>
         {/* Add embed route */}
         <Route path="/embed/booking/:packageId" element={<EmbedBookingRoute />} />

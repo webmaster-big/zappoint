@@ -209,11 +209,10 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
           { label: 'Accounts', href: '/admin/users', icon: Dot },
           { label: 'Create Accounts', href: '/admin/users/create', icon: Dot },
           { label: 'Activity Log', href: '/admin/activity', icon: Dot },
-          { label: 'Attendants Performance', href: '/admin/performance', icon: Dot },
+          { label: 'Attendants Performance', href: '/admin/attendants/performance', icon: Dot },
         ]},
         { label: 'Analytics & Reports', icon: BarChart3, href: '/admin/analytics' },
         // { label: 'Accounting', icon: DollarSign, href: '/accounting' },
-        { label: 'Activity Logs', icon: FileText, href: '/admin/activity-logs' },
         { label: 'Notifications', icon: Bell, href: '/notifications' },
         { label: 'Profile', icon: User, href: '/admin/profile' },
         { label: 'Settings', icon: Settings, href: '/admin/settings' }
