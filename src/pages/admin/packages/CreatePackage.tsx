@@ -78,7 +78,23 @@ const CreatePackage: React.FC = () => {
         availableDays: [] as string[],
         availableWeekDays: [] as string[],
         availableMonthDays: [] as string[],
+        image: "" as string, // base64 or data url
     });
+
+    // Image preview state
+    const [imagePreview, setImagePreview] = useState<string>("");
+    // Handle image upload
+    const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setForm(prev => ({ ...prev, image: reader.result as string }));
+                setImagePreview(reader.result as string);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
 
     // Toast state
     const [toast, setToast] = useState<{ message: string; type?: "success" | "error" | "info" } | null>(null);
@@ -224,6 +240,7 @@ const CreatePackage: React.FC = () => {
             addOns: addOnObjs,
             rooms: roomObjs,
             pricePerAdditional: form.pricePerAdditional,
+            image: form.image,
         };
 
         // Append and save
@@ -248,7 +265,9 @@ const CreatePackage: React.FC = () => {
             availableDays: [],
             availableWeekDays: [],
             availableMonthDays: [],
+            image: "",
         });
+        setImagePreview("");
     };
 
     // Format availability for display
@@ -285,6 +304,21 @@ const CreatePackage: React.FC = () => {
                         <h2 className="text-2xl sm:text-3xl font-bold text-neutral-900 tracking-tight">Create Package Deal</h2>
                         <p className="text-sm text-gray-500 mb-8 mt-2">Fill in the details below to create a new package deal.</p>    
                         <form className="space-y-8" onSubmit={handleSubmit} autoComplete="off">
+                            {/* Image Upload */}
+                            <div>
+                                <label className="block font-semibold mb-2 text-base text-neutral-800">Package Image</label>
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={handleImageChange}
+                                    className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-800 hover:file:bg-blue-100"
+                                />
+                                {imagePreview && (
+                                    <div className="mt-4">
+                                        <img src={imagePreview} alt="Preview" className="w-full max-h-56 object-contain rounded-md border border-gray-200" />
+                                    </div>
+                                )}
+                            </div>
                             {/* Details Section */}
                             <div>
                                 <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2">
@@ -755,7 +789,7 @@ const CreatePackage: React.FC = () => {
                                 <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2">
                                     <Info className="w-5 h-5 text-primary" /> Pricing
                                 </h3>
-                                <label className="block font-semibold mb-2 text-base text-neutral-800">Price ($)</label>
+                                <label className="block font-semibold mb-2 text-base text-neutral-800">Price</label>
                                 <input
                                     type="number"
                                     name="price"
@@ -763,7 +797,7 @@ const CreatePackage: React.FC = () => {
                                     onChange={handleChange}
                                     className="w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-primary focus:border-primary bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400"
                                     min="0"
-                                    placeholder="Enter price in $"
+                                    placeholder="Enter price"
                                     required
                                 />
                             </div>

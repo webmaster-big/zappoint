@@ -4,6 +4,13 @@ import { useNavigate } from 'react-router-dom';
 import { Calendar, Clock, Users, CreditCard, Gift, Tag, Plus, Minus } from 'lucide-react';
 
 // Types (unchanged)
+interface Room { name: string; capacity?: number; price?: number; }
+interface AddOn {
+  name: string;
+  price: number;
+  image?: string;
+}
+
 interface Package {
   id: string;
   name: string;
@@ -18,13 +25,15 @@ interface Package {
   availableWeekDays: string[];
   availableMonthDays: string[];
   attractions: string[];
-  addOns: { name: string; price: number }[];
+  addOns: AddOn[];
   giftCards: GiftCard[];
   promos: Promo[];
   duration: string;
   durationUnit: "hours" | "minutes";
   pricePerAdditional30min: string;
   pricePerAdditional1hr: string;
+  rooms?: (string | Room)[];
+  image?: string;
 }
 
 interface GiftCard {
@@ -94,13 +103,14 @@ const OnsiteBooking: React.FC = () => {
   const [availableDates, setAvailableDates] = useState<Date[]>([]);
   const [availableTimes, setAvailableTimes] = useState<string[]>([]);
   const [step, setStep] = useState(1);
+  const [selectedRoom, setSelectedRoom] = useState<string>("");
   const [bookingData, setBookingData] = useState<BookingData>({
     packageId: null,
     selectedAttractions: [],
     selectedAddOns: [],
     date: '',
     time: '',
-    participants: 1,
+    participants: 0,
     customer: {
       firstName: '',
       lastName: '',
@@ -112,6 +122,21 @@ const OnsiteBooking: React.FC = () => {
     promoCode: '',
     notes: ''
   });
+
+  // Check if all required fields are filled for final submission
+  const isBookingValid = () => {
+    return (
+      selectedPackage &&
+      bookingData.date &&
+      bookingData.time &&
+      bookingData.participants > 0 &&
+      bookingData.customer.firstName.trim() &&
+      bookingData.customer.lastName.trim() &&
+      bookingData.customer.email.trim() &&
+      bookingData.customer.phone.trim() &&
+      (!selectedPackage.rooms || selectedPackage.rooms.length === 0 || selectedRoom)
+    );
+  };
 
   // Format duration for display
   const formatDuration = (pkg: Package | null) => {
@@ -137,9 +162,15 @@ const OnsiteBooking: React.FC = () => {
         availableMonthDays: ['15', '16', '17', '18', '19', '20', '21', '22', '23', '24', '25', '26', '27', '28'],
         attractions: ['Laser Tag', 'Arcade Games', 'Bowling'],
         addOns: [
-          { name: 'Soda', price: 50 },
-          { name: 'Pizza', price: 350 }
+          { name: 'Soda', price: 50, image: '/soda.png' },
+          { name: 'Pizza', price: 350, image: '/pizza.png' }
         ],
+        rooms: [
+          { name: 'Party Room A', capacity: 30 },
+          { name: 'Party Room B', capacity: 40 },
+          { name: 'VIP Lounge', capacity: 20 }
+        ],
+        image: '/zapzone.png',
         giftCards: [
           {
             code: 'GC-PTM5JG-7060',
@@ -168,8 +199,8 @@ const OnsiteBooking: React.FC = () => {
         ],
         duration: '2',
         durationUnit: 'hours',
-        pricePerAdditional30min: '50',
-        pricePerAdditional1hr: '90'
+  pricePerAdditional30min: '50',
+  pricePerAdditional1hr: '90'
       },
       {
         id: 'pkg_1757977625822_92892',
@@ -185,15 +216,20 @@ const OnsiteBooking: React.FC = () => {
         availableMonthDays: [],
         attractions: ['Axe Throwing', 'Escape Room', 'Conference Room'],
         addOns: [
-          { name: 'Coffee Break', price: 150 },
-          { name: 'Lunch Buffet', price: 750 }
+          { name: 'Coffee Break', price: 150, image: '/coffee.png' },
+          { name: 'Lunch Buffet', price: 750, image: '/lunch.png' }
         ],
+        rooms: [
+          { name: 'Conference Room 1', capacity: 20 },
+          { name: 'Conference Room 2', capacity: 30 }
+        ],
+        image: '/Zap-Zone.png',
         giftCards: [],
         promos: [],
         duration: '4',
         durationUnit: 'hours',
-        pricePerAdditional30min: '75',
-        pricePerAdditional1hr: '125'
+  pricePerAdditional30min: '75',
+  pricePerAdditional1hr: '125'
       }
     ];
 
@@ -273,11 +309,13 @@ const OnsiteBooking: React.FC = () => {
 
   const handlePackageSelect = (pkg: Package) => {
     setSelectedPackage(pkg);
+    setSelectedRoom("");
     setBookingData(prev => ({ 
       ...prev, 
       packageId: pkg.id,
       selectedAttractions: [],
-      selectedAddOns: []
+      selectedAddOns: [],
+      participants: pkg.maxParticipants
     }));
     setStep(2); // Move directly to step 2 (Date & Time) after selecting a package
   };
@@ -494,9 +532,38 @@ const OnsiteBooking: React.FC = () => {
   // STEP 2: Date & Time (swapped with add-ons)
   const renderStep2 = () => (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-gray-900">Select Date & Time</h2>
-      
+      <h2 className="text-2xl font-bold text-gray-900">Select Room, Date & Time</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Room Selection */}
+        {selectedPackage?.rooms && selectedPackage.rooms.length > 0 && (
+          <div className="border border-gray-200 rounded-xl p-5 md:col-span-2">
+            <label className="block font-medium mb-3 text-gray-800 text-sm uppercase tracking-wide">Room Selection</label>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {selectedPackage.rooms.map((r) => {
+                let room: { name: string };
+                if (typeof r === "string") {
+                  room = { name: r };
+                } else {
+                  const { name } = r as Room;
+                  room = { name };
+                }
+                return (
+                  <label key={room.name} className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg cursor-pointer">
+                    <input
+                      type="radio"
+                      name="roomSelection"
+                      value={room.name}
+                      checked={selectedRoom === room.name}
+                      onChange={() => setSelectedRoom(room.name)}
+                      className="accent-blue-800"
+                    />
+                    <span className="font-medium text-gray-800 text-sm">{room.name}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        )}
         {/* Date Selection */}
         <div>
           <label className="block text-sm font-medium text-gray-800 mb-2">
@@ -518,27 +585,37 @@ const OnsiteBooking: React.FC = () => {
             ))}
           </select>
         </div>
-        
-        {/* Time Selection */}
+        {/* Time Selection as Radio Group */}
         <div>
           <label className="block text-sm font-medium text-gray-800 mb-2">
             <Clock className="inline mr-2 h-4 w-4" />
             Select Time
           </label>
-          <select
-            name="time"
-            value={bookingData.time}
-            onChange={handleInputChange}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400"
-            required
-          >
-            <option value="">Select a time</option>
-            {availableTimes.map(time => (
-              <option key={time} value={time}>{time}</option>
-            ))}
-          </select>
+          {selectedPackage?.rooms && selectedPackage.rooms.length > 0 && !selectedRoom ? (
+            <div className="text-xs text-gray-400 col-span-2">Select a room first to see available times</div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+              {availableTimes.length > 0 ? (
+                availableTimes.map((time) => (
+                  <label key={time} className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition ${bookingData.time === time ? 'border-blue-800 bg-blue-50' : 'border-gray-300 bg-white hover:border-blue-400'}`}>
+                    <input
+                      type="radio"
+                      name="time"
+                      value={time}
+                      checked={bookingData.time === time}
+                      onChange={handleInputChange}
+                      className="accent-blue-800"
+                      disabled={selectedPackage?.rooms && selectedPackage.rooms.length > 0 && !selectedRoom}
+                    />
+                    <span className="text-sm text-gray-800">{time}</span>
+                  </label>
+                ))
+              ) : (
+                <span className="text-xs text-gray-400 col-span-2">No available times</span>
+              )}
+            </div>
+          )}
         </div>
-        
         {/* Participants */}
         <div>
           <label className="block text-sm font-medium text-gray-800 mb-2">
@@ -549,14 +626,17 @@ const OnsiteBooking: React.FC = () => {
             type="number"
             name="participants"
             min="1"
-            max={selectedPackage?.maxParticipants || 50}
             value={bookingData.participants}
             onChange={handleInputChange}
             className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400"
             required
           />
+          {selectedPackage && bookingData.participants > selectedPackage.maxParticipants && selectedPackage.pricePerAdditional && (
+            <div className="mt-2 text-xs text-blue-800 bg-blue-50 rounded p-2">
+              Additional participants beyond {selectedPackage.maxParticipants} will be charged <b>${selectedPackage.pricePerAdditional}</b> each.
+            </div>
+          )}
         </div>
-
         {/* Duration Display */}
         {selectedPackage && (
           <div>
@@ -570,7 +650,6 @@ const OnsiteBooking: React.FC = () => {
           </div>
         )}
       </div>
-      
       <div className="flex justify-between">
         <button
           type="button"
@@ -582,7 +661,8 @@ const OnsiteBooking: React.FC = () => {
         <button
           type="button"
           onClick={() => setStep(3)}
-          className="bg-blue-800 text-white px-6 py-3 rounded-lg hover:bg-blue-800"
+          className={`px-6 py-3 rounded-lg transition-colors ${selectedPackage?.rooms && selectedPackage.rooms.length > 0 && !selectedRoom ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-blue-800 text-white hover:bg-blue-800'}`}
+          disabled={selectedPackage?.rooms && selectedPackage.rooms.length > 0 && !selectedRoom}
         >
           Continue to Attractions & Add-ons
         </button>
@@ -668,54 +748,62 @@ const OnsiteBooking: React.FC = () => {
             {selectedPackage.addOns.map(addOn => {
               const isSelected = bookingData.selectedAddOns.some(a => a.name === addOn.name);
               const selectedQty = bookingData.selectedAddOns.find(a => a.name === addOn.name)?.quantity || 0;
-              
               return (
                 <div
                   key={addOn.name}
-                  className={`border rounded-lg p-4 ${
+                  className={`border rounded-lg p-4 flex gap-4 ${
                     isSelected ? 'border-blue-600 bg-blue-50' : 'border-gray-200'
                   }`}
                 >
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h4 className="font-medium text-gray-900">{addOn.name}</h4>
-                      <p className="text-sm text-gray-800">${addOn.price}</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => handleAddOnToggle(addOn.name)}
-                      className={`px-3 py-1 rounded text-sm ${
-                        isSelected
-                          ? 'bg-red-100 text-red-800 hover:bg-red-200'
-                          : 'bg-blue-100 text-blue-800 hover:bg-blue-200'
-                      }`}
-                    >
-                      {isSelected ? 'Remove' : 'Add'}
-                    </button>
+                  {/* Add-on Image */}
+                  <div className="w-20 h-20 flex-shrink-0 flex items-center justify-center bg-gray-100 rounded-md border border-gray-200 overflow-hidden">
+                    {addOn.image ? (
+                      <img src={addOn.image} alt={addOn.name} className="object-cover w-full h-full" />
+                    ) : (
+                      <span className="text-gray-400 text-xs">No Image</span>
+                    )}
                   </div>
-                  
-                  {isSelected && (
-                    <div className="mt-3 flex items-center">
-                      <span className="text-sm text-gray-800 mr-3">Quantity:</span>
-                      <div className="flex items-center">
-                        <button
-                          type="button"
-                          onClick={() => handleAddOnQuantityChange(addOn.name, selectedQty - 1)}
-                          className="p-1 rounded bg-gray-200"
-                        >
-                          <Minus size={14} />
-                        </button>
-                        <span className="mx-2 w-8 text-center">{selectedQty}</span>
-                        <button
-                          type="button"
-                          onClick={() => handleAddOnQuantityChange(addOn.name, selectedQty + 1)}
-                          className="p-1 rounded bg-gray-200"
-                        >
-                          <Plus size={14} />
-                        </button>
+                  <div className="flex-1 flex flex-col justify-between">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h4 className="font-medium text-gray-900">{addOn.name}</h4>
+                        <p className="text-sm text-gray-800">${addOn.price}</p>
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => handleAddOnToggle(addOn.name)}
+                        className={`px-3 py-1 rounded text-sm ${
+                          isSelected
+                            ? 'bg-red-100 text-red-800 hover:bg-red-200'
+                            : 'bg-blue-100 text-blue-800 hover:bg-blue-200'
+                        }`}
+                      >
+                        {isSelected ? 'Remove' : 'Add'}
+                      </button>
                     </div>
-                  )}
+                    {isSelected && (
+                      <div className="mt-3 flex items-center">
+                        <span className="text-sm text-gray-800 mr-3">Quantity:</span>
+                        <div className="flex items-center">
+                          <button
+                            type="button"
+                            onClick={() => handleAddOnQuantityChange(addOn.name, selectedQty - 1)}
+                            className="p-1 rounded bg-gray-200"
+                          >
+                            <Minus size={14} />
+                          </button>
+                          <span className="mx-2 w-8 text-center">{selectedQty}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleAddOnQuantityChange(addOn.name, selectedQty + 1)}
+                            className="p-1 rounded bg-gray-200"
+                          >
+                            <Plus size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               );
             })}
@@ -734,7 +822,7 @@ const OnsiteBooking: React.FC = () => {
         <button
           type="button"
           onClick={() => setStep(4)}
-          className="bg-blue-800 text-white px-6 py-3 rounded-lg hover:bg-blue-800"
+          className="px-6 py-3 rounded-lg transition-colors bg-blue-800 text-white hover:bg-blue-800"
         >
           Continue to Customer Details
         </button>
@@ -852,7 +940,7 @@ const OnsiteBooking: React.FC = () => {
         <button
           type="button"
           onClick={() => setStep(5)}
-          className="bg-blue-800 text-white px-6 py-3 rounded-lg hover:bg-blue-800"
+          className="px-6 py-3 rounded-lg transition-colors bg-blue-800 text-white hover:bg-blue-800"
         >
           Continue to Payment
         </button>
@@ -866,37 +954,57 @@ const OnsiteBooking: React.FC = () => {
       
       <div className="bg-gray-50 p-6 rounded-lg">
         <h3 className="text-lg font-medium text-gray-900 mb-4">Booking Summary</h3>
-        
-        <div className="space-y-3">
+        <div className="space-y-4">
+          {/* Package Details */}
           {selectedPackage && (
-            <div className="flex justify-between">
-              <span>Package:</span>
-              <span className="font-medium">{selectedPackage.name}</span>
+            <div className="flex gap-4 items-center border-b pb-3 mb-3">
+              {selectedPackage.image && (
+                <img src={selectedPackage.image} alt={selectedPackage.name} className="w-20 h-20 object-cover rounded-md border" />
+              )}
+              <div>
+                <div className="font-bold text-lg text-blue-800">{selectedPackage.name}</div>
+                <div className="text-gray-700 text-sm">{selectedPackage.description}</div>
+                <div className="text-xs text-gray-500 mt-1">Category: {selectedPackage.category}</div>
+              </div>
             </div>
           )}
-          
-          <div className="flex justify-between">
-            <span>Date & Time:</span>
-            <span className="font-medium">
-              {new Date(bookingData.date).toLocaleDateString()} at {bookingData.time}
-            </span>
-          </div>
-          
-          <div className="flex justify-between">
-            <span>Participants:</span>
-            <span className="font-medium">{bookingData.participants}</span>
+
+          {/* Date, Time, Room */}
+          <div className="flex flex-col gap-1 border-b pb-3 mb-3">
+            <div className="flex justify-between">
+              <span>Date & Time:</span>
+              <span className="font-medium">
+                {new Date(bookingData.date).toLocaleDateString()} at {bookingData.time}
+              </span>
+            </div>
+            {selectedRoom && (
+              <div className="flex justify-between">
+                <span>Room:</span>
+                <span className="font-medium">{selectedRoom}</span>
+              </div>
+            )}
+            <div className="flex justify-between">
+              <span>Participants:</span>
+              <span className="font-medium">{bookingData.participants}</span>
+            </div>
+            {selectedPackage && bookingData.participants > selectedPackage.maxParticipants && selectedPackage.pricePerAdditional && (
+              <div className="flex justify-between text-sm text-blue-800">
+                <span>Additional ({bookingData.participants - selectedPackage.maxParticipants} x ${selectedPackage.pricePerAdditional}):</span>
+                <span>${(bookingData.participants - selectedPackage.maxParticipants) * selectedPackage.pricePerAdditional}</span>
+              </div>
+            )}
+            {selectedPackage && (
+              <div className="flex justify-between">
+                <span>Duration:</span>
+                <span className="font-medium">{formatDuration(selectedPackage)}</span>
+              </div>
+            )}
           </div>
 
-          {selectedPackage && (
-            <div className="flex justify-between">
-              <span>Duration:</span>
-              <span className="font-medium">{formatDuration(selectedPackage)}</span>
-            </div>
-          )}
-          
+          {/* Attractions */}
           {bookingData.selectedAttractions.length > 0 && (
-            <div>
-              <div className="font-medium mb-1">Attractions:</div>
+            <div className="border-b pb-3 mb-3">
+              <div className="font-medium mb-1 text-blue-800">Attractions:</div>
               {bookingData.selectedAttractions.map(({ id, quantity }) => {
                 const attraction = attractions.find(a => a.id === id);
                 return (
@@ -910,23 +1018,41 @@ const OnsiteBooking: React.FC = () => {
               })}
             </div>
           )}
-          
+
+          {/* Add-ons */}
           {bookingData.selectedAddOns.length > 0 && (
-            <div>
-              <div className="font-medium mb-1">Add-ons:</div>
+            <div className="border-b pb-3 mb-3">
+              <div className="font-medium mb-1 text-blue-800">Add-ons:</div>
               {bookingData.selectedAddOns.map(({ name, quantity }) => {
                 const addOn = selectedPackage?.addOns.find(a => a.name === name);
                 return (
-                  <div key={name} className="flex justify-between text-sm ml-2">
-                    <span>{name} (x{quantity})</span>
+                  <div key={name} className="flex items-center justify-between text-sm ml-2 gap-2">
+                    <div className="flex items-center gap-2">
+                      {addOn?.image && (
+                        <img src={addOn.image} alt={addOn.name} className="w-8 h-8 object-cover rounded border" />
+                      )}
+                      <span>{name} (x{quantity})</span>
+                    </div>
                     <span>${addOn ? addOn.price * quantity : 0}</span>
                   </div>
                 );
               })}
             </div>
           )}
-          
-          <div className="border-t pt-3 mt-3">
+
+          {/* Customer Info */}
+          <div className="border-b pb-3 mb-3">
+            <div className="font-medium mb-1 text-blue-800">Customer Info:</div>
+            <div className="flex flex-col gap-1 ml-2 text-sm">
+              <div><span className="font-medium">Name:</span> {bookingData.customer.firstName} {bookingData.customer.lastName}</div>
+              <div><span className="font-medium">Email:</span> {bookingData.customer.email}</div>
+              <div><span className="font-medium">Phone:</span> {bookingData.customer.phone}</div>
+              {bookingData.notes && <div><span className="font-medium">Notes:</span> {bookingData.notes}</div>}
+            </div>
+          </div>
+
+          {/* Total */}
+          <div className="pt-3">
             <div className="flex justify-between text-lg font-bold">
               <span>Total:</span>
               <span>${calculateTotal().toFixed(2)}</span>
@@ -964,7 +1090,8 @@ const OnsiteBooking: React.FC = () => {
         </button>
         <button
           type="submit"
-          className="bg-green-800 text-white px-6 py-3 rounded-lg hover:bg-green-800"
+          className={`px-6 py-3 rounded-lg transition-colors ${!isBookingValid() ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-green-800 text-white hover:bg-green-800'}`}
+          disabled={!isBookingValid()}
         >
           Confirm Booking
         </button>

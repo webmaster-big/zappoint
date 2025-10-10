@@ -43,6 +43,7 @@ import LocationAnalytics from "./pages/admin/Analytics/LocationManagerAnalytics"
 import CompanyAnalytics from "./pages/admin/Analytics/CompanyAnalytics";
 import AttendantActivityLogs from "./pages/admin/Attendants/AttendantActivityLogs";
 import ManageAttendants from "./pages/admin/Attendants/ManageAttendants";
+import ManageAddOns from "./pages/admin/packages/AddOns";
 
 
 function App() {
@@ -69,6 +70,7 @@ function App() {
           <Route path="/packages/create" element={<CreatePackage />} />
           <Route path="/packages" element={<Packages />} />
           <Route path="/packages/promos" element={<Promo />} />
+          <Route path="/packages/add-ons" element={<ManageAddOns />} />
           <Route path="/packages/gift-cards" element={<GiftCard />} />
           <Route path="/bookings" element={<Bookings />} />
           <Route path="/bookings/calendar" element={<CalendarView />} />

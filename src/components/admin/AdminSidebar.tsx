@@ -131,6 +131,7 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
         { label: 'Packages', icon: Package, items: [
           { label: 'Packages', href: '/packages', icon: Dot },
           { label: 'Create Package', href: '/packages/create', icon: Dot },
+          { label: 'Add-ons', href: '/packages/add-ons', icon: Dot },
           { label: 'Promos', href: '/packages/promos', icon: Dot },
           { label: 'Gift Cards', href: '/packages/gift-cards', icon: Dot }
         ]},
@@ -160,6 +161,7 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
         { label: 'Packages', icon: Package, items: [
           { label: 'Packages', href: '/packages', icon: Dot },
           { label: 'Create Package', href: '/packages/create', icon: Dot },
+          { label: 'Add-ons', href: '/packages/add-ons', icon: Dot },
           { label: 'Promos', href: '/packages/promos', icon: Dot },
           { label: 'Gift Cards', href: '/packages/gift-cards', icon: Dot }
         ]},
@@ -197,6 +199,7 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
         { label: 'Packages', icon: Package, items: [
           { label: 'Packages', href: '/packages', icon: Dot },
           { label: 'Create Package', href: '/packages/create', icon: Dot },
+          { label: 'Add-ons', href: '/packages/add-ons', icon: Dot },
           { label: 'Promos', href: '/packages/promos', icon: Dot },
           { label: 'Gift Cards', href: '/packages/gift-cards', icon: Dot }
         ]},

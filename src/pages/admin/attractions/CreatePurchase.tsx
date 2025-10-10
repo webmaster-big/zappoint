@@ -183,27 +183,37 @@ const CreatePurchase = () => {
                 {filteredAttractions.filter(a => a.status === 'active').map(attraction => (
                   <div
                     key={attraction.id}
-                    className={`border rounded-lg p-4 cursor-pointer transition-colors ${
+                    className={`border rounded-lg p-4 cursor-pointer transition-colors flex gap-4 ${
                       selectedAttraction?.id === attraction.id
                         ? 'border-blue-500 bg-blue-50'
                         : 'border-gray-200 hover:border-blue-300'
                     }`}
                     onClick={() => handleAddToCart(attraction)}
                   >
-                    <h3 className="font-semibold text-gray-800">{attraction.name}</h3>
-                    <p className="text-sm text-gray-600 mb-2">{attraction.category}</p>
-                    <div className="flex justify-between items-center">
-                      <span className="text-lg font-bold text-blue-600">
-                        ${attraction.price}
-                        <span className="text-xs font-normal text-gray-500 ml-1">
-                          {attraction.pricingType === 'per_person' ? '/person' : 
-                           attraction.pricingType === 'per_group' ? '/group' : 
-                           attraction.pricingType === 'per_hour' ? '/hour' : ''}
+                    {/* Attraction Image */}
+                    <div className="w-20 h-20 flex-shrink-0 flex items-center justify-center bg-gray-100 rounded-md border border-gray-200 overflow-hidden">
+                      {attraction.images && attraction.images.length > 0 ? (
+                        <img src={attraction.images[0]} alt={attraction.name} className="object-cover w-full h-full" />
+                      ) : (
+                        <span className="text-gray-400 text-xs">No Image</span>
+                      )}
+                    </div>
+                    <div className="flex-1 flex flex-col justify-between">
+                      <h3 className="font-semibold text-gray-800">{attraction.name}</h3>
+                      <p className="text-sm text-gray-600 mb-2">{attraction.category}</p>
+                      <div className="flex justify-between items-center">
+                        <span className="text-lg font-bold text-blue-600">
+                          ${attraction.price}
+                          <span className="text-xs font-normal text-gray-500 ml-1">
+                            {attraction.pricingType === 'per_person' ? '/person' : 
+                             attraction.pricingType === 'per_group' ? '/group' : 
+                             attraction.pricingType === 'per_hour' ? '/hour' : ''}
+                          </span>
                         </span>
-                      </span>
-                      <span className="text-xs text-gray-500">
-                        {attraction.duration} {attraction.durationUnit}
-                      </span>
+                        <span className="text-xs text-gray-500">
+                          {attraction.duration} {attraction.durationUnit}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -275,8 +285,15 @@ const CreatePurchase = () => {
                         <X className="h-4 w-4" />
                       </button>
                     </div>
+                    {/* Attraction Image */}
+                    <div className="mb-3 w-full flex justify-center">
+                      {selectedAttraction.images && selectedAttraction.images.length > 0 ? (
+                        <img src={selectedAttraction.images[0]} alt={selectedAttraction.name} className="max-h-32 rounded-lg object-contain border border-gray-200" />
+                      ) : (
+                        <span className="text-gray-400 text-xs">No Image</span>
+                      )}
+                    </div>
                     <p className="text-sm text-gray-600 mb-3">{selectedAttraction.category}</p>
-                    
                     {/* Quantity Selector */}
                     <div className="mb-4">
                       <label className="block text-sm font-medium text-gray-700 mb-2">Quantity</label>

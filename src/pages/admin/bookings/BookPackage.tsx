@@ -22,11 +22,12 @@ interface Package {
   pricePerAdditional1hr: string;
   promos: PromoOrGiftCard[];
   giftCards: PromoOrGiftCard[];
-  addOns: { name: string; price: number; unit?: string }[];
+  addOns: { name: string; price: number; unit?: string; image?: string }[];
   availabilityType: "daily" | "weekly" | "monthly";
   availableDays: string[];
   availableWeekDays: string[];
   availableMonthDays: string[];
+  image?: string;
 }
 
 interface Booking {
@@ -96,12 +97,18 @@ const BookPackage: React.FC = () => {
   const [giftCardCode, setGiftCardCode] = useState("");
   const [appliedPromo, setAppliedPromo] = useState<PromoOrGiftCard | null>(null);
   const [appliedGiftCard, setAppliedGiftCard] = useState<PromoOrGiftCard | null>(null);
-  const [participants, setParticipants] = useState(1);
+  const [participants, setParticipants] = useState<number>(() => {
+    // Default to maxParticipants if available, else 1
+    const packages = JSON.parse(localStorage.getItem("zapzone_packages") || "[]");
+    const found = packages.find((p: Package) => p.id === id);
+    return found && found.maxParticipants ? Number(found.maxParticipants) : 1;
+  });
   const [form, setForm] = useState({
     firstName: "",
     lastName: "",
     email: "",
     phone: "",
+    notes: ""
   });
   const [paymentMethod, setPaymentMethod] = useState("stripe");
   const [paymentType, setPaymentType] = useState<'full' | 'partial'>('full');
@@ -325,7 +332,7 @@ const BookPackage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center py-8 px-4">
-      <div className="w-full max-w-6xl flex flex-col md:flex-row gap-8">
+        <div className="w-full max-w-6xl flex flex-col md:flex-row gap-8">
         {/* Left: Booking Form */}
         <div className="flex-1 min-w-0">
           <div className="mb-8 bg-white rounded-xl p-6 shadow-sm border border-gray-100">
@@ -422,26 +429,26 @@ const BookPackage: React.FC = () => {
                     
                     <div>
                       <label className="block font-medium mb-2 text-gray-800 text-sm">Time</label>
-                      <select
-                        value={selectedTime}
-                        onChange={(e) => setSelectedTime(e.target.value)}
-                        className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
-                        disabled={!selectedRoom || availableTimes.length === 0}
-                      >
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                         {availableTimes.length > 0 ? (
                           availableTimes.map((time) => (
-                            <option key={time} value={time}>{time}</option>
+                            <label key={time} className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition ${selectedTime === time ? 'border-blue-800 bg-blue-50' : 'border-gray-300 bg-white hover:border-blue-400'}`}> 
+                              <input
+                                type="radio"
+                                name="timeSelection"
+                                value={time}
+                                checked={selectedTime === time}
+                                onChange={() => setSelectedTime(time)}
+                                className="accent-blue-800"
+                                disabled={!selectedRoom}
+                              />
+                              <span className="text-sm text-gray-800">{time}</span>
+                            </label>
                           ))
                         ) : (
-                          <option value="">Select a room first</option>
+                          <span className="text-xs text-gray-400 col-span-2">{!selectedRoom ? 'Select a room first' : 'No available times for this room on the selected date'}</span>
                         )}
-                      </select>
-                      {!selectedRoom && (
-                        <p className="text-xs text-red-500 mt-1">Please select a room to see available times</p>
-                      )}
-                      {selectedRoom && availableTimes.length === 0 && (
-                        <p className="text-xs text-red-500 mt-1">No available times for this room on the selected date</p>
-                      )}
+                      </div>
                     </div>
                   </div>
                   
@@ -452,32 +459,23 @@ const BookPackage: React.FC = () => {
                   </div>
                 </div>
                 
-                {/* Duration Display */}
-                <div className="bg-blue-50 p-5 rounded-xl">
-                  <label className="block font-medium mb-3 text-gray-800 text-sm uppercase tracking-wide">Duration</label>
-                  <div className="flex items-center">
-                    <svg className="w-5 h-5 text-gray-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                    </svg>
-                    <span className="text-gray-800 font-medium">{formatDuration()}</span>
-                  </div>
-                </div>
+          
                 
                 <div className="bg-blue-50 p-5 rounded-xl">
                   <label className="block font-medium mb-3 text-gray-800 text-sm uppercase tracking-wide">Participants</label>
                   <div className="flex items-center">
                     <button 
                       className="w-10 h-10 rounded-lg bg-white border border-gray-300 text-gray-800 flex items-center justify-center shadow-sm"
-                      onClick={() => setParticipants(Math.max(1, participants - 1))}
+                      onClick={() => setParticipants(Math.max(Number(pkg.maxParticipants), participants - 1))}
                     >
                       -
                     </button>
                     <input 
                       type="number" 
-                      min={1} 
+                      min={Number(pkg.maxParticipants)} 
                       max={Number(pkg.maxParticipants) + 10} 
                       value={participants} 
-                      onChange={e => setParticipants(Math.max(1, Math.min(Number(pkg.maxParticipants) + 10, Number(e.target.value))))} 
+                      onChange={e => setParticipants(Math.max(Number(pkg.maxParticipants), Math.min(Number(pkg.maxParticipants) + 10, Number(e.target.value))))} 
                       className="w-16 text-center mx-3 rounded-lg border border-gray-300 px-2 py-2 text-base font-medium text-gray-800" 
                     />
                     <button 
@@ -487,7 +485,7 @@ const BookPackage: React.FC = () => {
                       +
                     </button>
                     <span className="ml-4 text-sm text-gray-500">
-                      Max: {pkg.maxParticipants} included, then ${pkg.pricePerAdditional} per additional
+                      Min: {pkg.maxParticipants} included, then ${pkg.pricePerAdditional} per additional
                     </span>
                   </div>
                 </div>
@@ -554,10 +552,18 @@ const BookPackage: React.FC = () => {
                     <label className="block font-medium mb-3 text-gray-800 text-sm uppercase tracking-wide">Add-ons</label>
                     <div className="space-y-4">
                       {pkg.addOns.map((a) => {
-                        const addOn = typeof a === "string" ? { name: a, price: undefined } : a;
+                        const addOn = typeof a === "string" ? { name: a, price: undefined, image: undefined } : a;
                         return (
-                          <div key={addOn.name} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                            <div>
+                          <div key={addOn.name} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg gap-4">
+                            {/* Add-on Image */}
+                            <div className="w-16 h-16 flex-shrink-0 flex items-center justify-center bg-gray-100 rounded-md border border-gray-200 overflow-hidden">
+                              {addOn.image ? (
+                                <img src={addOn.image} alt={addOn.name} className="object-cover w-full h-full" />
+                              ) : (
+                                <span className="text-gray-400 text-xs">No Image</span>
+                              )}
+                            </div>
+                            <div className="flex-1 flex flex-col justify-between">
                               <span className="font-medium text-gray-800 text-sm">{addOn.name}</span>
                               <span className="block text-xs text-gray-500 mt-1">
                                 {typeof addOn.price === "number" && addOn.price > 0 
@@ -594,60 +600,65 @@ const BookPackage: React.FC = () => {
                 )}
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  <div className="border border-gray-200 rounded-xl p-5">
-                    <label className="block font-medium mb-3 text-gray-800 text-sm uppercase tracking-wide">Promo Code</label>
-                    <div className="flex gap-2 items-center">
-                      <input 
-                        type="text" 
-                        value={promoCode} 
-                        onChange={e => setPromoCode(e.target.value)} 
-                        className="flex-1 rounded-lg border border-gray-300 px-4 py-2.5 text-sm" 
-                        placeholder="Enter code" 
-                      />
-                      <button 
-                        type="button" 
-                        onClick={() => handleApplyCode("promo")}
-                        className="px-4 py-2.5 rounded-lg bg-blue-800 text-white font-medium hover:bg-blue-800 transition text-sm shadow-sm"
-                      >
-                        Apply
-                      </button>
-                    </div>
-                    {appliedPromo && (
-                      <div className="mt-3 p-2 bg-green-50 text-green-800 rounded-md text-xs border border-green-200">
-                        ✅ Applied: {appliedPromo.name}
+                  {/* Promo Code Section: Only show if promos exist */}
+                  {pkg.promos && pkg.promos.length > 0 && (
+                    <div className="border border-gray-200 rounded-xl p-5">
+                      <label className="block font-medium mb-3 text-gray-800 text-sm uppercase tracking-wide">Promo Code</label>
+                      <div className="flex gap-2 items-center">
+                        <input 
+                          type="text" 
+                          value={promoCode} 
+                          onChange={e => setPromoCode(e.target.value)} 
+                          className="flex-1 rounded-lg border border-gray-300 px-4 py-2.5 text-sm" 
+                          placeholder="Enter code" 
+                        />
+                        <button 
+                          type="button" 
+                          onClick={() => handleApplyCode("promo")}
+                          className="px-4 py-2.5 rounded-lg bg-blue-800 text-white font-medium hover:bg-blue-800 transition text-sm shadow-sm"
+                        >
+                          Apply
+                        </button>
                       </div>
-                    )}
-                  </div>
-                  
-                  <div className="border border-gray-200 rounded-xl p-5">
-                    <label className="block font-medium mb-3 text-gray-800 text-sm uppercase tracking-wide">Gift Card</label>
-                    <div className="flex gap-2 items-center">
-                      <input 
-                        type="text" 
-                        value={giftCardCode} 
-                        onChange={e => setGiftCardCode(e.target.value)} 
-                        className="flex-1 rounded-lg border border-gray-300 px-4 py-2.5 text-sm" 
-                        placeholder="Enter code" 
-                      />
-                      <button 
-                        type="button" 
-                        onClick={() => handleApplyCode("giftcard")}
-                        className="px-4 py-2.5 rounded-lg bg-green-600 text-white font-medium hover:bg-green-800 transition text-sm shadow-sm"
-                      >
-                        Apply
-                      </button>
+                      {appliedPromo && (
+                        <div className="mt-3 p-2 bg-blue-80 text-blue-800 rounded-md text-xs border border-blue-800">
+                          ✅ Applied: {appliedPromo.name}
+                        </div>
+                      )}
                     </div>
-                    {appliedGiftCard && (
-                      <div className="mt-3 p-2 bg-green-50 text-green-800 rounded-md text-xs border border-green-200">
-                        ✅ Applied: {appliedGiftCard.name}
+                  )}
+                  {/* Gift Card Section: Only show if gift cards exist */}
+                  {pkg.giftCards && pkg.giftCards.length > 0 && (
+                    <div className="border border-gray-200 rounded-xl p-5">
+                      <label className="block font-medium mb-3 text-gray-800 text-sm uppercase tracking-wide">Gift Card</label>
+                      <div className="flex gap-2 items-center">
+                        <input 
+                          type="text" 
+                          value={giftCardCode} 
+                          onChange={e => setGiftCardCode(e.target.value)} 
+                          className="flex-1 rounded-lg border border-gray-300 px-4 py-2.5 text-sm" 
+                          placeholder="Enter code" 
+                        />
+                        <button 
+                          type="button" 
+                          onClick={() => handleApplyCode("giftcard")}
+                          className="px-4 py-2.5 rounded-lg bg-blue-800 text-white font-medium hover:bg-blue-800 transition text-sm shadow-sm"
+                        >
+                          Apply
+                        </button>
                       </div>
-                    )}
-                  </div>
+                      {appliedGiftCard && (
+                        <div className="mt-3 p-2 bg-blue-80 text-blue-800 rounded-md text-xs border border-blue-800">
+                          ✅ Applied: {appliedGiftCard.name}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
                 
                 <div className="flex justify-end pt-4">
                   <button 
-                    className="py-3 px-6 rounded-lg bg-blue-800 text-white font-medium hover:bg-blue-800 transition shadow-sm flex items-center"
+                    className={`py-3 px-6 rounded-lg font-medium transition shadow-sm flex items-center ${(!selectedRoom || !selectedTime) ? 'bg-gray-300 text-gray-400 cursor-not-allowed' : 'bg-blue-800 text-white hover:bg-blue-800'}`}
                     onClick={() => setCurrentStep(2)}
                     disabled={!selectedRoom || !selectedTime}
                   >
@@ -702,6 +713,17 @@ const BookPackage: React.FC = () => {
                       onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} 
                     />
                   </div>
+                  {/* Additional Notes */}
+                  <div className="md:col-span-2">
+                    <label className="block font-medium mb-2 text-gray-800 text-sm">Additional Notes</label>
+                    <textarea
+                      placeholder="Any special requests or notes..."
+                      className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                      value={form.notes}
+                      onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
+                      rows={3}
+                    />
+                  </div>
                 </div>
                 
                 <div className="flex justify-between pt-6">
@@ -715,8 +737,9 @@ const BookPackage: React.FC = () => {
                     Back
                   </button>
                   <button 
-                    className="py-3 px-6 rounded-lg bg-blue-800 text-white font-medium hover:bg-blue-800 transition shadow-sm flex items-center"
+                    className={`py-3 px-6 rounded-lg font-medium transition shadow-sm flex items-center ${(!form.firstName || !form.lastName || !form.email || !form.phone) ? 'bg-gray-300 text-gray-400 cursor-not-allowed' : 'bg-blue-800 text-white hover:bg-blue-800'}`}
                     onClick={() => setCurrentStep(3)}
+                    disabled={!form.firstName || !form.lastName || !form.email || !form.phone}
                   >
                     Continue to Payment
                     <svg className="ml-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -815,7 +838,11 @@ const BookPackage: React.FC = () => {
                     </svg>
                     Back
                   </button>
-                  <button className="py-3 px-8 rounded-lg bg-blue-800 text-white font-medium hover:bg-blue-800 transition shadow-sm" onClick={handlePayNow}>
+                  <button 
+                    className={`py-3 px-8 rounded-lg font-medium transition shadow-sm ${(!paymentMethod || !paymentType) ? 'bg-gray-300 text-gray-400 cursor-not-allowed' : 'bg-blue-800 text-white hover:bg-blue-800'}`}
+                    onClick={handlePayNow}
+                    disabled={!paymentMethod || !paymentType}
+                  >
                     Pay Now
                   </button>
                 </div>
@@ -826,38 +853,40 @@ const BookPackage: React.FC = () => {
         
         {/* Right: Order Summary */}
         <div className="w-full md:w-80 flex-shrink-0">
-          <div className="bg-white rounded-xl shadow-sm p-6 sticky top-6 border border-gray-100">
-            <h3 className="font-semibold text-lg mb-5 text-gray-800 border-b pb-4">Order Summary</h3>
-            
-            <div className="mb-5">
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-gray-600 text-sm">Package:</span>
-                <span className="font-medium text-gray-800 text-sm">{pkg.name}</span>
-              </div>
-              <div className="text-xs text-gray-500 mb-4">{participants} participants</div>
-              
-              {/* Duration in Order Summary */}
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-gray-600 text-sm">Duration:</span>
-                <span className="font-medium text-gray-800 text-sm">{formatDuration()}</span>
-              </div>
-              
-              {selectedDate && (
+            <div className="bg-white rounded-xl shadow-sm p-6 sticky top-6 border border-gray-100">
+              <h3 className="font-semibold text-lg mb-5 text-gray-800 border-b pb-4">Order Summary</h3>
+              {/* Package Image in Order Summary */}
+              {pkg.image && (
+                <div className="mb-4 w-full flex justify-center">
+                  <img src={pkg.image} alt={pkg.name} className="max-h-32 rounded-lg object-contain border border-gray-200" />
+                </div>
+              )}
+              <div className="mb-5">
                 <div className="flex justify-between items-center mb-2">
-                  <span className="text-gray-600 text-sm">Date:</span>
-                  <span className="font-medium text-gray-800 text-sm">
-                    {new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
-                  </span>
+                  <span className="text-gray-600 text-sm">Package:</span>
+                  <span className="font-medium text-gray-800 text-sm">{pkg.name}</span>
                 </div>
-              )}
-              
-              {selectedTime && (
-                <div className="flex justify-between items-center mb-4">
-                  <span className="text-gray-600 text-sm">Time:</span>
-                  <span className="font-medium text-gray-800 text-sm">{selectedTime}</span>
+                <div className="text-xs text-gray-500 mb-4">{participants} participants</div>
+                {/* Duration in Order Summary */}
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-gray-600 text-sm">Duration:</span>
+                  <span className="font-medium text-gray-800 text-sm">{formatDuration()}</span>
                 </div>
-              )}
-            </div>
+                {selectedDate && (
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-gray-600 text-sm">Date:</span>
+                    <span className="font-medium text-gray-800 text-sm">
+                      {new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                    </span>
+                  </div>
+                )}
+                {selectedTime && (
+                  <div className="flex justify-between items-center mb-4">
+                    <span className="text-gray-600 text-sm">Time:</span>
+                    <span className="font-medium text-gray-800 text-sm">{selectedTime}</span>
+                  </div>
+                )}
+              </div>
             
             <div className="space-y-4 border-t pt-4 text-sm">
               <div className="flex justify-between">
@@ -933,14 +962,14 @@ const BookPackage: React.FC = () => {
               )}
               
               {appliedPromo && (
-                <div className="flex justify-between text-green-600">
+                <div className="flex justify-between text-blue-800">
                   <span>Promo Discount</span>
                   <span>-${promoDiscount.toFixed(2)}</span>
                 </div>
               )}
               
               {appliedGiftCard && (
-                <div className="flex justify-between text-green-600">
+                <div className="flex justify-between text-blue-800">
                   <span>Gift Card</span>
                   <span>-${giftCardDiscount.toFixed(2)}</span>
                 </div>
