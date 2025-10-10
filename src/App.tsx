@@ -38,11 +38,11 @@ import CreateAccount from "./pages/admin/users/CreateAccounts";
 import EntertainmentLandingPage from "./pages/customer/Home";
 import CustomerLogin from "./pages/customer/CustomerLogin";
 import CustomerRegister from "./pages/customer/CustomerRegister";
-import AttendantsPerformance from "./pages/admin/attendants/AttendantsPerformance";
-import LocationAnalytics from "./pages/admin/analytics/LocationManagerAnalytics";
-import CompanyAnalytics from "./pages/admin/analytics/CompanyAnalytics";
-import AttendantActivityLogs from "./pages/admin/attendants/AttendantActivityLogs";
-import ManageAttendants from "./pages/admin/attendants/ManageAttendants";
+import AttendantsPerformance from "./pages/admin/Attendants/AttendantsPerformance";
+import LocationAnalytics from "./pages/admin/Analytics/LocationManagerAnalytics";
+import CompanyAnalytics from "./pages/admin/Analytics/CompanyAnalytics";
+import AttendantActivityLogs from "./pages/admin/Attendants/AttendantActivityLogs";
+import ManageAttendants from "./pages/admin/Attendants/ManageAttendants";
 
 
 function App() {
