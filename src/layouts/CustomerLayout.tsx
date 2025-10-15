@@ -3,8 +3,6 @@ import {
   Menu,
   X,
   ChevronRight,
-  LogOut,
-  Settings,
   Bell
 } from 'lucide-react';
 import { Link, useLocation, Outlet } from 'react-router-dom';
