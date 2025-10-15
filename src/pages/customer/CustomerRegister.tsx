@@ -1,16 +1,18 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, ArrowLeft } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
+import type { RegisterFormData } from '../../types/customer';
 
 const CustomerRegister = () => {
   const navigate = useNavigate();
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<RegisterFormData>({
     firstName: '',
     lastName: '',
     email: '',
     phone: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
+    agreeToTerms: false
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -69,6 +71,7 @@ const CustomerRegister = () => {
       localStorage.setItem('customer_user', JSON.stringify(newUser));
       navigate('/');
     } catch (err) {
+      console.error(err);
       setError('Registration failed. Please try again.');
     } finally {
       setIsLoading(false);
@@ -99,24 +102,6 @@ const CustomerRegister = () => {
       {/* Right Side - Register Form */}
       <div className="flex-1 max-w-full lg:w-2/5 xl:w-1/3 flex flex-col items-center justify-center py-12 px-4 sm:px-6 lg:px-12 xl:px-16">
         <div className="mx-auto w-full max-w-md">
-          {/* Back Button - Mobile */}
-          <button
-            onClick={() => navigate(-1)}
-            className="lg:hidden flex items-center text-zinc-600 hover:text-zinc-800 mb-6 transition-colors"
-          >
-            <ArrowLeft size={20} className="mr-2" />
-            Back
-          </button>
-
-          {/* Logo - Mobile */}
-          <div className="lg:hidden flex justify-center mb-8">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-blue-800 rounded-lg flex items-center justify-center">
-                <div className="w-6 h-6 bg-white rounded-full"></div>
-              </div>
-              <span className="text-xl font-bold text-zinc-900">Zap Zone</span>
-            </div>
-          </div>
 
           <div className="mb-8">
             <h1 className="text-2xl sm:text-3xl font-bold text-zinc-900 mb-2 tracking-tight">Create your account</h1>

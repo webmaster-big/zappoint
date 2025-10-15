@@ -8,21 +8,19 @@ import {
   Zap,
   Ticket,
   Package,
-  Filter,
   Search,
   ChevronRight
 } from 'lucide-react';
-import CustomerLayout from '../../layouts/CustomerLayout';
+import type { Attraction, Package as PackageType, BookingType } from '../../types/customer';
 
 const EntertainmentLandingPage = () => {
   const [selectedLocation, setSelectedLocation] = useState('All Locations');
-  const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedAttraction, setSelectedAttraction] = useState<typeof attractions[0] | null>(null);
-  const [selectedPackage, setSelectedPackage] = useState<typeof packages[0] | null>(null);
+  const [selectedAttraction, setSelectedAttraction] = useState<Attraction | null>(null);
+  const [selectedPackage, setSelectedPackage] = useState<PackageType | null>(null);
   const [showLocationModal, setShowLocationModal] = useState(false);
 
-  const [activeBookingType, setActiveBookingType] = useState<'attraction' | 'package' | null>(null);
+  const [activeBookingType, setActiveBookingType] = useState<BookingType | null>(null);
 
   const locations = [
     'Brighton', 'Canton', 'Farmington', 'Lansing', 'Taylor', 
@@ -30,7 +28,7 @@ const EntertainmentLandingPage = () => {
   ];
 
   // Sample attractions data
-  const attractions = [
+  const attractions: Attraction[] = [
     {
       id: 1,
       name: 'Laser Tag Arena',
@@ -107,7 +105,7 @@ const EntertainmentLandingPage = () => {
   ];
 
   // Sample packages data
-  const packages = [
+  const packages: PackageType[] = [
     {
       id: 1,
       name: 'Birthday Bash Package',
@@ -188,45 +186,32 @@ const EntertainmentLandingPage = () => {
     }
   ];
 
-  const categories = [
-    { id: 'all', name: 'All Activities' },
-    { id: 'adventure', name: 'Adventure' },
-    { id: 'technology', name: 'Technology' },
-    { id: 'sports', name: 'Sports' },
-    { id: 'games', name: 'Games' },
-    { id: 'celebration', name: 'Celebration' },
-    { id: 'corporate', name: 'Corporate' },
-    { id: 'family', name: 'Family' },
-    { id: 'premium', name: 'Premium' }
-  ];
 
   const filteredAttractions = attractions.filter(attraction => {
     const matchesLocation = selectedLocation === 'All Locations' || 
       attraction.availableLocations.includes(selectedLocation);
-    const matchesCategory = selectedCategory === 'all' || attraction.category === selectedCategory;
     const matchesSearch = attraction.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       attraction.description.toLowerCase().includes(searchQuery.toLowerCase());
     
-    return matchesLocation && matchesCategory && matchesSearch;
+    return matchesLocation && matchesSearch;
   });
 
   const filteredPackages = packages.filter(pkg => {
     const matchesLocation = selectedLocation === 'All Locations' || 
       pkg.availableLocations.includes(selectedLocation);
-    const matchesCategory = selectedCategory === 'all' || pkg.category === selectedCategory;
     const matchesSearch = pkg.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       pkg.description.toLowerCase().includes(searchQuery.toLowerCase());
     
-    return matchesLocation && matchesCategory && matchesSearch;
+    return matchesLocation && matchesSearch;
   });
 
-  const handleBuyTickets = (attraction: typeof attractions[0]) => {
+  const handleBuyTickets = (attraction: Attraction) => {
     setSelectedAttraction(attraction);
     setActiveBookingType('attraction');
     setShowLocationModal(true);
   };
 
-  const handleBookPackage = (pkg: typeof packages[0]) => {
+  const handleBookPackage = (pkg: PackageType) => {
     setSelectedPackage(pkg);
     setActiveBookingType('package');
     setShowLocationModal(true);
@@ -250,13 +235,9 @@ const EntertainmentLandingPage = () => {
   };
 
   return (
-    <CustomerLayout 
-      selectedLocation={selectedLocation} 
-      onLocationChange={setSelectedLocation}
-    >
-
+    <>
       {/* Hero Section */}
-      <section className="relative text-white py-38 overflow-hidden">
+      <section className="relative text-white py-38 overflow-hidden" style={{marginTop: '-4rem'}}>
         {/* Video Background (hidden on mobile) */}
         <div className="hidden md:block absolute inset-0 z-0">
           <div style={{ position: 'relative', paddingTop: '56.25%' }}>
@@ -318,29 +299,40 @@ const EntertainmentLandingPage = () => {
         <div className="absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t from-gray-50/20 to-transparent"></div>
       </section>
 
-      {/* Filters */}
-      <section className="bg-gray-50 py-6 border-b border-gray-200">
+      {/* Location Selector Only */}
+      <section className="bg-white py-8 border-b border-gray-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div className="flex items-center space-x-3">
-              <Filter size={20} className="text-gray-600" />
-              <span className="text-sm font-medium text-gray-700">Filter by Category:</span>
-            </div>
-            
-            <div className="flex flex-wrap gap-2">
-              {categories.map(category => (
+          <div className="space-y-6">
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-semibold text-gray-900 tracking-wide">Select Locations</h3>
+              <div className="flex flex-wrap gap-2">
                 <button
-                  key={category.id}
-                  onClick={() => setSelectedCategory(category.id)}
-                  className={`px-4 py-2 text-sm font-medium transition ${
-                    selectedCategory === category.id
-                      ? 'bg-blue-800 text-white'
-                      : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                  onClick={() => setSelectedLocation('All Locations')}
+                  className={`px-3 py-2 text-xs font-medium transition-all duration-200 ${
+                    selectedLocation === 'All Locations'
+                        ? 'bg-blue-800 text-white shadow-sm'
+                      : 'bg-gray-50 text-gray-700 hover:bg-gray-100 hover:text-gray-900 hover:shadow-md'
                   }`}
                 >
-                  {category.name}
+                  All Locations
                 </button>
-              ))}
+                {locations.map(location => (
+                  <button
+                    key={location}
+                    onClick={() => setSelectedLocation(location)}
+                    className={`px-3 py-2 text-xs font-medium transition-all duration-200 ${
+                      selectedLocation === location
+                        ? 'bg-blue-800 text-white shadow-sm'
+                        : 'bg-gray-50 text-gray-700 hover:bg-gray-100 hover:text-gray-900 hover:shadow-md'
+                    }`}
+                  >
+                    {location}
+                  </button>
+                ))}
+              </div>
+              </div>
+              
             </div>
           </div>
         </div>
@@ -609,7 +601,7 @@ const EntertainmentLandingPage = () => {
           </div>
         </div>
       </footer>
-    </CustomerLayout>
+    </>
   );
 };
 

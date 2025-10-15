@@ -1,6 +1,3 @@
-
-
-
 import Navigation from "../components/navigations/Navigation";
 import { useState } from "react";
 

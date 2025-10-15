@@ -44,6 +44,10 @@ import CompanyAnalytics from "./pages/admin/Analytics/CompanyAnalytics";
 import AttendantActivityLogs from "./pages/admin/Attendants/AttendantActivityLogs";
 import ManageAttendants from "./pages/admin/Attendants/ManageAttendants";
 import ManageAddOns from "./pages/admin/packages/AddOns";
+import CustomerReservations from "./pages/customer/CustomerReservation";
+import CustomerGiftCards from './pages/customer/CustomerGiftCards';
+import CustomerNotifications from "./pages/customer/CustomerNotifications";
+import CustomerLayout from "./layouts/CustomerLayout";
 
 
 function App() {
@@ -56,7 +60,12 @@ function App() {
         <Route path="/home" element={<Home />} />
         <Route path="/customer/login" element={<CustomerLogin />} />
         <Route path="/customer/register" element={<CustomerRegister />} />
-        <Route path="/" element={<EntertainmentLandingPage />} />
+        <Route element={<CustomerLayout />}>
+          <Route path="/" element={<EntertainmentLandingPage />} />
+          <Route path="/customer/reservations" element={<CustomerReservations />} />
+          <Route path="/customer/gift-cards" element={<CustomerGiftCards />} />
+          <Route path="/customer/notifications" element={<CustomerNotifications />} />
+        </Route>
         <Route path="/book/package/:id" element={<BookPackage />} />
         <Route path="/purchase/attraction/:id" element={<PurchaseAttraction />} />
         <Route element={<MainLayout />}> 

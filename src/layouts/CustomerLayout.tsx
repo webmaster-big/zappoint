@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { 
-  MapPin, 
   Menu,
   X,
   ChevronRight,
@@ -8,13 +7,7 @@ import {
   Settings,
   Bell
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
-
-interface CustomerLayoutProps {
-  children: React.ReactNode;
-  selectedLocation?: string;
-  onLocationChange?: (location: string) => void;
-}
+import { Link, useLocation, Outlet } from 'react-router-dom';
 
 interface CustomerUser {
   id: string;
@@ -23,20 +16,25 @@ interface CustomerUser {
   // Add other user properties as needed
 }
 
-const CustomerLayout = ({ children, selectedLocation = 'All Locations', onLocationChange }: CustomerLayoutProps) => {
+const CustomerLayout = () => {
+  const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [customerUser, setCustomerUser] = useState<CustomerUser | null>(null);
+  const [isLoading, setIsLoading] = useState(true); // Add loading state
 
-  const locations = [
-    'Brighton', 'Canton', 'Farmington', 'Lansing', 'Taylor', 
-    'Waterford', 'Sterling Heights', 'Battle Creek', 'Ypsilanti', 'Escape Room Zone'
-  ];
+
 
   // Check for logged-in user on component mount
   useEffect(() => {
     checkUserLoginStatus();
   }, []);
+
+  // Close mobile menu when location changes (don't affect user state)
+  useEffect(() => {
+    setMobileMenuOpen(false);
+    setUserMenuOpen(false);
+  }, [location.pathname]);
 
   const checkUserLoginStatus = () => {
     try {
@@ -50,8 +48,12 @@ const CustomerLayout = ({ children, selectedLocation = 'All Locations', onLocati
     } catch (error) {
       console.error('Error reading user data from localStorage:', error);
       setCustomerUser(null);
+    } finally {
+      setIsLoading(false); // Always set loading to false after check
     }
   };
+
+  console.log(window.location.pathname);
 
   const handleLogout = () => {
     localStorage.removeItem('customer_user');
@@ -61,17 +63,17 @@ const CustomerLayout = ({ children, selectedLocation = 'All Locations', onLocati
     // window.location.href = '/';
   };
 
-  const handleLogin = () => {
-    // Optional: Redirect to login page
-    // window.location.href = '/login';
-    console.log('Redirect to login page');
-  };
-
-  const handleCreateAccount = () => {
-    // Optional: Redirect to signup page
-    // window.location.href = '/signup';
-    console.log('Redirect to signup page');
-  };
+  // Don't render anything until we've checked localStorage
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-800 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-white">
@@ -84,7 +86,8 @@ const CustomerLayout = ({ children, selectedLocation = 'All Locations', onLocati
               <img 
                 src="/Zap-Zone.png" 
                 alt="ZapZone Logo" 
-                className="md:w-35 md:h-12 sm:w-20 sm:h-10 object-contain"
+                className="w-28 h-10 sm:w-32 sm:h-12 md:w-36 md:h-14 object-contain"
+                style={{ maxWidth: '140px', height: 'auto' }}
               />
             </div>
             
@@ -92,47 +95,43 @@ const CustomerLayout = ({ children, selectedLocation = 'All Locations', onLocati
             <div className="hidden lg:flex items-center space-x-6">
               {/* Navigation Links (only real pages) */}
               <nav className="flex items-center space-x-4">
+            
                 {customerUser && (
                   <>
-                    <Link to="/customer/reservations" className="text-gray-700 hover:text-blue-800 font-medium transition-colors px-2 py-1">
+                      <Link
+                  to="/"
+                  className={`px-2 py-1 font-medium text-sm transition-colors ${location.pathname === '/' ? 'text-blue-800 border-b-2 border-blue-800' : 'text-gray-700 hover:text-blue-800'}`}
+                >
+                  Home
+                </Link>
+                    <Link
+                      to="/customer/reservations"
+                      className={`px-2 py-1 font-medium text-sm transition-colors ${location.pathname.startsWith('/customer/reservations') ? 'text-blue-800 border-b-2 border-blue-800' : 'text-gray-700 hover:text-blue-800'}`}
+                    >
                       Reservations
                     </Link>
-                    <Link to="/customer/gift-cards" className="text-gray-700 hover:text-blue-800 font-medium transition-colors px-2 py-1">
+                   
+                    <Link
+                      to="/customer/gift-cards"
+                      className={`px-2 py-1 font-medium text-sm transition-colors ${location.pathname.startsWith('/customer/gift-cards') ? 'text-blue-800 border-b-2 border-blue-800' : 'text-gray-700 hover:text-blue-800'}`}
+                    >
                       Gift Cards
                     </Link>
-                   
                   </>
                 )}
               </nav>
-
-              {/* Location Selector - updated design */}
-              <div className="relative">
-                <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-blue-800" size={18} />
-                <select
-                  value={selectedLocation}
-                  onChange={(e) => onLocationChange?.(e.target.value)}
-                  className="pl-10 pr-6 py-2 rounded-none border border-blue-800 bg-white text-gray-900 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-800 focus:bg-blue-50 hover:bg-blue-50 transition-all shadow-none appearance-none"
-                  style={{ minWidth: 160 }}
-                >
-                  <option value="All Locations">All Locations</option>
-                  {locations.map(location => (
-                    <option key={location} value={location}>{location}</option>
-                  ))}
-                </select>
-              </div>
-              
               {/* Auth Buttons - Conditional Rendering */}
               {customerUser ? (
                 /* Logged In User Menu + Notification */
                 <div className="flex items-center space-x-2 relative">
                   {/* Notification Bell */}
                   <Link to="/customer/notifications" className="p-2 hover:bg-blue-50 text-blue-800 transition-colors">
-                    <Bell size={20} />
+                    <Bell size={16} />
                   </Link>
                   {/* User Menu */}
                   <div className="relative">
                     <button 
-                      className="flex items-center space-x-2 px-4 py-2 text-gray-700 hover:text-blue-800 font-medium transition-colors hover:bg-blue-50"
+                      className="flex items-center space-x-2 px-4 py-2 text-sm text-gray-700 hover:text-blue-800 font-medium transition-colors hover:bg-blue-50"
                       onClick={() => setUserMenuOpen(!userMenuOpen)}
                     >
                       <span>{customerUser.name || 'My Account'}</span>
@@ -145,18 +144,17 @@ const CustomerLayout = ({ children, selectedLocation = 'All Locations', onLocati
                     {userMenuOpen && (
                       <div className="absolute right-0 mt-1 w-48 bg-white border border-blue-800 py-1 z-50">
                         <div className="px-4 py-2 border-b border-blue-200">
+                          
                           <p className="text-sm font-medium text-gray-900">{customerUser.name}</p>
                           <p className="text-sm text-gray-500 truncate">{customerUser.email}</p>
                         </div>
                         <button className="w-full flex items-center space-x-2 px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 transition-colors">
-                          <Settings size={16} />
                           <span>Account Settings</span>
                         </button>
                         <button 
                           className="w-full flex items-center space-x-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
                           onClick={handleLogout}
                         >
-                          <LogOut size={16} />
                           <span>Sign Out</span>
                         </button>
                       </div>
@@ -168,15 +166,13 @@ const CustomerLayout = ({ children, selectedLocation = 'All Locations', onLocati
                 <div className="flex items-center space-x-2">
                   <Link 
                     to="/customer/login"
-                    className="flex items-center space-x-2 px-4 py-2 text-gray-700 hover:text-blue-800 font-medium transition-colors"
-                    onClick={handleLogin}
+                    className="flex items-center text-sm space-x-2 px-5 py-2 rounded-full border border-blue-800 text-blue-800 font-semibold bg-white shadow-sm hover:bg-blue-50 hover:text-blue-900 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-800"
                   >
                     <span>Sign In</span>
                   </Link>
                   <Link 
                     to="/customer/register"
-                    className="flex items-center space-x-2 px-4 py-2 bg-blue-800 text-white font-medium hover:bg-blue-900 transition-colors"
-                    onClick={handleCreateAccount}
+                    className="flex items-center text-sm space-x-2 px-5 py-2 rounded-full bg-blue-800 text-white font-semibold shadow-md hover:from-blue-900 hover:to-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-800"
                   >
                     <span>Create Account</span>
                     <ChevronRight size={16} />
@@ -200,32 +196,35 @@ const CustomerLayout = ({ children, selectedLocation = 'All Locations', onLocati
               <div className="space-y-4">
                 {/* Mobile Navigation Links */}
                 <div className="flex flex-col space-y-2">
+                
                   {customerUser && (
                     <>
-                      <Link to="/customer/reservations" className="text-gray-700 hover:text-blue-800 font-medium px-4 py-2 hover:bg-blue-50 transition-colors">
+                      <Link
+                    to="/"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={`px-4 py-2 font-medium text-sm transition-colors ${location.pathname === '/' ? 'text-blue-800 bg-blue-50' : 'text-gray-700 hover:text-blue-800 hover:bg-blue-50'}`}
+                  >
+                    Home
+                  </Link>
+                      <Link
+                        to="/customer/reservations"
+                        onClick={() => setMobileMenuOpen(false)}
+                        className={`px-4 py-2 font-medium text-sm transition-colors ${location.pathname.startsWith('/customer/reservations') ? 'text-blue-800 bg-blue-50' : 'text-gray-700 hover:text-blue-800 hover:bg-blue-50'}`}
+                      >
                         Reservations
                       </Link>
-                      <Link to="/customer/gift-cards" className="text-gray-700 hover:text-blue-800 font-medium px-4 py-2 hover:bg-blue-50 transition-colors">
+                      <Link
+                        to="/customer/gift-cards"
+                        onClick={() => setMobileMenuOpen(false)}
+                        className={`px-4 py-2 font-medium text-sm transition-colors ${location.pathname.startsWith('/customer/gift-cards') ? 'text-blue-800 bg-blue-50' : 'text-gray-700 hover:text-blue-800 hover:bg-blue-50'}`}
+                      >
                         Gift Cards
                       </Link>
                     </>
                   )}
                 </div>
                 
-                {/* Mobile Location Selector */}
-                <div className="relative">
-                  <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-blue-800" size={16} />
-                  <select
-                    value={selectedLocation}
-                    onChange={(e) => onLocationChange?.(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-blue-800 bg-white text-gray-900 font-medium focus:outline-none focus:bg-blue-50"
-                  >
-                    <option value="All Locations">All Locations</option>
-                    {locations.map(location => (
-                      <option key={location} value={location}>{location}</option>
-                    ))}
-                  </select>
-                </div>
+
                 
                 {/* Mobile Auth Buttons - Conditional Rendering */}
                 {customerUser ? (
@@ -248,15 +247,19 @@ const CustomerLayout = ({ children, selectedLocation = 'All Locations', onLocati
                   <div className="space-y-2 pt-2">
                     <Link 
                       to="/customer/login"
-                      className="w-full flex items-center justify-center space-x-2 px-4 py-2 border border-blue-800 text-gray-700 font-medium hover:bg-blue-50 transition-colors"
-                      onClick={handleLogin}
+                      className="w-full flex items-center text-sm justify-center space-x-2 px-5 py-2 rounded-full border border-blue-800 text-blue-800 font-semibold bg-white shadow-sm hover:bg-blue-50 hover:text-blue-900 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-800"
+                      onClick={() => {
+                        setMobileMenuOpen(false);
+                      }}
                     >
                       <span>Sign In</span>
                     </Link>
                     <Link
                       to="/customer/register"
-                      className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-blue-800 text-white font-medium hover:bg-blue-900 transition-colors"
-                      onClick={handleCreateAccount}
+                      className="w-full flex items-center text-sm justify-center space-x-2 px-5 py-2 rounded-full bg-gradient-to-r from-blue-800 to-blue-600 text-white font-semibold shadow-md hover:from-blue-900 hover:to-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-800"
+                      onClick={() => {
+                        setMobileMenuOpen(false);
+                      }}
                     >
                       <span>Create Account</span>
                       <ChevronRight size={16} />
@@ -271,7 +274,7 @@ const CustomerLayout = ({ children, selectedLocation = 'All Locations', onLocati
 
       {/* Page Content */}
       <main>
-        {children}
+        <Outlet />
       </main>
     </div>
   );
