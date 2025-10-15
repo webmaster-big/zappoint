@@ -83,7 +83,7 @@ export interface BookingData {
 export interface Booking {
   id: string;
   type: 'package' | 'attraction';
-  packageName?: string;
+  packageName: string;
   customerName: string;
   email: string;
   phone: string;

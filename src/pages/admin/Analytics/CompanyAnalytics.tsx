@@ -10,17 +10,18 @@ import {
   TrendingUp,
   TrendingDown,
 } from 'lucide-react';
+import type { Booking } from '../../../types/booking';
 
-// Interface Definitions
-interface Booking {
-  id: string;
-  date: string;
-  package: string;
-  participants: number;
-  amount: number;
-  status: 'Confirmed' | 'Pending' | 'Cancelled';
-  location: string;
-}
+// // Interface Definitions
+// interface Booking {
+//   id: string;
+//   date: string;
+//   package: string;
+//   participants: number;
+//   amount: number;
+//   status: 'Confirmed' | 'Pending' | 'Cancelled';
+//   location: string;
+// }
 
 interface TicketPurchase {
   id: string;
@@ -62,10 +63,7 @@ interface MetricCardProps {
   trend?: 'up' | 'down';
 }
 
-// Props for the main component (empty for now but good practice)
-interface CompanyAnalyticsProps {}
-
-const CompanyAnalytics: React.FC<CompanyAnalyticsProps> = () => {
+const CompanyAnalytics: React.FC<null> = () => {
   const [timeRange, setTimeRange] = useState<string>('30d');
   const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
   const [reportType, setReportType] = useState<string>('overview');
@@ -181,7 +179,7 @@ const CompanyAnalytics: React.FC<CompanyAnalyticsProps> = () => {
       const locationBookings = locationData.bookings.length;
       const locationTickets = locationData.ticketPurchases.length;
       const locationRevenue = 
-        locationData.bookings.reduce((sum: number, b: Booking) => sum + b.amount, 0) +
+        locationData.bookings.reduce((sum: number, b: Booking) => sum + b.totalAmount, 0) +
         locationData.ticketPurchases.reduce((sum: number, t: TicketPurchase) => sum + t.amount, 0);
       const locationParticipants = locationData.bookings.reduce((sum: number, b: Booking) => sum + b.participants, 0);
 
@@ -199,7 +197,7 @@ const CompanyAnalytics: React.FC<CompanyAnalyticsProps> = () => {
 
       // Package revenue breakdown
       locationData.bookings.forEach((booking: Booking) => {
-        packageRevenue[booking.package] = (packageRevenue[booking.package] || 0) + booking.amount;
+        packageRevenue[booking.packageName] = (packageRevenue[booking.packageName] || 0) + booking.totalAmount;
       });
 
       // Attraction revenue breakdown
