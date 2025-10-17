@@ -529,7 +529,10 @@ const EntertainmentLandingPage = () => {
             {/* Modal Header */}
             <div className="relative h-64 bg-gradient-to-br from-violet-500 to-blue-800">
               <button
-                onClick={() => setShowAttractionModal(false)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowAttractionModal(false);
+                }}
                 className="absolute top-4 right-4 p-2 bg-white/20 backdrop-blur-sm rounded-full text-white hover:bg-white/30 transition"
               >
                 <X size={24} />
@@ -641,7 +644,10 @@ const EntertainmentLandingPage = () => {
 
               {/* Action Button */}
               <button
-                onClick={() => handleBuyTickets(selectedAttraction)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleBuyTickets(selectedAttraction);
+                }}
                 className="w-full py-4 bg-blue-800 text-white rounded-lg font-bold text-lg hover:bg-blue-900 transition flex items-center justify-center gap-2"
               >
                 <Ticket size={24} />
@@ -659,7 +665,10 @@ const EntertainmentLandingPage = () => {
             {/* Modal Header */}
             <div className="relative h-64 bg-gradient-to-br from-blue-800 to-violet-500">
               <button
-                onClick={() => setShowPackageModal(false)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowPackageModal(false);
+                }}
                 className="absolute top-4 right-4 p-2 bg-white/20 backdrop-blur-sm rounded-full text-white hover:bg-white/30 transition"
               >
                 <X size={24} />
@@ -767,7 +776,10 @@ const EntertainmentLandingPage = () => {
 
               {/* Action Button */}
               <button
-                onClick={() => handleBookPackage(selectedPackage)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleBookPackage(selectedPackage);
+                }}
                 className="w-full py-4 bg-blue-800 text-white rounded-lg font-bold text-lg hover:bg-blue-900 transition flex items-center justify-center gap-2"
               >
                 <Package size={24} />
@@ -780,8 +792,8 @@ const EntertainmentLandingPage = () => {
 
       {/* Location Selection Modal */}
       {showLocationModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white max-w-md w-full p-6">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onClick={() => setShowLocationModal(false)}>
+          <div className="bg-white max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-2xl font-bold text-gray-900 mb-2">
               Select Location
             </h3>
@@ -827,7 +839,10 @@ const EntertainmentLandingPage = () => {
             </div>
             
             <button
-              onClick={() => setShowLocationModal(false)}
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowLocationModal(false);
+              }}
               className="w-full mt-6 px-4 py-3 border border-gray-300 text-gray-700 hover:bg-gray-50 transition font-semibold"
             >
               Cancel
