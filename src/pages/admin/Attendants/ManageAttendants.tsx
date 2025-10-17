@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   Eye, 
@@ -24,8 +24,8 @@ import type {
 
 interface InvitationModalProps {
   isOpen: boolean;
-  attendantName: string;
-  generatedLink: string;
+  attendantName?: string;
+  generatedLink?: string;
   loading?: boolean;
   onClose: () => void;
   onSendInvitation: (email: string) => void;
@@ -226,6 +226,36 @@ const ManageAttendants = () => {
     }
   ];
 
+  // Apply filters callback
+  const applyFilters = useCallback(() => {
+    let result = [...attendants];
+
+    // Apply search filter
+    if (filters.search) {
+      const searchTerm = filters.search.toLowerCase();
+      result = result.filter(attendant =>
+        attendant.firstName.toLowerCase().includes(searchTerm) ||
+        attendant.lastName.toLowerCase().includes(searchTerm) ||
+        attendant.email.toLowerCase().includes(searchTerm) ||
+        attendant.employeeId.toLowerCase().includes(searchTerm) ||
+        attendant.department.toLowerCase().includes(searchTerm)
+      );
+    }
+
+    // Apply status filter
+    if (filters.status !== 'all') {
+      result = result.filter(attendant => attendant.status === filters.status);
+    }
+
+    // Apply department filter
+    if (filters.department !== 'all') {
+      result = result.filter(attendant => attendant.department === filters.department);
+    }
+
+    setFilteredAttendants(result);
+    setCurrentPage(1); // Reset to first page when filters change
+  }, [attendants, filters]);
+
   // Load attendants from localStorage
   useEffect(() => {
     loadAttendants();
@@ -234,7 +264,7 @@ const ManageAttendants = () => {
   // Apply filters when attendants or filters change
   useEffect(() => {
     applyFilters();
-  }, [attendants, filters]);
+  }, [applyFilters]);
 
   const loadAttendants = () => {
     try {
@@ -322,35 +352,6 @@ const ManageAttendants = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const applyFilters = () => {
-    let result = [...attendants];
-
-    // Apply search filter
-    if (filters.search) {
-      const searchTerm = filters.search.toLowerCase();
-      result = result.filter(attendant =>
-        attendant.firstName.toLowerCase().includes(searchTerm) ||
-        attendant.lastName.toLowerCase().includes(searchTerm) ||
-        attendant.email.toLowerCase().includes(searchTerm) ||
-        attendant.employeeId.toLowerCase().includes(searchTerm) ||
-        attendant.department.toLowerCase().includes(searchTerm)
-      );
-    }
-
-    // Apply status filter
-    if (filters.status !== 'all') {
-      result = result.filter(attendant => attendant.status === filters.status);
-    }
-
-    // Apply department filter
-    if (filters.department !== 'all') {
-      result = result.filter(attendant => attendant.department === filters.department);
-    }
-
-    setFilteredAttendants(result);
-    setCurrentPage(1); // Reset to first page when filters change
   };
 
   const handleFilterChange = (key: keyof ManageAttendantsFilterOptions, value: string) => {
