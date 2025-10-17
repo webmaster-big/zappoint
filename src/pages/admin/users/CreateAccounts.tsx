@@ -12,45 +12,17 @@ import {
   Users
 
 } from 'lucide-react';
-
-// Types
-interface AccountFormData {
-  userType: 'attendant' | 'manager';
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone: string;
-  hireDate: string;
-  position: string;
-  employeeId: string;
-  department: string;
-  location: string;
-  shift: string;
-  assignedAreas: string[];
-  salary?: string;
-  status: 'active' | 'inactive';
-  username: string;
-  password: string;
-  confirmPassword: string;
-}
-
-interface Department {
-  id: string;
-  name: string;
-  userTypes: ('attendant' | 'manager')[];
-}
-
-interface Location {
-  id: string;
-  name: string;
-  managers: string[];
-}
+import type { 
+  CreateAccountsFormData, 
+  CreateAccountsDepartment, 
+  CreateAccountsLocation 
+} from '../../../types/CreateAccounts.types';
 
 const CreateAccount = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState(1);
-  const [formData, setFormData] = useState<AccountFormData>({
+  const [formData, setFormData] = useState<CreateAccountsFormData>({
     userType: 'attendant',
     firstName: '',
     lastName: '',
@@ -63,7 +35,6 @@ const CreateAccount = () => {
     location: '',
     shift: '',
     assignedAreas: [],
-    salary: '',
     status: 'active',
     username: '',
     password: '',
@@ -71,7 +42,7 @@ const CreateAccount = () => {
   });
 
   // Available departments with user type restrictions
-  const departments: Department[] = [
+  const departments: CreateAccountsDepartment[] = [
     { id: 'dept_1', name: 'Guest Services', userTypes: ['attendant'] },
     { id: 'dept_2', name: 'Entertainment', userTypes: ['attendant'] },
     { id: 'dept_3', name: 'Food & Beverage', userTypes: ['attendant'] },
@@ -82,7 +53,7 @@ const CreateAccount = () => {
   ];
 
   // Available locations
-  const locations: Location[] = [
+  const locations: CreateAccountsLocation[] = [
     { id: 'loc_1', name: 'Brighton', managers: ['John Smith'] },
     { id: 'loc_2', name: 'Canton', managers: ['Sarah Wilson'] },
     { id: 'loc_3', name: 'Farmington', managers: ['Michael Davis'] },
@@ -132,7 +103,7 @@ const CreateAccount = () => {
     ]
   };
 
-  const handleInputChange = (field: keyof AccountFormData, value: any) => {
+  const handleInputChange = (field: keyof CreateAccountsFormData, value: string | string[]) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
@@ -478,20 +449,7 @@ const CreateAccount = () => {
             </div>
           )}
 
-          {formData.userType === 'manager' && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Salary
-              </label>
-              <input
-                type="text"
-                value={formData.salary}
-                onChange={(e) => handleInputChange('salary', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-800 focus:border-blue-800"
-                placeholder="Enter salary"
-              />
-            </div>
-          )}
+         
         </div>
 
         {/* Assigned Areas - Only for Attendants */}

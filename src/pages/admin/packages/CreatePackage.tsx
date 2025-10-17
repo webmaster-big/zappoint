@@ -2,6 +2,13 @@ import React, { useState } from "react";
 import Toast from "../../../components/ui/Toast";
 import { Info, Plus, RefreshCcw, Calendar, Clock, Gift, Tag, Home } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import type { 
+    CreatePackageAttraction, 
+    CreatePackageAddOn, 
+    CreatePackageRoom,
+    CreatePackagePromo,
+    CreatePackageGiftCard
+} from '../../../types/createPackage.types';
 
 // Mock data tables (simulate fetch)
 const initialAttractions = ["Laser Tag", "Arcade", "Bowling", "Axe Throwing", "Party Room"];
@@ -42,8 +49,7 @@ const CreatePackage: React.FC = () => {
     const navigate = useNavigate();
     
     // Option tables (simulate fetch)
-    type Attraction = { name: string; price: number; unit?: string };
-    const [attractions, setAttractions] = useState<Attraction[]>(() => {
+    const [attractions, setAttractions] = useState<CreatePackageAttraction[]>(() => {
         const stored = localStorage.getItem("zapzone_attractions");
         if (stored) return JSON.parse(stored);
         // If old format, convert
@@ -52,11 +58,11 @@ const CreatePackage: React.FC = () => {
         }
         return initialAttractions;
     });
-    const [addOns, setAddOns] = useState<{ name: string; price: number }[]>(() => JSON.parse(localStorage.getItem("zapzone_addons") || JSON.stringify(initialAddOns)));
+    const [addOns, setAddOns] = useState<CreatePackageAddOn[]>(() => JSON.parse(localStorage.getItem("zapzone_addons") || JSON.stringify(initialAddOns)));
     const [categories, setCategories] = useState<string[]>(() => JSON.parse(localStorage.getItem("zapzone_categories") || JSON.stringify(initialCategories)));
-    const [rooms, setRooms] = useState<{ name: string }[]>(() => JSON.parse(localStorage.getItem("zapzone_rooms") || JSON.stringify(initialRooms)));
-    const [promos, setPromos] = useState<{ name: string; code: string; description: string }[]>(getActivePromos);
-    const [giftCards, setGiftCards] = useState<{ name: string; code: string; description: string }[]>(getActiveGiftCards);
+    const [rooms, setRooms] = useState<CreatePackageRoom[]>(() => JSON.parse(localStorage.getItem("zapzone_rooms") || JSON.stringify(initialRooms)));
+    const [promos, setPromos] = useState<CreatePackagePromo[]>(getActivePromos);
+    const [giftCards, setGiftCards] = useState<CreatePackageGiftCard[]>(getActiveGiftCards);
 
     // Form state
     const [form, setForm] = useState({

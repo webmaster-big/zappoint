@@ -19,45 +19,17 @@ import {
   Settings,
   Building
 } from 'lucide-react';
-
-// Types
-interface ActivityLog {
-  id: string;
-  userId: string;
-  userName: string;
-  userType: 'attendant' | 'manager' | 'system';
-  userRole?: string;
-  location: string;
-  action: string;
-  resourceType: 'package' | 'customer' | 'purchase' | 'attraction' | 'booking' | 'attendant' | 'manager' | 'inventory' | 'settings';
-  resourceId?: string;
-  resourceName?: string;
-  details: string;
-  timestamp: string;
-  severity: 'info' | 'success' | 'warning' | 'error';
-}
-
-interface FilterOptions {
-  action: string;
-  resourceType: string;
-  user: string;
-  userType: string;
-  dateRange: string;
-  search: string;
-}
-
-interface LocationData {
-  name: string;
-  managers: string[];
-  attendants: string[];
-  recentActivity: number;
-}
+import type { 
+  LocationActivityLogsActivityLog, 
+  LocationActivityLogsFilterOptions, 
+  LocationActivityLogsLocationData 
+} from '../../types/LocationActivityLogs.types';
 
 const LocationActivityLogs = () => {
-  const [logs, setLogs] = useState<ActivityLog[]>([]);
-  const [filteredLogs, setFilteredLogs] = useState<ActivityLog[]>([]);
+  const [logs, setLogs] = useState<LocationActivityLogsActivityLog[]>([]);
+  const [filteredLogs, setFilteredLogs] = useState<LocationActivityLogsActivityLog[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState<FilterOptions>({
+  const [filters, setFilters] = useState<LocationActivityLogsFilterOptions>({
     action: 'all',
     resourceType: 'all',
     user: 'all',
@@ -71,7 +43,7 @@ const LocationActivityLogs = () => {
   const [selectedLocation, setSelectedLocation] = useState<string>('all');
 
   // Locations data
-  const locations: LocationData[] = [
+  const locations: LocationActivityLogsLocationData[] = [
     {
       name: 'Brighton',
       managers: ['John Smith', 'Sarah Wilson'],
@@ -232,9 +204,9 @@ const LocationActivityLogs = () => {
     }
   };
 
-  const generateSampleLogs = (): ActivityLog[] => {
+  const generateSampleLogs = (): LocationActivityLogsActivityLog[] => {
     const managers = locations.flatMap(loc => 
-      loc.managers.map(name => ({
+      loc.managers.map((name: string) => ({
         id: `mgr_${loc.name.toLowerCase()}_${name.toLowerCase().replace(' ', '_')}`,
         name,
         type: 'manager' as const,
@@ -244,7 +216,7 @@ const LocationActivityLogs = () => {
     );
 
     const attendants = locations.flatMap(loc => 
-      loc.attendants.map(name => ({
+      loc.attendants.map((name: string) => ({
         id: `att_${loc.name.toLowerCase()}_${name.toLowerCase().replace(' ', '_')}`,
         name,
         type: 'attendant' as const,
@@ -280,7 +252,7 @@ const LocationActivityLogs = () => {
       { action: 'purchased', resourceType: 'purchase', details: 'Processed purchase for {name}', severity: 'success', userTypes: ['manager', 'attendant'] },
     ];
 
-    const sampleLogs: ActivityLog[] = [];
+    const sampleLogs: LocationActivityLogsActivityLog[] = [];
     const now = new Date();
     
     // Generate logs for the last 30 days
@@ -421,7 +393,7 @@ const LocationActivityLogs = () => {
     setCurrentPage(1);
   };
 
-  const handleFilterChange = (key: keyof FilterOptions, value: any) => {
+  const handleFilterChange = (key: keyof LocationActivityLogsFilterOptions, value: string) => {
     setFilters(prev => ({
       ...prev,
       [key]: value
@@ -595,7 +567,7 @@ const LocationActivityLogs = () => {
             <div>
               <h4 className="text-sm font-medium text-gray-700 mb-2">Location Managers</h4>
               <div className="space-y-2">
-                {locations.find(l => l.name === selectedLocation)?.managers.map(manager => (
+                {locations.find(l => l.name === selectedLocation)?.managers.map((manager: string) => (
                   <div key={manager} className="flex items-center gap-2 text-sm text-gray-800">
                     <User className="w-4 h-4 text-green-600" />
                     {manager}
@@ -609,7 +581,7 @@ const LocationActivityLogs = () => {
             <div>
               <h4 className="text-sm font-medium text-gray-700 mb-2">Attendants</h4>
               <div className="space-y-2">
-                {locations.find(l => l.name === selectedLocation)?.attendants.map(attendant => (
+                {locations.find(l => l.name === selectedLocation)?.attendants.map((attendant: string) => (
                   <div key={attendant} className="flex items-center gap-2 text-sm text-gray-800">
                     <Users className="w-4 h-4 text-blue-600" />
                     {attendant}

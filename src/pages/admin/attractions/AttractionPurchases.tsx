@@ -11,37 +11,14 @@ import {
   XCircle,
   Clock
 } from 'lucide-react';
-
-// Types
-interface Purchase {
-  id: string;
-  type: string;
-  attractionName: string;
-  customerName: string;
-  email: string;
-  phone: string;
-  quantity: number;
-  status: 'confirmed' | 'pending' | 'cancelled' | 'refunded';
-  totalAmount: number;
-  createdAt: string;
-  paymentMethod: string;
-  duration: string;
-  activity: string;
-}
-
-interface FilterOptions {
-  status: string;
-  paymentMethod: string;
-  search: string;
-  dateRange: string;
-}
+import type { AttractionPurchasesPurchase, AttractionPurchasesFilterOptions } from '../../../types/AttractionPurchases.types';
 
 const ManagePurchases = () => {
-  const [purchases, setPurchases] = useState<Purchase[]>([]);
-  const [filteredPurchases, setFilteredPurchases] = useState<Purchase[]>([]);
+  const [purchases, setPurchases] = useState<AttractionPurchasesPurchase[]>([]);
+  const [filteredPurchases, setFilteredPurchases] = useState<AttractionPurchasesPurchase[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedPurchases, setSelectedPurchases] = useState<string[]>([]);
-  const [filters, setFilters] = useState<FilterOptions>({
+  const [filters, setFilters] = useState<AttractionPurchasesFilterOptions>({
     status: 'all',
     paymentMethod: 'all',
     search: '',
@@ -111,7 +88,7 @@ const ManagePurchases = () => {
         setPurchases(parsedPurchases);
       } else {
         // Sample data for demonstration
-        const samplePurchases: Purchase[] = [
+        const samplePurchases: AttractionPurchasesPurchase[] = [
           {
             id: 'purchase_1',
             type: 'attraction',
@@ -250,7 +227,7 @@ const ManagePurchases = () => {
     setFilteredPurchases(result);
   };
 
-  const handleFilterChange = (key: keyof FilterOptions, value: any) => {
+  const handleFilterChange = (key: keyof AttractionPurchasesFilterOptions, value: string) => {
     setFilters(prev => ({
       ...prev,
       [key]: value
@@ -282,7 +259,7 @@ const ManagePurchases = () => {
     }
   };
 
-  const handleStatusChange = (id: string, newStatus: Purchase['status']) => {
+  const handleStatusChange = (id: string, newStatus: AttractionPurchasesPurchase['status']) => {
     const updatedPurchases = purchases.map(purchase =>
       purchase.id === id ? { ...purchase, status: newStatus } : purchase
     );
@@ -309,7 +286,7 @@ const ManagePurchases = () => {
     }
   };
 
-  const handleBulkStatusChange = (newStatus: Purchase['status']) => {
+  const handleBulkStatusChange = (newStatus: AttractionPurchasesPurchase['status']) => {
     if (selectedPurchases.length === 0) return;
     
     const updatedPurchases = purchases.map(purchase =>
@@ -520,7 +497,7 @@ const ManagePurchases = () => {
           </span>
           <div className="flex gap-2">
             <select
-              onChange={(e) => handleBulkStatusChange(e.target.value as Purchase['status'])}
+              onChange={(e) => handleBulkStatusChange(e.target.value as AttractionPurchasesPurchase['status'])}
               className="border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400"
             >
               <option value="">Change Status</option>
@@ -607,7 +584,7 @@ const ManagePurchases = () => {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <select
                           value={purchase.status}
-                          onChange={(e) => handleStatusChange(purchase.id, e.target.value as Purchase['status'])}
+                          onChange={(e) => handleStatusChange(purchase.id, e.target.value as AttractionPurchasesPurchase['status'])}
                           className={`text-xs font-medium px-3 py-1 rounded-full ${statusConfig[purchase.status].color} border-none focus:ring-2 focus:ring-blue-400`}
                         >
                           <option value="confirmed">Confirmed</option>

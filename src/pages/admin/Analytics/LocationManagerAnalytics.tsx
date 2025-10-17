@@ -9,71 +9,22 @@ import {
   Ticket,
   MapPin,
   Star,
-  type LucideIcon,
 } from 'lucide-react';
-
-// TypeScript Interfaces
-interface Booking {
-  id: string;
-  date: string;
-  package: string;
-  participants: number;
-  amount: number;
-  status: 'Confirmed' | 'Pending' | 'Cancelled';
-  location: string;
-  customer: string;
-  duration: string;
-}
-
-interface TicketPurchase {
-  id: string;
-  date: string;
-  attraction: string;
-  quantity: number;
-  amount: number;
-  status: 'Completed' | 'Pending' | 'Cancelled';
-  location: string;
-  customer: string;
-  timeSlot: 'Morning' | 'Afternoon' | 'Evening';
-}
-
-interface AnalyticsData {
-  bookings: Booking[];
-  ticketPurchases: TicketPurchase[];
-}
-
-interface Metrics {
-  totalRevenue: number;
-  totalBookings: number;
-  totalTickets: number;
-  totalParticipants: number;
-  packageRevenue: Record<string, number>;
-  attractionRevenue: Record<string, number>;
-  timeSlotRevenue: {
-    Morning: number;
-    Afternoon: number;
-    Evening: number;
-  };
-  attractionPopularity: Record<string, number>;
-  bookingStatus: Record<string, number>;
-  avgBookingValue: number;
-  occupancyRate: number;
-}
-
-interface MetricCardProps {
-  title: string;
-  value: string;
-  change?: string;
-  icon: LucideIcon;
-  trend?: 'up' | 'down';
-  subtitle?: string;
-}
+import { useThemeColor } from '../../../hooks/useThemeColor';
+import type {
+  LocationManagerAnalyticsBooking,
+  LocationManagerAnalyticsTicketPurchase,
+  LocationManagerAnalyticsData,
+  LocationManagerAnalyticsMetrics,
+  LocationManagerAnalyticsMetricCardProps,
+} from '../../../types/LocationManagerAnalytics.types';
 
 const LocationAnalytics = () => {
+  const { themeColor, fullColor } = useThemeColor();
   const [timeRange, setTimeRange] = useState<string>('30d');
   const [reportType, setReportType] = useState<string>('overview');
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
-  const [data, setData] = useState<AnalyticsData | null>(null);
+  const [data, setData] = useState<LocationManagerAnalyticsData | null>(null);
 
   const location = 'Brighton';
   const packages = ['Adventure Package', 'Birthday Package', 'Corporate Package', 'Family Package', 'Group Package'];
@@ -92,11 +43,11 @@ const LocationAnalytics = () => {
   }, []);
 
   // Generate Brighton-specific sample data
-  const generateBrightonData = (): AnalyticsData => {
+  const generateBrightonData = (): LocationManagerAnalyticsData => {
     const today = new Date();
     
     // Bookings data for Brighton
-    const bookings: Booking[] = Array.from({ length: 85 }, (_, i) => {
+    const bookings: LocationManagerAnalyticsBooking[] = Array.from({ length: 85 }, (_, i) => {
       const date = new Date();
       date.setDate(today.getDate() - Math.floor(Math.random() * 30));
       return {
@@ -113,7 +64,7 @@ const LocationAnalytics = () => {
     });
 
     // Ticket purchases data for Brighton
-    const ticketPurchases: TicketPurchase[] = Array.from({ length: 120 }, (_, i) => {
+    const ticketPurchases: LocationManagerAnalyticsTicketPurchase[] = Array.from({ length: 120 }, (_, i) => {
       const date = new Date();
       date.setDate(today.getDate() - Math.floor(Math.random() * 30));
       const attraction = attractions[Math.floor(Math.random() * attractions.length)];
@@ -134,18 +85,18 @@ const LocationAnalytics = () => {
   };
 
   // Filter data based on selected time range
-  const getFilteredData = (): AnalyticsData | null => {
+  const getFilteredData = (): LocationManagerAnalyticsData | null => {
     if (!data) return null;
 
     const days = parseInt(timeRange);
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - days);
 
-    const filteredBookings = data.bookings.filter((booking: Booking) => 
+    const filteredBookings = data.bookings.filter((booking: LocationManagerAnalyticsBooking) => 
       new Date(booking.date) >= cutoffDate
     );
 
-    const filteredTickets = data.ticketPurchases.filter((ticket: TicketPurchase) =>
+    const filteredTickets = data.ticketPurchases.filter((ticket: LocationManagerAnalyticsTicketPurchase) =>
       new Date(ticket.date) >= cutoffDate
     );
 
@@ -155,44 +106,44 @@ const LocationAnalytics = () => {
   const filteredData = getFilteredData();
 
   // Calculate Brighton-specific metrics
-  const calculateMetrics = (): Metrics | null => {
+  const calculateMetrics = (): LocationManagerAnalyticsMetrics | null => {
     if (!filteredData) return null;
 
     const totalRevenue = 
-      filteredData.bookings.reduce((sum: number, b: Booking) => sum + b.amount, 0) +
-      filteredData.ticketPurchases.reduce((sum: number, t: TicketPurchase) => sum + t.amount, 0);
+      filteredData.bookings.reduce((sum: number, b: LocationManagerAnalyticsBooking) => sum + b.amount, 0) +
+      filteredData.ticketPurchases.reduce((sum: number, t: LocationManagerAnalyticsTicketPurchase) => sum + t.amount, 0);
 
     const totalBookings = filteredData.bookings.length;
     const totalTickets = filteredData.ticketPurchases.length;
-    const totalParticipants = filteredData.bookings.reduce((sum: number, b: Booking) => sum + b.participants, 0);
+    const totalParticipants = filteredData.bookings.reduce((sum: number, b: LocationManagerAnalyticsBooking) => sum + b.participants, 0);
 
     // Package revenue breakdown
     const packageRevenue: Record<string, number> = {};
-    filteredData.bookings.forEach((booking: Booking) => {
+    filteredData.bookings.forEach((booking: LocationManagerAnalyticsBooking) => {
       packageRevenue[booking.package] = (packageRevenue[booking.package] || 0) + booking.amount;
     });
 
     // Attraction revenue breakdown
     const attractionRevenue: Record<string, number> = {};
-    filteredData.ticketPurchases.forEach((ticket: TicketPurchase) => {
+    filteredData.ticketPurchases.forEach((ticket: LocationManagerAnalyticsTicketPurchase) => {
       attractionRevenue[ticket.attraction] = (attractionRevenue[ticket.attraction] || 0) + ticket.amount;
     });
 
     // Time slot analysis
     const timeSlotRevenue = { Morning: 0, Afternoon: 0, Evening: 0 };
-    filteredData.ticketPurchases.forEach((ticket: TicketPurchase) => {
+    filteredData.ticketPurchases.forEach((ticket: LocationManagerAnalyticsTicketPurchase) => {
       timeSlotRevenue[ticket.timeSlot] += ticket.amount;
     });
 
     // Popular attractions by quantity
     const attractionPopularity: Record<string, number> = {};
-    filteredData.ticketPurchases.forEach((ticket: TicketPurchase) => {
+    filteredData.ticketPurchases.forEach((ticket: LocationManagerAnalyticsTicketPurchase) => {
       attractionPopularity[ticket.attraction] = (attractionPopularity[ticket.attraction] || 0) + ticket.quantity;
     });
 
     // Booking status breakdown
     const bookingStatus: Record<string, number> = {};
-    filteredData.bookings.forEach((booking: Booking) => {
+    filteredData.bookings.forEach((booking: LocationManagerAnalyticsBooking) => {
       bookingStatus[booking.status] = (bookingStatus[booking.status] || 0) + 1;
     });
 
@@ -242,7 +193,7 @@ const LocationAnalytics = () => {
   };
 
   // Quick metrics cards
-  const MetricCard = ({ title, value, icon: Icon, subtitle }: MetricCardProps) => (
+  const MetricCard = ({ title, value, icon: Icon, subtitle }: LocationManagerAnalyticsMetricCardProps) => (
     <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
       <div className="flex items-center justify-between">
         <div>
@@ -251,8 +202,8 @@ const LocationAnalytics = () => {
           {subtitle && <p className="text-sm text-gray-500 mt-1">{subtitle}</p>}
          
         </div>
-        <div className="p-3 bg-blue-100 rounded-lg">
-          <Icon size={24} className="text-blue-800" />
+        <div className={`p-3 bg-${themeColor}-100 rounded-lg`}>
+          <Icon size={24} className={`text-${fullColor}`} />
         </div>
       </div>
     </div>
@@ -275,7 +226,7 @@ const LocationAnalytics = () => {
                    Analytics $ Reports
                 </h1>
                 <p className="text-gray-600 mt-2 flex items-center">
-                  <MapPin size={16} className="mr-2 text-blue-800" />
+                  <MapPin size={16} className={`mr-2 text-${fullColor}`} />
                   456 Entertainment Avenue, Brighton, MI 48116
                 </p>
               </div>
@@ -283,7 +234,7 @@ const LocationAnalytics = () => {
             <button
               onClick={generatePDFReport}
               disabled={isGenerating}
-              className="px-6 py-3 bg-blue-800 text-white rounded-xl hover:bg-blue-900 transition flex items-center gap-2 disabled:opacity-50"
+              className={`px-6 py-3 bg-${fullColor} text-white rounded-xl hover:bg-${themeColor}-900 transition flex items-center gap-2 disabled:opacity-50`}
             >
               <Download size={20} />
               {isGenerating ? 'Generating Report...' : 'Export Report'}
@@ -302,7 +253,7 @@ const LocationAnalytics = () => {
               <select
                 value={timeRange}
                 onChange={(e) => setTimeRange(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-800 focus:border-blue-800"
+                className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${fullColor} focus:border-${fullColor}`}
               >
                 <option value="7">Last 7 days</option>
                 <option value="30">Last 30 days</option>
@@ -319,7 +270,7 @@ const LocationAnalytics = () => {
               <select
                 value={reportType}
                 onChange={(e) => setReportType(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-800 focus:border-blue-800"
+                className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${fullColor} focus:border-${fullColor}`}
               >
                 <option value="overview">Overview</option>
                 <option value="bookings">Bookings Analysis</option>
@@ -336,7 +287,7 @@ const LocationAnalytics = () => {
                   Rating: 4.8/5
                 </div>
                 <div className="flex items-center">
-                  <Users size={16} className="text-blue-600 mr-1" />
+                  <Users size={16} className={`text-${themeColor}-600 mr-1`} />
                   Capacity: {metrics.occupancyRate}%
                 </div>
               </div>
@@ -379,7 +330,7 @@ const LocationAnalytics = () => {
             {/* Package Performance */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                <Package className="w-5 h-5 text-blue-800 mr-2" />
+                <Package className={`w-5 h-5 text-${fullColor} mr-2`} />
                 Package Performance
               </h3>
               <div className="space-y-4">
@@ -388,11 +339,11 @@ const LocationAnalytics = () => {
                   .map(([pkg, revenue]) => (
                     <div key={pkg} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                       <div className="flex items-center space-x-3">
-                        <div className="w-3 h-3 bg-blue-600 rounded-full"></div>
+                        <div className={`w-3 h-3 bg-${themeColor}-600 rounded-full`}></div>
                         <span className="font-medium text-gray-900">{pkg}</span>
                       </div>
                       <div className="text-right">
-                        <div className="font-bold text-blue-800">${revenue.toLocaleString()}</div>
+                        <div className={`font-bold text-${fullColor}`}>${revenue.toLocaleString()}</div>
                         <div className="text-sm text-gray-600">
                           {Math.round((revenue / metrics.totalRevenue) * 100)}% of revenue
                         </div>
@@ -405,7 +356,7 @@ const LocationAnalytics = () => {
             {/* Attraction Performance */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                <Ticket className="w-5 h-5 text-blue-800 mr-2" />
+                <Ticket className={`w-5 h-5 text-${fullColor} mr-2`} />
                 Attraction Performance
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -418,7 +369,7 @@ const LocationAnalytics = () => {
                       .map(([attraction, revenue]) => (
                         <div key={attraction} className="flex justify-between items-center">
                           <span className="text-gray-700">{attraction}</span>
-                          <span className="font-semibold text-blue-800">${revenue.toLocaleString()}</span>
+                          <span className={`font-semibold text-${fullColor}`}>${revenue.toLocaleString()}</span>
                         </div>
                       ))}
                   </div>
@@ -450,9 +401,9 @@ const LocationAnalytics = () => {
               </h3>
               <div className="space-y-3">
                 {Object.entries(metrics.timeSlotRevenue).map(([slot, revenue]) => (
-                  <div key={slot} className="flex justify-between items-center p-2 bg-blue-50 rounded">
-                    <span className="text-blue-800 font-medium">{slot}</span>
-                    <span className="font-bold text-blue-800">${revenue.toLocaleString()}</span>
+                  <div key={slot} className={`flex justify-between items-center p-2 bg-${themeColor}-50 rounded`}>
+                    <span className={`text-${fullColor} font-medium`}>{slot}</span>
+                    <span className={`font-bold text-${fullColor}`}>${revenue.toLocaleString()}</span>
                   </div>
                 ))}
               </div>
@@ -480,11 +431,11 @@ const LocationAnalytics = () => {
             </div>
 
             {/* Performance Highlights */}
-            <div className="bg-blue-50 rounded-xl border border-blue-200 p-6">
-              <h3 className="text-lg font-semibold text-blue-900 mb-3 flex items-center">
+            <div className={`bg-${themeColor}-50 rounded-xl border border-${themeColor}-200 p-6`}>
+              <h3 className={`text-lg font-semibold text-${themeColor}-900 mb-3 flex items-center`}>
                 Highlights
               </h3>
-              <div className="space-y-2 text-sm text-blue-800">
+              <div className={`space-y-2 text-sm text-${fullColor}`}>
                 <div className="flex justify-between">
                   <span>Avg Booking Value:</span>
                   <span className="font-semibold">${metrics.avgBookingValue.toFixed(2)}</span>

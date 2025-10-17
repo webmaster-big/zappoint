@@ -7,16 +7,19 @@ import MainLayout from "./layouts/AdminMainLayout";
 import Home from "./pages/Home"
 import Login from "./pages/auth/Login"
 import CreatePackage from "./pages/admin/packages/CreatePackage"
+import EditPackage from "./pages/admin/packages/EditPackage"
 import Packages from "./pages/admin/packages/Packages"
 import BookPackage from "./pages/admin/bookings/BookPackage"
 import GiftCard from "./pages/admin/packages/GiftCard"
 import Promo from "./pages/admin/packages/Promo"
 import EmbedBookingRoute from "./components/embed/EmbedBookingRoute";
 import Bookings from "./pages/admin/bookings/Bookings"
+import EditBooking from "./pages/admin/bookings/EditBooking"
 import CalendarView from "./pages/admin/bookings/CalendarView"
 import OnsiteBooking from "./pages/admin/bookings/OnsiteBooking"
 import CheckIn from "./pages/admin/bookings/CheckIn"
 import CreateAttraction from "./pages/admin/attractions/CreateAttractions";
+import EditAttraction from "./pages/admin/attractions/EditAttraction";
 import ManageAttractions from "./pages/admin/attractions/ManageAttractions";
 import LocationManagerDashboard from "./pages/admin/ManagerDashboard";
 import CompanyDashboard from "./pages/admin/CompanyDashboard";
@@ -48,6 +51,7 @@ import CustomerReservations from "./pages/customer/CustomerReservation";
 import CustomerGiftCards from './pages/customer/CustomerGiftCards';
 import CustomerNotifications from "./pages/customer/CustomerNotifications";
 import CustomerLayout from "./layouts/CustomerLayout";
+import Settings from "./pages/admin/Settings";
 
 
 function App() {
@@ -73,15 +77,18 @@ function App() {
           <Route path="/manager/dashboard" element={<LocationManagerDashboard />} />
           <Route path="/company/dashboard" element={<CompanyDashboard />} />
           <Route path="/attractions/create" element={<CreateAttraction />} />
+          <Route path="/edit-attraction/:id" element={<EditAttraction />} />
           <Route path="/attractions/" element={<ManageAttractions />} />
           <Route path="/attractions/purchases" element={<ManagePurchases />} />
           <Route path="/attractions/purchases/create" element={<CreatePurchase />} />
           <Route path="/packages/create" element={<CreatePackage />} />
+          <Route path="/packages/edit/:id" element={<EditPackage />} />
           <Route path="/packages" element={<Packages />} />
           <Route path="/packages/promos" element={<Promo />} />
           <Route path="/packages/add-ons" element={<ManageAddOns />} />
           <Route path="/packages/gift-cards" element={<GiftCard />} />
           <Route path="/bookings" element={<Bookings />} />
+          <Route path="/bookings/edit/:id" element={<EditBooking />} />
           <Route path="/bookings/calendar" element={<CalendarView />} />
           <Route path="/bookings/create" element={<OnsiteBooking />} />
           <Route path="/bookings/check-in" element={<CheckIn />} />
@@ -101,6 +108,10 @@ function App() {
           <Route path="/admin/attendants/performance" element={<AttendantsPerformance />} />
           <Route path="/admin/users" element={<ManageAccounts />} />
           <Route path="/admin/users/create" element={<CreateAccount />} />
+          {/* Settings routes for all roles */}
+          <Route path="/attendant/settings" element={<Settings />} />
+          <Route path="/manager/settings" element={<Settings />} />
+          <Route path="/admin/settings" element={<Settings />} />
         </Route>
         {/* Add embed route */}
         <Route path="/embed/booking/:packageId" element={<EmbedBookingRoute />} />

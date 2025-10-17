@@ -17,40 +17,18 @@ import {
   X,
   Copy
 } from 'lucide-react';
-
-// Types
-interface Attendant {
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone: string;
-  hireDate: string;
-  position: string;
-  employeeId: string;
-  department: string;
-  shift: string;
-  assignedAreas: string[];
-  status: 'active' | 'inactive';
-  username: string;
-  createdAt: string;
-  accountCreated?: boolean;
-  invitationSent?: boolean;
-  invitationLink?: string;
-  invitationExpiry?: string;
-}
-
-interface FilterOptions {
-  status: string;
-  department: string;
-  search: string;
-}
+import type {
+  ManageAttendantsAttendant,
+  ManageAttendantsFilterOptions,
+} from '../../../types/ManageAttendants.types';
 
 interface InvitationModalProps {
   isOpen: boolean;
+  attendantName: string;
+  generatedLink: string;
+  loading?: boolean;
   onClose: () => void;
   onSendInvitation: (email: string) => void;
-  loading?: boolean;
 }
 
 const InvitationModal: React.FC<InvitationModalProps> = ({ 
@@ -176,11 +154,11 @@ const InvitationModal: React.FC<InvitationModalProps> = ({
 };
 
 const ManageAttendants = () => {
-  const [attendants, setAttendants] = useState<Attendant[]>([]);
-  const [filteredAttendants, setFilteredAttendants] = useState<Attendant[]>([]);
+  const [attendants, setAttendants] = useState<ManageAttendantsAttendant[]>([]);
+  const [filteredAttendants, setFilteredAttendants] = useState<ManageAttendantsAttendant[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedAttendants, setSelectedAttendants] = useState<string[]>([]);
-  const [filters, setFilters] = useState<FilterOptions>({
+  const [filters, setFilters] = useState<ManageAttendantsFilterOptions>({
     status: 'all',
     department: 'all',
     search: ''
@@ -190,7 +168,7 @@ const ManageAttendants = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [showInvitationModal, setShowInvitationModal] = useState(false);
   const [sendingInvitation, setSendingInvitation] = useState(false);
-  const [selectedAttendantForInvite, setSelectedAttendantForInvite] = useState<Attendant | null>(null);
+  const [selectedAttendantForInvite, setSelectedAttendantForInvite] = useState<ManageAttendantsAttendant | null>(null);
 
   // Status colors
   const statusColors = {
@@ -266,7 +244,7 @@ const ManageAttendants = () => {
         setAttendants(parsedAttendants);
       } else {
         // Sample data for demonstration (all accounts already created)
-        const sampleAttendants: Attendant[] = [
+        const sampleAttendants: ManageAttendantsAttendant[] = [
           {
             id: 'att_1',
             firstName: 'Sarah',
@@ -375,7 +353,7 @@ const ManageAttendants = () => {
     setCurrentPage(1); // Reset to first page when filters change
   };
 
-  const handleFilterChange = (key: keyof FilterOptions, value: any) => {
+  const handleFilterChange = (key: keyof ManageAttendantsFilterOptions, value: string) => {
     setFilters(prev => ({
       ...prev,
       [key]: value
@@ -406,7 +384,7 @@ const ManageAttendants = () => {
     }
   };
 
-  const handleStatusChange = (id: string, newStatus: Attendant['status']) => {
+  const handleStatusChange = (id: string, newStatus: ManageAttendantsAttendant['status']) => {
     const updatedAttendants = attendants.map(attendant =>
       attendant.id === id ? { ...attendant, status: newStatus } : attendant
     );
@@ -433,7 +411,7 @@ const ManageAttendants = () => {
     }
   };
 
-  const handleBulkStatusChange = (newStatus: Attendant['status']) => {
+  const handleBulkStatusChange = (newStatus: ManageAttendantsAttendant['status']) => {
     if (selectedAttendants.length === 0) return;
     
     const updatedAttendants = attendants.map(attendant =>
@@ -480,7 +458,7 @@ const ManageAttendants = () => {
   };
 
   // Open invitation modal for specific attendant
-  const handleInviteAttendant = (attendant?: Attendant) => {
+  const handleInviteAttendant = (attendant?: ManageAttendantsAttendant) => {
     if (attendant) {
       setSelectedAttendantForInvite(attendant);
       setShowInvitationModal(true);
@@ -658,7 +636,7 @@ const ManageAttendants = () => {
           </span>
           <div className="flex gap-2">
             <select
-              onChange={(e) => handleBulkStatusChange(e.target.value as Attendant['status'])}
+              onChange={(e) => handleBulkStatusChange(e.target.value as ManageAttendantsAttendant['status'])}
               className="border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400"
             >
               <option value="">Change Status</option>
@@ -755,7 +733,7 @@ const ManageAttendants = () => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <select
                         value={attendant.status}
-                        onChange={(e) => handleStatusChange(attendant.id, e.target.value as Attendant['status'])}
+                        onChange={(e) => handleStatusChange(attendant.id, e.target.value as ManageAttendantsAttendant['status'])}
                         className={`text-xs font-medium px-3 py-1 rounded-full ${statusColors[attendant.status]} border-none focus:ring-2 focus:ring-blue-400`}
                       >
                         <option value="active">Active</option>

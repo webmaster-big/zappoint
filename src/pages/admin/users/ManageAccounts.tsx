@@ -18,50 +18,13 @@ import {
   Shield,
   UserCheck
 } from 'lucide-react';
+import type { 
+  ManageAccountsAccount, 
+  ManageAccountsFilterOptions, 
+  ManageAccountsInvitationModalProps 
+} from '../../../types/ManageAccounts.types';
 
-// Types
-interface Account {
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone: string;
-  hireDate: string;
-  position: string;
-  employeeId: string;
-  department: string;
-  location: string;
-  userType: 'attendant' | 'manager';
-  shift?: string;
-  assignedAreas?: string[];
-  status: 'active' | 'inactive';
-  username: string;
-  createdAt: string;
-  accountCreated?: boolean;
-  invitationSent?: boolean;
-  invitationLink?: string;
-  invitationExpiry?: string;
-  lastLogin?: string;
-}
-
-interface FilterOptions {
-  status: string;
-  department: string;
-  userType: string;
-  location: string;
-  search: string;
-}
-
-interface InvitationModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSendInvitation: (email: string, userType: 'attendant' | 'manager') => void;
-  loading?: boolean;
-  defaultEmail?: string;
-  defaultUserType?: 'attendant' | 'manager';
-}
-
-const InvitationModal: React.FC<InvitationModalProps> = ({ 
+const InvitationModal: React.FC<ManageAccountsInvitationModalProps> = ({ 
   isOpen, 
   onClose, 
   onSendInvitation, 
@@ -198,11 +161,11 @@ const InvitationModal: React.FC<InvitationModalProps> = ({
 };
 
 const ManageAccounts = () => {
-  const [accounts, setAccounts] = useState<Account[]>([]);
-  const [filteredAccounts, setFilteredAccounts] = useState<Account[]>([]);
+  const [accounts, setAccounts] = useState<ManageAccountsAccount[]>([]);
+  const [filteredAccounts, setFilteredAccounts] = useState<ManageAccountsAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
-  const [filters, setFilters] = useState<FilterOptions>({
+  const [filters, setFilters] = useState<ManageAccountsFilterOptions>({
     status: 'all',
     department: 'all',
     userType: 'all',
@@ -214,7 +177,7 @@ const ManageAccounts = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [showInvitationModal, setShowInvitationModal] = useState(false);
   const [sendingInvitation, setSendingInvitation] = useState(false);
-  const [selectedAccountForInvite, setSelectedAccountForInvite] = useState<Account | null>(null);
+  const [selectedAccountForInvite, setSelectedAccountForInvite] = useState<ManageAccountsAccount | null>(null);
 
   // Locations
   const locations = [
@@ -302,7 +265,7 @@ const ManageAccounts = () => {
         setAccounts(parsedAccounts);
       } else {
         // Sample data for demonstration
-        const sampleAccounts: Account[] = [
+        const sampleAccounts: ManageAccountsAccount[] = [
           // Location Managers
           {
             id: 'mgr_1',
@@ -455,7 +418,7 @@ const ManageAccounts = () => {
     setCurrentPage(1);
   };
 
-  const handleFilterChange = (key: keyof FilterOptions, value: any) => {
+  const handleFilterChange = (key: keyof ManageAccountsFilterOptions, value: string) => {
     setFilters(prev => ({
       ...prev,
       [key]: value
@@ -488,7 +451,7 @@ const ManageAccounts = () => {
     }
   };
 
-  const handleStatusChange = (id: string, newStatus: Account['status']) => {
+  const handleStatusChange = (id: string, newStatus: ManageAccountsAccount['status']) => {
     const updatedAccounts = accounts.map(account =>
       account.id === id ? { ...account, status: newStatus } : account
     );
@@ -515,7 +478,7 @@ const ManageAccounts = () => {
     }
   };
 
-  const handleBulkStatusChange = (newStatus: Account['status']) => {
+  const handleBulkStatusChange = (newStatus: ManageAccountsAccount['status']) => {
     if (selectedAccounts.length === 0) return;
     
     const updatedAccounts = accounts.map(account =>
@@ -537,7 +500,7 @@ const ManageAccounts = () => {
       const expiryDate = new Date();
       expiryDate.setDate(expiryDate.getDate() + 7);
 
-      let updatedAccounts: Account[];
+      let updatedAccounts: ManageAccountsAccount[];
       
       if (selectedAccountForInvite) {
         // Update existing account
@@ -554,7 +517,7 @@ const ManageAccounts = () => {
         });
       } else {
         // Create new account entry
-        const newAccount: Account = {
+        const newAccount: ManageAccountsAccount = {
           id: `new_${Date.now()}`,
           firstName: '',
           lastName: '',
@@ -589,7 +552,7 @@ const ManageAccounts = () => {
   };
 
   // Open invitation modal for specific account or new invitation
-  const handleInviteAccount = (account?: Account) => {
+  const handleInviteAccount = (account?: ManageAccountsAccount) => {
     if (account) {
       setSelectedAccountForInvite(account);
       setShowInvitationModal(true);
@@ -812,7 +775,7 @@ const ManageAccounts = () => {
           </span>
           <div className="flex gap-2">
             <select
-              onChange={(e) => handleBulkStatusChange(e.target.value as Account['status'])}
+              onChange={(e) => handleBulkStatusChange(e.target.value as ManageAccountsAccount['status'])}
               className="border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-800"
             >
               <option value="">Change Status</option>
@@ -919,7 +882,7 @@ const ManageAccounts = () => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <select
                         value={account.status}
-                        onChange={(e) => handleStatusChange(account.id, e.target.value as Account['status'])}
+                        onChange={(e) => handleStatusChange(account.id, e.target.value as ManageAccountsAccount['status'])}
                         className={`text-xs font-medium px-3 py-1 rounded-full ${statusColors[account.status]} border-none focus:ring-2 focus:ring-blue-800`}
                       >
                         <option value="active">Active</option>

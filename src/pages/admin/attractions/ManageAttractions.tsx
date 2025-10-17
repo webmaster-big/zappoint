@@ -4,7 +4,6 @@ import {
   Eye, 
   Pencil, 
   Trash2, 
-  Plus, 
   Search, 
   Filter, 
   RefreshCcw,
@@ -12,39 +11,24 @@ import {
   DollarSign,
   Zap,
   Star,
-  ShoppingCart
+  ShoppingCart,
+  Download,
+  Upload,
+  X,
+  CheckSquare,
+  Square
 } from 'lucide-react';
-
-// Types
-interface Attraction {
-  id: string;
-  name: string;
-  description: string;
-  category: string;
-  price: number;
-  pricingType: string;
-  maxCapacity: number;
-  duration: string;
-  durationUnit: string;
-  location: string;
-  images: string[];
-  status: 'active' | 'inactive' | 'maintenance';
-  createdAt: string;
-  availability: Record<string, boolean>;
-}
-
-interface FilterOptions {
-  status: string;
-  category: string;
-  search: string;
-}
+import type {
+  ManageAttractionsAttraction,
+  ManageAttractionsFilterOptions,
+} from '../../../types/manageAttractions.types';
 
 const ManageAttractions = () => {
-  const [attractions, setAttractions] = useState<Attraction[]>([]);
-  const [filteredAttractions, setFilteredAttractions] = useState<Attraction[]>([]);
+  const [attractions, setAttractions] = useState<ManageAttractionsAttraction[]>([]);
+  const [filteredAttractions, setFilteredAttractions] = useState<ManageAttractionsAttraction[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedAttractions, setSelectedAttractions] = useState<string[]>([]);
-  const [filters, setFilters] = useState<FilterOptions>({
+  const [filters, setFilters] = useState<ManageAttractionsFilterOptions>({
     status: 'all',
     category: 'all',
     search: ''
@@ -53,6 +37,81 @@ const ManageAttractions = () => {
   const [itemsPerPage] = useState(10);
   const [showFilters, setShowFilters] = useState(false);
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [selectedForExport, setSelectedForExport] = useState<string[]>([]);
+  const [importData, setImportData] = useState<string>("");
+
+  // Export/Import handlers
+  const handleOpenExportModal = () => {
+    setSelectedForExport(attractions.map(attraction => attraction.id));
+    setShowExportModal(true);
+  };
+
+  const handleToggleExportSelection = (id: string) => {
+    setSelectedForExport(prev =>
+      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAllForExport = () => {
+    if (selectedForExport.length === attractions.length) {
+      setSelectedForExport([]);
+    } else {
+      setSelectedForExport(attractions.map(attraction => attraction.id));
+    }
+  };
+
+  const handleExport = () => {
+    const attractionsToExport = attractions.filter(attraction => selectedForExport.includes(attraction.id || ''));
+    const jsonData = JSON.stringify(attractionsToExport, null, 2);
+    const blob = new Blob([jsonData], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `zapzone-attractions-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    setShowExportModal(false);
+  };
+
+  const handleImport = () => {
+    try {
+      const parsedData = JSON.parse(importData);
+      if (!Array.isArray(parsedData)) {
+        alert('Invalid data format. Please provide a valid JSON array of attractions.');
+        return;
+      }
+
+      const newAttractions = parsedData.map((attraction: ManageAttractionsAttraction) => ({
+        ...attraction,
+        id: `attr_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      }));
+
+      const updatedAttractions = [...attractions, ...newAttractions];
+      setAttractions(updatedAttractions);
+      localStorage.setItem('zapzone_attractions', JSON.stringify(updatedAttractions));
+      setImportData("");
+      setShowImportModal(false);
+      alert(`Successfully imported ${newAttractions.length} attraction(s)!`);
+    } catch (error) {
+      alert('Invalid JSON format. Please check your data and try again.');
+    }
+  };
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const content = e.target?.result as string;
+        setImportData(content);
+      };
+      reader.readAsText(file);
+    }
+  };
 
   // Status colors
   const statusColors = {
@@ -113,7 +172,7 @@ const ManageAttractions = () => {
         setAttractions(parsedAttractions);
       } else {
         // Sample data for demonstration
-        const sampleAttractions: Attraction[] = [
+        const sampleAttractions: ManageAttractionsAttraction[] = [
           {
             id: 'attr_1',
             name: 'Laser Tag Arena',
@@ -224,7 +283,7 @@ const ManageAttractions = () => {
     setFilteredAttractions(result);
   };
 
-  const handleFilterChange = (key: keyof FilterOptions, value: any) => {
+  const handleFilterChange = (key: keyof ManageAttractionsFilterOptions, value: string) => {
     setFilters(prev => ({
       ...prev,
       [key]: value
@@ -255,7 +314,7 @@ const ManageAttractions = () => {
     }
   };
 
-  const handleStatusChange = (id: string, newStatus: Attraction['status']) => {
+  const handleStatusChange = (id: string, newStatus: ManageAttractionsAttraction['status']) => {
     const updatedAttractions = attractions.map(attraction =>
       attraction.id === id ? { ...attraction, status: newStatus } : attraction
     );
@@ -282,7 +341,7 @@ const ManageAttractions = () => {
     }
   };
 
-  const handleBulkStatusChange = (newStatus: Attraction['status']) => {
+  const handleBulkStatusChange = (newStatus: ManageAttractionsAttraction['status']) => {
     if (selectedAttractions.length === 0) return;
     
     const updatedAttractions = attractions.map(attraction =>
@@ -330,13 +389,29 @@ const ManageAttractions = () => {
           <h1 className="text-3xl font-bold text-gray-900">Manage Attractions</h1>
           <p className="text-gray-600 mt-2">View and manage all attractions in your facility</p>
         </div>
-        <Link
-          to="/attractions/create"
-          className="mt-4 sm:mt-0 inline-flex items-center px-4 py-2 bg-blue-800 text-white rounded-lg hover:bg-blue-800 transition-colors"
-        >
-          <Plus className="h-5 w-5 mr-2" />
-          New Attraction
-        </Link>
+        <div className="mt-4 sm:mt-0 flex gap-2">
+          <button
+            className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-semibold whitespace-nowrap flex items-center gap-2"
+            onClick={() => setShowImportModal(true)}
+          >
+            <Upload size={18} />
+            Import
+          </button>
+          <button
+            className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-semibold whitespace-nowrap flex items-center gap-2"
+            onClick={handleOpenExportModal}
+            disabled={attractions.length === 0}
+          >
+            <Download size={18} />
+            Export
+          </button>
+          <button
+            className="bg-blue-700 hover:bg-blue-800 text-white px-6 py-2 rounded-lg font-semibold whitespace-nowrap"
+            onClick={() => window.location.href = "/attractions/create"}
+          >
+            New Attraction
+          </button>
+        </div>
       </div>
 
       {/* Metrics Grid */}
@@ -446,7 +521,7 @@ const ManageAttractions = () => {
           </span>
           <div className="flex gap-2">
             <select
-              onChange={(e) => handleBulkStatusChange(e.target.value as Attraction['status'])}
+              onChange={(e) => handleBulkStatusChange(e.target.value as ManageAttractionsAttraction['status'])}
               className="border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400"
             >
               <option value="">Change Status</option>
@@ -534,7 +609,7 @@ const ManageAttractions = () => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <select
                         value={attraction.status}
-                        onChange={(e) => handleStatusChange(attraction.id, e.target.value as Attraction['status'])}
+                        onChange={(e) => handleStatusChange(attraction.id, e.target.value as ManageAttractionsAttraction['status'])}
                         className={`text-xs font-medium px-3 py-1 rounded-full ${statusColors[attraction.status]} border-none focus:ring-2 focus:ring-blue-400`}
                       >
                         <option value="active">Active</option>
@@ -633,6 +708,201 @@ const ManageAttractions = () => {
           </div>
         )}
       </div>
+
+      {/* Export Modal */}
+      {showExportModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">Export Attractions</h3>
+                  <p className="text-sm text-gray-500 mt-1">Select attractions to export as JSON</p>
+                </div>
+                <button
+                  onClick={() => setShowExportModal(false)}
+                  className="p-2 hover:bg-gray-100 rounded-lg"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6 overflow-y-auto flex-1">
+              <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-200">
+                <button
+                  onClick={handleSelectAllForExport}
+                  className="flex items-center gap-2 text-sm font-medium text-blue-700 hover:text-blue-800"
+                >
+                  {selectedForExport.length === attractions.length ? (
+                    <CheckSquare size={18} />
+                  ) : (
+                    <Square size={18} />
+                  )}
+                  {selectedForExport.length === attractions.length ? 'Deselect All' : 'Select All'}
+                </button>
+                <span className="text-sm text-gray-600">
+                  {selectedForExport.length} of {attractions.length} selected
+                </span>
+              </div>
+
+              <div className="space-y-2">
+                {attractions.map((attraction) => (
+                  <div
+                    key={attraction.id}
+                    className={`p-4 border rounded-lg cursor-pointer transition-colors ${
+                      selectedForExport.includes(attraction.id)
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                    onClick={() => handleToggleExportSelection(attraction.id)}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="mt-1">
+                        {selectedForExport.includes(attraction.id) ? (
+                          <CheckSquare size={18} className="text-blue-700" />
+                        ) : (
+                          <Square size={18} className="text-gray-400" />
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-gray-900">{attraction.name}</h4>
+                        <p className="text-sm text-gray-600 mt-1">
+                          {attraction.category} • ${attraction.price}
+                          <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${statusColors[attraction.status]}`}>
+                            {attraction.status}
+                          </span>
+                        </p>
+                        {attraction.description && (
+                          <p className="text-xs text-gray-500 mt-1 line-clamp-1">{attraction.description}</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
+              <button
+                onClick={() => setShowExportModal(false)}
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleExport}
+                disabled={selectedForExport.length === 0}
+                className="px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                <Download size={18} />
+                Export {selectedForExport.length} Attraction{selectedForExport.length !== 1 ? 's' : ''}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Import Modal */}
+      {showImportModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">Import Attractions</h3>
+                  <p className="text-sm text-gray-500 mt-1">Upload or paste JSON data to import attractions</p>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowImportModal(false);
+                    setImportData('');
+                  }}
+                  className="p-2 hover:bg-gray-100 rounded-lg"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6 overflow-y-auto flex-1">
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Upload JSON File
+                </label>
+                <input
+                  type="file"
+                  accept=".json"
+                  onChange={handleFileUpload}
+                  className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                />
+              </div>
+
+              <div className="relative mb-4">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-200"></div>
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="px-2 bg-white text-gray-500">OR</span>
+                </div>
+              </div>
+
+              <div className="mb-4">
+                <div className="flex justify-between items-center mb-2">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Or Paste JSON Data
+                  </label>
+                  {importData && (
+                    <button
+                      onClick={() => setImportData('')}
+                      className="text-xs text-gray-500 hover:text-gray-700"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+                <textarea
+                  value={importData}
+                  onChange={(e) => setImportData(e.target.value)}
+                  placeholder='[{"name": "Attraction Name", "category": "Category", "price": 50, ...}]'
+                  rows={12}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-sm"
+                />
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h4 className="text-sm font-semibold text-blue-900 mb-2">Import Notes:</h4>
+                <ul className="text-xs text-blue-800 space-y-1">
+                  <li>• JSON must be an array of attraction objects</li>
+                  <li>• Each attraction must have at least a name and price</li>
+                  <li>• Imported attractions will be added to existing attractions</li>
+                  <li>• New IDs will be generated to avoid conflicts</li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowImportModal(false);
+                  setImportData('');
+                }}
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleImport}
+                disabled={!importData.trim()}
+                className="px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                <Upload size={18} />
+                Import Attractions
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

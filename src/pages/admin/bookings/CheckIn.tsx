@@ -1,39 +1,16 @@
 // src/pages/checkin/CheckIn.tsx
 import React, { useState, useEffect, useRef } from 'react';
 import { QrCode, Search, Calendar, CheckCircle, XCircle, Eye } from 'lucide-react';
-
-// Types
-interface Booking {
-  id: string;
-  type: 'package';
-  packageName: string;
-  customerName: string;
-  email: string;
-  phone: string;
-  date: string;
-  time: string;
-  participants: number;
-  status: 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'checked-in';
-  totalAmount: number;
-  amountPaid: number;
-  createdAt: string;
-  paymentMethod: string;
-  attractions?: { name: string; quantity: number }[];
-  addOns?: { name: string; quantity: number; price: number }[];
-  duration?: string;
-  activity?: string;
-  notes?: string;
-  checkInTime?: string;
-}
+import type { CheckInBooking } from '../../../types/checkIn.types';
 
 const CheckIn: React.FC = () => {
-  const [bookings, setBookings] = useState<Booking[]>([]);
-  const [filteredBookings, setFilteredBookings] = useState<Booking[]>([]);
+  const [bookings, setBookings] = useState<CheckInBooking[]>([]);
+  const [filteredBookings, setFilteredBookings] = useState<CheckInBooking[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [scanning, setScanning] = useState(false);
   const [scannedData, setScannedData] = useState<string | null>(null);
-  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
+  const [selectedBooking, setSelectedBooking] = useState<CheckInBooking | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -73,7 +50,7 @@ const CheckIn: React.FC = () => {
         setBookings(packageBookings);
         if (packageBookings.length === 0) {
           // Add dummy data if empty
-          const dummyBookings: Booking[] = [
+          const dummyBookings: CheckInBooking[] = [
             {
               id: 'booking_001',
               type: 'package',
@@ -123,7 +100,7 @@ const CheckIn: React.FC = () => {
         }
       } else {
         // If no bookings at all, add dummy data
-        const dummyBookings: Booking[] = [
+        const dummyBookings: CheckInBooking[] = [
           {
             id: 'booking_001',
             type: 'package',
@@ -223,7 +200,7 @@ const CheckIn: React.FC = () => {
     stopScanning();
   };
 
-  const handleCheckIn = (booking: Booking) => {
+  const handleCheckIn = (booking: CheckInBooking) => {
     const updatedBookings = bookings.map(b => 
       b.id === booking.id 
         ? { 
@@ -240,11 +217,11 @@ const CheckIn: React.FC = () => {
     setShowDetailsModal(true);
   };
 
-  const manualCheckIn = (booking: Booking) => {
+  const manualCheckIn = (booking: CheckInBooking) => {
     handleCheckIn(booking);
   };
 
-  const viewDetails = (booking: Booking) => {
+  const viewDetails = (booking: CheckInBooking) => {
     // If scannedData is present, use it to find the booking
     if (scannedData) {
       const scannedBooking = bookings.find(b => b.id === scannedData);

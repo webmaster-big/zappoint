@@ -1,35 +1,11 @@
 import React, { useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-
-interface FormData {
-  name: string;
-  description: string;
-  category: string;
-  price: string;
-  pricingType: string;
-  maxCapacity: string;
-  duration: string;
-  durationUnit: string;
-  // location: string; // Removed
-  images: string[];
-  bookingLink: string;
-  embedCode: string;
-  availability: {
-    monday: boolean;
-    tuesday: boolean;
-    wednesday: boolean;
-    thursday: boolean;
-    friday: boolean;
-    saturday: boolean;
-    sunday: boolean;
-  };
-  id?: string;
-}
+import type { CreateAttractionsFormData } from '../../../types/createAttractions.types';
 
 const CreateAttraction = () => {
   const navigate = useNavigate();
-  const [formData, setFormData] = useState<FormData>({
+  const [formData, setFormData] = useState<CreateAttractionsFormData>({
     name: '',
     description: '',
     category: '',
@@ -65,7 +41,7 @@ const CreateAttraction = () => {
     }));
   };
 
-  const handleAvailabilityChange = (day: keyof FormData['availability']) => {
+  const handleAvailabilityChange = (day: keyof CreateAttractionsFormData['availability']) => {
     setFormData(prev => ({
       ...prev,
       availability: {
@@ -154,7 +130,7 @@ const CreateAttraction = () => {
   ] as const;
 
   // LivePreview component
-  const LivePreview: React.FC<{ formData: FormData; imagePreviews: string[] }> = ({ formData, imagePreviews }) => {
+  const LivePreview: React.FC<{ formData: CreateAttractionsFormData; imagePreviews: string[] }> = ({ formData, imagePreviews }) => {
     return (
       <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
         <h2 className="text-xl font-bold mb-4 text-blue-800 border-b pb-2">Live Preview</h2>

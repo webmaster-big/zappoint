@@ -13,6 +13,7 @@ import {
   BadgeCheck,
   Zap
 } from 'lucide-react';
+import type { AttendantProfileData } from '../../../types/AttendantProfile.types';
 
 const AttendantProfile = () => {
   const [isEditing, setIsEditing] = useState(false);
@@ -20,7 +21,7 @@ const AttendantProfile = () => {
   const [isLoading, setIsLoading] = useState(false);
 
   // Sample profile data for Attendant/Staff
-  const [profileData, setProfileData] = useState({
+  const [profileData, setProfileData] = useState<AttendantProfileData>({
     personal: {
       firstName: 'Jessica',
       lastName: 'Rodriguez',
@@ -87,11 +88,11 @@ const AttendantProfile = () => {
     setIsLoading(false);
   };
 
-  const handleInputChange = (section: string, field: string, value: string) => {
+  const handleInputChange = (section: keyof AttendantProfileData, field: string, value: string) => {
     setEditedData(prev => ({
       ...prev,
       [section]: {
-        ...prev[section as keyof typeof prev],
+        ...prev[section],
         [field]: value
       }
     }));

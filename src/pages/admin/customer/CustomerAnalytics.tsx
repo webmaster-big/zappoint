@@ -30,36 +30,13 @@ import {
   ResponsiveContainer,
   Cell,
 } from 'recharts';
-
-interface CustomerData {
-  id: string;
-  name: string;
-  email: string;
-  joinDate: string;
-  totalSpent: number;
-  bookings: number;
-  lastActivity: string;
-  status: 'active' | 'inactive' | 'new';
-  satisfaction: number;
-}
-
-interface AnalyticsData {
-  customerGrowth: { month: string; customers: number; growth: number }[];
-  revenueTrend: { month: string; revenue: number; bookings: number }[];
-  activityHours: { hour: string; activity: number }[];
-  bookingTimeDistribution: { time: string; count: number }[];
-  customerLifetimeValue: { segment: string; value: number; color: string }[];
-  satisfactionScores: { rating: number; count: number; percentage: number }[];
-  repeatCustomers: { month: string; repeatRate: number }[];
-  bookingsPerCustomer: { name: string; bookings: number }[];
-  statusDistribution: { status: string; count: number; color: string }[];
-}
+import type { CustomerAnalyticsCustomerData, CustomerAnalyticsAnalyticsData } from '../../../types/CustomerAnalytics.types';
 
 const CustomerAnalytics: React.FC = () => {
   const [dateRange, setDateRange] = useState<'7d' | '30d' | '90d' | '1y'>('30d');
 
   // Sample customer data
-  const customerData: CustomerData[] = [
+  const customerData: CustomerAnalyticsCustomerData[] = [
   { id: '1', name: 'John Smith', email: 'john@email.com', joinDate: '2024-01-15', totalSpent: 1250, bookings: 8, lastActivity: '2024-09-20', status: 'active', satisfaction: 4.8 },
   { id: '2', name: 'Sarah Johnson', email: 'sarah@email.com', joinDate: '2024-02-20', totalSpent: 850, bookings: 5, lastActivity: '2024-09-18', status: 'active', satisfaction: 4.5 },
   { id: '3', name: 'Mike Wilson', email: 'mike@email.com', joinDate: '2024-03-10', totalSpent: 420, bookings: 3, lastActivity: '2024-09-15', status: 'active', satisfaction: 4.2 },
@@ -68,7 +45,7 @@ const CustomerAnalytics: React.FC = () => {
   ];
 
   // Analytics data
-  const analyticsData: AnalyticsData = {
+  const analyticsData: CustomerAnalyticsAnalyticsData = {
     customerGrowth: [
       { month: 'Jan', customers: 120, growth: 5 },
       { month: 'Feb', customers: 145, growth: 12 },

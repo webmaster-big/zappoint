@@ -16,25 +16,11 @@ import {
   Plus,
   Tag,
 } from 'lucide-react';
-
-interface Customer {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-  joinDate: string;
-  lastActivity: string;
-  totalSpent: number;
-  bookings: number;
-  ticketsPurchased: number;
-  status: 'active' | 'inactive' | 'new';
-  satisfaction: number;
-  tags: string[];
-}
+import type { CustomersCustomer } from '../../../types/Customers.types';
 
 const CustomerListing: React.FC = () => {
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [filteredCustomers, setFilteredCustomers] = useState<Customer[]>([]);
+  const [customers, setCustomers] = useState<CustomersCustomer[]>([]);
+  const [filteredCustomers, setFilteredCustomers] = useState<CustomersCustomer[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [searchTerm, setSearchTerm] = useState('');
@@ -43,7 +29,7 @@ const CustomerListing: React.FC = () => {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
   // Sample customer data
-  const sampleCustomers: Customer[] = [
+  const sampleCustomers: CustomersCustomer[] = [
     {
       id: '1',
       name: 'John Smith',
@@ -287,8 +273,8 @@ const CustomerListing: React.FC = () => {
         if (a.status === 'inactive') return 1;
         if (b.status === 'inactive') return -1;
       }
-      let aValue: any = a[sortBy as keyof Customer];
-      let bValue: any = b[sortBy as keyof Customer];
+      let aValue: any = a[sortBy as keyof CustomersCustomer];
+      let bValue: any = b[sortBy as keyof CustomersCustomer];
 
       if (sortBy === 'joinDate' || sortBy === 'lastActivity') {
         aValue = new Date(aValue).getTime();

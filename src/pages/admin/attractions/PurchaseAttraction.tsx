@@ -11,36 +11,15 @@ import {
   Wallet,
   ShoppingCart
 } from 'lucide-react';
-
-// Define interfaces for our data structures
-interface Attraction {
-  id: string;
-  name: string;
-  description: string;
-  location: string;
-  duration: string;
-  durationUnit: string;
-  maxCapacity: number;
-  price: number;
-  pricingType: 'per_person' | 'fixed' | 'per_group' | 'per_hour' | 'per_game';
-  images: string[];
-  purchaseLink: string;
-}
-
-interface CustomerInfo {
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone: string;
-}
+import type { PurchaseAttractionAttraction, PurchaseAttractionCustomerInfo } from '../../../types/PurchaseAttraction.types';
 
 const PurchaseAttraction = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [attraction, setAttraction] = useState<Attraction | null>(null);
+  const [attraction, setAttraction] = useState<PurchaseAttractionAttraction | null>(null);
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
-  const [customerInfo, setCustomerInfo] = useState<CustomerInfo>({
+  const [customerInfo, setCustomerInfo] = useState<PurchaseAttractionCustomerInfo>({
     firstName: '',
     lastName: '',
     email: '',
@@ -55,7 +34,7 @@ const PurchaseAttraction = () => {
     const loadAttraction = () => {
       try {
         const attractions = JSON.parse(localStorage.getItem('zapzone_attractions') || '[]');
-        const foundAttraction = attractions.find((a: Attraction) => a.id === id);
+        const foundAttraction = attractions.find((a: PurchaseAttractionAttraction) => a.id === id);
         
         if (foundAttraction) {
           setAttraction(foundAttraction);

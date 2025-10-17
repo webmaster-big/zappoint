@@ -14,45 +14,14 @@ import {
   PackageIcon,
   Gift
 } from 'lucide-react';
-
-// Types
-interface Booking {
-  id: string;
-  type: 'package';
-  packageName: string;
-  customerName: string;
-  email: string;
-  phone: string;
-  date: string;
-  time: string;
-  participants: number;
-  status: 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'checked-in';
-  totalAmount: number;
-  amountPaid: number;
-  createdAt: string;
-  paymentMethod: string;
-  attractions?: { name: string; quantity: number }[];
-  addOns?: { name: string; quantity: number; price: number }[];
-  duration?: string;
-  notes?: string;
-}
-
-interface FilterOptions {
-  view: 'day' | 'week' | 'month' | 'range';
-  packages: string[];
-  dateRange: {
-    start: string;
-    end: string;
-  };
-  search: string;
-}
+import type { CalendarViewBooking, CalendarViewFilterOptions } from '../../../types/calendarView.types';
 
 const CalendarView: React.FC = () => {
-  const [bookings, setBookings] = useState<Booking[]>([]);
-  const [filteredBookings, setFilteredBookings] = useState<Booking[]>([]);
+  const [bookings, setBookings] = useState<CalendarViewBooking[]>([]);
+  const [filteredBookings, setFilteredBookings] = useState<CalendarViewBooking[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [filters, setFilters] = useState<FilterOptions>({
+  const [filters, setFilters] = useState<CalendarViewFilterOptions>({
     view: 'month',
     packages: [],
     dateRange: {
@@ -63,7 +32,7 @@ const CalendarView: React.FC = () => {
   });
   const [showFilters, setShowFilters] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
+  const [selectedBooking, setSelectedBooking] = useState<CalendarViewBooking | null>(null);
 
   // Load bookings from localStorage
   useEffect(() => {
@@ -93,7 +62,7 @@ const CalendarView: React.FC = () => {
         }
       } else {
         // Sample data for 2025 with only package bookings
-        const sampleBookings: Booking[] = [
+        const sampleBookings: CalendarViewBooking[] = [
           {
             id: '1',
             type: 'package',
@@ -244,7 +213,7 @@ const CalendarView: React.FC = () => {
     setFilteredBookings(result);
   };
 
-  const handleFilterChange = (key: keyof FilterOptions, value: any) => {
+  const handleFilterChange = (key: keyof CalendarViewFilterOptions, value: string | string[]) => {
     setFilters(prev => ({
       ...prev,
       [key]: value
@@ -363,7 +332,7 @@ const CalendarView: React.FC = () => {
     return [...new Set(packages)];
   };
 
-  const getBookingTitle = (booking: Booking) => {
+  const getBookingTitle = (booking: CalendarViewBooking) => {
     return booking.packageName || 'Package Booking';
   };
 

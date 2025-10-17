@@ -1,27 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { Plus, X, Edit2, Trash2, Eye, EyeOff, Copy } from "lucide-react";
-
-// --- Gift Card Data Model ---
-export type GiftCardStatus = "active" | "inactive" | "expired" | "redeemed" | "cancelled" | "deleted";
-export type GiftCardType = "fixed" | "percentage";
-
-export interface GiftCard {
-  code: string;
-  type: GiftCardType;
-  initial_value: number;
-  balance: number;
-  max_usage: number;
-  description: string;
-  status: GiftCardStatus;
-  expiry_date?: string; // ISO string
-  created_by: string; // admin id
-  created_at: string; // ISO string
-  updated_at?: string; // ISO string
-  deleted?: boolean;
-}
+import type { GiftCardStatus, GiftCardType, GiftCardItem } from '../../../types/GiftCard.types';
 
 const GiftCard: React.FC = () => {
-  const [giftCards, setGiftCards] = useState<GiftCard[]>([]);
+  const [giftCards, setGiftCards] = useState<GiftCardItem[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState<{
     type: GiftCardType;
@@ -91,7 +73,7 @@ const GiftCard: React.FC = () => {
     const initialValue = Number(form.initial_value);
     const balanceValue = Number(form.balance);
     const maxUsage = Number(form.max_usage);
-    const newCard: GiftCard = {
+    const newCard: GiftCardItem = {
       code,
       type: form.type,
       initial_value: initialValue,

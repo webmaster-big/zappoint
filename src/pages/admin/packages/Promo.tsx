@@ -1,31 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { Plus, X, Edit2, Trash2, Eye, EyeOff, Copy } from "lucide-react";
-
-export type PromoStatus = "active" | "inactive" | "expired" | "exhausted";
-export type PromoType = "fixed" | "percentage";
-
-export interface Promo {
-  code: string;
-  type: PromoType;
-  value: number;
-  start_date: string; // ISO string
-  end_date: string; // ISO string
-  usage_limit_total: number;
-  usage_limit_per_user: number;
-  status: PromoStatus;
-  description?: string;
-  created_by: string;
-  created_at: string;
-  updated_at?: string;
-  deleted?: boolean;
-}
+import type { PromoStatus, PromoType, PromoItem } from '../../../types/Promo.types';
 
 const Promo: React.FC = () => {
-  const [promos, setPromos] = useState<Promo[]>([]);
+  const [promos, setPromos] = useState<PromoItem[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [editIndex, setEditIndex] = useState<number | null>(null);
-  const [editForm, setEditForm] = useState<null | Partial<Promo>>(null);
+  const [editForm, setEditForm] = useState<null | Partial<PromoItem>>(null);
   
   const [form, setForm] = useState({
     type: "fixed" as PromoType,
@@ -84,7 +66,7 @@ const Promo: React.FC = () => {
     const code = form.code || generatePromoCode();
     const value = Number(form.value);
     
-    const newPromo: Promo = {
+    const newPromo: PromoItem = {
       code,
       type: form.type,
       value,

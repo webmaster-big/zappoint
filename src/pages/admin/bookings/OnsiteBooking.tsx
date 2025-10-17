@@ -2,81 +2,14 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Calendar, Clock, Users, CreditCard, Gift, Tag, Plus, Minus } from 'lucide-react';
+import type { 
+  OnsiteBookingRoom, 
+  OnsiteBookingPackage, 
+  OnsiteBookingAttraction, 
+  OnsiteBookingData 
+} from '../../../types/onsiteBooking.types';
 
-// Types (unchanged)
-interface Room { name: string; capacity?: number; price?: number; }
-interface AddOn {
-  name: string;
-  price: number;
-  image?: string;
-}
-
-interface Package {
-  id: string;
-  name: string;
-  description: string;
-  price: number;
-  pricePerAdditional?: number;
-  maxParticipants: number;
-  category: string;
-  features: string;
-  availabilityType: string;
-  availableDays: string[];
-  availableWeekDays: string[];
-  availableMonthDays: string[];
-  attractions: string[];
-  addOns: AddOn[];
-  giftCards: GiftCard[];
-  promos: Promo[];
-  duration: string;
-  durationUnit: "hours" | "minutes";
-  pricePerAdditional30min: string;
-  pricePerAdditional1hr: string;
-  rooms?: (string | Room)[];
-  image?: string;
-}
-
-interface GiftCard {
-  code: string;
-  type: 'fixed' | 'percentage';
-  value: number;
-  initial_value: number;
-  remaining_usage: number;
-  max_usage: number;
-  status: string;
-  expiry_date: string;
-  description: string;
-}
-
-interface Promo {
-  code: string;
-  type: 'fixed' | 'percentage';
-  value: number;
-  status: string;
-  start_date: string;
-  end_date: string;
-  usage_limit_per_user: number;
-  usage_limit_total: number;
-  description: string;
-}
-
-interface Attraction {
-  id: string;
-  name: string;
-  description: string;
-  price: number;
-  pricingType: 'per_person' | 'per_unit' | 'fixed' | 'per_lane';
-  maxCapacity: number;
-  category: string;
-}
-
-interface BookingData {
-  packageId: string | null;
-  selectedAttractions: { id: string; quantity: number }[];
-  selectedAddOns: { name: string; quantity: number }[];
-  date: string;
-  time: string;
-  participants: number;
+interface BookingData extends Omit<OnsiteBookingData, 'customer'> {
   customer: {
     firstName: string;
     lastName: string;
@@ -97,9 +30,9 @@ const TIME_SLOTS = [
 
 const OnsiteBooking: React.FC = () => {
   const navigate = useNavigate();
-  const [packages, setPackages] = useState<Package[]>([]);
-  const [attractions, setAttractions] = useState<Attraction[]>([]);
-  const [selectedPackage, setSelectedPackage] = useState<Package | null>(null);
+  const [packages, setPackages] = useState<OnsiteBookingPackage[]>([]);
+  const [attractions, setAttractions] = useState<OnsiteBookingAttraction[]>([]);
+  const [selectedPackage, setSelectedPackage] = useState<OnsiteBookingPackage | null>(null);
   const [availableDates, setAvailableDates] = useState<Date[]>([]);
   const [availableTimes, setAvailableTimes] = useState<string[]>([]);
   const [step, setStep] = useState(1);
@@ -117,10 +50,12 @@ const OnsiteBooking: React.FC = () => {
       email: '',
       phone: ''
     },
+    room: '',
     paymentMethod: 'cash',
     giftCardCode: '',
     promoCode: '',
-    notes: ''
+    notes: '',
+    total: 0
   });
 
   // Check if all required fields are filled for final submission
@@ -139,7 +74,7 @@ const OnsiteBooking: React.FC = () => {
   };
 
   // Format duration for display
-  const formatDuration = (pkg: Package | null) => {
+  const formatDuration = (pkg: OnsiteBookingPackage | null) => {
     if (!pkg || !pkg.duration) return "Not specified";
     return `${pkg.duration} ${pkg.durationUnit}`;
   };
@@ -147,7 +82,7 @@ const OnsiteBooking: React.FC = () => {
   // Load packages and attractions
   useEffect(() => {
     // Load packages (sample or from localStorage)
-    const samplePackages: Package[] = [
+    const samplePackages: OnsiteBookingPackage[] = [
       {
         id: 'pkg_1757977625822_92891',
         name: 'Family Fun Package',
@@ -307,7 +242,7 @@ const OnsiteBooking: React.FC = () => {
     }
   }, [bookingData.date, bookingData.time]);
 
-  const handlePackageSelect = (pkg: Package) => {
+  const handlePackageSelect = (pkg: OnsiteBookingPackage) => {
     setSelectedPackage(pkg);
     setSelectedRoom("");
     setBookingData(prev => ({ 
@@ -544,7 +479,7 @@ const OnsiteBooking: React.FC = () => {
                 if (typeof r === "string") {
                   room = { name: r };
                 } else {
-                  const { name } = r as Room;
+                  const { name } = r as OnsiteBookingRoom;
                   room = { name };
                 }
                 return (

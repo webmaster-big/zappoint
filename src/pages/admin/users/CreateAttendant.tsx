@@ -14,9 +14,10 @@ import {
   Users,
   Check
 } from 'lucide-react';
+import type { CreateAttendantFormData } from '../../../types/CreateAttendant.types';
 
 const CreateAttendant = () => {
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<CreateAttendantFormData>({
     // Personal Information
     firstName: '',
     lastName: '',
@@ -80,7 +81,7 @@ const CreateAttendant = () => {
     'Specialist'
   ];
 
-  const handleInputChange = (field: string, value: any) => {
+  const handleInputChange = (field: keyof CreateAttendantFormData, value: string | string[]) => {
     setFormData(prev => ({
       ...prev,
       [field]: value

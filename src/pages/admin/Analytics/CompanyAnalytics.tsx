@@ -10,65 +10,23 @@ import {
   TrendingUp,
   TrendingDown,
 } from 'lucide-react';
-import type { Booking } from '../../../types/booking';
+import { useThemeColor } from '../../../hooks/useThemeColor';
+import type {
+  CompanyAnalyticsBooking,
+  CompanyAnalyticsTicketPurchase,
+  CompanyAnalyticsLocationData,
+  CompanyAnalyticsLocationMetrics,
+  CompanyAnalyticsMetrics,
+  CompanyAnalyticsMetricCardProps,
+} from '../../../types/CompanyAnalytics.types';
 
-// // Interface Definitions
-// interface Booking {
-//   id: string;
-//   date: string;
-//   package: string;
-//   participants: number;
-//   amount: number;
-//   status: 'Confirmed' | 'Pending' | 'Cancelled';
-//   location: string;
-// }
-
-interface TicketPurchase {
-  id: string;
-  date: string;
-  attraction: string;
-  quantity: number;
-  amount: number;
-  status: 'Completed' | 'Pending' | 'Cancelled';
-  location: string;
-}
-
-interface LocationData {
-  bookings: Booking[];
-  ticketPurchases: TicketPurchase[];
-}
-
-interface LocationMetrics {
-  revenue: number;
-  bookings: number;
-  tickets: number;
-  participants: number;
-}
-
-interface Metrics {
-  totalRevenue: number;
-  totalBookings: number;
-  totalTickets: number;
-  totalParticipants: number;
-  locationMetrics: Record<string, LocationMetrics>;
-  packageRevenue: Record<string, number>;
-  attractionRevenue: Record<string, number>;
-}
-
-interface MetricCardProps {
-  title: string;
-  value: string;
-  change?: string;
-  icon: React.ComponentType<{ size?: number; className?: string }>;
-  trend?: 'up' | 'down';
-}
-
-const CompanyAnalytics: React.FC<null> = () => {
+const CompanyAnalytics: React.FC = () => {
+  const { themeColor, fullColor } = useThemeColor();
   const [timeRange, setTimeRange] = useState<string>('30d');
   const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
   const [reportType, setReportType] = useState<string>('overview');
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
-  const [data, setData] = useState<Record<string, LocationData> | null>(null);
+  const [data, setData] = useState<Record<string, CompanyAnalyticsLocationData> | null>(null);
 
   const locations: string[] = [
     'Brighton', 'Canton', 'Farmington', 'Lansing', 'Taylor', 
@@ -89,16 +47,16 @@ const CompanyAnalytics: React.FC<null> = () => {
   }, []);
 
   // Generate comprehensive sample data
-  const generateSampleData = (): Record<string, LocationData> => {
+  const generateSampleData = (): Record<string, CompanyAnalyticsLocationData> => {
     const packages: string[] = ['Adventure Package', 'Birthday Package', 'Corporate Package', 'Family Package', 'Group Package'];
     const attractions: string[] = ['Laser Tag', 'Bowling', 'VR Experience', 'Arcade', 'Escape Room', 'Mini Golf'];
     
-    const locationData: Record<string, LocationData> = {};
+    const locationData: Record<string, CompanyAnalyticsLocationData> = {};
     const today = new Date();
     
     locations.forEach(location => {
       // Bookings data
-      const bookings: Booking[] = Array.from({ length: 50 }, (_, i) => {
+      const bookings: CompanyAnalyticsBooking[] = Array.from({ length: 50 }, (_, i) => {
         const date = new Date();
         date.setDate(today.getDate() - Math.floor(Math.random() * 30));
         return {
@@ -113,7 +71,7 @@ const CompanyAnalytics: React.FC<null> = () => {
       });
 
       // Ticket purchases data
-      const ticketPurchases: TicketPurchase[] = Array.from({ length: 100 }, (_, i) => {
+      const ticketPurchases: CompanyAnalyticsTicketPurchase[] = Array.from({ length: 100 }, (_, i) => {
         const date = new Date();
         date.setDate(today.getDate() - Math.floor(Math.random() * 30));
         return {
@@ -134,10 +92,10 @@ const CompanyAnalytics: React.FC<null> = () => {
   };
 
   // Filter data based on selected time range and locations
-  const getFilteredData = (): Record<string, LocationData> | null => {
+  const getFilteredData = (): Record<string, CompanyAnalyticsLocationData> | null => {
     if (!data) return null;
 
-    const filteredData: Record<string, LocationData> = {};
+    const filteredData: Record<string, CompanyAnalyticsLocationData> = {};
     const days = parseInt(timeRange);
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - days);
@@ -148,10 +106,10 @@ const CompanyAnalytics: React.FC<null> = () => {
       const locationData = data[location];
       if (locationData) {
         filteredData[location] = {
-          bookings: locationData.bookings.filter((booking: Booking) => 
+          bookings: locationData.bookings.filter((booking: CompanyAnalyticsBooking) =>
             new Date(booking.date) >= cutoffDate
           ),
-          ticketPurchases: locationData.ticketPurchases.filter((ticket: TicketPurchase) =>
+          ticketPurchases: locationData.ticketPurchases.filter((ticket: CompanyAnalyticsTicketPurchase) =>
             new Date(ticket.date) >= cutoffDate
           )
         };
@@ -164,24 +122,24 @@ const CompanyAnalytics: React.FC<null> = () => {
   const filteredData = getFilteredData();
 
   // Calculate metrics
-  const calculateMetrics = (): Metrics | null => {
+  const calculateMetrics = (): CompanyAnalyticsMetrics | null => {
     if (!filteredData) return null;
 
     let totalRevenue = 0;
     let totalBookings = 0;
     let totalTickets = 0;
     let totalParticipants = 0;
-    const locationMetrics: Record<string, LocationMetrics> = {};
+    const locationMetrics: Record<string, CompanyAnalyticsLocationMetrics> = {};
     const packageRevenue: Record<string, number> = {};
     const attractionRevenue: Record<string, number> = {};
 
-    Object.entries(filteredData).forEach(([location, locationData]: [string, LocationData]) => {
+    Object.entries(filteredData).forEach(([location, locationData]: [string, CompanyAnalyticsLocationData]) => {
       const locationBookings = locationData.bookings.length;
       const locationTickets = locationData.ticketPurchases.length;
       const locationRevenue = 
-        locationData.bookings.reduce((sum: number, b: Booking) => sum + b.totalAmount, 0) +
-        locationData.ticketPurchases.reduce((sum: number, t: TicketPurchase) => sum + t.amount, 0);
-      const locationParticipants = locationData.bookings.reduce((sum: number, b: Booking) => sum + b.participants, 0);
+        locationData.bookings.reduce((sum: number, b: CompanyAnalyticsBooking) => sum + b.amount, 0) +
+        locationData.ticketPurchases.reduce((sum: number, t: CompanyAnalyticsTicketPurchase) => sum + t.amount, 0);
+      const locationParticipants = locationData.bookings.reduce((sum: number, b: CompanyAnalyticsBooking) => sum + b.participants, 0);
 
       totalRevenue += locationRevenue;
       totalBookings += locationBookings;
@@ -196,12 +154,12 @@ const CompanyAnalytics: React.FC<null> = () => {
       };
 
       // Package revenue breakdown
-      locationData.bookings.forEach((booking: Booking) => {
-        packageRevenue[booking.packageName] = (packageRevenue[booking.packageName] || 0) + booking.totalAmount;
+      locationData.bookings.forEach((booking: CompanyAnalyticsBooking) => {
+        packageRevenue[booking.package] = (packageRevenue[booking.package] || 0) + booking.amount;
       });
 
       // Attraction revenue breakdown
-      locationData.ticketPurchases.forEach((ticket: TicketPurchase) => {
+      locationData.ticketPurchases.forEach((ticket: CompanyAnalyticsTicketPurchase) => {
         attractionRevenue[ticket.attraction] = (attractionRevenue[ticket.attraction] || 0) + ticket.amount;
       });
     });
@@ -258,7 +216,7 @@ const CompanyAnalytics: React.FC<null> = () => {
   };
 
   // Quick metrics cards
-  const MetricCard: React.FC<MetricCardProps> = ({ title, value, change, icon: Icon, trend }) => (
+  const MetricCard: React.FC<CompanyAnalyticsMetricCardProps> = ({ title, value, change, icon: Icon, trend }) => (
     <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
       <div className="flex items-center justify-between">
         <div>
@@ -273,8 +231,8 @@ const CompanyAnalytics: React.FC<null> = () => {
             </p>
           )}
         </div>
-        <div className="p-3 bg-blue-100 rounded-lg">
-          <Icon size={24} className="text-blue-800" />
+        <div className={`p-3 bg-${themeColor}-100 rounded-lg`}>
+          <Icon size={24} className={`text-${fullColor}`} />
         </div>
       </div>
     </div>
@@ -292,7 +250,7 @@ const CompanyAnalytics: React.FC<null> = () => {
           <div className="flex flex-col md:flex-row md:items-center md:justify-between">
             <div>
               <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-                <BarChart3 className="w-8 h-8 text-blue-800" />
+                <BarChart3 className={`w-8 h-8 text-${fullColor}`} />
                 Analytics & Reports
               </h1>
               <p className="text-gray-600 mt-2">Comprehensive insights across all locations</p>
@@ -300,7 +258,7 @@ const CompanyAnalytics: React.FC<null> = () => {
             <button
               onClick={generatePDFReport}
               disabled={isGenerating}
-              className="mt-4 md:mt-0 px-6 py-3 bg-blue-800 text-white rounded-xl hover:bg-blue-900 transition flex items-center gap-2 disabled:opacity-50"
+              className={`mt-4 md:mt-0 px-6 py-3 bg-${fullColor} text-white rounded-xl hover:bg-${themeColor}-900 transition flex items-center gap-2 disabled:opacity-50`}
             >
               <Download size={20} />
               {isGenerating ? 'Generating Report...' : 'Export Report'}
@@ -316,7 +274,7 @@ const CompanyAnalytics: React.FC<null> = () => {
               <select
                 value={timeRange}
                 onChange={(e) => setTimeRange(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-800 focus:border-blue-800"
+                className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${fullColor} focus:border-${fullColor}`}
               >
                 <option value="7">Last 7 days</option>
                 <option value="30">Last 30 days</option>
@@ -330,7 +288,7 @@ const CompanyAnalytics: React.FC<null> = () => {
               <select
                 value={reportType}
                 onChange={(e) => setReportType(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-800 focus:border-blue-800"
+                className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${fullColor} focus:border-${fullColor}`}
               >
                 <option value="overview">Overview</option>
                 <option value="bookings">Bookings Analysis</option>
@@ -371,7 +329,7 @@ const CompanyAnalytics: React.FC<null> = () => {
                   onClick={() => toggleLocation(location)}
                   className={`px-3 py-2 rounded-lg text-sm font-medium transition ${
                     selectedLocations.includes(location)
-                      ? 'bg-blue-800 text-white'
+                      ? `bg-${fullColor} text-white`
                       : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                   }`}
                 >
@@ -421,16 +379,16 @@ const CompanyAnalytics: React.FC<null> = () => {
             {/* Location Revenue Chart */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                <BarChart3 className="w-5 h-5 text-blue-800 mr-2" />
+                <BarChart3 className={`w-5 h-5 text-${fullColor} mr-2`} />
                 Location Revenue Performance
               </h3>
               <div className="space-y-4">
                 {Object.entries(metrics.locationMetrics)
-                  .sort(([,a], [,b]) => (b as LocationMetrics).revenue - (a as LocationMetrics).revenue)
-                  .map(([location, locationMetrics]: [string, LocationMetrics]) => (
+                  .sort(([,a], [,b]) => (b as CompanyAnalyticsLocationMetrics).revenue - (a as CompanyAnalyticsLocationMetrics).revenue)
+                  .map(([location, locationMetrics]: [string, CompanyAnalyticsLocationMetrics]) => (
                     <div key={location} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                       <div className="flex items-center space-x-3">
-                        <MapPin size={16} className="text-blue-800" />
+                        <MapPin size={16} className={`text-${fullColor}`} />
                         <span className="font-medium text-gray-900">{location}</span>
                       </div>
                       <div className="text-right">
@@ -447,7 +405,7 @@ const CompanyAnalytics: React.FC<null> = () => {
             {/* Package Performance */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                <Package className="w-5 h-5 text-blue-800 mr-2" />
+                <Package className={`w-5 h-5 text-${fullColor} mr-2`} />
                 Package Performance
               </h3>
               <div className="space-y-3">
@@ -456,7 +414,7 @@ const CompanyAnalytics: React.FC<null> = () => {
                   .map(([pkg, revenue]) => (
                     <div key={pkg} className="flex justify-between items-center">
                       <span className="text-gray-700">{pkg}</span>
-                      <span className="font-semibold text-blue-800">${(revenue as number).toLocaleString()}</span>
+                      <span className={`font-semibold text-${fullColor}`}>${(revenue as number).toLocaleString()}</span>
                     </div>
                   ))}
               </div>
@@ -468,7 +426,7 @@ const CompanyAnalytics: React.FC<null> = () => {
             {/* Attraction Performance */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                <Ticket className="w-5 h-5 text-blue-800 mr-2" />
+                <Ticket className={`w-5 h-5 text-${fullColor} mr-2`} />
                 Top Attractions
               </h3>
               <div className="space-y-3">
@@ -478,7 +436,7 @@ const CompanyAnalytics: React.FC<null> = () => {
                   .map(([attraction, revenue]) => (
                     <div key={attraction} className="flex justify-between items-center">
                       <span className="text-gray-700">{attraction}</span>
-                      <span className="font-semibold text-blue-800">${(revenue as number).toLocaleString()}</span>
+                      <span className={`font-semibold text-${fullColor}`}>${(revenue as number).toLocaleString()}</span>
                     </div>
                   ))}
               </div>
@@ -487,7 +445,7 @@ const CompanyAnalytics: React.FC<null> = () => {
             {/* Quick Stats */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                <TrendingUp className="w-5 h-5 text-blue-800 mr-2" />
+                <TrendingUp className={`w-5 h-5 text-${fullColor} mr-2`} />
                 Performance Highlights
               </h3>
               <div className="space-y-3 text-sm">
@@ -495,8 +453,8 @@ const CompanyAnalytics: React.FC<null> = () => {
                   <span className="text-green-800">Best Performing Location</span>
                   <span className="font-semibold">Brighton</span>
                 </div>
-                <div className="flex justify-between items-center p-2 bg-blue-50 rounded">
-                  <span className="text-blue-800">Most Popular Package</span>
+                <div className={`flex justify-between items-center p-2 bg-${themeColor}-50 rounded`}>
+                  <span className={`text-${fullColor}`}>Most Popular Package</span>
                   <span className="font-semibold">Corporate Package</span>
                 </div>
                 <div className="flex justify-between items-center p-2 bg-purple-50 rounded">
@@ -507,9 +465,9 @@ const CompanyAnalytics: React.FC<null> = () => {
             </div>
 
             {/* Report Summary */}
-            <div className="bg-blue-50 rounded-xl border border-blue-200 p-6">
-              <h3 className="text-lg font-semibold text-blue-900 mb-2">Report Summary</h3>
-              <div className="text-sm text-blue-800 space-y-2">
+            <div className={`bg-${themeColor}-50 rounded-xl border border-${themeColor}-200 p-6`}>
+              <h3 className={`text-lg font-semibold text-${themeColor}-900 mb-2`}>Report Summary</h3>
+              <div className={`text-sm text-${fullColor} space-y-2`}>
                 <div>Time Period: {timeRange} days</div>
                 <div>Locations: {selectedLocations.length || 'All'} locations</div>
                 <div>Total Data Points: {(metrics.totalBookings + metrics.totalTickets).toLocaleString()}</div>

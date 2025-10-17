@@ -13,6 +13,7 @@ import {
   Target,
   Star
 } from 'lucide-react';
+import type { LocationManagerProfileData } from '../../../types/LocationManagerProfile.types';
 
 const LocationManagerProfile = () => {
   const [isEditing, setIsEditing] = useState(false);
@@ -20,7 +21,7 @@ const LocationManagerProfile = () => {
   const [isLoading, setIsLoading] = useState(false);
 
   // Sample profile data for Location Manager
-  const [profileData, setProfileData] = useState({
+  const [profileData, setProfileData] = useState<LocationManagerProfileData>({
     personal: {
       firstName: 'Michael',
       lastName: 'Chen',
@@ -77,11 +78,11 @@ const LocationManagerProfile = () => {
     setIsLoading(false);
   };
 
-  const handleInputChange = (section: string, field: string, value: string) => {
+  const handleInputChange = (section: keyof LocationManagerProfileData, field: string, value: string) => {
     setEditedData(prev => ({
       ...prev,
       [section]: {
-        ...prev[section as keyof typeof prev],
+        ...prev[section],
         [field]: value
       }
     }));

@@ -9,35 +9,15 @@ import {
   Search,
   X
 } from 'lucide-react';
-
-interface Attraction {
-  id: string;
-  name: string;
-  description: string;
-  category: string;
-  price: number;
-  pricingType: string;
-  maxCapacity: number;
-  duration: string;
-  durationUnit: string;
-  location: string;
-  images: string[];
-  status: string;
-}
-
-interface CustomerInfo {
-  name: string;
-  email: string;
-  phone: string;
-}
+import type { CreatePurchaseAttraction, CreatePurchaseCustomerInfo } from '../../../types/CreatePurchase.types';
 
 const CreatePurchase = () => {
-  const [attractions, setAttractions] = useState<Attraction[]>([]);
-  const [filteredAttractions, setFilteredAttractions] = useState<Attraction[]>([]);
+  const [attractions, setAttractions] = useState<CreatePurchaseAttraction[]>([]);
+  const [filteredAttractions, setFilteredAttractions] = useState<CreatePurchaseAttraction[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedAttraction, setSelectedAttraction] = useState<Attraction | null>(null);
+  const [selectedAttraction, setSelectedAttraction] = useState<CreatePurchaseAttraction | null>(null);
   const [quantity, setQuantity] = useState(1);
-  const [customerInfo, setCustomerInfo] = useState<CustomerInfo>({
+  const [customerInfo, setCustomerInfo] = useState<CreatePurchaseCustomerInfo>({
     name: '',
     email: '',
     phone: ''
@@ -98,7 +78,7 @@ const CreatePurchase = () => {
     return Math.max(0, subtotal - discount);
   };
 
-  const handleAddToCart = (attraction: Attraction) => {
+  const handleAddToCart = (attraction: CreatePurchaseAttraction) => {
     setSelectedAttraction(attraction);
     setQuantity(1);
     setDiscount(0);

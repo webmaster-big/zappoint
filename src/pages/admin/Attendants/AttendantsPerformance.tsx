@@ -11,47 +11,18 @@ import {
   ChevronDown,
   ChevronUp,
 } from 'lucide-react';
-
-// Types
-interface Attendant {
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  department: string;
-  position: string;
-  hireDate: string;
-  status: 'active' | 'inactive';
-}
-
-interface PerformanceMetric {
-  attendantId: string;
-  period: string;
-  bookingsCreated: number;
-  purchasesProcessed: number;
-  totalRevenue: number;
-  customersHandled: number;
-  totalHours: number;
-  lastActive: string;
-  loginCount: number;
-}
-
-interface PerformanceData {
-  attendant: Attendant;
-  metrics: PerformanceMetric[];
-}
-
-interface FilterOptions {
-  timeRange: '1' | '7' | '30' | '90' | '365';
-  department: string;
-  search: string;
-}
+import type {
+  AttendantsPerformanceAttendant,
+  AttendantsPerformanceMetric,
+  AttendantsPerformanceData,
+  AttendantsPerformanceFilterOptions,
+} from '../../../types/AttendantsPerformance.types';
 
 const AttendantsPerformance = () => {
-  const [performanceData, setPerformanceData] = useState<PerformanceData[]>([]);
-  const [filteredData, setFilteredData] = useState<PerformanceData[]>([]);
+  const [performanceData, setPerformanceData] = useState<AttendantsPerformanceData[]>([]);
+  const [filteredData, setFilteredData] = useState<AttendantsPerformanceData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState<FilterOptions>({
+  const [filters, setFilters] = useState<AttendantsPerformanceFilterOptions>({
     timeRange: '7',
     department: 'all',
     search: ''
@@ -108,9 +79,9 @@ const AttendantsPerformance = () => {
         const attendants = JSON.parse(storedAttendants);
         const performanceMetrics = JSON.parse(storedPerformance);
         
-        const combinedData = attendants.map((attendant: Attendant) => ({
+        const combinedData = attendants.map((attendant: AttendantsPerformanceAttendant) => ({
           attendant,
-          metrics: performanceMetrics.filter((metric: PerformanceMetric) => 
+          metrics: performanceMetrics.filter((metric: AttendantsPerformanceMetric) => 
             metric.attendantId === attendant.id
           )
         }));
@@ -127,7 +98,7 @@ const AttendantsPerformance = () => {
   };
 
   const generateSampleData = () => {
-    const sampleAttendants: Attendant[] = [
+    const sampleAttendants: AttendantsPerformanceAttendant[] = [
       {
         id: 'att_1',
         firstName: 'Sarah',
@@ -171,7 +142,7 @@ const AttendantsPerformance = () => {
     ];
 
     const timePeriods = ['1', '7', '30', '90', '365'];
-    const performanceMetrics: PerformanceMetric[] = [];
+    const performanceMetrics: AttendantsPerformanceMetric[] = [];
 
     sampleAttendants.forEach(attendant => {
       timePeriods.forEach(period => {
@@ -279,7 +250,7 @@ const AttendantsPerformance = () => {
     setFilteredData(result);
   };
 
-  const handleFilterChange = (key: keyof FilterOptions, value: any) => {
+  const handleFilterChange = (key: keyof AttendantsPerformanceFilterOptions, value: string) => {
     setFilters(prev => ({
       ...prev,
       [key]: value
@@ -295,7 +266,7 @@ const AttendantsPerformance = () => {
     }
   };
 
-  const getCurrentMetric = (metrics: PerformanceMetric[]) => {
+  const getCurrentMetric = (metrics: AttendantsPerformanceMetric[]) => {
     return metrics.find(metric => metric.period === filters.timeRange);
   };
 

@@ -15,34 +15,16 @@ import {
   Trash2,
   Plus
 } from 'lucide-react';
-
-// Types
-interface ActivityLog {
-  id: string;
-  attendantId: string;
-  attendantName: string;
-  action: string;
-  resourceType: 'package' | 'customer' | 'purchase' | 'attraction' | 'booking' | 'attendant';
-  resourceId?: string;
-  resourceName?: string;
-  details: string;
-  timestamp: string;
-  severity: 'info' | 'success' | 'warning';
-}
-
-interface FilterOptions {
-  action: string;
-  resourceType: string;
-  attendant: string;
-  dateRange: string;
-  search: string;
-}
+import type {
+  AttendantActivityLogsLog,
+  AttendantActivityLogsFilterOptions,
+} from '../../../types/AttendantActivityLogs.types';
 
 const AttendantActivityLogs = () => {
-  const [logs, setLogs] = useState<ActivityLog[]>([]);
-  const [filteredLogs, setFilteredLogs] = useState<ActivityLog[]>([]);
+  const [logs, setLogs] = useState<AttendantActivityLogsLog[]>([]);
+  const [filteredLogs, setFilteredLogs] = useState<AttendantActivityLogsLog[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState<FilterOptions>({
+  const [filters, setFilters] = useState<AttendantActivityLogsFilterOptions>({
     action: 'all',
     resourceType: 'all',
     attendant: 'all',
@@ -152,7 +134,7 @@ const AttendantActivityLogs = () => {
     }
   };
 
-  const generateSampleLogs = (): ActivityLog[] => {
+  const generateSampleLogs = (): AttendantActivityLogsLog[] => {
     const attendants = [
       { id: 'att_1', name: 'Sarah Johnson' },
       { id: 'att_2', name: 'Mike Chen' },
@@ -191,7 +173,7 @@ const AttendantActivityLogs = () => {
       { action: 'viewed', resourceType: 'booking', details: 'Viewed booking details #{id}', severity: 'info' },
     ];
 
-    const sampleLogs: ActivityLog[] = [];
+    const sampleLogs: AttendantActivityLogsLog[] = [];
     const now = new Date();
     
     // Generate logs for the last 7 days
@@ -291,7 +273,7 @@ const AttendantActivityLogs = () => {
     setCurrentPage(1);
   };
 
-  const handleFilterChange = (key: keyof FilterOptions, value: any) => {
+  const handleFilterChange = (key: keyof AttendantActivityLogsFilterOptions, value: string) => {
     setFilters(prev => ({
       ...prev,
       [key]: value

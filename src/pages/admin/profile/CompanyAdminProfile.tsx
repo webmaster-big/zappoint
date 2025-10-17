@@ -14,6 +14,7 @@ import {
   Calendar,
   Globe
 } from 'lucide-react';
+import type { CompanyAdminProfileData } from '../../../types/CompanyAdminProfile.types';
 
 const CompanyAdminProfile = () => {
   const [isEditing, setIsEditing] = useState(false);
@@ -21,7 +22,7 @@ const CompanyAdminProfile = () => {
   const [isLoading, setIsLoading] = useState(false);
 
   // Sample profile data - in real app, this would come from API
-  const [profileData, setProfileData] = useState({
+  const [profileData, setProfileData] = useState<CompanyAdminProfileData>({
     personal: {
       firstName: 'Sarah',
       lastName: 'Johnson',
@@ -80,11 +81,11 @@ const CompanyAdminProfile = () => {
     setIsLoading(false);
   };
 
-  const handleInputChange = (section: string, field: string, value: string) => {
+  const handleInputChange = (section: keyof CompanyAdminProfileData, field: string, value: string) => {
     setEditedData(prev => ({
       ...prev,
       [section]: {
-        ...prev[section as keyof typeof prev],
+        ...prev[section],
         [field]: value
       }
     }));

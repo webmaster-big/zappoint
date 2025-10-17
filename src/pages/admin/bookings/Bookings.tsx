@@ -1,5 +1,6 @@
 // src/pages/admin/bookings/Bookings.tsx
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { 
   Eye, 
   Pencil, 
@@ -13,44 +14,14 @@ import {
   DollarSign,
   Users
 } from 'lucide-react';
-
-// Types
-interface Booking {
-  id: string;
-  type: 'package';
-  packageName: string;
-  customerName: string;
-  email: string;
-  phone: string;
-  date: string;
-  time: string;
-  participants: number;
-  status: 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'checked-in';
-  totalAmount: number;
-  createdAt: string;
-  paymentMethod: string;
-  attractions?: { name: string; quantity: number }[];
-  addOns?: { name: string; quantity: number }[];
-  duration?: string;
-  activity?: string;
-}
-
-interface FilterOptions {
-  status: string;
-  dateRange: {
-    start: string;
-    end: string;
-  };
-  search: string;
-  payment: string;
-}
+import type { BookingsPageBooking, BookingsPageFilterOptions } from '../../../types/Bookings.types';
 
 const Bookings: React.FC = () => {
-  const [bookings, setBookings] = useState<Booking[]>([]);
-  const [filteredBookings, setFilteredBookings] = useState<Booking[]>([]);
+  const [bookings, setBookings] = useState<BookingsPageBooking[]>([]);
+  const [filteredBookings, setFilteredBookings] = useState<BookingsPageBooking[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedBookings, setSelectedBookings] = useState<string[]>([]);
-  const [filters, setFilters] = useState<FilterOptions>({
+  const [filters, setFilters] = useState<BookingsPageFilterOptions>({
     status: 'all',
     dateRange: {
       start: '',
@@ -131,7 +102,7 @@ const Bookings: React.FC = () => {
         setBookings(packageBookings);
       } else {
         // Sample data for demonstration - only packages
-        const sampleBookings: Booking[] = [
+        const sampleBookings: BookingsPageBooking[] = [
           {
             id: '1',
             type: 'package',
@@ -249,7 +220,7 @@ const Bookings: React.FC = () => {
     setFilteredBookings(result);
   };
 
-  const handleFilterChange = (key: keyof FilterOptions, value: any) => {
+  const handleFilterChange = (key: keyof BookingsPageFilterOptions, value: string) => {
     setFilters(prev => ({
       ...prev,
       [key]: value
@@ -302,7 +273,7 @@ const Bookings: React.FC = () => {
     localStorage.setItem('zapzone_bookings', JSON.stringify(updatedBookings));
   };
 
-  const handleStatusChange = (id: string, newStatus: Booking['status']) => {
+  const handleStatusChange = (id: string, newStatus: BookingsPageBooking['status']) => {
     const updatedBookings = bookings.map(booking =>
       booking.id === id ? { ...booking, status: newStatus } : booking
     );
@@ -321,7 +292,7 @@ const Bookings: React.FC = () => {
     }
   };
 
-  const handleBulkStatusChange = (newStatus: Booking['status']) => {
+  const handleBulkStatusChange = (newStatus: BookingsPageBooking['status']) => {
     if (selectedBookings.length === 0) return;
     
     const updatedBookings = bookings.map(booking =>
@@ -484,7 +455,7 @@ const Bookings: React.FC = () => {
             </span>
             <div className="flex gap-2">
               <select
-                onChange={(e) => handleBulkStatusChange(e.target.value as Booking['status'])}
+                onChange={(e) => handleBulkStatusChange(e.target.value as BookingsPageBooking['status'])}
                 className="border border-gray-200 rounded-lg px-3 py-1 focus:ring-2 focus:ring-blue-600 "
               >
                 <option value="">Change Status</option>
@@ -576,7 +547,7 @@ const Bookings: React.FC = () => {
                       <td className="px-4 py-3 whitespace-nowrap">
                         <select
                           value={booking.status}
-                          onChange={(e) => handleStatusChange(booking.id, e.target.value as Booking['status'])}
+                          onChange={(e) => handleStatusChange(booking.id, e.target.value as BookingsPageBooking['status'])}
                           className={`text-xs font-medium px-2 py-1 rounded-full ${statusColors[booking.status]} border-none focus:ring-2 focus:ring-blue-600 `}
                         >
                           <option value="pending">Pending</option>
@@ -612,13 +583,13 @@ const Bookings: React.FC = () => {
                           >
                             <Eye className="h-4 w-4" />
                           </button>
-                          <button
-                            onClick={() => {/* Edit booking */}}
-                            className="p-1 text-gray-800 hover:text-gray-800"
+                          <Link
+                            to={`/bookings/edit/${booking.id}`}
+                            className="p-1 text-blue-600 hover:text-blue-800"
                             title="Edit"
                           >
                             <Pencil className="h-4 w-4" />
-                          </button>
+                          </Link>
                         </div>
                       </td>
                     </tr>

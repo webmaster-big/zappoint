@@ -1,43 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-
-// Types
-interface Attraction { name: string; price: number; unit?: string; }
-interface Room { name: string; capacity: number; price: number; }
-interface PromoOrGiftCard { name: string; code: string; description?: string; }
-interface Package {
-  id: string;
-  name: string;
-  description: string;
-  category: string;
-  features: string;
-  attractions: (string | { name: string; price: number; unit?: string })[];
-  rooms: (string | Room)[];
-  price: string;
-  maxParticipants: string;
-  pricePerAdditional: string;
-  duration: string;
-  durationUnit: "hours" | "minutes";
-  pricePerAdditional30min: string;
-  pricePerAdditional1hr: string;
-  promos: PromoOrGiftCard[];
-  giftCards: PromoOrGiftCard[];
-  addOns: { name: string; price: number; unit?: string; image?: string }[];
-  availabilityType: "daily" | "weekly" | "monthly";
-  availableDays: string[];
-  availableWeekDays: string[];
-  availableMonthDays: string[];
-  image?: string;
-}
-
-interface Booking {
-  packageId: string;
-  date: string;
-  time: string;
-  duration: string;
-  room: string;
-  status?: string;
-}
+import type { BookPackageAttraction, BookPackageRoom, BookPackagePromoOrGiftCard, BookPackagePackage, BookPackageBooking } from '../../../types/BookPackage.types';
 
 // Generate time slots from 8am to 12am (midnight) in 1-hour increments
 const generateTimeSlots = () => {
@@ -87,20 +50,20 @@ const BookPackage: React.FC = () => {
     alert("Booking saved!");
   };
   const { id } = useParams<{ id: string }>();
-  const [pkg, setPkg] = useState<Package | null>(null);
-  const [attractions, setAttractions] = useState<Attraction[]>([]);
+  const [pkg, setPkg] = useState<BookPackagePackage | null>(null);
+  const [attractions, setAttractions] = useState<BookPackageAttraction[]>([]);
   // Removed unused rooms state
   const [selectedAddOns, setSelectedAddOns] = useState<{ [name: string]: number }>({});
   const [selectedAttractions, setSelectedAttractions] = useState<{ [name: string]: number }>({});
   const [selectedRoom, setSelectedRoom] = useState<string>("");
   const [promoCode, setPromoCode] = useState("");
   const [giftCardCode, setGiftCardCode] = useState("");
-  const [appliedPromo, setAppliedPromo] = useState<PromoOrGiftCard | null>(null);
-  const [appliedGiftCard, setAppliedGiftCard] = useState<PromoOrGiftCard | null>(null);
+  const [appliedPromo, setAppliedPromo] = useState<BookPackagePromoOrGiftCard | null>(null);
+  const [appliedGiftCard, setAppliedGiftCard] = useState<BookPackagePromoOrGiftCard | null>(null);
   const [participants, setParticipants] = useState<number>(() => {
     // Default to maxParticipants if available, else 1
     const packages = JSON.parse(localStorage.getItem("zapzone_packages") || "[]");
-    const found = packages.find((p: Package) => p.id === id);
+    const found = packages.find((p: BookPackagePackage) => p.id === id);
     return found && found.maxParticipants ? Number(found.maxParticipants) : 1;
   });
   const [form, setForm] = useState({
@@ -123,7 +86,7 @@ const BookPackage: React.FC = () => {
   // Load package and options from localStorage
   useEffect(() => {
     const packages = JSON.parse(localStorage.getItem("zapzone_packages") || "[]");
-    const found = packages.find((p: Package) => p.id === id);
+    const found = packages.find((p: BookPackagePackage) => p.id === id);
     setPkg(found || null);
     setAttractions(JSON.parse(localStorage.getItem("zapzone_attractions") || "[]"));
   }, [id]);
@@ -178,7 +141,7 @@ const BookPackage: React.FC = () => {
     if (!pkg || !selectedDate || !selectedRoom) return;
     
     // Get all existing bookings
-    const existingBookings: Booking[] = JSON.parse(localStorage.getItem("zapzone_bookings") || "[]");
+    const existingBookings: BookPackageBooking[] = JSON.parse(localStorage.getItem("zapzone_bookings") || "[]");
     
     // Filter bookings for the same date and room with status not "checked-in"
     const conflictingBookings = existingBookings.filter(booking => 
@@ -262,10 +225,10 @@ const BookPackage: React.FC = () => {
   const handleApplyCode = (type: "promo" | "giftcard") => {
     if (!pkg) return;
     if (type === "promo") {
-      const found = (pkg.promos as PromoOrGiftCard[]).find((p) => p.code === promoCode);
+      const found = (pkg.promos as BookPackagePromoOrGiftCard[]).find((p) => p.code === promoCode);
       setAppliedPromo(found || null);
     } else {
-      const found = (pkg.giftCards as PromoOrGiftCard[]).find((g) => g.code === giftCardCode);
+      const found = (pkg.giftCards as BookPackagePromoOrGiftCard[]).find((g) => g.code === giftCardCode);
       setAppliedGiftCard(found || null);
     }
   };
@@ -386,7 +349,7 @@ const BookPackage: React.FC = () => {
                         if (typeof r === "string") {
                           room = { name: r };
                         } else {
-                          const { name } = r as Room;
+                          const { name } = r as BookPackageRoom;
                           room = { name };
                         }
                         return (

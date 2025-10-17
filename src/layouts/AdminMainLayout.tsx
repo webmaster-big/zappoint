@@ -13,6 +13,7 @@ interface UserData {
 
 const MainLayout: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
+  const [isSidebarMinimized, setIsSidebarMinimized] = useState<boolean>(false);
 
   // Load user data from localStorage if available
   const [userData, setUserData] = useState<UserData | null>(null);
@@ -42,7 +43,14 @@ const MainLayout: React.FC = () => {
 
   return (
     <div className="flex h-screen bg-gray-50">
-  <Sidebar user={userData!} isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} handleSignOut={handleSignOut} />
+  <Sidebar 
+    user={userData!} 
+    isOpen={isSidebarOpen} 
+    setIsOpen={setIsSidebarOpen} 
+    handleSignOut={handleSignOut}
+    isMinimized={isSidebarMinimized}
+    setIsMinimized={setIsSidebarMinimized}
+  />
       
       <div className="flex-1 flex flex-col overflow-hidden bg-white shadow-xl">
         <header className="sticky top-0 z-30 bg-white/90 backdrop-blur px-8 flex items-center gap-4 ">
