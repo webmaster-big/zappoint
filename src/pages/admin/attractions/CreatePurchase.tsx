@@ -13,7 +13,7 @@ import { useThemeColor } from '../../../hooks/useThemeColor';
 import type { CreatePurchaseAttraction, CreatePurchaseCustomerInfo } from '../../../types/CreatePurchase.types';
 
 const CreatePurchase = () => {
-  const { themeColor, fullColor } = useThemeColor();
+  const { themeColor } = useThemeColor();
   const [attractions, setAttractions] = useState<CreatePurchaseAttraction[]>([]);
   const [filteredAttractions, setFilteredAttractions] = useState<CreatePurchaseAttraction[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
