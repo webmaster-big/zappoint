@@ -194,18 +194,12 @@ const ManageAccounts = () => {
     inactive: 'bg-gray-100 text-gray-800'
   };
 
-  // User type colors - using function to avoid template literal issues in object
-  const getUserTypeColor = (userType: 'attendant' | 'manager') => {
-    return `bg-${themeColor}-100 text-${fullColor}`;
-  };
+  // User type badge color
+  const userTypeBadgeColor = `bg-${themeColor}-100 text-${fullColor}`;
 
-  // Department colors - using function
-  const getDepartmentColor = (department: string) => {
-    if (department === 'Food & Beverage') {
-      return 'bg-yellow-100 text-yellow-800';
-    }
-    return `bg-${themeColor}-100 text-${fullColor}`;
-  };
+  // Department badge color
+  const departmentBadgeColor = `bg-${themeColor}-100 text-${fullColor}`;
+  const foodBeverageBadgeColor = 'bg-yellow-100 text-yellow-800';
 
   // Calculate metrics data
   // Calculate new accounts in the last 30 days
@@ -861,7 +855,7 @@ const ManageAccounts = () => {
                     </td>
                     <td className="px-6 py-4">
                       <div className="space-y-2">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getUserTypeColor(account.userType)}`}>
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${userTypeBadgeColor}`}>
                           {account.userType === 'manager' ? 'Location Manager' : 'Attendant'}
                         </span>
                         <div className="flex items-center gap-1 text-xs text-gray-600">
@@ -871,7 +865,7 @@ const ManageAccounts = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getDepartmentColor(account.department)}`}>
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${account.department === 'Food & Beverage' ? foodBeverageBadgeColor : departmentBadgeColor}`}>
                         {account.department}
                       </span>
                     </td>
