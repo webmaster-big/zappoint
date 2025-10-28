@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Calendar, Users, DollarSign, Package, Clock, Mail, Phone, User } from 'lucide-react';
+import { useThemeColor } from '../../../hooks/useThemeColor';
 import type { BookingsPageBooking } from '../../../types/Bookings.types';
 
 const EditBooking: React.FC = () => {
+  const { themeColor, fullColor } = useThemeColor();
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const [loading, setLoading] = useState(true);
@@ -103,7 +105,7 @@ const EditBooking: React.FC = () => {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-800"></div>
+        <div className={`animate-spin rounded-full h-12 w-12 border-b-2 border-${fullColor}`}></div>
       </div>
     );
   }
@@ -116,7 +118,7 @@ const EditBooking: React.FC = () => {
           <p className="text-gray-600 mb-6">The booking you're looking for doesn't exist.</p>
           <button
             onClick={() => navigate('/bookings')}
-            className="px-6 py-2 bg-blue-800 text-white rounded-lg hover:bg-blue-900"
+            className={`px-6 py-2 bg-${fullColor} text-white rounded-lg hover:bg-${themeColor}-900`}
           >
             Back to Bookings
           </button>
@@ -158,7 +160,7 @@ const EditBooking: React.FC = () => {
                   required
                   value={formData.customerName}
                   onChange={handleInputChange}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                  className={`w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent transition-colors`}
                   placeholder="John Doe"
                 />
               </div>
@@ -175,7 +177,7 @@ const EditBooking: React.FC = () => {
                   required
                   value={formData.email}
                   onChange={handleInputChange}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                  className={`w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent transition-colors`}
                   placeholder="john@example.com"
                 />
               </div>
@@ -192,7 +194,7 @@ const EditBooking: React.FC = () => {
                   required
                   value={formData.phone}
                   onChange={handleInputChange}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                  className={`w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent transition-colors`}
                   placeholder="555-1234"
                 />
               </div>
@@ -218,7 +220,7 @@ const EditBooking: React.FC = () => {
                   required
                   value={formData.packageName}
                   onChange={handleInputChange}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                  className={`w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent transition-colors`}
                   placeholder="Family Fun Package"
                 />
               </div>
@@ -233,7 +235,7 @@ const EditBooking: React.FC = () => {
                   id="activity"
                   value={formData.activity}
                   onChange={handleInputChange}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                  className={`w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent transition-colors`}
                   placeholder="Family Entertainment"
                 />
               </div>
@@ -250,7 +252,7 @@ const EditBooking: React.FC = () => {
                   required
                   value={formData.date}
                   onChange={handleInputChange}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                  className={`w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent transition-colors`}
                 />
               </div>
 
@@ -266,7 +268,7 @@ const EditBooking: React.FC = () => {
                   required
                   value={formData.time}
                   onChange={handleInputChange}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                  className={`w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent transition-colors`}
                 />
               </div>
 
@@ -280,7 +282,7 @@ const EditBooking: React.FC = () => {
                   id="duration"
                   value={formData.duration}
                   onChange={handleInputChange}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                  className={`w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent transition-colors`}
                   placeholder="2 hours"
                 />
               </div>
@@ -298,7 +300,7 @@ const EditBooking: React.FC = () => {
                   required
                   value={formData.participants}
                   onChange={handleInputChange}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                  className={`w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent transition-colors`}
                   placeholder="4"
                 />
               </div>
@@ -330,7 +332,7 @@ const EditBooking: React.FC = () => {
                     required
                     value={formData.totalAmount}
                     onChange={handleInputChange}
-                    className="w-full pl-8 px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                    className={`w-full pl-8 px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent transition-colors`}
                     placeholder="0.00"
                   />
                 </div>
@@ -346,7 +348,7 @@ const EditBooking: React.FC = () => {
                   required
                   value={formData.paymentMethod}
                   onChange={handleInputChange}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                  className={`w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent transition-colors`}
                 >
                   <option value="credit_card">Credit Card</option>
                   <option value="paypal">PayPal</option>
@@ -365,7 +367,7 @@ const EditBooking: React.FC = () => {
                   required
                   value={formData.status}
                   onChange={handleInputChange}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                  className={`w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent transition-colors`}
                 >
                   <option value="pending">Pending</option>
                   <option value="confirmed">Confirmed</option>
@@ -419,8 +421,8 @@ const EditBooking: React.FC = () => {
               )}
 
               {/* Booking metadata */}
-              <div className="bg-blue-50 rounded-lg p-4">
-                <div className="text-sm text-blue-900">
+              <div className={`bg-${themeColor}-50 rounded-lg p-4`}>
+                <div className={`text-sm text-${themeColor}-900`}>
                   <p><strong>Booking ID:</strong> {formData.id}</p>
                   <p><strong>Created:</strong> {new Date(formData.createdAt).toLocaleString()}</p>
                   <p><strong>Type:</strong> {formData.type}</p>
@@ -434,13 +436,13 @@ const EditBooking: React.FC = () => {
             <button
               type="button"
               onClick={() => navigate('/bookings')}
-              className="px-5 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-800 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+              className={`px-5 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-800 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-${themeColor}-500 transition-colors`}
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-5 py-2.5 bg-blue-800 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white hover:bg-blue-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all"
+              className={`px-5 py-2.5 bg-${fullColor} border border-transparent rounded-lg shadow-sm text-sm font-medium text-white hover:bg-${themeColor}-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-${themeColor}-500 transition-all`}
             >
               Update Booking
             </button>

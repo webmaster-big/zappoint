@@ -19,6 +19,7 @@ import {
   Settings,
   Building
 } from 'lucide-react';
+import { useThemeColor } from '../../hooks/useThemeColor';
 import type { 
   LocationActivityLogsActivityLog, 
   LocationActivityLogsFilterOptions, 
@@ -26,6 +27,7 @@ import type {
 } from '../../types/LocationActivityLogs.types';
 
 const LocationActivityLogs = () => {
+  const { themeColor, fullColor } = useThemeColor();
   const [logs, setLogs] = useState<LocationActivityLogsActivityLog[]>([]);
   const [filteredLogs, setFilteredLogs] = useState<LocationActivityLogsActivityLog[]>([]);
   const [loading, setLoading] = useState(true);
@@ -99,29 +101,38 @@ const LocationActivityLogs = () => {
     rejected: XCircle
   };
 
-  const severityColors = {
-    info: 'bg-blue-100 text-blue-800',
-    success: 'bg-green-100 text-green-800',
-    warning: 'bg-yellow-100 text-yellow-800',
-    error: 'bg-red-100 text-red-800'
+  const getSeverityColors = (severity: string) => {
+    const colors: Record<string, string> = {
+      info: `bg-${themeColor}-100 text-${fullColor}`,
+      success: 'bg-green-100 text-green-800',
+      warning: 'bg-yellow-100 text-yellow-800',
+      error: 'bg-red-100 text-red-800'
+    };
+    return colors[severity] || `bg-${themeColor}-100 text-${fullColor}`;
   };
 
-  const resourceTypeColors = {
-    package: 'bg-purple-100 text-purple-800',
-    customer: 'bg-blue-100 text-blue-800',
-    purchase: 'bg-green-100 text-green-800',
-    attraction: 'bg-orange-100 text-orange-800',
-    booking: 'bg-indigo-100 text-indigo-800',
-    attendant: 'bg-pink-100 text-pink-800',
-    manager: 'bg-red-100 text-red-800',
-    inventory: 'bg-blue-100 text-blue-800',
-    settings: 'bg-gray-100 text-gray-800'
+  const getResourceTypeColors = (resourceType: string) => {
+    const colors: Record<string, string> = {
+      package: 'bg-purple-100 text-purple-800',
+      customer: `bg-${themeColor}-100 text-${fullColor}`,
+      purchase: 'bg-green-100 text-green-800',
+      attraction: 'bg-orange-100 text-orange-800',
+      booking: 'bg-indigo-100 text-indigo-800',
+      attendant: 'bg-pink-100 text-pink-800',
+      manager: 'bg-red-100 text-red-800',
+      inventory: `bg-${themeColor}-100 text-${fullColor}`,
+      settings: 'bg-gray-100 text-gray-800'
+    };
+    return colors[resourceType] || `bg-${themeColor}-100 text-${fullColor}`;
   };
 
-  const userTypeColors = {
-    attendant: 'bg-blue-100 text-blue-800',
-    manager: 'bg-blue-100 text-blue-800',
-    system: 'bg-gray-100 text-gray-800'
+  const getUserTypeColors = (userType: string) => {
+    const colors: Record<string, string> = {
+      attendant: `bg-${themeColor}-100 text-${fullColor}`,
+      manager: `bg-${themeColor}-100 text-${fullColor}`,
+      system: 'bg-gray-100 text-gray-800'
+    };
+    return colors[userType] || `bg-${themeColor}-100 text-${fullColor}`;
   };
 
   const isToday = (date: Date) => {
@@ -146,28 +157,28 @@ const LocationActivityLogs = () => {
         title: 'Total Activities',
         value: locationLogs.length.toString(),
         change: selectedLocation === 'all' ? 'All locations' : `${selectedLocation} only`,
-        accent: 'bg-blue-100 text-blue-800',
+        accent: `bg-${themeColor}-100 text-${fullColor}`,
         icon: Clock,
       },
       {
         title: "Today's Activities",
         value: todayLogs.length.toString(),
         change: 'Last 24 hours',
-        accent: 'bg-blue-100 text-blue-800',
+        accent: `bg-${themeColor}-100 text-${fullColor}`,
         icon: Zap,
       },
       {
         title: 'Manager Actions',
         value: managerLogs.length.toString(),
         change: `${selectedLocation === 'all' ? 'All locations' : selectedLocation}`,
-        accent: 'bg-blue-100 text-blue-800',
+        accent: `bg-${themeColor}-100 text-${fullColor}`,
         icon: User,
       },
       {
         title: 'Attendant Actions',
         value: attendantLogs.length.toString(),
         change: `${selectedLocation === 'all' ? 'All locations' : selectedLocation}`,
-        accent: 'bg-blue-100 text-blue-800',
+        accent: `bg-${themeColor}-100 text-${fullColor}`,
         icon: Users,
       }
     ];
@@ -481,7 +492,7 @@ const LocationActivityLogs = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-800"></div>
+        <div className={`animate-spin rounded-full h-12 w-12 border-b-2 border-${fullColor}`}></div>
       </div>
     );
   }
@@ -492,7 +503,7 @@ const LocationActivityLogs = () => {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-            <Building className="w-8 h-8 text-blue-800" />
+            <Building className={`w-8 h-8 text-${fullColor}`} />
             Location Activity Logs
           </h1>
           <p className="text-gray-600 mt-2">
@@ -524,7 +535,7 @@ const LocationActivityLogs = () => {
             onClick={() => setSelectedLocation('all')}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
               selectedLocation === 'all'
-                ? 'bg-blue-800 text-white'
+                ? `bg-${fullColor} text-white`
                 : 'text-gray-700 hover:bg-gray-100'
             }`}
           >
@@ -536,7 +547,7 @@ const LocationActivityLogs = () => {
               onClick={() => setSelectedLocation(location.name)}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2 ${
                 selectedLocation === location.name
-                  ? 'bg-blue-800 text-white'
+                  ? `bg-${fullColor} text-white`
                   : 'text-gray-700 hover:bg-gray-100'
               }`}
             >
@@ -544,7 +555,7 @@ const LocationActivityLogs = () => {
               {location.name}
               <span className={`px-1.5 py-0.5 rounded-full text-xs ${
                 selectedLocation === location.name
-                  ? 'bg-blue-600 text-white'
+                  ? `bg-${themeColor}-600 text-white`
                   : 'bg-gray-200 text-gray-700'
               }`}>
                 {location.recentActivity}
@@ -558,7 +569,7 @@ const LocationActivityLogs = () => {
       {selectedLocation !== 'all' && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
           <div className="flex items-center gap-3 mb-4">
-            <MapPin className="w-5 h-5 text-blue-800" />
+            <MapPin className={`w-5 h-5 text-${fullColor}`} />
             <h3 className="text-lg font-semibold text-gray-900">
               {selectedLocation} Location Details
             </h3>
@@ -583,9 +594,9 @@ const LocationActivityLogs = () => {
               <div className="space-y-2">
                 {locations.find(l => l.name === selectedLocation)?.attendants.map((attendant: string) => (
                   <div key={attendant} className="flex items-center gap-2 text-sm text-gray-800">
-                    <Users className="w-4 h-4 text-blue-600" />
+                    <Users className={`w-4 h-4 text-${themeColor}-600`} />
                     {attendant}
-                    <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
+                    <span className={`px-2 py-1 bg-${themeColor}-100 text-${fullColor} text-xs rounded-full`}>
                       Attendant
                     </span>
                   </div>
@@ -632,7 +643,7 @@ const LocationActivityLogs = () => {
               placeholder="Search activities, users, or locations..."
               value={filters.search}
               onChange={(e) => handleFilterChange('search', e.target.value)}
-              className="pl-9 pr-3 py-2 border border-gray-200 rounded-lg w-full focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
+              className={`pl-9 pr-3 py-2 border border-gray-200 rounded-lg w-full focus:ring-2 focus:ring-${themeColor}-400 focus:border-${themeColor}-400`}
             />
           </div>
           <div className="flex gap-2">
@@ -655,7 +666,7 @@ const LocationActivityLogs = () => {
                 <select
                   value={filters.action}
                   onChange={(e) => handleFilterChange('action', e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
+                  className={`w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-400 focus:border-${themeColor}-400`}
                 >
                   <option value="all">All Actions</option>
                   {getUniqueActions().map(action => (
@@ -670,7 +681,7 @@ const LocationActivityLogs = () => {
                 <select
                   value={filters.resourceType}
                   onChange={(e) => handleFilterChange('resourceType', e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
+                  className={`w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-400 focus:border-${themeColor}-400`}
                 >
                   <option value="all">All Types</option>
                   {getUniqueResourceTypes().map(type => (
@@ -685,7 +696,7 @@ const LocationActivityLogs = () => {
                 <select
                   value={filters.userType}
                   onChange={(e) => handleFilterChange('userType', e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
+                  className={`w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-400 focus:border-${themeColor}-400`}
                 >
                   <option value="all">All Users</option>
                   <option value="manager">Managers Only</option>
@@ -698,7 +709,7 @@ const LocationActivityLogs = () => {
                 <select
                   value={filters.user}
                   onChange={(e) => handleFilterChange('user', e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
+                  className={`w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-400 focus:border-${themeColor}-400`}
                 >
                   <option value="all">All Users</option>
                   {getUniqueUsers().map(user => (
@@ -713,7 +724,7 @@ const LocationActivityLogs = () => {
                 <select
                   value={filters.dateRange}
                   onChange={(e) => handleFilterChange('dateRange', e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
+                  className={`w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-400 focus:border-${themeColor}-400`}
                 >
                   <option value="all">All Time</option>
                   <option value="today">Today</option>
@@ -758,14 +769,14 @@ const LocationActivityLogs = () => {
               return (
                 <div key={log.id} className="p-6 hover:bg-gray-50 transition-colors">
                   <div className="flex items-start gap-4">
-                    <div className={`p-2 rounded-lg ${severityColors[log.severity]}`}>
+                    <div className={getSeverityColors(log.severity) + ' p-2 rounded-lg'}>
                       <ActionIcon size={16} />
                     </div>
                     
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-3 flex-wrap mb-2">
                         <span className="font-medium text-gray-900">{log.userName}</span>
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${userTypeColors[log.userType]}`}>
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getUserTypeColors(log.userType)}`}>
                           {log.userType.charAt(0).toUpperCase() + log.userType.slice(1)}
                         </span>
                         <span className="text-gray-400">•</span>
@@ -778,7 +789,7 @@ const LocationActivityLogs = () => {
                       </div>
                       
                       <div className="flex items-center gap-3 mt-2 flex-wrap">
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${resourceTypeColors[log.resourceType]}`}>
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getResourceTypeColors(log.resourceType)}`}>
                           {log.resourceType.charAt(0).toUpperCase() + log.resourceType.slice(1)}
                         </span>
                         <span className="text-xs text-gray-500 capitalize">
@@ -845,7 +856,7 @@ const LocationActivityLogs = () => {
                       onClick={() => paginate(page)}
                       className={`px-3 py-2 border rounded-lg text-sm font-medium ${
                         currentPage === page
-                          ? 'border-blue-800 bg-blue-800 text-white'
+                          ? `border-${fullColor} bg-${fullColor} text-white`
                           : 'border-gray-200 text-gray-800 hover:bg-gray-50'
                       }`}
                     >

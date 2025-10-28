@@ -14,9 +14,11 @@ import {
   DollarSign,
   Users
 } from 'lucide-react';
+import { useThemeColor } from '../../../hooks/useThemeColor';
 import type { BookingsPageBooking, BookingsPageFilterOptions } from '../../../types/Bookings.types';
 
 const Bookings: React.FC = () => {
+  const { themeColor, fullColor } = useThemeColor();
   const [bookings, setBookings] = useState<BookingsPageBooking[]>([]);
   const [filteredBookings, setFilteredBookings] = useState<BookingsPageBooking[]>([]);
   const [loading, setLoading] = useState(true);
@@ -37,15 +39,15 @@ const Bookings: React.FC = () => {
   // Status and payment colors
   const statusColors = {
     pending: 'bg-yellow-100 text-yellow-800',
-    confirmed: 'bg-blue-100 text-blue-800',
+    confirmed: `bg-${themeColor}-100 text-${fullColor}`,
     cancelled: 'bg-red-100 text-red-800',
     completed: 'bg-green-100 text-green-800',
-    'checked-in': 'bg-blue-100 text-blue-800'
+    'checked-in': `bg-${themeColor}-100 text-${fullColor}`
   };
 
   const paymentColors = {
-    credit_card: 'bg-blue-100 text-blue-800',
-    paypal: 'bg-blue-100 text-blue-800',
+    credit_card: `bg-${themeColor}-100 text-${fullColor}`,
+    paypal: `bg-${themeColor}-100 text-${fullColor}`,
     cash: 'bg-green-100 text-green-800',
     'e-wallet': 'bg-orange-100 text-orange-800'
   };
@@ -57,28 +59,28 @@ const Bookings: React.FC = () => {
       value: bookings.length.toString(),
       change: `${bookings.length} total bookings`,
       icon: Calendar,
-      accent: 'bg-blue-100 text-blue-800',
+      accent: `bg-${themeColor}-100 text-${fullColor}`,
     },
     {
       title: 'Package Bookings',
       value: bookings.length.toString(),
       change: `${bookings.filter(b => b.status === 'confirmed').length} confirmed`,
       icon: Package,
-      accent: 'bg-blue-100 text-blue-800',
+      accent: `bg-${themeColor}-100 text-${fullColor}`,
     },
     {
       title: 'Participants',
       value: bookings.reduce((sum, booking) => sum + booking.participants, 0).toString(),
       change: `${bookings.length} bookings`,
       icon: Users,
-      accent: 'bg-blue-100 text-blue-800',
+      accent: `bg-${themeColor}-100 text-${fullColor}`,
     },
     {
       title: 'Revenue',
       value: `$${Number(bookings.reduce((sum, booking) => sum + booking.totalAmount, 0)).toFixed(2)}`,
       change: 'All bookings',
       icon: DollarSign,
-      accent: 'bg-blue-100 text-blue-800',
+      accent: `bg-${themeColor}-100 text-${fullColor}`,
     },
   ];
 
@@ -314,7 +316,7 @@ const Bookings: React.FC = () => {
   if (loading) {
     return (
         <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-800"></div>
+          <div className={`animate-spin rounded-full h-12 w-12 border-b-2 border-${fullColor}`}></div>
         </div>
     );
   }
@@ -363,7 +365,7 @@ const Bookings: React.FC = () => {
                 placeholder="Search package bookings..."
                 value={filters.search}
                 onChange={(e) => handleFilterChange('search', e.target.value)}
-                className="pl-9 pr-3 py-1.5 border border-gray-200 rounded-lg w-full text-sm focus:ring-2 focus:ring-blue-600  focus:border-blue-600 "
+                className={`pl-9 pr-3 py-1.5 border border-gray-200 rounded-lg w-full text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
               />
             </div>
             <div className="flex gap-1">
@@ -392,7 +394,7 @@ const Bookings: React.FC = () => {
                   <select
                     value={filters.status}
                     onChange={(e) => handleFilterChange('status', e.target.value)}
-                    className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-blue-600  focus:border-blue-600 "
+                    className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                   >
                     <option value="all">All Statuses</option>
                     <option value="pending">Pending</option>
@@ -407,7 +409,7 @@ const Bookings: React.FC = () => {
                   <select
                     value={filters.payment}
                     onChange={(e) => handleFilterChange('payment', e.target.value)}
-                    className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-blue-600  focus:border-blue-600 "
+                    className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                   >
                     <option value="all">All Methods</option>
                     <option value="credit_card">Credit Card</option>
@@ -422,7 +424,7 @@ const Bookings: React.FC = () => {
                     type="date"
                     value={filters.dateRange.start}
                     onChange={(e) => handleDateRangeChange('start', e.target.value)}
-                    className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-blue-600  focus:border-blue-600 "
+                    className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                   />
                 </div>
                 <div>
@@ -431,7 +433,7 @@ const Bookings: React.FC = () => {
                     type="date"
                     value={filters.dateRange.end}
                     onChange={(e) => handleDateRangeChange('end', e.target.value)}
-                    className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-blue-600  focus:border-blue-600 "
+                    className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                   />
                 </div>
               </div>
@@ -449,14 +451,14 @@ const Bookings: React.FC = () => {
 
         {/* Bulk Actions */}
         {selectedBookings.length > 0 && (
-          <div className="bg-blue-50 p-4 rounded-lg mb-6 flex flex-wrap items-center gap-4">
-            <span className="text-blue-800 font-medium">
+          <div className={`bg-${themeColor}-50 p-4 rounded-lg mb-6 flex flex-wrap items-center gap-4`}>
+            <span className={`text-${fullColor} font-medium`}>
               {selectedBookings.length} booking(s) selected
             </span>
             <div className="flex gap-2">
               <select
                 onChange={(e) => handleBulkStatusChange(e.target.value as BookingsPageBooking['status'])}
-                className="border border-gray-200 rounded-lg px-3 py-1 focus:ring-2 focus:ring-blue-600 "
+                className={`border border-gray-200 rounded-lg px-3 py-1 focus:ring-2 focus:ring-${themeColor}-600`}
               >
                 <option value="">Change Status</option>
                 <option value="confirmed">Confirm</option>
@@ -486,7 +488,7 @@ const Bookings: React.FC = () => {
                       type="checkbox"
                       checked={selectedBookings.length === currentBookings.length && currentBookings.length > 0}
                       onChange={handleSelectAll}
-                      className="rounded border-gray-300 text-blue-800 focus:ring-blue-600 "
+                      className={`rounded border-gray-300 text-${fullColor} focus:ring-${themeColor}-600`}
                     />
                   </th>
                   <th scope="col" className="px-4 py-3 font-medium w-40">Date & Time</th>
@@ -515,7 +517,7 @@ const Bookings: React.FC = () => {
                           type="checkbox"
                           checked={selectedBookings.includes(booking.id)}
                           onChange={() => handleSelectBooking(booking.id)}
-                          className="rounded border-gray-300 text-blue-800 focus:ring-blue-600 "
+                          className={`rounded border-gray-300 text-${fullColor} focus:ring-${themeColor}-600`}
                         />
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
@@ -548,7 +550,7 @@ const Bookings: React.FC = () => {
                         <select
                           value={booking.status}
                           onChange={(e) => handleStatusChange(booking.id, e.target.value as BookingsPageBooking['status'])}
-                          className={`text-xs font-medium px-2 py-1 rounded-full ${statusColors[booking.status]} border-none focus:ring-2 focus:ring-blue-600 `}
+                          className={`text-xs font-medium px-2 py-1 rounded-full ${statusColors[booking.status]} border-none focus:ring-2 focus:ring-${themeColor}-600`}
                         >
                           <option value="pending">Pending</option>
                           <option value="confirmed">Confirmed</option>
@@ -585,7 +587,7 @@ const Bookings: React.FC = () => {
                           </button>
                           <Link
                             to={`/bookings/edit/${booking.id}`}
-                            className="p-1 text-blue-600 hover:text-blue-800"
+                            className={`p-1 text-${themeColor}-600 hover:text-${fullColor}`}
                             title="Edit"
                           >
                             <Pencil className="h-4 w-4" />
@@ -625,7 +627,7 @@ const Bookings: React.FC = () => {
                       onClick={() => paginate(page)}
                       className={`px-3 py-1 border rounded-lg text-sm font-medium ${
                         currentPage === page
-                          ? 'border-blue-500 bg-blue-500 text-white'
+                          ? `border-${themeColor}-500 bg-${themeColor}-500 text-white`
                           : 'border-gray-200 text-gray-800 hover:bg-gray-50'
                       }`}
                     >

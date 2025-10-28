@@ -14,9 +14,11 @@ import {
   Calendar,
   Globe
 } from 'lucide-react';
+import { useThemeColor } from '../../../hooks/useThemeColor';
 import type { CompanyAdminProfileData } from '../../../types/CompanyAdminProfile.types';
 
 const CompanyAdminProfile = () => {
+  const { themeColor, fullColor } = useThemeColor();
   const [isEditing, setIsEditing] = useState(false);
   const [activeTab, setActiveTab] = useState('personal');
   const [isLoading, setIsLoading] = useState(false);
@@ -118,10 +120,10 @@ const CompanyAdminProfile = () => {
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between">
             <div className="flex items-center space-x-4 mb-4 sm:mb-0">
               <div className="relative">
-                <div className="w-16 h-16 bg-gradient-to-br from-blue-800 to-blue-800 rounded-full flex items-center justify-center text-white text-2xl font-bold">
+                <div className={`w-16 h-16 bg-gradient-to-br from-${fullColor} to-${fullColor} rounded-full flex items-center justify-center text-white text-2xl font-bold`}>
                   {profileData.personal.firstName[0]}{profileData.personal.lastName[0]}
                 </div>
-                <button className="absolute -bottom-1 -right-1 bg-blue-800 text-white p-1.5 rounded-full hover:bg-blue-700 transition">
+                <button className={`absolute -bottom-1 -right-1 bg-${fullColor} text-white p-1.5 rounded-full hover:bg-${themeColor}-900 transition`}>
                   <Camera size={14} />
                 </button>
               </div>
@@ -130,7 +132,7 @@ const CompanyAdminProfile = () => {
                   {profileData.personal.firstName} {profileData.personal.lastName}
                 </h1>
                 <p className="text-gray-600 flex items-center">
-                  <Shield size={16} className="mr-1.5 text-blue-800" />
+                  <Shield size={16} className={`mr-1.5 text-${fullColor}`} />
                   Company Administrator
                 </p>
               </div>
@@ -149,7 +151,7 @@ const CompanyAdminProfile = () => {
                   <button
                     onClick={handleSave}
                     disabled={isLoading}
-                    className="px-4 py-2 bg-blue-800 text-white rounded-lg hover:bg-blue-700 transition flex items-center disabled:opacity-50"
+                    className={`px-4 py-2 bg-${fullColor} text-white rounded-lg hover:bg-${themeColor}-900 transition flex items-center disabled:opacity-50`}
                   >
                     <Save size={18} className="mr-2" />
                     {isLoading ? 'Saving...' : 'Save Changes'}
@@ -158,7 +160,7 @@ const CompanyAdminProfile = () => {
               ) : (
                 <button
                   onClick={handleEdit}
-                  className="px-4 py-2 bg-blue-800 text-white rounded-lg hover:bg-blue-700 transition flex items-center"
+                  className={`px-4 py-2 bg-${fullColor} text-white rounded-lg hover:bg-${themeColor}-900 transition flex items-center`}
                 >
                   <Edit2 size={18} className="mr-2" />
                   Edit Profile
@@ -179,7 +181,7 @@ const CompanyAdminProfile = () => {
                   onClick={() => setActiveTab(tab.id)}
                   className={`flex items-center px-6 py-4 border-b-2 font-medium text-sm transition-all ${
                     activeTab === tab.id
-                      ? 'border-blue-800 text-blue-800 bg-blue-50'
+                      ? `border-${fullColor} text-${fullColor} bg-${themeColor}-50`
                       : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                   }`}
                 >
@@ -197,7 +199,7 @@ const CompanyAdminProfile = () => {
           {activeTab === 'personal' && (
             <div className="space-y-6">
               <h2 className="text-lg font-semibold text-gray-900 flex items-center">
-                <User size={20} className="mr-2 text-blue-800" />
+                <User size={20} className={`mr-2 text-${themeColor}-600`} />
                 Personal Information
               </h2>
               
@@ -209,7 +211,7 @@ const CompanyAdminProfile = () => {
                     value={isEditing ? editedData.personal.firstName : profileData.personal.firstName}
                     onChange={(e) => handleInputChange('personal', 'firstName', e.target.value)}
                     disabled={!isEditing}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-800 focus:border-blue-800 disabled:bg-gray-100 disabled:text-gray-500"
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 disabled:bg-gray-100 disabled:text-gray-500`}
                   />
                 </div>
                 
@@ -220,7 +222,7 @@ const CompanyAdminProfile = () => {
                     value={isEditing ? editedData.personal.lastName : profileData.personal.lastName}
                     onChange={(e) => handleInputChange('personal', 'lastName', e.target.value)}
                     disabled={!isEditing}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-800 focus:border-blue-800 disabled:bg-gray-100 disabled:text-gray-500"
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 disabled:bg-gray-100 disabled:text-gray-500`}
                   />
                 </div>
                 
@@ -234,7 +236,7 @@ const CompanyAdminProfile = () => {
                     value={isEditing ? editedData.personal.email : profileData.personal.email}
                     onChange={(e) => handleInputChange('personal', 'email', e.target.value)}
                     disabled={!isEditing}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-800 focus:border-blue-800 disabled:bg-gray-100 disabled:text-gray-500"
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 disabled:bg-gray-100 disabled:text-gray-500`}
                   />
                 </div>
                 
@@ -248,7 +250,7 @@ const CompanyAdminProfile = () => {
                     value={isEditing ? editedData.personal.phone : profileData.personal.phone}
                     onChange={(e) => handleInputChange('personal', 'phone', e.target.value)}
                     disabled={!isEditing}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-800 focus:border-blue-800 disabled:bg-gray-100 disabled:text-gray-500"
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 disabled:bg-gray-100 disabled:text-gray-500`}
                   />
                 </div>
                 
@@ -259,7 +261,7 @@ const CompanyAdminProfile = () => {
                     value={isEditing ? editedData.personal.position : profileData.personal.position}
                     onChange={(e) => handleInputChange('personal', 'position', e.target.value)}
                     disabled={!isEditing}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-800 focus:border-blue-800 disabled:bg-gray-100 disabled:text-gray-500"
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 disabled:bg-gray-100 disabled:text-gray-500`}
                   />
                 </div>
               </div>
@@ -270,7 +272,7 @@ const CompanyAdminProfile = () => {
           {activeTab === 'company' && (
             <div className="space-y-6">
               <h2 className="text-lg font-semibold text-gray-900 flex items-center">
-                <Building size={20} className="mr-2 text-blue-800" />
+                <Building size={20} className={`mr-2 text-${themeColor}-600`} />
                 Company Information
               </h2>
               
@@ -282,7 +284,7 @@ const CompanyAdminProfile = () => {
                     value={isEditing ? editedData.company.name : profileData.company.name}
                     onChange={(e) => handleInputChange('company', 'name', e.target.value)}
                     disabled={!isEditing}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-800 focus:border-blue-800 disabled:bg-gray-100 disabled:text-gray-500"
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 disabled:bg-gray-100 disabled:text-gray-500`}
                   />
                 </div>
                 
@@ -296,7 +298,7 @@ const CompanyAdminProfile = () => {
                     value={isEditing ? editedData.company.email : profileData.company.email}
                     onChange={(e) => handleInputChange('company', 'email', e.target.value)}
                     disabled={!isEditing}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-800 focus:border-blue-800 disabled:bg-gray-100 disabled:text-gray-500"
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 disabled:bg-gray-100 disabled:text-gray-500`}
                   />
                 </div>
                 
@@ -310,7 +312,7 @@ const CompanyAdminProfile = () => {
                     value={isEditing ? editedData.company.phone : profileData.company.phone}
                     onChange={(e) => handleInputChange('company', 'phone', e.target.value)}
                     disabled={!isEditing}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-800 focus:border-blue-800 disabled:bg-gray-100 disabled:text-gray-500"
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 disabled:bg-gray-100 disabled:text-gray-500`}
                   />
                 </div>
                 
@@ -324,7 +326,7 @@ const CompanyAdminProfile = () => {
                     value={isEditing ? editedData.company.website : profileData.company.website}
                     onChange={(e) => handleInputChange('company', 'website', e.target.value)}
                     disabled={!isEditing}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-800 focus:border-blue-800 disabled:bg-gray-100 disabled:text-gray-500"
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 disabled:bg-gray-100 disabled:text-gray-500`}
                   />
                 </div>
                 
@@ -338,7 +340,7 @@ const CompanyAdminProfile = () => {
                     value={isEditing ? editedData.company.founded : profileData.company.founded}
                     onChange={(e) => handleInputChange('company', 'founded', e.target.value)}
                     disabled={!isEditing}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-800 focus:border-blue-800 disabled:bg-gray-100 disabled:text-gray-500"
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 disabled:bg-gray-100 disabled:text-gray-500`}
                   />
                 </div>
                 
@@ -349,13 +351,13 @@ const CompanyAdminProfile = () => {
                     onChange={(e) => handleInputChange('company', 'description', e.target.value)}
                     disabled={!isEditing}
                     rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-800 focus:border-blue-800 disabled:bg-gray-100 disabled:text-gray-500 resize-none"
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 disabled:bg-gray-100 disabled:text-gray-500 resize-none`}
                   />
                 </div>
                 
                 <div className="md:col-span-2">
                   <h3 className="text-md font-medium text-gray-900 mb-3 flex items-center">
-                    <MapPin size={18} className="mr-2 text-blue-800" />
+                    <MapPin size={18} className={`mr-2 text-${themeColor}-600`} />
                      Address
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -366,7 +368,7 @@ const CompanyAdminProfile = () => {
                         value={isEditing ? editedData.company.address.street : profileData.company.address.street}
                         onChange={(e) => handleAddressChange('street', e.target.value)}
                         disabled={!isEditing}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-800 focus:border-blue-800 disabled:bg-gray-100 disabled:text-gray-500"
+                        className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 disabled:bg-gray-100 disabled:text-gray-500`}
                       />
                     </div>
                     <div>
@@ -376,7 +378,7 @@ const CompanyAdminProfile = () => {
                         value={isEditing ? editedData.company.address.city : profileData.company.address.city}
                         onChange={(e) => handleAddressChange('city', e.target.value)}
                         disabled={!isEditing}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-800 focus:border-blue-800 disabled:bg-gray-100 disabled:text-gray-500"
+                        className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 disabled:bg-gray-100 disabled:text-gray-500`}
                       />
                     </div>
                     <div>
@@ -386,7 +388,7 @@ const CompanyAdminProfile = () => {
                         value={isEditing ? editedData.company.address.state : profileData.company.address.state}
                         onChange={(e) => handleAddressChange('state', e.target.value)}
                         disabled={!isEditing}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-800 focus:border-blue-800 disabled:bg-gray-100 disabled:text-gray-500"
+                        className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 disabled:bg-gray-100 disabled:text-gray-500`}
                       />
                     </div>
                     <div>
@@ -396,7 +398,7 @@ const CompanyAdminProfile = () => {
                         value={isEditing ? editedData.company.address.zipCode : profileData.company.address.zipCode}
                         onChange={(e) => handleAddressChange('zipCode', e.target.value)}
                         disabled={!isEditing}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-800 focus:border-blue-800 disabled:bg-gray-100 disabled:text-gray-500"
+                        className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 disabled:bg-gray-100 disabled:text-gray-500`}
                       />
                     </div>
                     <div>
@@ -406,7 +408,7 @@ const CompanyAdminProfile = () => {
                         value={isEditing ? editedData.company.address.country : profileData.company.address.country}
                         onChange={(e) => handleAddressChange('country', e.target.value)}
                         disabled={!isEditing}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-800 focus:border-blue-800 disabled:bg-gray-100 disabled:text-gray-500"
+                        className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 disabled:bg-gray-100 disabled:text-gray-500`}
                       />
                     </div>
                   </div>
@@ -419,25 +421,25 @@ const CompanyAdminProfile = () => {
           {activeTab === 'business' && (
             <div className="space-y-6">
               <h2 className="text-lg font-semibold text-gray-900 flex items-center">
-                <Users size={20} className="mr-2 text-blue-800" />
+                <Users size={20} className={`mr-2 text-${themeColor}-600`} />
                 Business Overview
               </h2>
               
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-                <div className="bg-blue-50 rounded-lg p-4 text-center">
-                  <div className="text-2xl font-bold text-blue-800">{profileData.business.totalLocations}</div>
+                <div className={`bg-${themeColor}-50 rounded-lg p-4 text-center`}>
+                  <div className={`text-2xl font-bold text-${fullColor}`}>{profileData.business.totalLocations}</div>
                   <div className="text-sm text-gray-600">Total Locations</div>
                 </div>
-                <div className="bg-blue-50 rounded-lg p-4 text-center">
-                  <div className="text-2xl font-bold text-blue-800">{profileData.business.activeLocations}</div>
+                <div className={`bg-${themeColor}-50 rounded-lg p-4 text-center`}>
+                  <div className={`text-2xl font-bold text-${fullColor}`}>{profileData.business.activeLocations}</div>
                   <div className="text-sm text-gray-600">Active Locations</div>
                 </div>
-                <div className="bg-blue-50 rounded-lg p-4 text-center">
-                  <div className="text-2xl font-bold text-blue-800">{profileData.business.totalEmployees}</div>
+                <div className={`bg-${themeColor}-50 rounded-lg p-4 text-center`}>
+                  <div className={`text-2xl font-bold text-${fullColor}`}>{profileData.business.totalEmployees}</div>
                   <div className="text-sm text-gray-600">Total Employees</div>
                 </div>
-                <div className="bg-blue-50 rounded-lg p-4 text-center">
-                  <div className="text-2xl font-bold text-blue-800">{profileData.business.monthlyCapacity.toLocaleString()}</div>
+                <div className={`bg-${themeColor}-50 rounded-lg p-4 text-center`}>
+                  <div className={`text-2xl font-bold text-${fullColor}`}>{profileData.business.monthlyCapacity.toLocaleString()}</div>
                   <div className="text-sm text-gray-600">Monthly Capacity</div>
                 </div>
               </div>

@@ -15,12 +15,14 @@ import {
   Trash2,
   Plus
 } from 'lucide-react';
+import { useThemeColor } from '../../../hooks/useThemeColor';
 import type {
   AttendantActivityLogsLog,
   AttendantActivityLogsFilterOptions,
 } from '../../../types/AttendantActivityLogs.types';
 
 const AttendantActivityLogs = () => {
+  const { themeColor, fullColor } = useThemeColor();
   const [logs, setLogs] = useState<AttendantActivityLogsLog[]>([]);
   const [filteredLogs, setFilteredLogs] = useState<AttendantActivityLogsLog[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,18 +51,18 @@ const AttendantActivityLogs = () => {
   };
 
   const severityColors = {
-    info: 'bg-blue-100 text-blue-800',
+    info: `bg-${themeColor}-100 text-${themeColor}-800`,
     success: 'bg-green-100 text-green-800',
     warning: 'bg-yellow-100 text-yellow-800',
   };
 
   const resourceTypeColors = {
-    package: 'bg-blue-100 text-blue-800',
-    customer: 'bg-blue-100 text-blue-800',
-    purchase: 'bg-blue-100 text-blue-800',
-    attraction: 'bg-blue-100 text-blue-800',
-    booking: 'bg-blue-100 text-blue-800',
-    attendant: 'bg-blue-100 text-blue-800'
+    package: `bg-${themeColor}-100 text-${themeColor}-800`,
+    customer: `bg-${themeColor}-100 text-${themeColor}-800`,
+    purchase: `bg-${themeColor}-100 text-${themeColor}-800`,
+    attraction: `bg-${themeColor}-100 text-${themeColor}-800`,
+    booking: `bg-${themeColor}-100 text-${themeColor}-800`,
+    attendant: `bg-${themeColor}-100 text-${themeColor}-800`
   };
 
     const isToday = (date: Date) => {
@@ -77,21 +79,21 @@ const AttendantActivityLogs = () => {
       title: 'Total Activities',
       value: logs.length.toString(),
       change: 'All time',
-      accent: 'bg-blue-100 text-blue-800',
+      accent: `bg-${themeColor}-100 text-${themeColor}-800`,
       icon: Clock,
     },
     {
       title: 'Today Activities',
       value: logs.filter(log => isToday(new Date(log.timestamp))).length.toString(),
       change: 'Last 24 hours',
-      accent: 'bg-blue-100 text-blue-800',
+      accent: `bg-${themeColor}-100 text-${themeColor}-800`,
       icon: Zap,
     },
     {
       title: 'Purchases Made',
       value: logs.filter(log => log.action === 'purchased').length.toString(),
       change: 'Total sales',
-      accent: 'bg-blue-100 text-blue-800',
+      accent: `bg-${themeColor}-100 text-${themeColor}-800`,
       icon: ShoppingCart,
     },
     {
@@ -100,7 +102,7 @@ const AttendantActivityLogs = () => {
         isToday(new Date(log.timestamp)) && log.action === 'logged_in'
       ).map(log => log.attendantId))].length.toString(),
       change: 'Logged in today',
-      accent: 'bg-blue-100 text-blue-800',
+      accent: `bg-${themeColor}-100 text-${themeColor}-800`,
       icon: Users,
     }
   ];
@@ -356,7 +358,7 @@ const AttendantActivityLogs = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-800"></div>
+        <div className={`animate-spin rounded-full h-12 w-12 border-b-2 border-${fullColor}`}></div>
       </div>
     );
   }
@@ -408,7 +410,7 @@ const AttendantActivityLogs = () => {
               placeholder="Search activities..."
               value={filters.search}
               onChange={(e) => handleFilterChange('search', e.target.value)}
-              className="pl-9 pr-3 py-2 border border-gray-200 rounded-lg w-full focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
+              className={`pl-9 pr-3 py-2 border border-gray-200 rounded-lg w-full focus:ring-2 focus:ring-${themeColor}-400 focus:border-${themeColor}-400`}
             />
           </div>
           <div className="flex gap-2">
@@ -444,7 +446,7 @@ const AttendantActivityLogs = () => {
                 <select
                   value={filters.action}
                   onChange={(e) => handleFilterChange('action', e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
+                  className={`w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-400 focus:border-${themeColor}-400`}
                 >
                   <option value="all">All Actions</option>
                   {getUniqueActions().map(action => (
@@ -459,7 +461,7 @@ const AttendantActivityLogs = () => {
                 <select
                   value={filters.resourceType}
                   onChange={(e) => handleFilterChange('resourceType', e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
+                  className={`w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-400 focus:border-${themeColor}-400`}
                 >
                   <option value="all">All Types</option>
                   {getUniqueResourceTypes().map(type => (
@@ -474,7 +476,7 @@ const AttendantActivityLogs = () => {
                 <select
                   value={filters.attendant}
                   onChange={(e) => handleFilterChange('attendant', e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
+                  className={`w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-400 focus:border-${themeColor}-400`}
                 >
                   <option value="all">All Attendants</option>
                   {getUniqueAttendants().map(attendant => (
@@ -489,7 +491,7 @@ const AttendantActivityLogs = () => {
                 <select
                   value={filters.dateRange}
                   onChange={(e) => handleFilterChange('dateRange', e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
+                  className={`w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-400 focus:border-${themeColor}-400`}
                 >
                   <option value="all">All Time</option>
                   <option value="today">Today</option>
@@ -611,7 +613,7 @@ const AttendantActivityLogs = () => {
                       onClick={() => paginate(page)}
                       className={`px-3 py-2 border rounded-lg text-sm font-medium ${
                         currentPage === page
-                          ? 'border-blue-800 bg-blue-800 text-white'
+                          ? `border-${fullColor} bg-${fullColor} text-white`
                           : 'border-gray-200 text-gray-800 hover:bg-gray-50'
                       }`}
                     >

@@ -13,46 +13,56 @@ import {
   Trash2,
   RefreshCcw
 } from 'lucide-react';
+import { useThemeColor } from '../../hooks/useThemeColor';
 import type { NotificationsNotification } from '../../types/Notifications.types';
 
 const Notifications = () => {
+  const { themeColor, fullColor } = useThemeColor();
   const [notifications, setNotifications] = useState<NotificationsNotification[]>([]);
   const [filter, setFilter] = useState<'all' | 'unread' | 'bookings' | 'purchases'>('all');
   const [loading, setLoading] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
 
   // Notification type configurations
-  const     notificationConfig = {
-    booking: {
-      icon: Calendar,
-      color: 'text-blue-600',
-      bgColor: 'bg-blue-50',
-      borderColor: 'border-blue-200'
-    },
-    purchase: {
-      icon: Ticket,
-      color: 'text-green-600',
-      bgColor: 'bg-green-50',
-      borderColor: 'border-green-200'
-    },
-    system: {
-      icon: Zap,
-      color: 'text-purple-600',
-      bgColor: 'bg-purple-50',
-      borderColor: 'border-purple-200'
-    },
-    attendant: {
-      icon: Users,
-      color: 'text-orange-600',
-      bgColor: 'bg-orange-50',
-      borderColor: 'border-orange-200'
-    },
-    customer: {
-      icon: Users,
-      color: 'text-indigo-600',
-      bgColor: 'bg-indigo-50',
-      borderColor: 'border-indigo-200'
-    }
+  const getNotificationConfig = (type: string) => {
+    const configs: Record<string, any> = {
+      booking: {
+        icon: Calendar,
+        color: `text-${themeColor}-600`,
+        bgColor: `bg-${themeColor}-50`,
+        borderColor: `border-${themeColor}-200`
+      },
+      purchase: {
+        icon: Ticket,
+        color: 'text-green-600',
+        bgColor: 'bg-green-50',
+        borderColor: 'border-green-200'
+      },
+      system: {
+        icon: Zap,
+        color: 'text-purple-600',
+        bgColor: 'bg-purple-50',
+        borderColor: 'border-purple-200'
+      },
+      attendant: {
+        icon: Users,
+        color: 'text-orange-600',
+        bgColor: 'bg-orange-50',
+        borderColor: 'border-orange-200'
+      },
+      customer: {
+        icon: Users,
+        color: 'text-indigo-600',
+        bgColor: 'bg-indigo-50',
+        borderColor: 'border-indigo-200'
+      }
+    };
+    return configs[type] || {
+      icon: Bell,
+      color: 'text-gray-500',
+      bgColor: 'bg-gray-100',
+      borderColor: 'border-gray-200'
+    };
   };
 
   // Priority colors
@@ -300,7 +310,7 @@ const Notifications = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-800"></div>
+        <div className={`animate-spin rounded-full h-12 w-12 border-b-2 border-${fullColor}`}></div>
       </div>
     );
   }
@@ -311,7 +321,7 @@ const Notifications = () => {
       <div className="mb-6">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-800 rounded-lg">
+            <div className={`p-2 bg-${fullColor} rounded-lg`}>
               <Bell className="h-6 w-6 text-white" />
             </div>
             <div>
@@ -321,7 +331,7 @@ const Notifications = () => {
           </div>
           
           {unreadCount > 0 && (
-            <div className="bg-blue-800 text-white px-3 py-1 rounded-full text-sm font-medium">
+            <div className={`bg-${fullColor} text-white px-3 py-1 rounded-full text-sm font-medium`}>
               {unreadCount} new
             </div>
           )}
@@ -343,7 +353,7 @@ const Notifications = () => {
             {unreadCount > 0 && (
               <button
                 onClick={markAllAsRead}
-                className="flex items-center gap-2 px-3 py-2 text-sm text-blue-800 hover:bg-blue-50 rounded-lg transition-colors"
+                className={`flex items-center gap-2 px-3 py-2 text-sm text-${fullColor} hover:bg-${themeColor}-50 rounded-lg transition-colors`}
               >
                 <CheckCircle className="h-4 w-4" />
                 Mark all read
@@ -370,7 +380,7 @@ const Notifications = () => {
                 onClick={() => setFilter('all')}
                 className={`px-3 py-2 text-sm rounded-lg transition-colors ${
                   filter === 'all'
-                    ? 'bg-blue-800 text-white'
+                    ? `bg-${fullColor} text-white`
                     : 'text-gray-700 hover:bg-gray-50'
                 }`}
               >
@@ -380,7 +390,7 @@ const Notifications = () => {
                 onClick={() => setFilter('unread')}
                 className={`px-3 py-2 text-sm rounded-lg transition-colors ${
                   filter === 'unread'
-                    ? 'bg-blue-800 text-white'
+                    ? `bg-${fullColor} text-white`
                     : 'text-gray-700 hover:bg-gray-50'
                 }`}
               >
@@ -390,7 +400,7 @@ const Notifications = () => {
                 onClick={() => setFilter('bookings')}
                 className={`px-3 py-2 text-sm rounded-lg transition-colors ${
                   filter === 'bookings'
-                    ? 'bg-blue-800 text-white'
+                    ? `bg-${fullColor} text-white`
                     : 'text-gray-700 hover:bg-gray-50'
                 }`}
               >
@@ -400,7 +410,7 @@ const Notifications = () => {
                 onClick={() => setFilter('purchases')}
                 className={`px-3 py-2 text-sm rounded-lg transition-colors ${
                   filter === 'purchases'
-                    ? 'bg-blue-800 text-white'
+                    ? `bg-${fullColor} text-white`
                     : 'text-gray-700 hover:bg-gray-50'
                 }`}
               >
@@ -426,12 +436,7 @@ const Notifications = () => {
         ) : (
           filteredNotifications.map((notification) => {
             // Fallback config if notification type is not found
-            const config = notificationConfig[notification.type] || {
-              icon: Bell,
-              color: 'text-gray-500',
-              bgColor: 'bg-gray-100',
-              borderColor: 'border-gray-200'
-            };
+            const config = getNotificationConfig(notification.type);
             const Icon = config.icon;
 
             return (
@@ -461,7 +466,7 @@ const Notifications = () => {
                               {notification.title}
                             </h3>
                             {!notification.read && (
-                              <div className="w-2 h-2 bg-blue-800 rounded-full"></div>
+                              <div className={`w-2 h-2 bg-${fullColor} rounded-full`}></div>
                             )}
                           </div>
                           
@@ -501,7 +506,7 @@ const Notifications = () => {
                           {!notification.read && (
                             <button
                               onClick={() => markAsRead(notification.id)}
-                              className="p-1 text-gray-400 hover:text-blue-800 transition-colors"
+                              className={`p-1 text-gray-400 hover:text-${fullColor} transition-colors`}
                               title="Mark as read"
                             >
                               <Check className="h-4 w-4" />
@@ -528,8 +533,8 @@ const Notifications = () => {
       {/* Empty State for No Notifications */}
       {notifications.length === 0 && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center mt-8">
-          <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Bell className="h-8 w-8 text-blue-800" />
+          <div className={`w-16 h-16 bg-${themeColor}-100 rounded-full flex items-center justify-center mx-auto mb-4`}>
+            <Bell className={`h-8 w-8 text-${fullColor}`} />
           </div>
           <h3 className="text-lg font-semibold text-gray-900 mb-2">No notifications yet</h3>
           <p className="text-gray-600 text-sm mb-4">
@@ -537,7 +542,7 @@ const Notifications = () => {
           </p>
           <button
             onClick={loadNotifications}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-800 text-white rounded-lg hover:bg-blue-900 transition-colors"
+            className={`inline-flex items-center gap-2 px-4 py-2 bg-${fullColor} text-white rounded-lg hover:bg-${fullColor} transition-colors`}
           >
             <RefreshCcw className="h-4 w-4" />
             Load Sample Notifications

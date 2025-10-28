@@ -18,12 +18,14 @@ import {
   CheckSquare,
   Square
 } from 'lucide-react';
+import { useThemeColor } from '../../../hooks/useThemeColor';
 import type {
   ManageAttractionsAttraction,
   ManageAttractionsFilterOptions,
 } from '../../../types/manageAttractions.types';
 
 const ManageAttractions = () => {
+  const { themeColor, fullColor } = useThemeColor();
   const [attractions, setAttractions] = useState<ManageAttractionsAttraction[]>([]);
   const [filteredAttractions, setFilteredAttractions] = useState<ManageAttractionsAttraction[]>([]);
   const [loading, setLoading] = useState(true);
@@ -115,7 +117,7 @@ const ManageAttractions = () => {
 
   // Status colors
   const statusColors = {
-    active: 'bg-blue-100 text-blue-800',
+    active: `bg-${themeColor}-100 text-${fullColor}`,
     inactive: 'bg-gray-100 text-gray-800',
     maintenance: 'bg-yellow-100 text-yellow-800'
   };
@@ -126,14 +128,14 @@ const ManageAttractions = () => {
       title: 'Total Attractions',
       value: attractions.length.toString(),
       change: `${attractions.filter(a => a.status === 'active').length} active`,
-      accent: 'bg-blue-100 text-blue-800',
+      accent: `bg-${themeColor}-100 text-${fullColor}`,
       icon: Star,
     },
     {
       title: 'Active Attractions',
       value: attractions.filter(a => a.status === 'active').length.toString(),
       change: `${attractions.filter(a => a.status === 'inactive').length} inactive`,
-      accent: 'bg-blue-100 text-blue-800',
+      accent: `bg-${themeColor}-100 text-${fullColor}`,
       icon: Zap,
     },
     {
@@ -142,14 +144,14 @@ const ManageAttractions = () => {
         ? `$${(attractions.reduce((sum, a) => sum + a.price, 0) / attractions.length).toFixed(2)}` 
         : '$0.00',
       change: 'Per attraction',
-      accent: 'bg-blue-100 text-blue-800',
+      accent: `bg-${themeColor}-100 text-${fullColor}`,
       icon: DollarSign,
     },
     {
       title: 'Total Capacity',
       value: attractions.reduce((sum, a) => sum + a.maxCapacity, 0).toString(),
       change: 'Across all attractions',
-      accent: 'bg-blue-100 text-blue-800',
+      accent: `bg-${themeColor}-100 text-${fullColor}`,
       icon: Users,
     }
   ];
@@ -376,7 +378,7 @@ const ManageAttractions = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-800"></div>
+        <div className={`animate-spin rounded-full h-12 w-12 border-b-2 border-${fullColor}`}></div>
       </div>
     );
   }
@@ -406,7 +408,7 @@ const ManageAttractions = () => {
             Export
           </button>
           <button
-            className="bg-blue-700 hover:bg-blue-800 text-white px-6 py-2 rounded-lg font-semibold whitespace-nowrap"
+            className={`bg-${fullColor} hover:bg-${themeColor}-900 text-white px-6 py-2 rounded-lg font-semibold whitespace-nowrap`}
             onClick={() => window.location.href = "/attractions/create"}
           >
             New Attraction
@@ -450,7 +452,7 @@ const ManageAttractions = () => {
               placeholder="Search attractions..."
               value={filters.search}
               onChange={(e) => handleFilterChange('search', e.target.value)}
-              className="pl-9 pr-3 py-2 border border-gray-200 rounded-lg w-full focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
+              className={`pl-9 pr-3 py-2 border border-gray-200 rounded-lg w-full focus:ring-2 focus:ring-${themeColor}-400 focus:border-${themeColor}-400`}
             />
           </div>
           <div className="flex gap-2">
@@ -479,7 +481,7 @@ const ManageAttractions = () => {
                 <select
                   value={filters.status}
                   onChange={(e) => handleFilterChange('status', e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
+                  className={`w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-400 focus:border-${themeColor}-400`}
                 >
                   <option value="all">All Statuses</option>
                   <option value="active">Active</option>
@@ -492,7 +494,7 @@ const ManageAttractions = () => {
                 <select
                   value={filters.category}
                   onChange={(e) => handleFilterChange('category', e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
+                  className={`w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-400 focus:border-${themeColor}-400`}
                 >
                   <option value="all">All Categories</option>
                   {getUniqueCategories().map(category => (
@@ -515,14 +517,14 @@ const ManageAttractions = () => {
 
       {/* Bulk Actions */}
       {selectedAttractions.length > 0 && (
-        <div className="bg-blue-50 p-4 rounded-lg mb-6 flex flex-wrap items-center gap-4">
-          <span className="text-blue-800 font-medium">
+        <div className={`bg-${themeColor}-50 p-4 rounded-lg mb-6 flex flex-wrap items-center gap-4`}>
+          <span className={`text-${fullColor} font-medium`}>
             {selectedAttractions.length} attraction(s) selected
           </span>
           <div className="flex gap-2">
             <select
               onChange={(e) => handleBulkStatusChange(e.target.value as ManageAttractionsAttraction['status'])}
-              className="border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400"
+              className={`border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-400`}
             >
               <option value="">Change Status</option>
               <option value="active">Activate</option>
@@ -551,7 +553,7 @@ const ManageAttractions = () => {
                     type="checkbox"
                     checked={selectedAttractions.length === currentAttractions.length && currentAttractions.length > 0}
                     onChange={handleSelectAll}
-                    className="rounded border-gray-300 text-blue-800 focus:ring-blue-400"
+                    className={`rounded border-gray-300 text-${fullColor} focus:ring-${themeColor}-400`}
                   />
                 </th>
                 <th scope="col" className="px-6 py-4 font-medium">Attraction</th>
@@ -579,7 +581,7 @@ const ManageAttractions = () => {
                         type="checkbox"
                         checked={selectedAttractions.includes(attraction.id)}
                         onChange={() => handleSelectAttraction(attraction.id)}
-                        className="rounded border-gray-300 text-blue-800 focus:ring-blue-400"
+                        className={`rounded border-gray-300 text-${fullColor} focus:ring-${themeColor}-400`}
                       />
                     </td>
                     <td className="px-6 py-4">
@@ -610,7 +612,7 @@ const ManageAttractions = () => {
                       <select
                         value={attraction.status}
                         onChange={(e) => handleStatusChange(attraction.id, e.target.value as ManageAttractionsAttraction['status'])}
-                        className={`text-xs font-medium px-3 py-1 rounded-full ${statusColors[attraction.status]} border-none focus:ring-2 focus:ring-blue-400`}
+                        className={`text-xs font-medium px-3 py-1 rounded-full ${statusColors[attraction.status]} border-none focus:ring-2 focus:ring-${themeColor}-400`}
                       >
                         <option value="active">Active</option>
                         <option value="inactive">Inactive</option>
@@ -621,7 +623,7 @@ const ManageAttractions = () => {
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => copyPurchaseLink(attraction.id)}
-                          className="flex items-center px-3 py-1 bg-blue-100 text-blue-800 rounded-lg hover:bg-blue-200 transition-colors text-xs"
+                          className={`flex items-center px-3 py-1 bg-${themeColor}-100 text-${fullColor} rounded-lg hover:bg-${themeColor}-200 transition-colors text-xs`}
                           title="Copy purchase link"
                         >
                           <ShoppingCart className="h-3 w-3 mr-1" />
@@ -633,7 +635,7 @@ const ManageAttractions = () => {
                       <div className="flex items-center gap-3">
                         <Link
                           to={`${window.location.origin}/purchase/attraction/${attraction.id}`}
-                          className="text-blue-600 hover:text-blue-800"
+                          className={`text-${themeColor}-600 hover:text-${fullColor}`}
                           title="View Purchase Page"
                           target="_blank"
                         >
@@ -688,7 +690,7 @@ const ManageAttractions = () => {
                     onClick={() => paginate(page)}
                     className={`px-3 py-2 border rounded-lg text-sm font-medium ${
                       currentPage === page
-                        ? 'border-blue-800 bg-blue-800 text-white'
+                        ? `border-${fullColor} bg-${fullColor} text-white`
                         : 'border-gray-200 text-gray-800 hover:bg-gray-50'
                     }`}
                   >
@@ -732,7 +734,7 @@ const ManageAttractions = () => {
               <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-200">
                 <button
                   onClick={handleSelectAllForExport}
-                  className="flex items-center gap-2 text-sm font-medium text-blue-700 hover:text-blue-800"
+                  className={`flex items-center gap-2 text-sm font-medium text-${themeColor}-700 hover:text-${fullColor}`}
                 >
                   {selectedForExport.length === attractions.length ? (
                     <CheckSquare size={18} />
@@ -752,7 +754,7 @@ const ManageAttractions = () => {
                     key={attraction.id}
                     className={`p-4 border rounded-lg cursor-pointer transition-colors ${
                       selectedForExport.includes(attraction.id)
-                        ? 'border-blue-500 bg-blue-50'
+                        ? `border-${themeColor}-500 bg-${themeColor}-50`
                         : 'border-gray-200 hover:border-gray-300'
                     }`}
                     onClick={() => handleToggleExportSelection(attraction.id)}
@@ -760,7 +762,7 @@ const ManageAttractions = () => {
                     <div className="flex items-start gap-3">
                       <div className="mt-1">
                         {selectedForExport.includes(attraction.id) ? (
-                          <CheckSquare size={18} className="text-blue-700" />
+                          <CheckSquare size={18} className={`text-${themeColor}-700`} />
                         ) : (
                           <Square size={18} className="text-gray-400" />
                         )}
@@ -793,7 +795,7 @@ const ManageAttractions = () => {
               <button
                 onClick={handleExport}
                 disabled={selectedForExport.length === 0}
-                className="px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className={`px-4 py-2 bg-${themeColor}-700 text-white rounded-lg hover:bg-${fullColor} disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2`}
               >
                 <Download size={18} />
                 Export {selectedForExport.length} Attraction{selectedForExport.length !== 1 ? 's' : ''}
@@ -834,7 +836,7 @@ const ManageAttractions = () => {
                   type="file"
                   accept=".json"
                   onChange={handleFileUpload}
-                  className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                  className={`block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-${themeColor}-50 file:text-${themeColor}-700 hover:file:bg-${themeColor}-100`}
                 />
               </div>
 
@@ -866,13 +868,13 @@ const ManageAttractions = () => {
                   onChange={(e) => setImportData(e.target.value)}
                   placeholder='[{"name": "Attraction Name", "category": "Category", "price": 50, ...}]'
                   rows={12}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-sm"
+                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 font-mono text-sm`}
                 />
               </div>
 
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <h4 className="text-sm font-semibold text-blue-900 mb-2">Import Notes:</h4>
-                <ul className="text-xs text-blue-800 space-y-1">
+              <div className={`bg-${themeColor}-50 border border-${themeColor}-200 rounded-lg p-4`}>
+                <h4 className={`text-sm font-semibold text-${themeColor}-900 mb-2`}>Import Notes:</h4>
+                <ul className={`text-xs text-${fullColor} space-y-1`}>
                   <li>• JSON must be an array of attraction objects</li>
                   <li>• Each attraction must have at least a name and price</li>
                   <li>• Imported attractions will be added to existing attractions</li>
@@ -894,7 +896,7 @@ const ManageAttractions = () => {
               <button
                 onClick={handleImport}
                 disabled={!importData.trim()}
-                className="px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className={`px-4 py-2 bg-${themeColor}-700 text-white rounded-lg hover:bg-${fullColor} disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2`}
               >
                 <Upload size={18} />
                 Import Attractions

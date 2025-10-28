@@ -12,6 +12,7 @@ import {
   Users
 
 } from 'lucide-react';
+import { useThemeColor } from '../../../hooks/useThemeColor';
 import type { 
   CreateAccountsFormData, 
   CreateAccountsDepartment, 
@@ -19,6 +20,7 @@ import type {
 } from '../../../types/CreateAccounts.types';
 
 const CreateAccount = () => {
+  const { themeColor, fullColor } = useThemeColor();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState(1);
@@ -196,7 +198,7 @@ const CreateAccount = () => {
     <div className="space-y-6">
       <div>
         <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-          <User className="h-5 w-5 text-blue-800" />
+          <User className="h-5 w-5 text-${fullColor}" />
           Basic Information
         </h3>
         
@@ -207,13 +209,13 @@ const CreateAccount = () => {
             onClick={() => handleInputChange('userType', 'attendant')}
             className={`p-4 border-2 rounded-xl text-left transition-all ${
               formData.userType === 'attendant'
-                ? 'border-blue-800 bg-blue-50'
+                ? 'border-${fullColor} bg-${themeColor}-50'
                 : 'border-gray-200 hover:border-gray-300'
             }`}
           >
             <div className="flex items-center gap-3">
               <div className={`p-2 rounded-lg ${
-                formData.userType === 'attendant' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600'
+                formData.userType === 'attendant' ? `bg-${themeColor}-100 text-${fullColor}` : 'bg-gray-100 text-gray-600'
               }`}>
                 <UserCheck className="h-6 w-6" />
               </div>
@@ -229,13 +231,13 @@ const CreateAccount = () => {
             onClick={() => handleInputChange('userType', 'manager')}
             className={`p-4 border-2 rounded-xl text-left transition-all ${
               formData.userType === 'manager'
-                ? 'border-blue-800 bg-blue-50'
+                ? 'border-${fullColor} bg-${themeColor}-50'
                 : 'border-gray-200 hover:border-gray-300'
             }`}
           >
             <div className="flex items-center gap-3">
               <div className={`p-2 rounded-lg ${
-                formData.userType === 'manager' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600'
+                formData.userType === 'manager' ? `bg-${themeColor}-100 text-${fullColor}` : 'bg-gray-100 text-gray-600'
               }`}>
                 <Shield className="h-6 w-6" />
               </div>
@@ -257,7 +259,7 @@ const CreateAccount = () => {
               required
               value={formData.password}
               onChange={(e) => handleInputChange('password', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-800 focus:border-blue-800"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500"
               placeholder="Enter password"
             />
           </div>
@@ -270,7 +272,7 @@ const CreateAccount = () => {
               required
               value={formData.confirmPassword}
               onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-800 focus:border-blue-800"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500"
               placeholder="Confirm password"
             />
           </div>
@@ -283,7 +285,7 @@ const CreateAccount = () => {
               required
               value={formData.firstName}
               onChange={(e) => handleInputChange('firstName', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-800 focus:border-blue-800"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500"
               placeholder="Enter first name"
             />
           </div>
@@ -297,7 +299,7 @@ const CreateAccount = () => {
               required
               value={formData.lastName}
               onChange={(e) => handleInputChange('lastName', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-800 focus:border-blue-800"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500"
               placeholder="Enter last name"
             />
           </div>
@@ -311,7 +313,7 @@ const CreateAccount = () => {
               required
               value={formData.email}
               onChange={(e) => handleInputChange('email', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-800 focus:border-blue-800"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500"
               placeholder="Enter email address"
             />
           </div>
@@ -325,7 +327,7 @@ const CreateAccount = () => {
               required
               value={formData.phone}
               onChange={(e) => handleInputChange('phone', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-800 focus:border-blue-800"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500"
               placeholder="Enter phone number"
             />
           </div>
@@ -339,7 +341,7 @@ const CreateAccount = () => {
               required
               value={formData.hireDate}
               onChange={(e) => handleInputChange('hireDate', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-800 focus:border-blue-800"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500"
             />
           </div>
 
@@ -351,7 +353,7 @@ const CreateAccount = () => {
               required
               value={formData.position}
               onChange={(e) => handleInputChange('position', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-800 focus:border-blue-800"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500"
             >
               <option value="">Select Position</option>
               {positionOptions[formData.userType].map(position => (
@@ -369,7 +371,7 @@ const CreateAccount = () => {
     <div className="space-y-6">
       <div>
         <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-          <Building className="h-5 w-5 text-blue-800" />
+          <Building className="h-5 w-5 text-${fullColor}" />
           Work Details
         </h3>
 
@@ -384,7 +386,7 @@ const CreateAccount = () => {
                 required
                 value={formData.employeeId}
                 onChange={(e) => handleInputChange('employeeId', e.target.value)}
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-800 focus:border-blue-800"
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500"
                 placeholder="Employee ID"
               />
               <button
@@ -405,7 +407,7 @@ const CreateAccount = () => {
               required
               value={formData.department}
               onChange={(e) => handleInputChange('department', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-800 focus:border-blue-800"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500"
             >
               <option value="">Select Department</option>
               {filteredDepartments.map(dept => (
@@ -422,7 +424,7 @@ const CreateAccount = () => {
               required
               value={formData.location}
               onChange={(e) => handleInputChange('location', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-800 focus:border-blue-800"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500"
             >
               <option value="">Select Location</option>
               {locations.map(location => (
@@ -439,7 +441,7 @@ const CreateAccount = () => {
               <select
                 value={formData.shift}
                 onChange={(e) => handleInputChange('shift', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-800 focus:border-blue-800"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500"
               >
                 <option value="">Select Shift</option>
                 {shifts.map(shift => (
@@ -465,7 +467,7 @@ const CreateAccount = () => {
                     type="checkbox"
                     checked={formData.assignedAreas.includes(area)}
                     onChange={() => handleAreaToggle(area)}
-                    className="rounded border-gray-300 text-blue-800 focus:ring-blue-800"
+                    className={`rounded border-gray-300 text-${fullColor} focus:ring-${themeColor}-500`}
                   />
                   <span className="text-sm text-gray-700">{area}</span>
                 </label>
@@ -482,7 +484,7 @@ const CreateAccount = () => {
     <div className="space-y-6">
       <div>
         <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-          <Users className="h-5 w-5 text-blue-800" />
+          <Users className="h-5 w-5 text-${fullColor}" />
           Additional Information
         </h3>
 
@@ -499,7 +501,7 @@ const CreateAccount = () => {
                 required
                 value={formData.username}
                 onChange={(e) => handleInputChange('username', e.target.value)}
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-800 focus:border-blue-800"
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500"
                 placeholder="Username"
               />
               <button
@@ -520,7 +522,7 @@ const CreateAccount = () => {
               required
               value={formData.status}
               onChange={(e) => handleInputChange('status', e.target.value as 'active' | 'inactive')}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-800 focus:border-blue-800"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500"
             >
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
@@ -589,7 +591,7 @@ const CreateAccount = () => {
               <button
                 type="button"
                 onClick={nextStep}
-                className="px-6 py-3 bg-blue-800 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+                className={`px-6 py-3 bg-${fullColor} text-white rounded-lg hover:bg-${themeColor}-900 transition-colors flex items-center gap-2`}
               >
                 Next Step
                 <ArrowLeft className="h-4 w-4 rotate-180" />

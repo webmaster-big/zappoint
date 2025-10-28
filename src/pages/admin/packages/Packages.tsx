@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { ExternalLink, Link2, Calendar, Users, Tag, Gift, Search, Filter, Download, Upload, X, CheckSquare, Square, Pencil, Trash2 } from "lucide-react";
 import type { PackagesPackage } from '../../../types/Packages.types';
+import { useThemeColor } from '../../../hooks/useThemeColor';
 
 const getPackages = (): PackagesPackage[] => {
   try {
@@ -12,6 +13,7 @@ const getPackages = (): PackagesPackage[] => {
 };
 
 const Packages: React.FC = () => {
+  const { themeColor, fullColor } = useThemeColor();
   const [packages, setPackages] = useState<PackagesPackage[]>([]);
   const [filteredPackages, setFilteredPackages] = useState<PackagesPackage[]>([]);
   const [filterCategory, setFilterCategory] = useState<string>("all");
@@ -237,7 +239,7 @@ const Packages: React.FC = () => {
               Export
             </button>
             <button
-              className="bg-blue-800 hover:bg-blue-800 text-white px-6 py-2 rounded-lg font-semibold whitespace-nowrap"
+              className={`bg-${fullColor} hover:bg-${themeColor}-900 text-white px-6 py-2 rounded-lg font-semibold whitespace-nowrap`}
               onClick={() => window.location.href = "/packages/create"}
             >
               Create Package
@@ -251,7 +253,7 @@ const Packages: React.FC = () => {
             <div className="text-gray-400 mb-2">No packages found</div>
             <p className="text-gray-500 text-sm mb-4">Create your first package to get started</p>
             <button
-              className="bg-blue-800 hover:bg-blue-800 text-white px-6 py-2 rounded-lg font-semibold"
+              className={`bg-${fullColor} hover:bg-${themeColor}-900 text-white px-6 py-2 rounded-lg font-semibold`}
               onClick={() => window.location.href = "/packages/create"}
             >
               Create Package
@@ -269,7 +271,7 @@ const Packages: React.FC = () => {
                   placeholder="Search packages by name, description, or category..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  className={`w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 outline-none`}
                 />
               </div>
 
@@ -285,7 +287,7 @@ const Packages: React.FC = () => {
                         key={category}
                         className={`px-3 py-1.5 rounded-full text-sm transition-colors ${
                           filterCategory === category 
-                            ? "bg-blue-800 text-white" 
+                            ? `bg-${fullColor} text-white` 
                             : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                         }`}
                         onClick={() => setFilterCategory(category)}
@@ -302,7 +304,7 @@ const Packages: React.FC = () => {
                   <select
                     value={sortBy}
                     onChange={(e) => setSortBy(e.target.value)}
-                    className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    className={`px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 outline-none`}
                   >
                     <option value="name">Name</option>
                     <option value="price">Price</option>
@@ -333,13 +335,13 @@ const Packages: React.FC = () => {
                         <h3 className="font-semibold text-lg text-gray-900 truncate">{pkg.name || "Unnamed Package"}</h3>
                         <div className="flex items-center gap-2 mt-1">
                           <span className="text-sm text-gray-500">{pkg.category || "No category"}</span>
-                          <span className="text-lg font-semibold text-blue-800">${pkg.price || "0"}</span>
+                          <span className={`text-lg font-semibold text-${fullColor}`}>${pkg.price || "0"}</span>
                         </div>
                       </div>
                       <div className="flex gap-2 ml-2">
                         <Link
                           to={`/packages/edit/${pkg.id}`}
-                          className="p-2 text-blue-800 hover:bg-blue-50 rounded-lg transition-colors"
+                          className={`p-2 text-${fullColor} hover:bg-${themeColor}-50 rounded-lg transition-colors`}
                           title="Edit package"
                         >
                           <Pencil size={18} />
@@ -438,7 +440,7 @@ const Packages: React.FC = () => {
                           <div className="inline-flex items-center gap-1 text-sm font-medium text-gray-800">
                             <Link2 className="w-4 h-4" /> Embed Link
                           </div>
-                          <div className="text-xs text-blue-800 break-all bg-blue-50 rounded px-2 py-1.5 border border-blue-100">
+                          <div className={`text-xs text-${fullColor} break-all bg-${themeColor}-50 rounded px-2 py-1.5 border border-${themeColor}-100`}>
                             {`${bookingDomain}/book/embed?id=${pkg.id}`}
                           </div>
                         </div>
@@ -447,7 +449,7 @@ const Packages: React.FC = () => {
                           <div className="inline-flex items-center gap-1 text-sm font-medium text-gray-800">
                             <ExternalLink className="w-4 h-4" /> Booking Page
                           </div>
-                          <div className="text-xs text-blue-800 break-all bg-blue-50 rounded px-2 py-1.5 border border-blue-100">
+                          <div className={`text-xs text-${fullColor} break-all bg-${themeColor}-50 rounded px-2 py-1.5 border border-${themeColor}-100`}>
                             {`${bookingDomain}/book/package/${pkg.id}`}
                           </div>
                         </div>
@@ -479,7 +481,7 @@ const Packages: React.FC = () => {
                   </button>
                 )}
                 <button
-                  className="bg-blue-800 hover:bg-blue-800 text-white px-6 py-2 rounded-lg font-semibold"
+                  className={`bg-${fullColor} hover:bg-${themeColor}-900 text-white px-6 py-2 rounded-lg font-semibold`}
                   onClick={() => window.location.href = "/packages/create"}
                 >
                   Create Package
@@ -513,7 +515,7 @@ const Packages: React.FC = () => {
               <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-200">
                 <button
                   onClick={handleSelectAllForExport}
-                  className="flex items-center gap-2 text-sm font-medium text-blue-800 hover:text-blue-800"
+                  className={`flex items-center gap-2 text-sm font-medium text-${fullColor} hover:text-${themeColor}-900`}
                 >
                   {selectedForExport.length === packages.length ? (
                     <CheckSquare size={18} />
@@ -533,7 +535,7 @@ const Packages: React.FC = () => {
                     key={pkg.id}
                     className={`p-4 border rounded-lg cursor-pointer transition-colors ${
                       selectedForExport.includes(pkg.id || '')
-                        ? 'border-blue-500 bg-blue-50'
+                        ? `border-${themeColor}-500 bg-${themeColor}-50`
                         : 'border-gray-200 hover:border-gray-300'
                     }`}
                     onClick={() => handleToggleExportSelection(pkg.id || '')}
@@ -541,7 +543,7 @@ const Packages: React.FC = () => {
                     <div className="flex items-start gap-3">
                       <div className="mt-1">
                         {selectedForExport.includes(pkg.id || '') ? (
-                          <CheckSquare size={18} className="text-blue-800" />
+                          <CheckSquare size={18} className={`text-${fullColor}`} />
                         ) : (
                           <Square size={18} className="text-gray-400" />
                         )}
@@ -569,7 +571,7 @@ const Packages: React.FC = () => {
               <button
                 onClick={handleExport}
                 disabled={selectedForExport.length === 0}
-                className="px-4 py-2 bg-blue-800 text-white rounded-lg hover:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className={`px-4 py-2 bg-${fullColor} text-white rounded-lg hover:bg-${themeColor}-900 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2`}
               >
                 <Download size={18} />
                 Export {selectedForExport.length} Package{selectedForExport.length !== 1 ? 's' : ''}
@@ -610,7 +612,7 @@ const Packages: React.FC = () => {
                   type="file"
                   accept=".json"
                   onChange={handleFileUpload}
-                  className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-800 hover:file:bg-blue-100"
+                  className={`block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-${themeColor}-50 file:text-${fullColor} hover:file:bg-${themeColor}-100`}
                 />
               </div>
 
@@ -633,7 +635,7 @@ const Packages: React.FC = () => {
                   onChange={(e) => setImportData(e.target.value)}
                   placeholder='[{"name": "Package Name", "price": "100", "category": "Type", ...}]'
                   rows={12}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-sm"
+                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 font-mono text-sm`}
                 />
               </div>
 
@@ -661,7 +663,7 @@ const Packages: React.FC = () => {
               <button
                 onClick={handleImport}
                 disabled={!importData.trim()}
-                className="px-4 py-2 bg-blue-800 text-white rounded-lg hover:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className={`px-4 py-2 bg-${fullColor} text-white rounded-lg hover:bg-${themeColor}-900 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2`}
               >
                 <Upload size={18} />
                 Import Packages

@@ -11,6 +11,7 @@ import {
   Download,
   ChevronDown,
 } from 'lucide-react';
+import { useThemeColor } from '../../../hooks/useThemeColor';
 
 // Recharts for charts
 import {
@@ -33,6 +34,7 @@ import {
 import type { CustomerAnalyticsCustomerData, CustomerAnalyticsAnalyticsData } from '../../../types/CustomerAnalytics.types';
 
 const CustomerAnalytics: React.FC = () => {
+  const { themeColor, fullColor } = useThemeColor();
   const [dateRange, setDateRange] = useState<'7d' | '30d' | '90d' | '1y'>('30d');
 
   // Sample customer data
@@ -148,7 +150,7 @@ const CustomerAnalytics: React.FC = () => {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-gray-900 flex items-center gap-2 mb-1">
-            <Users className="w-6 h-6 text-blue-600" />
+            <Users className={`w-6 h-6 text-${themeColor}-600`} />
             Customer Analytics
           </h1>
           <p className="text-sm md:text-base text-gray-600">
@@ -159,7 +161,7 @@ const CustomerAnalytics: React.FC = () => {
             <select 
               value={dateRange}
               onChange={(e) => setDateRange(e.target.value as '7d' | '30d' | '90d' | '1y')}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className={`px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-${themeColor}-500`}
             >
               <option value="7d">Last 7 days</option>
               <option value="30d">Last 30 days</option>
@@ -189,8 +191,8 @@ const CustomerAnalytics: React.FC = () => {
                     {metric.change} from previous period
                   </p>
                 </div>
-                <div className="p-2 bg-blue-50 rounded-lg">
-                  <Icon className="w-5 h-5 text-blue-600" />
+                <div className={`p-2 bg-${themeColor}-50 rounded-lg`}>
+                  <Icon className={`w-5 h-5 text-${themeColor}-600`} />
                 </div>
               </div>
             </div>
@@ -212,7 +214,7 @@ const CustomerAnalytics: React.FC = () => {
               <XAxis dataKey="time" stroke="#6b7280" />
               <YAxis stroke="#6b7280" />
               <Tooltip />
-              <Bar dataKey="count" fill="#06b6d4" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="count" fill={`var(--color-${themeColor}-500)`} radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -231,8 +233,8 @@ const CustomerAnalytics: React.FC = () => {
               <Area 
                 type="monotone" 
                 dataKey="customers" 
-                stroke="#3b82f6" 
-                fill="#3b82f6" 
+                stroke={`var(--color-${themeColor}-500)`}
+                fill={`var(--color-${themeColor}-500)`}
                 fillOpacity={0.1}
                 name="Total Customers"
               />
@@ -250,7 +252,7 @@ const CustomerAnalytics: React.FC = () => {
             <LineChart data={analyticsData.revenueTrend}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
               <XAxis dataKey="month" stroke="#6b7280" />
-              <YAxis yAxisId="left" stroke="#3b82f6" />
+              <YAxis yAxisId="left" stroke={`var(--color-${themeColor}-500)`} />
               <YAxis yAxisId="right" orientation="right" stroke="#10b981" />
               <Tooltip />
               <Legend />
@@ -258,7 +260,7 @@ const CustomerAnalytics: React.FC = () => {
                 yAxisId="left"
                 type="monotone" 
                 dataKey="revenue" 
-                stroke="#3b82f6" 
+                stroke={`var(--color-${themeColor}-500)`}
                 strokeWidth={2}
                 name="Revenue ($)"
               />
@@ -286,7 +288,7 @@ const CustomerAnalytics: React.FC = () => {
               <XAxis dataKey="name" stroke="#6b7280" />
               <YAxis stroke="#6b7280" />
               <Tooltip />
-              <Bar dataKey="bookings" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="bookings" fill={`var(--color-${themeColor}-500)`} radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -331,7 +333,7 @@ const CustomerAnalytics: React.FC = () => {
               <XAxis dataKey="hour" stroke="#6b7280" />
               <YAxis stroke="#6b7280" />
               <Tooltip />
-              <Bar dataKey="activity" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="activity" fill={`var(--color-${themeColor}-600)`} radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -387,7 +389,7 @@ const CustomerAnalytics: React.FC = () => {
   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
   <div className="bg-white rounded-xl shadow-sm p-3 sm:p-6 border border-gray-100">
           <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-            <Activity className="w-5 h-5 text-blue-600" />
+            <Activity className={`w-5 h-5 text-${themeColor}-600`} />
             Top 5 Most Purchased Activities by Customer
           </h3>
           <table className="w-full text-sm">
@@ -477,7 +479,7 @@ const CustomerAnalytics: React.FC = () => {
   <div className="bg-white rounded-xl shadow-sm p-3 sm:p-6 border border-gray-100">
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-lg font-semibold text-gray-900">Recent Customers</h3>
-          <button className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1">
+          <button className={`text-sm text-${themeColor}-600 hover:text-${themeColor}-700 flex items-center gap-1`}>
             View All <ChevronDown className="w-4 h-4" />
           </button>
         </div>
@@ -517,7 +519,7 @@ const CustomerAnalytics: React.FC = () => {
                       customer.status === 'active' 
                         ? 'bg-green-100 text-green-800'
                         : customer.status === 'new'
-                        ? 'bg-blue-100 text-blue-800'
+                        ? `bg-${themeColor}-100 text-${fullColor}`
                         : 'bg-gray-100 text-gray-800'
                     }`}>
                       {customer.status}

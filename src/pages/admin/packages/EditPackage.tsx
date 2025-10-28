@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import Toast from "../../../components/ui/Toast";
 import { Info, Plus, Calendar, Clock, Gift, Tag, Home, ArrowLeft, Save } from "lucide-react";
+import { useThemeColor } from '../../../hooks/useThemeColor';
 import type { PackagesPackage } from '../../../types/Packages.types';
 import type { 
     CreatePackageAttraction, 
@@ -49,6 +50,7 @@ const getActiveGiftCards = (): CreatePackageGiftCard[] => {
 };
 
 const EditPackage: React.FC = () => {
+    const { themeColor, fullColor } = useThemeColor();
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const [loading, setLoading] = useState(true);
@@ -364,7 +366,7 @@ const EditPackage: React.FC = () => {
         return (
             <div className="flex items-center justify-center min-h-screen">
                 <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-700 mx-auto"></div>
+                    <div className={`animate-spin rounded-full h-12 w-12 border-b-2 border-${themeColor}-700 mx-auto`}></div>
                     <p className="mt-4 text-gray-600">Loading package...</p>
                 </div>
             </div>
@@ -380,7 +382,7 @@ const EditPackage: React.FC = () => {
                     <p className="text-gray-600 mb-6">The package you're looking for doesn't exist.</p>
                     <Link
                         to="/packages"
-                        className="inline-flex items-center gap-2 bg-blue-700 hover:bg-blue-800 text-white px-6 py-2 rounded-lg font-semibold"
+                        className={`inline-flex items-center gap-2 bg-${themeColor}-700 hover:bg-${fullColor} text-white px-6 py-2 rounded-lg font-semibold`}
                     >
                         <ArrowLeft size={18} />
                         Back to Packages
@@ -416,7 +418,7 @@ const EditPackage: React.FC = () => {
                                 type="file"
                                 accept="image/*"
                                 onChange={handleImageChange}
-                                className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-800 hover:file:bg-blue-100"
+                                className={`block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-${themeColor}-50 file:text-${fullColor} hover:file:bg-${themeColor}-100`}
                             />
                             {imagePreview && (
                                 <div className="mt-4">
@@ -427,8 +429,8 @@ const EditPackage: React.FC = () => {
 
                         {/* Details Section */}
                         <div>
-                            <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2">
-                                <Info className="w-5 h-5 text-primary" /> Details
+                            <h3 className={`text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2`}>
+                                <Info className={`w-5 h-5 text-${themeColor}-600`} /> Details
                             </h3>
                             <div className="space-y-5">
                                 <div>
@@ -438,7 +440,7 @@ const EditPackage: React.FC = () => {
                                         name="name"
                                         value={form.name}
                                         onChange={handleChange}
-                                        className="w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-primary focus:border-primary bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400"
+                                        className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400`}
                                         placeholder="Enter package name"
                                         required
                                     />
@@ -451,7 +453,7 @@ const EditPackage: React.FC = () => {
                                         value={form.description}
                                         onChange={handleChange}
                                         rows={3}
-                                        className="w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-primary focus:border-primary bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400"
+                                        className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400`}
                                         placeholder="Enter package description"
                                     />
                                 </div>
@@ -463,7 +465,7 @@ const EditPackage: React.FC = () => {
                                             name="category"
                                             value={form.category}
                                             onChange={handleChange}
-                                            className="w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-primary focus:border-primary bg-white text-neutral-900 text-base transition-all"
+                                            className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all`}
                                         >
                                             <option value="">Select category</option>
                                             {categories.map((cat) => (
@@ -479,7 +481,7 @@ const EditPackage: React.FC = () => {
                                             name="maxParticipants"
                                             value={form.maxParticipants}
                                             onChange={handleChange}
-                                            className="w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-primary focus:border-primary bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400"
+                                            className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400`}
                                             min="0"
                                             placeholder="Enter max participants"
                                         />
@@ -494,7 +496,7 @@ const EditPackage: React.FC = () => {
                                             name="pricePerAdditional"
                                             value={form.pricePerAdditional}
                                             onChange={handleChange}
-                                            className="w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-primary focus:border-primary bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400"
+                                            className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400`}
                                             min="0"
                                             placeholder="Enter price per additional participant"
                                         />
@@ -509,7 +511,7 @@ const EditPackage: React.FC = () => {
                                             name="duration"
                                             value={form.duration}
                                             onChange={handleChange}
-                                            className="flex-1 rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-primary focus:border-primary bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400"
+                                            className={`flex-1 rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400`}
                                             min="0"
                                             placeholder="Enter duration"
                                         />
@@ -517,7 +519,7 @@ const EditPackage: React.FC = () => {
                                             name="durationUnit"
                                             value={form.durationUnit}
                                             onChange={handleChange}
-                                            className="rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-primary focus:border-primary bg-white text-neutral-900 text-base transition-all"
+                                            className={`rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all`}
                                         >
                                             <option value="hours">Hours</option>
                                             <option value="minutes">Minutes</option>
@@ -532,7 +534,7 @@ const EditPackage: React.FC = () => {
                                         value={form.features}
                                         onChange={handleChange}
                                         rows={3}
-                                        className="w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-primary focus:border-primary bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400"
+                                        className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400`}
                                         placeholder="Enter package features (comma-separated)"
                                     />
                                 </div>
@@ -541,8 +543,8 @@ const EditPackage: React.FC = () => {
                         
                         {/* Availability Section */}
                         <div>
-                            <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2">
-                                <Calendar className="w-5 h-5 text-primary" /> Availability
+                            <h3 className={`text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2`}>
+                                <Calendar className={`w-5 h-5 text-${themeColor}-600`} /> Availability
                             </h3>
                             <div className="space-y-4">
                                 <div>
@@ -551,7 +553,7 @@ const EditPackage: React.FC = () => {
                                         name="availabilityType"
                                         value={form.availabilityType}
                                         onChange={handleChange}
-                                        className="w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-primary focus:border-primary bg-white text-neutral-900 text-base transition-all"
+                                        className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all`}
                                     >
                                         <option value="daily">Daily</option>
                                         <option value="weekly">Weekly</option>
@@ -570,7 +572,7 @@ const EditPackage: React.FC = () => {
                                                     onClick={() => handleAvailabilityChange("daily", day)}
                                                     className={`px-4 py-2 rounded-md text-sm font-semibold transition-all ${
                                                         form.availableDays.includes(day)
-                                                            ? "bg-blue-700 text-white"
+                                                            ? `bg-${themeColor}-50 border border-${themeColor}-500 text-${fullColor}`
                                                             : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                                                     }`}
                                                 >
@@ -592,7 +594,7 @@ const EditPackage: React.FC = () => {
                                                     onClick={() => handleAvailabilityChange("weekly", day)}
                                                     className={`px-4 py-2 rounded-md text-sm font-semibold transition-all ${
                                                         form.availableWeekDays.includes(day)
-                                                            ? "bg-blue-700 text-white"
+                                                            ? `bg-${themeColor}-50 border border-${themeColor}-500 text-${fullColor}`
                                                             : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                                                     }`}
                                                 >
@@ -616,7 +618,7 @@ const EditPackage: React.FC = () => {
                                                         onClick={() => handleAvailabilityChange("monthly", day)}
                                                         className={`px-3 py-2 rounded-md text-sm font-semibold transition-all ${
                                                             form.availableMonthDays.includes(day)
-                                                                ? "bg-blue-700 text-white"
+                                                                ? `bg-${themeColor}-50 border border-${themeColor}-500 text-${fullColor}`
                                                                 : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                                                         }`}
                                                     >
@@ -629,7 +631,7 @@ const EditPackage: React.FC = () => {
                                                 onClick={() => handleAvailabilityChange("monthly", "last")}
                                                 className={`px-3 py-2 rounded-md text-sm font-semibold transition-all ${
                                                     form.availableMonthDays.includes("last")
-                                                        ? "bg-blue-700 text-white"
+                                                        ? `bg-${themeColor}-50 border border-${themeColor}-500 text-${fullColor}`
                                                         : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                                                 }`}
                                             >
@@ -645,8 +647,8 @@ const EditPackage: React.FC = () => {
                         
                         {/* Attractions Section */}
                         <div>
-                            <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2">
-                                <Info className="w-5 h-5 text-primary" /> Attractions
+                            <h3 className={`text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2`}>
+                                <Info className={`w-5 h-5 text-${themeColor}-600`} /> Attractions
                             </h3>
                             <div className="flex flex-wrap gap-2 mb-2">
                                 {attractions.map((attraction) => (
@@ -656,7 +658,7 @@ const EditPackage: React.FC = () => {
                                         onClick={() => handleMultiSelect("attractions", attraction.name)}
                                         className={`px-3 py-1.5 rounded-full text-sm font-semibold transition-all ${
                                             form.attractions.includes(attraction.name)
-                                                ? "bg-blue-700 text-white"
+                                                ? `bg-${themeColor}-50 border border-${themeColor}-500 text-${fullColor}`
                                                 : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                                         }`}
                                     >
@@ -693,8 +695,7 @@ const EditPackage: React.FC = () => {
                                         if (priceInput) priceInput.value = "";
                                         if (unitInput) unitInput.value = "";
                                     }}
-                                    className="px-3 py-1.5 bg-blue-50 text-blue-800 rounded-md text-sm font-semibold hover:bg-blue-100 transition-all flex items-center gap-1"
-                                >
+                                    className={`px-3 py-1.5 bg-${themeColor}-50 text-${fullColor} rounded-md text-sm font-semibold hover:bg-${themeColor}-100 transition-all flex items-center gap-1`}                                >
                                     <Plus className="w-4 h-4" /> Add
                                 </button>
                             </div>
@@ -702,8 +703,8 @@ const EditPackage: React.FC = () => {
                         
                         {/* Rooms Section */}
                         <div>
-                            <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2">
-                                <Home className="w-5 h-5 text-primary" /> Rooms
+                            <h3 className={`text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2`}>
+                                <Home className={`w-5 h-5 text-${themeColor}-600`} /> Rooms
                             </h3>
                             <div className="flex flex-wrap gap-2 mb-2">
                                 {rooms.map((room) => (
@@ -713,7 +714,7 @@ const EditPackage: React.FC = () => {
                                         onClick={() => handleMultiSelect("rooms", room.name)}
                                         className={`px-3 py-1.5 rounded-full text-sm font-semibold transition-all ${
                                             form.rooms.includes(room.name)
-                                                ? "bg-blue-700 text-white"
+                                                ? `bg-${themeColor}-50 border border-${themeColor}-500 text-${fullColor}`
                                                 : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                                         }`}
                                     >
@@ -733,7 +734,7 @@ const EditPackage: React.FC = () => {
                                         handleAddOption("room", input?.value || "");
                                         if (input) input.value = "";
                                     }}
-                                    className="px-3 py-1.5 bg-blue-50 text-blue-800 rounded-md text-sm font-semibold hover:bg-blue-100 transition-all flex items-center gap-1"
+                                    className={`px-3 py-1.5 bg-${themeColor}-50 text-${fullColor} rounded-md text-sm font-semibold hover:bg-${themeColor}-100 transition-all flex items-center gap-1`}
                                 >
                                     <Plus className="w-4 h-4" /> Add
                                 </button>
@@ -742,8 +743,8 @@ const EditPackage: React.FC = () => {
                         
                         {/* Add-ons Section */}
                         <div>
-                            <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2">
-                                <Info className="w-5 h-5 text-primary" /> Add-ons
+                            <h3 className={`text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2`}>
+                                <Info className={`w-5 h-5 text-${themeColor}-600`} /> Add-ons
                             </h3>
                             <div className="flex flex-wrap gap-2 mb-2">
                                 {addOns.map((addon) => (
@@ -753,7 +754,7 @@ const EditPackage: React.FC = () => {
                                         onClick={() => handleMultiSelect("addOns", addon.name)}
                                         className={`px-3 py-1.5 rounded-full text-sm font-semibold transition-all ${
                                             form.addOns.includes(addon.name)
-                                                ? "bg-blue-700 text-white"
+                                                ? `bg-${themeColor}-50 border border-${themeColor}-500 text-${fullColor}`
                                                 : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                                         }`}
                                     >
@@ -782,7 +783,7 @@ const EditPackage: React.FC = () => {
                                         if (nameInput) nameInput.value = "";
                                         if (priceInput) priceInput.value = "";
                                     }}
-                                    className="px-3 py-1.5 bg-blue-50 text-blue-800 rounded-md text-sm font-semibold hover:bg-blue-100 transition-all flex items-center gap-1"
+                                    className={`px-3 py-1.5 bg-${themeColor}-50 text-${fullColor} rounded-md text-sm font-semibold hover:bg-${themeColor}-100 transition-all flex items-center gap-1`}
                                 >
                                     <Plus className="w-4 h-4" /> Add
                                 </button>
@@ -791,8 +792,8 @@ const EditPackage: React.FC = () => {
                         
                         {/* Promos Section */}
                         <div>
-                            <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2">
-                                <Tag className="w-5 h-5 text-primary" /> Promos
+                            <h3 className={`text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2`}>
+                                <Tag className={`w-5 h-5 text-${themeColor}-600`} /> Promos
                             </h3>
                             {promos.length === 0 ? (
                                 <div className="text-sm text-gray-500 bg-gray-50 rounded-lg p-4 border border-gray-200">
@@ -826,8 +827,8 @@ const EditPackage: React.FC = () => {
                         
                         {/* Gift Cards Section */}
                         <div>
-                            <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2">
-                                <Gift className="w-5 h-5 text-primary" /> Gift Cards
+                            <h3 className={`text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2`}>
+                                <Gift className={`w-5 h-5 text-${themeColor}-600`} /> Gift Cards
                             </h3>
                             {giftCards.length === 0 ? (
                                 <div className="text-sm text-gray-500 bg-gray-50 rounded-lg p-4 border border-gray-200">
@@ -861,8 +862,8 @@ const EditPackage: React.FC = () => {
                         
                         {/* Pricing Section */}
                         <div>
-                            <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2">
-                                <Info className="w-5 h-5 text-primary" /> Pricing
+                            <h3 className={`text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2`}>
+                                <Info className={`w-5 h-5 text-${themeColor}-600`} /> Pricing
                             </h3>
                             <label className="block font-semibold mb-2 text-base text-neutral-800">Price</label>
                             <input
@@ -870,7 +871,7 @@ const EditPackage: React.FC = () => {
                                 name="price"
                                 value={form.price}
                                 onChange={handleChange}
-                                className="w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-primary focus:border-primary bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400"
+                                className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400`}
                                 min="0"
                                 placeholder="Enter price"
                                 required
@@ -880,7 +881,7 @@ const EditPackage: React.FC = () => {
                         <div className="flex gap-2 mt-6">
                             <button
                                 type="submit"
-                                className="flex-1 bg-blue-800 hover:bg-blue-900 text-white font-semibold py-2 rounded-md transition text-base flex items-center justify-center gap-2"
+                                className={`flex-1 bg-${fullColor} hover:bg-${themeColor}-900 text-white font-semibold py-2 rounded-md transition text-base flex items-center justify-center gap-2`}
                             >
                                 <Save className="w-5 h-5" /> Update Package
                             </button>
@@ -901,7 +902,7 @@ const EditPackage: React.FC = () => {
                     <h3 className="text-2xl font-bold mb-6 text-neutral-900 tracking-tight">Live Preview</h3>
                     <div className="space-y-4">
                         <div className="flex items-center justify-between mb-2">
-                            <span className="font-bold text-2xl text-primary tracking-tight">{form.name || "Package Name"}</span>
+                            <span className={`font-bold text-2xl text-${themeColor}-600 tracking-tight`}>{form.name || "Package Name"}</span>
                             <span className="text-lg text-gray-500 font-semibold">${form.price || "0"}</span>
                         </div>
                         <div className="text-xs text-gray-500 mb-2">{form.category || "Category"}</div>
@@ -945,7 +946,7 @@ const EditPackage: React.FC = () => {
                             {(form.promos || []).length ? (form.promos || []).map((code: string) => {
                                 const promo = promos.find(p => p.code === code);
                                 return promo ? (
-                                    <span key={code} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-md font-semibold">
+                                    <span key={code} className={`px-2 py-1 bg-${themeColor}-100 text-${fullColor} text-xs rounded-md font-semibold`}>
                                         {promo.name}
                                     </span>
                                 ) : null;

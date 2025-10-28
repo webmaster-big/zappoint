@@ -18,8 +18,10 @@ import {
   Star,
   Ticket,
 } from 'lucide-react';
+import { useThemeColor } from '../../hooks/useThemeColor';
 
 const AttendantDashboard: React.FC = () => {
+   const { themeColor, fullColor } = useThemeColor();
    const [currentWeek, setCurrentWeek] = useState(new Date());
    const [selectedStatus, setSelectedStatus] = useState('all');
    const [calendarFilter, setCalendarFilter] = useState({
@@ -129,7 +131,7 @@ const AttendantDashboard: React.FC = () => {
        change: '+12% from last week',
        trend: 'up',
        icon: Calendar,
-       accent: 'bg-blue-100 text-blue-800',
+       accent: `bg-${themeColor}-100 text-${fullColor}`,
      },
      {
        title: 'Pending Approvals',
@@ -137,7 +139,7 @@ const AttendantDashboard: React.FC = () => {
        change: '2 require urgent attention',
        trend: 'neutral',
        icon: AlertTriangle,
-       accent: 'bg-blue-100 text-blue-800',
+       accent: `bg-${themeColor}-100 text-${fullColor}`,
      },
      {
        title: 'Packages Booked',
@@ -145,7 +147,7 @@ const AttendantDashboard: React.FC = () => {
        change: 'Corporate leading',
        trend: 'up',
        icon: Package,
-       accent: 'bg-blue-100 text-blue-800',
+       accent: `bg-${themeColor}-100 text-${fullColor}`,
      },
      {
        title: 'Weekly Revenue',
@@ -153,7 +155,7 @@ const AttendantDashboard: React.FC = () => {
        change: '+8% from last week',
        trend: 'up',
        icon: DollarSign,
-       accent: 'bg-blue-100 text-blue-800',
+       accent: `bg-${themeColor}-100 text-${fullColor}`,
      },
      {
        title: 'Ticket Sales',
@@ -161,7 +163,7 @@ const AttendantDashboard: React.FC = () => {
        change: 'Laser Tag most popular',
        trend: 'up',
        icon: Ticket,
-       accent: 'bg-blue-100 text-blue-800',
+       accent: `bg-${themeColor}-100 text-${fullColor}`,
      },
    ];
 
@@ -237,10 +239,10 @@ const AttendantDashboard: React.FC = () => {
 
    // Quick actions
    const quickActions = [
-     { title: 'New Booking', icon: Plus, accent: 'bg-blue-800 hover:bg-blue-800' },
-     { title: 'Check-in', icon: CheckCircle, accent: 'bg-blue-800 hover:bg-blue-800' },
-     { title: 'Send Reminders', icon: Mail, accent: 'bg-blue-800 hover:bg-blue-800' },
-     { title: 'Export Data', icon: Download, accent: 'bg-blue-800 hover:bg-blue-800' },
+     { title: 'New Booking', icon: Plus, accent: `bg-${fullColor} hover:bg-${themeColor}-900` },
+     { title: 'Check-in', icon: CheckCircle, accent: `bg-${fullColor} hover:bg-${themeColor}-900` },
+     { title: 'Send Reminders', icon: Mail, accent: `bg-${fullColor} hover:bg-${themeColor}-900` },
+     { title: 'Export Data', icon: Download, accent: `bg-${fullColor} hover:bg-${themeColor}-900` },
    ];
 
    // Status colors
@@ -258,8 +260,8 @@ const AttendantDashboard: React.FC = () => {
      Paid: 'bg-emerald-100 text-emerald-800',
      Partial: 'bg-amber-100 text-amber-800',
      Refunded: 'bg-rose-100 text-rose-800',
-     credit_card: 'bg-blue-100 text-blue-800',
-     paypal: 'bg-blue-100 text-blue-800',
+     credit_card: `bg-${themeColor}-100 text-${fullColor}`,
+     paypal: `bg-${themeColor}-100 text-${fullColor}`,
      cash: 'bg-gray-100 text-gray-800',
    };
 
@@ -295,7 +297,7 @@ const AttendantDashboard: React.FC = () => {
              </h1>
              <p className="text-base text-gray-800">Weekly overview of bookings and activities</p>
            </div>
-           <button className="mt-4 md:mt-0 px-5 py-2.5 bg-blue-800 text-white rounded-xl flex items-center gap-2 hover:bg-blue-900 transition font-semibold shadow-sm">
+           <button className="mt-4 md:mt-0 px-5 py-2.5 bg-${fullColor} text-white rounded-xl flex items-center gap-2 hover:bg-${themeColor}-900 transition font-semibold shadow-sm">
              <Plus size={20} />
              <span>New Booking</span>
            </button>
@@ -327,7 +329,7 @@ const AttendantDashboard: React.FC = () => {
          <div className="bg-white rounded-xl shadow-sm p-4 md:p-6 border border-gray-100">
            <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
              <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-               <Calendar className="w-6 h-6 text-blue-800" /> Weekly Calendar
+               <Calendar className="w-6 h-6 text-${fullColor}" /> Weekly Calendar
              </h2>
              <div className="flex items-center space-x-2 mt-4 md:mt-0">
                <button 
@@ -346,7 +348,7 @@ const AttendantDashboard: React.FC = () => {
                >
                  <ChevronRight size={18} />
                </button>
-               <button className="ml-2 px-3 py-2 text-sm bg-blue-100 text-blue-800 rounded-lg hover:bg-blue-400" onClick={() => setCurrentWeek(new Date())}>
+               <button className={`ml-2 px-3 py-2 text-sm bg-${themeColor}-100 text-${fullColor} rounded-lg hover:bg-${themeColor}-400`} onClick={() => setCurrentWeek(new Date())}>
                  Today
                </button>
                
@@ -355,14 +357,14 @@ const AttendantDashboard: React.FC = () => {
                  onClick={() => setShowFilterPanel(!showFilterPanel)}
                  className={`ml-2 px-3 py-2 text-sm rounded-lg flex items-center ${
                    calendarFilter.type !== 'all' 
-                     ? 'bg-blue-100 text-blue-800 border border-blue-300' 
+                     ? `bg-${themeColor}-100 text-${fullColor} border border-${themeColor}-300` 
                      : 'bg-gray-100 text-gray-800 border border-gray-200'
                  }`}
                >
                  <Filter size={16} className="mr-1" />
                  Filter
                  {calendarFilter.type !== 'all' && (
-                   <span className="ml-1 bg-blue-800 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs">
+                   <span className={`ml-1 bg-${fullColor} text-white rounded-full w-4 h-4 flex items-center justify-center text-xs`}>
                      !
                    </span>
                  )}
@@ -427,7 +429,7 @@ const AttendantDashboard: React.FC = () => {
                  {calendarFilter.type !== 'all' && (
                    <button
                      onClick={clearCalendarFilter}
-                     className="ml-auto text-sm text-blue-800 hover:text-blue-800 flex items-center"
+                     className="ml-auto text-sm text-${fullColor} hover:text-${fullColor} flex items-center"
                    >
                      <X size={14} className="mr-1" />
                      Clear Filter
@@ -514,7 +516,7 @@ const AttendantDashboard: React.FC = () => {
            {/* Quick Actions */}
            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 flex flex-col gap-4">
              <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-               <Zap className="w-5 h-5 text-blue-800" /> Quick Actions
+               <Zap className="w-5 h-5 text-${fullColor}" /> Quick Actions
              </h2>
              <div className="grid grid-cols-2 gap-3">
                {quickActions.map((action, index) => {
@@ -536,9 +538,9 @@ const AttendantDashboard: React.FC = () => {
            <div className="lg:col-span-2 bg-white rounded-xl border border-gray-100 shadow-sm p-5">
              <div className="flex items-center justify-between mb-4">
                <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                 <Activity className="w-5 h-5 text-blue-800" /> Recent Activity
+                 <Activity className="w-5 h-5 text-${fullColor}" /> Recent Activity
                </h2>
-               <button className="text-sm text-blue-800 hover:text-blue-800 font-medium flex items-center gap-1">
+               <button className="text-sm text-${fullColor} hover:text-${fullColor} font-medium flex items-center gap-1">
                  <ChevronRight size={16} /> View all
                </button>
              </div>
@@ -590,7 +592,7 @@ const AttendantDashboard: React.FC = () => {
          <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
            <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-               <Ticket className="w-5 h-5 text-blue-800" /> Recent Attraction Ticket Purchases
+               <Ticket className="w-5 h-5 text-${fullColor}" /> Recent Attraction Ticket Purchases
              </h2>
              <div className="flex flex-wrap gap-2 mt-4 md:mt-0">
                <div className="relative">
@@ -598,13 +600,13 @@ const AttendantDashboard: React.FC = () => {
                  <input
                    type="text"
                    placeholder="Search purchases..."
-                   className="pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+                   className="pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-${themeColor}-500"
                  />
                </div>
                <select 
                  value={selectedStatus}
                  onChange={(e) => setSelectedStatus(e.target.value)}
-                 className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+                 className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-${themeColor}-500"
                >
                  <option value="all">All Statuses</option>
                  <option value="confirmed">Confirmed</option>
@@ -685,13 +687,13 @@ const AttendantDashboard: React.FC = () => {
                  <input
                    type="text"
                    placeholder="Search bookings..."
-                   className="pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+                   className="pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-${themeColor}-500"
                  />
                </div>
                <select 
                  value={selectedStatus}
                  onChange={(e) => setSelectedStatus(e.target.value)}
-                 className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+                 className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-${themeColor}-500"
                >
                  <option value="all">All Statuses</option>
                  <option value="Confirmed">Confirmed</option>
@@ -751,7 +753,7 @@ const AttendantDashboard: React.FC = () => {
                      <td className="px-4 py-3 font-medium">{booking.amount}</td>
                      <td className="px-4 py-3">
                        <div className="flex space-x-2">
-                         <button className="p-1 text-blue-800 hover:text-blue-800" title="Check-in">
+                         <button className="p-1 text-${fullColor} hover:text-${fullColor}" title="Check-in">
                            <CheckCircle size={16} />
                          </button>
                          <button className="p-1 text-gray-600 hover:text-gray-800" title="Send reminder">

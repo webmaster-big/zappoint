@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import Toast from "../../../components/ui/Toast";
 import { Info, Plus, RefreshCcw, Calendar, Clock, Gift, Tag, Home } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useThemeColor } from '../../../hooks/useThemeColor';
 import type { 
     CreatePackageAttraction, 
     CreatePackageAddOn, 
@@ -47,6 +48,7 @@ const getActiveGiftCards = () => {
 
 const CreatePackage: React.FC = () => {
     const navigate = useNavigate();
+    const { themeColor, fullColor } = useThemeColor();
     
     // Option tables (simulate fetch)
     const [attractions, setAttractions] = useState<CreatePackageAttraction[]>(() => {
@@ -317,7 +319,7 @@ const CreatePackage: React.FC = () => {
                                     type="file"
                                     accept="image/*"
                                     onChange={handleImageChange}
-                                    className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-800 hover:file:bg-blue-100"
+                                    className={`block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-${themeColor}-50 file:text-${fullColor} hover:file:bg-${themeColor}-100`}
                                 />
                                 {imagePreview && (
                                     <div className="mt-4">
@@ -335,16 +337,14 @@ const CreatePackage: React.FC = () => {
                                         <label className="block font-semibold mb-2 text-base text-neutral-800">Package Name</label>
                                         <input
                                             type="text"
-                                            name="name"
-                                            value={form.name}
-                                            onChange={handleChange}
-                                            className="w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-primary focus:border-primary bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400"
-                                            placeholder="Enter package name"
-                                            required
-                                        />
-                                    </div>
-                                    
-                                    {/* Duration Section */}
+                            name="name"
+                            value={form.name}
+                            onChange={handleChange}
+                            className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400`}
+                            placeholder="Enter package name"
+                            required
+                        />
+                    </div>                                    {/* Duration Section */}
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div>
                                             <label className="block font-semibold mb-2 text-base text-neutral-800">Duration</label>
@@ -354,7 +354,7 @@ const CreatePackage: React.FC = () => {
                                                     name="duration"
                                                     value={form.duration}
                                                     onChange={handleChange}
-                                                    className="w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-primary focus:border-primary bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400"
+                                                    className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400`}
                                                     min="1"
                                                     placeholder="Duration"
                                                 />
@@ -362,7 +362,7 @@ const CreatePackage: React.FC = () => {
                                                     name="durationUnit"
                                                     value={form.durationUnit}
                                                     onChange={handleChange}
-                                                    className="rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-primary focus:border-primary bg-white text-neutral-900 text-base transition-all"
+                                                    className={`rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all`}
                                                 >
                                                     <option value="hours">Hours</option>
                                                     <option value="minutes">Minutes</option>
@@ -377,7 +377,7 @@ const CreatePackage: React.FC = () => {
                                                 name="maxParticipants"
                                                 value={form.maxParticipants}
                                                 onChange={handleChange}
-                                                className="w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-primary focus:border-primary bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400"
+                                                className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400`}
                                                 min="1"
                                                 placeholder="Enter max participants"
                                             />
@@ -394,7 +394,7 @@ const CreatePackage: React.FC = () => {
                                                     name="pricePerAdditional"
                                                     value={form.pricePerAdditional}
                                                     onChange={handleChange}
-                                                    className="w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-primary focus:border-primary bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400"
+                                                    className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400`}
                                                     min="0"
                                                     placeholder="Enter price for each additional participant"
                                                 />
@@ -409,7 +409,7 @@ const CreatePackage: React.FC = () => {
                                                 name="category"
                                                 value={form.category}
                                                 onChange={handleChange}
-                                                className="rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-primary focus:border-primary bg-white text-neutral-900 text-base min-w-0 flex-1 transition-all"
+                                                className={`rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base min-w-0 flex-1 transition-all`}
                                                 required
                                             >
                                                 <option value="">Select category</option>
@@ -444,7 +444,7 @@ const CreatePackage: React.FC = () => {
                                             name="features"
                                             value={form.features}
                                             onChange={handleChange}
-                                            className="w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-primary focus:border-primary bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400"
+                                            className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400`}
                                             placeholder="e.g. Free drinks, VIP room, etc."
                                         />
                                     </div>
@@ -454,7 +454,7 @@ const CreatePackage: React.FC = () => {
                                             name="description"
                                             value={form.description}
                                             onChange={handleChange}
-                                            className="w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-primary focus:border-primary bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400"
+                                            className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400`}
                                             rows={3}
                                             placeholder="Describe the package"
                                             required
@@ -516,7 +516,7 @@ const CreatePackage: React.FC = () => {
                                                     <button
                                                         type="button"
                                                         key={day}
-                                                        className={`px-3 py-1.5 rounded-full border text-sm font-medium transition-all duration-150 hover:bg-primary/10 hover:border-primary/60 focus:outline-none focus:ring-2 focus:ring-primary/30 ${form.availableDays.includes(day) ? "bg-primary/10 border-primary text-primary" : "bg-white border-gray-200 text-neutral-800"}`}
+                                                        className={`px-3 py-1.5 rounded-full border text-sm font-medium transition-all duration-150 hover:bg-${themeColor}-50 hover:border-${themeColor}-400 focus:outline-none focus:ring-2 focus:ring-${themeColor}-200 ${form.availableDays.includes(day) ? `bg-${themeColor}-50 border-${themeColor}-500 text-${fullColor}` : "bg-white border-gray-200 text-neutral-800"}`}
                                                         onClick={() => handleAvailabilityChange("daily", day)}
                                                     >
                                                         {day.substring(0, 3)}
@@ -534,7 +534,7 @@ const CreatePackage: React.FC = () => {
                                                     <button
                                                         type="button"
                                                         key={day}
-                                                        className={`px-3 py-1.5 rounded-full border text-sm font-medium transition-all duration-150 hover:bg-primary/10 hover:border-primary/60 focus:outline-none focus:ring-2 focus:ring-primary/30 ${form.availableWeekDays.includes(day) ? "bg-primary/10 border-primary text-primary" : "bg-white border-gray-200 text-neutral-800"}`}
+                                                        className={`px-3 py-1.5 rounded-full border text-sm font-medium transition-all duration-150 hover:bg-${themeColor}-50 hover:border-${themeColor}-400 focus:outline-none focus:ring-2 focus:ring-${themeColor}-200 ${form.availableWeekDays.includes(day) ? `bg-${themeColor}-50 border-${themeColor}-500 text-${fullColor}` : "bg-white border-gray-200 text-neutral-800"}`}
                                                         onClick={() => handleAvailabilityChange("weekly", day)}
                                                     >
                                                         {day.substring(0, 3)}
@@ -552,7 +552,7 @@ const CreatePackage: React.FC = () => {
                                                     <button
                                                         type="button"
                                                         key={day}
-                                                        className={`px-3 py-1.5 rounded-full border text-sm font-medium transition-all duration-150 hover:bg-primary/10 hover:border-primary/60 focus:outline-none focus:ring-2 focus:ring-primary/30 ${form.availableMonthDays.includes(day) ? "bg-primary/10 border-primary text-primary" : "bg-white border-gray-200 text-neutral-800"}`}
+                                                        className={`px-3 py-1.5 rounded-full border text-sm font-medium transition-all duration-150 hover:bg-${themeColor}-50 hover:border-${themeColor}-400 focus:outline-none focus:ring-2 focus:ring-${themeColor}-200 ${form.availableMonthDays.includes(day) ? `bg-${themeColor}-50 border-${themeColor}-500 text-${fullColor}` : "bg-white border-gray-200 text-neutral-800"}`}
                                                         onClick={() => handleAvailabilityChange("monthly", day)}
                                                     >
                                                         {day === "last" ? "Last" : day}
@@ -576,7 +576,7 @@ const CreatePackage: React.FC = () => {
                                         <button
                                             type="button"
                                             key={act.name}
-                                            className={`px-3 py-1 rounded-full border text-sm font-medium transition-all duration-150 hover:bg-primary/10 hover:border-primary/60 focus:outline-none focus:ring-2 focus:ring-primary/30 ${form.attractions.includes(act.name) ? "bg-primary/10 border-primary text-primary" : "bg-white border-gray-200 text-neutral-800"}`}
+                                            className={`px-3 py-1 rounded-full border text-sm font-medium transition-all duration-150 hover:bg-${themeColor}-50 hover:border-${themeColor}-400 focus:outline-none focus:ring-2 focus:ring-${themeColor}-200 ${form.attractions.includes(act.name) ? `bg-${themeColor}-50 border-${themeColor}-500 text-${fullColor}` : "bg-white border-gray-200 text-neutral-800"}`}
                                             onClick={() => handleMultiSelect("attractions", act.name)}
                                         >
                                             {act.name} <span className="text-xs text-gray-400 ml-1">${act.price}</span>
@@ -629,7 +629,7 @@ const CreatePackage: React.FC = () => {
                                         <button
                                             type="button"
                                             key={room.name}
-                                            className={`px-3 py-1 rounded-full border text-sm font-medium transition-all duration-150 hover:bg-blue-50 hover:border-blue-400/60 focus:outline-none focus:ring-2 focus:ring-blue-200 ${form.rooms.includes(room.name) ? "bg-blue-50 border-blue-400 text-blue-800" : "bg-white border-gray-200 text-neutral-800"}`}
+                                            className={`px-3 py-1 rounded-full border text-sm font-medium transition-all duration-150 hover:bg-${themeColor}-50 hover:border-${themeColor}-400 focus:outline-none focus:ring-2 focus:ring-${themeColor}-200 ${form.rooms.includes(room.name) ? `bg-${themeColor}-50 border-${themeColor}-500 text-${fullColor}` : "bg-white border-gray-200 text-neutral-800"}`}
                                             onClick={() => handleMultiSelect("rooms", room.name)}
                                         >
                                             {room.name}
@@ -711,7 +711,7 @@ const CreatePackage: React.FC = () => {
                                         <button
                                             type="button"
                                             onClick={() => navigate('/packages/promos')}
-                                            className="inline-flex items-center gap-2 bg-blue-800 text-xs hover:bg-blue-800 text-white px-4 py-2 rounded-md transition"
+                                            className={`inline-flex items-center gap-2 bg-${fullColor} text-xs hover:bg-${themeColor}-900 text-white px-4 py-2 rounded-md transition`}
                                         >
                                             <Plus className="w-4 h-4" />
                                             Create Promo
@@ -755,8 +755,8 @@ const CreatePackage: React.FC = () => {
                                         <p className="text-gray-500 mb-3 text-sm">No gift cards available yet</p>
                                         <button
                                             type="button"
-                                            onClick={() => navigate('/packages/gift-cards')}
-                                            className="inline-flex items-center gap-2 bg-blue-800 text-xs hover:bg-blue-800 text-white px-4 py-2 rounded-md transition"
+                                            onClick={() => navigate('/packages/giftcards')}
+                                            className={`inline-flex items-center gap-2 bg-${fullColor} text-xs hover:bg-${themeColor}-900 text-white px-4 py-2 rounded-md transition`}
                                         >
                                             <Plus className="w-4 h-4" />
                                             Create Gift Card
@@ -801,7 +801,7 @@ const CreatePackage: React.FC = () => {
                                     name="price"
                                     value={form.price}
                                     onChange={handleChange}
-                                    className="w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-primary focus:border-primary bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400"
+                                    className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400`}
                                     min="0"
                                     placeholder="Enter price"
                                     required
@@ -811,7 +811,7 @@ const CreatePackage: React.FC = () => {
                             <div className="flex gap-2 mt-6">
                                 <button
                                     type="submit"
-                                    className="flex-1 bg-blue-800 hover:bg-blue-800 text-white font-semibold py-2 rounded-md transition text-base flex items-center justify-center gap-2 visible"
+                                    className={`flex-1 bg-${fullColor} hover:bg-${themeColor}-900 text-white font-semibold py-2 rounded-md transition text-base flex items-center justify-center gap-2 visible`}
                                 >
                                     <Plus className="w-5 h-5" /> Submit
                                 </button>

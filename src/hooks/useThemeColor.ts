@@ -1,17 +1,15 @@
 import { useState, useEffect } from 'react';
 
 export const useThemeColor = () => {
-  const [themeColor, setThemeColor] = useState('blue');
-  const [themeShade, setThemeShade] = useState('800');
+  // Load initial values from localStorage or use defaults
+  const [themeColor, setThemeColor] = useState(() => {
+    return localStorage.getItem('zapzone_theme_color') || 'blue';
+  });
+  const [themeShade, setThemeShade] = useState(() => {
+    return localStorage.getItem('zapzone_theme_shade') || '800';
+  });
 
   useEffect(() => {
-    // Load initial color and shade from localStorage
-    const savedColor = localStorage.getItem('zapzone_theme_color') || 'blue';
-    const savedShade = localStorage.getItem('zapzone_theme_shade') || '800';
-    
-    setThemeColor(savedColor);
-    setThemeShade(savedShade);
-
     // Listen for color changes from Settings page
     const handleColorChange = (event: CustomEvent) => {
       setThemeColor(event.detail.color);

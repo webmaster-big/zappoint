@@ -13,9 +13,11 @@ import {
   BadgeCheck,
   Zap
 } from 'lucide-react';
+import { useThemeColor } from '../../../hooks/useThemeColor';
 import type { AttendantProfileData } from '../../../types/AttendantProfile.types';
 
 const AttendantProfile = () => {
+  const { themeColor, fullColor } = useThemeColor();
   const [isEditing, setIsEditing] = useState(false);
   const [activeTab, setActiveTab] = useState('personal');
   const [isLoading, setIsLoading] = useState(false);
@@ -112,10 +114,10 @@ const AttendantProfile = () => {
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between">
             <div className="flex items-center space-x-4 mb-4 sm:mb-0">
               <div className="relative">
-                <div className="w-16 h-16 bg-gradient-to-br from-blue-800 to-blue-800 rounded-full flex items-center justify-center text-white text-2xl font-bold">
+                <div className={`w-16 h-16 bg-gradient-to-br from-${fullColor} to-${fullColor} rounded-full flex items-center justify-center text-white text-2xl font-bold`}>
                   {profileData.personal.firstName[0]}{profileData.personal.lastName[0]}
                 </div>
-                <button className="absolute -bottom-1 -right-1 bg-blue-800 text-white p-1.5 rounded-full hover:bg-blue-700 transition">
+                <button className={`absolute -bottom-1 -right-1 bg-${fullColor} text-white p-1.5 rounded-full hover:bg-${themeColor}-900 transition`}>
                   <Camera size={14} />
                 </button>
               </div>
@@ -124,12 +126,12 @@ const AttendantProfile = () => {
                   {profileData.personal.firstName} {profileData.personal.lastName}
                 </h1>
                 <p className="text-gray-600 flex items-center">
-                  <Zap size={16} className="mr-1.5 text-blue-800" />
+                  <Zap size={16} className={`mr-1.5 text-${fullColor}`} />
                   {profileData.personal.position} • {profileData.location.name}
                 </p>
                 <div className="flex items-center mt-1 space-x-4 text-sm text-gray-500">
                   <span className="flex items-center">
-                    <BadgeCheck size={14} className="mr-1 text-blue-800" />
+                    <BadgeCheck size={14} className={`mr-1 text-${fullColor}`} />
                     ID: {profileData.personal.employeeId}
                   </span>
                  
@@ -150,7 +152,7 @@ const AttendantProfile = () => {
                   <button
                     onClick={handleSave}
                     disabled={isLoading}
-                    className="px-4 py-2 bg-blue-800 text-white rounded-lg hover:bg-blue-700 transition flex items-center disabled:opacity-50"
+                    className={`px-4 py-2 bg-${fullColor} text-white rounded-lg hover:bg-${themeColor}-900 transition flex items-center disabled:opacity-50`}
                   >
                     <Save size={18} className="mr-2" />
                     {isLoading ? 'Saving...' : 'Save Changes'}
@@ -159,7 +161,7 @@ const AttendantProfile = () => {
               ) : (
                 <button
                   onClick={handleEdit}
-                  className="px-4 py-2 bg-blue-800 text-white rounded-lg hover:bg-blue-700 transition flex items-center"
+                  className={`px-4 py-2 bg-${fullColor} text-white rounded-lg hover:bg-${themeColor}-900 transition flex items-center`}
                 >
                   <Edit2 size={18} className="mr-2" />
                   Edit Profile
@@ -180,7 +182,7 @@ const AttendantProfile = () => {
                   onClick={() => setActiveTab(tab.id)}
                   className={`flex items-center px-6 py-4 border-b-2 font-medium text-sm transition-all ${
                     activeTab === tab.id
-                      ? 'border-blue-800 text-blue-800 bg-blue-50'
+                      ? `border-${fullColor} text-${fullColor} bg-${themeColor}-50`
                       : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                   }`}
                 >
@@ -198,7 +200,7 @@ const AttendantProfile = () => {
           {activeTab === 'personal' && (
             <div className="space-y-6">
               <h2 className="text-lg font-semibold text-gray-900 flex items-center">
-                <User size={20} className="mr-2 text-blue-800" />
+                <User size={20} className={`mr-2 text-${themeColor}-600`} />
                 Personal Information
               </h2>
               
@@ -210,7 +212,7 @@ const AttendantProfile = () => {
                     value={isEditing ? editedData.personal.firstName : profileData.personal.firstName}
                     onChange={(e) => handleInputChange('personal', 'firstName', e.target.value)}
                     disabled={!isEditing}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-800 focus:border-blue-800 disabled:bg-gray-100 disabled:text-gray-500"
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 disabled:bg-gray-100 disabled:text-gray-500`}
                   />
                 </div>
                 
@@ -221,7 +223,7 @@ const AttendantProfile = () => {
                     value={isEditing ? editedData.personal.lastName : profileData.personal.lastName}
                     onChange={(e) => handleInputChange('personal', 'lastName', e.target.value)}
                     disabled={!isEditing}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-800 focus:border-blue-800 disabled:bg-gray-100 disabled:text-gray-500"
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 disabled:bg-gray-100 disabled:text-gray-500`}
                   />
                 </div>
                 
@@ -235,7 +237,7 @@ const AttendantProfile = () => {
                     value={isEditing ? editedData.personal.email : profileData.personal.email}
                     onChange={(e) => handleInputChange('personal', 'email', e.target.value)}
                     disabled={!isEditing}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-800 focus:border-blue-800 disabled:bg-gray-100 disabled:text-gray-500"
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 disabled:bg-gray-100 disabled:text-gray-500`}
                   />
                 </div>
                 
@@ -249,7 +251,7 @@ const AttendantProfile = () => {
                     value={isEditing ? editedData.personal.phone : profileData.personal.phone}
                     onChange={(e) => handleInputChange('personal', 'phone', e.target.value)}
                     disabled={!isEditing}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-800 focus:border-blue-800 disabled:bg-gray-100 disabled:text-gray-500"
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 disabled:bg-gray-100 disabled:text-gray-500`}
                   />
                 </div>
                 
@@ -270,7 +272,7 @@ const AttendantProfile = () => {
                     value={isEditing ? editedData.personal.department : profileData.personal.department}
                     onChange={(e) => handleInputChange('personal', 'department', e.target.value)}
                     disabled={!isEditing}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-800 focus:border-blue-800 disabled:bg-gray-100 disabled:text-gray-500"
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 disabled:bg-gray-100 disabled:text-gray-500`}
                   />
                 </div>
 
@@ -281,7 +283,7 @@ const AttendantProfile = () => {
                     value={isEditing ? editedData.personal.hireDate : profileData.personal.hireDate}
                     onChange={(e) => handleInputChange('personal', 'hireDate', e.target.value)}
                     disabled={!isEditing}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-800 focus:border-blue-800 disabled:bg-gray-100 disabled:text-gray-500"
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 disabled:bg-gray-100 disabled:text-gray-500`}
                   />
                 </div>
               </div>
@@ -292,7 +294,7 @@ const AttendantProfile = () => {
           {activeTab === 'location' && (
             <div className="space-y-6">
               <h2 className="text-lg font-semibold text-gray-900 flex items-center">
-                <MapPin size={20} className="mr-2 text-blue-800" />
+                <MapPin size={20} className={`mr-2 text-${themeColor}-600`} />
                 Work Details
               </h2>
               
@@ -324,7 +326,7 @@ const AttendantProfile = () => {
                     value={isEditing ? editedData.location.shift : profileData.location.shift}
                     onChange={(e) => handleInputChange('location', 'shift', e.target.value)}
                     disabled={!isEditing}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-800 focus:border-blue-800 disabled:bg-gray-100 disabled:text-gray-500"
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 disabled:bg-gray-100 disabled:text-gray-500`}
                   />
                 </div>
 
@@ -332,7 +334,7 @@ const AttendantProfile = () => {
                   <label className="block text-sm font-medium text-gray-700 mb-2">Assigned Work Areas</label>
                   <div className="flex flex-wrap gap-2">
                     {profileData.location.assignedAreas.map((area, index) => (
-                      <span key={index} className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
+                      <span key={index} className={`px-3 py-1 bg-${themeColor}-100 text-${fullColor} rounded-full text-sm font-medium`}>
                         {area}
                       </span>
                     ))}
@@ -341,7 +343,7 @@ const AttendantProfile = () => {
 
                 <div className="md:col-span-2">
                   <h3 className="text-md font-medium text-gray-900 mb-3 flex items-center">
-                    <MapPin size={18} className="mr-2 text-blue-800" />
+                    <MapPin size={18} className={`mr-2 text-${themeColor}-600`} />
                     Location Address
                   </h3>
                   <div className="bg-gray-50 rounded-lg p-4">
@@ -358,13 +360,13 @@ const AttendantProfile = () => {
           {activeTab === 'schedule' && (
             <div className="space-y-6">
               <h2 className="text-lg font-semibold text-gray-900 flex items-center">
-                <Calendar size={20} className="mr-2 text-blue-800" />
+                <Calendar size={20} className={`mr-2 text-${themeColor}-600`} />
                 My Schedule
               </h2>
               
               <div className="mb-6">
                 <h3 className="font-semibold text-gray-900 mb-4 flex items-center">
-                  <Clock size={18} className="mr-2 text-blue-800" />
+                  <Clock size={18} className={`mr-2 text-${themeColor}-600`} />
                   Current Week (September 16-22)
                 </h3>
                 <div className="space-y-3">
@@ -372,7 +374,7 @@ const AttendantProfile = () => {
                     <div key={index} className={`flex justify-between items-center p-3 rounded-lg border ${
                       day.shift === 'OFF' 
                         ? 'bg-gray-50 border-gray-200' 
-                        : 'bg-blue-50 border-blue-200'
+                        : `bg-${themeColor}-50 border-${themeColor}-200`
                     }`}>
                       <div className="flex items-center space-x-4">
                         <div className="w-20 font-medium text-gray-700">{day.day}</div>
@@ -380,7 +382,7 @@ const AttendantProfile = () => {
                       </div>
                       <div className="text-right">
                         <div className={`font-medium ${
-                          day.shift === 'OFF' ? 'text-gray-600' : 'text-blue-700'
+                          day.shift === 'OFF' ? 'text-gray-600' : `text-${themeColor}-700`
                         }`}>
                           {day.shift}
                         </div>
@@ -393,7 +395,7 @@ const AttendantProfile = () => {
 
               <div>
                 <h3 className="font-semibold text-gray-900 mb-4 flex items-center">
-                  <Clock size={18} className="mr-2 text-blue-800" />
+                  <Clock size={18} className={`mr-2 text-${themeColor}-600`} />
                   Next Week (September 23-29)
                 </h3>
                 <div className="space-y-3">
@@ -401,7 +403,7 @@ const AttendantProfile = () => {
                     <div key={index} className={`flex justify-between items-center p-3 rounded-lg border ${
                       day.shift === 'OFF' 
                         ? 'bg-gray-50 border-gray-200' 
-                        : 'bg-blue-50 border-blue-200'
+                        : `bg-${themeColor}-50 border-${themeColor}-200`
                     }`}>
                       <div className="flex items-center space-x-4">
                         <div className="w-20 font-medium text-gray-700">{day.day}</div>
@@ -409,7 +411,7 @@ const AttendantProfile = () => {
                       </div>
                       <div className="text-right">
                         <div className={`font-medium ${
-                          day.shift === 'OFF' ? 'text-gray-600' : 'text-blue-700'
+                          day.shift === 'OFF' ? 'text-gray-600' : `text-${themeColor}-700`
                         }`}>
                           {day.shift}
                         </div>

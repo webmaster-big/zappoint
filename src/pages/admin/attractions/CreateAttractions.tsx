@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useThemeColor } from '../../../hooks/useThemeColor';
 import type { CreateAttractionsFormData } from '../../../types/createAttractions.types';
 
 const CreateAttraction = () => {
   const navigate = useNavigate();
+  const { themeColor, fullColor } = useThemeColor();
   const [formData, setFormData] = useState<CreateAttractionsFormData>({
     name: '',
     description: '',
@@ -133,7 +135,7 @@ const CreateAttraction = () => {
   const LivePreview: React.FC<{ formData: CreateAttractionsFormData; imagePreviews: string[] }> = ({ formData, imagePreviews }) => {
     return (
       <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
-        <h2 className="text-xl font-bold mb-4 text-blue-800 border-b pb-2">Live Preview</h2>
+        <h2 className={`text-xl font-bold mb-4 text-${fullColor} border-b pb-2`}>Live Preview</h2>
         
         {imagePreviews.length > 0 && (
           <div className="mb-4">
@@ -156,7 +158,7 @@ const CreateAttraction = () => {
           </div>
           
           <div className="flex justify-between items-center">
-            <span className="font-bold text-lg text-blue-800">
+            <span className={`font-bold text-lg text-${fullColor}`}>
               {formData.price ? `$${formData.price}` : "$0.00"}
               <span className="text-xs font-normal text-gray-500 ml-1">
                 {formData.pricingType === 'per_person' ? '/person' : 
@@ -183,7 +185,7 @@ const CreateAttraction = () => {
               {Object.entries(formData.availability)
                 .filter(([, v]) => v)
                 .map(([day]) => (
-                  <span key={day} className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">
+                  <span key={day} className={`bg-${themeColor}-100 text-${fullColor} px-2 py-1 rounded text-xs`}>
                     {day.slice(0, 3)}
                   </span>
                 ))}
@@ -227,7 +229,7 @@ const CreateAttraction = () => {
                       required
                       value={formData.name}
                       onChange={handleInputChange}
-                      className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                      className={`w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent transition-colors`}
                       placeholder="e.g., Laser Tag, Bowling, Escape Room"
                     />
                   </div>
@@ -243,7 +245,7 @@ const CreateAttraction = () => {
                       required
                       value={formData.description}
                       onChange={handleInputChange}
-                      className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                      className={`w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent transition-colors`}
                       placeholder="Describe the attraction in detail..."
                     />
                   </div>
@@ -258,7 +260,7 @@ const CreateAttraction = () => {
                       required
                       value={formData.category === customCategory ? 'other' : formData.category}
                       onChange={handleCategoryChange}
-                      className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                      className={`w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent transition-colors`}
                     >
                       <option value="">Select a category</option>
                       <option value="adventure">Adventure</option>
@@ -309,7 +311,7 @@ const CreateAttraction = () => {
                         required
                         value={formData.price}
                         onChange={handleInputChange}
-                        className="w-full pl-8 px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                        className={`w-full pl-8 px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent transition-colors`}
                         placeholder="0.00"
                       />
                     </div>
@@ -325,7 +327,7 @@ const CreateAttraction = () => {
                       required
                       value={formData.pricingType}
                       onChange={handleInputChange}
-                      className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                      className={`w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent transition-colors`}
                     >
                       <option value="per_person">Per Person</option>
                       <option value="per_group">Per Group</option>
@@ -347,7 +349,7 @@ const CreateAttraction = () => {
                       required
                       value={formData.maxCapacity}
                       onChange={handleInputChange}
-                      className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                      className={`w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent transition-colors`}
                       placeholder="e.g., 10"
                     />
                   </div>
@@ -356,7 +358,7 @@ const CreateAttraction = () => {
                     <label htmlFor="duration" className="block text-sm font-medium text-gray-800 mb-2">
                       Duration
                     </label>
-                    <div className="flex rounded-lg overflow-hidden border border-gray-200 focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent">
+                    <div className={`flex rounded-lg overflow-hidden border border-gray-200 focus-within:ring-2 focus-within:ring-${themeColor}-500 focus-within:border-transparent`}>
                       <input
                         type="number"
                         name="duration"
@@ -399,7 +401,7 @@ const CreateAttraction = () => {
                         onClick={() => handleAvailabilityChange(day.key)}
                         className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                           formData.availability[day.key] 
-                            ? 'bg-blue-800 text-white shadow-md' 
+                            ? `bg-${fullColor} text-white shadow-md` 
                             : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
                         }`}
                       >
@@ -425,7 +427,7 @@ const CreateAttraction = () => {
                       <div className="flex text-sm text-gray-600 justify-center">
                         <label
                           htmlFor="image-upload"
-                          className="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none"
+                          className={`relative cursor-pointer bg-white rounded-md font-medium text-${themeColor}-600 hover:text-${themeColor}-500 focus-within:outline-none`}
                         >
                           <span>Select images</span>
                           <input
@@ -476,13 +478,13 @@ const CreateAttraction = () => {
                 <button
                   type="button"
                   onClick={() => navigate('/attractions')}
-                  className="px-5 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-800 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                  className={`px-5 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-800 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-${themeColor}-500 transition-colors`}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 bg-blue-800 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white hover:from-blue-800 hover:to-blue-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all"
+                  className={`px-5 py-2.5 bg-${fullColor} border border-transparent rounded-lg shadow-sm text-sm font-medium text-white hover:from-${fullColor} hover:to-${fullColor} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-${themeColor}-500 transition-all`}
                 >
                   Create Attraction
                 </button>

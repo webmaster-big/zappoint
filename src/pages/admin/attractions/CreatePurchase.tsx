@@ -9,9 +9,11 @@ import {
   Search,
   X
 } from 'lucide-react';
+import { useThemeColor } from '../../../hooks/useThemeColor';
 import type { CreatePurchaseAttraction, CreatePurchaseCustomerInfo } from '../../../types/CreatePurchase.types';
 
 const CreatePurchase = () => {
+  const { themeColor, fullColor } = useThemeColor();
   const [attractions, setAttractions] = useState<CreatePurchaseAttraction[]>([]);
   const [filteredAttractions, setFilteredAttractions] = useState<CreatePurchaseAttraction[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -125,7 +127,7 @@ const CreatePurchase = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <div className={`animate-spin rounded-full h-12 w-12 border-b-2 border-${themeColor}-600`}></div>
       </div>
     );
   }
@@ -154,7 +156,7 @@ const CreatePurchase = () => {
                   placeholder="Search attractions..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className={`pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
                 />
               </div>
 
@@ -165,8 +167,8 @@ const CreatePurchase = () => {
                     key={attraction.id}
                     className={`border rounded-lg p-4 cursor-pointer transition-colors flex gap-4 ${
                       selectedAttraction?.id === attraction.id
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-gray-200 hover:border-blue-300'
+                        ? `border-${themeColor}-500 bg-${themeColor}-50`
+                        : `border-gray-200 hover:border-${themeColor}-300`
                     }`}
                     onClick={() => handleAddToCart(attraction)}
                   >
@@ -182,7 +184,7 @@ const CreatePurchase = () => {
                       <h3 className="font-semibold text-gray-800">{attraction.name}</h3>
                       <p className="text-sm text-gray-600 mb-2">{attraction.category}</p>
                       <div className="flex justify-between items-center">
-                        <span className="text-lg font-bold text-blue-600">
+                        <span className={`text-lg font-bold text-${themeColor}-600`}>
                           ${attraction.price}
                           <span className="text-xs font-normal text-gray-500 ml-1">
                             {attraction.pricingType === 'per_person' ? '/person' : 
@@ -213,7 +215,7 @@ const CreatePurchase = () => {
                     name="name"
                     value={customerInfo.name}
                     onChange={handleCustomerInfoChange}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className={`w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
                     placeholder="Walk-in Customer"
                   />
                 </div>
@@ -226,7 +228,7 @@ const CreatePurchase = () => {
                     name="email"
                     value={customerInfo.email}
                     onChange={handleCustomerInfoChange}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className={`w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
                     placeholder="customer@example.com"
                   />
                 </div>
@@ -239,7 +241,7 @@ const CreatePurchase = () => {
                     name="phone"
                     value={customerInfo.phone}
                     onChange={handleCustomerInfoChange}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className={`w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
                     placeholder="(555) 123-4567"
                   />
                 </div>
@@ -303,7 +305,7 @@ const CreatePurchase = () => {
                         max={calculateSubtotal()}
                         value={discount}
                         onChange={(e) => setDiscount(Number(e.target.value))}
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        className={`w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
                       />
                     </div>
 
@@ -314,7 +316,7 @@ const CreatePurchase = () => {
                         value={notes}
                         onChange={(e) => setNotes(e.target.value)}
                         rows={2}
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        className={`w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
                         placeholder="Additional notes..."
                       />
                     </div>
@@ -328,7 +330,7 @@ const CreatePurchase = () => {
                         onClick={() => setPaymentMethod('cash')}
                         className={`p-3 border rounded-lg text-center transition-colors ${
                           paymentMethod === 'cash'
-                            ? 'border-blue-500 bg-blue-50 text-blue-700'
+                            ? `border-${themeColor}-500 bg-${themeColor}-50 text-${themeColor}-700`
                             : 'border-gray-300 hover:border-gray-400'
                         }`}
                       >
@@ -339,7 +341,7 @@ const CreatePurchase = () => {
                         onClick={() => setPaymentMethod('e_wallet')}
                         className={`p-3 border rounded-lg text-center transition-colors ${
                           paymentMethod === 'e_wallet'
-                            ? 'border-blue-500 bg-blue-50 text-blue-700'
+                            ? `border-${themeColor}-500 bg-${themeColor}-50 text-${themeColor}-700`
                             : 'border-gray-300 hover:border-gray-400'
                         }`}
                       >
@@ -350,7 +352,7 @@ const CreatePurchase = () => {
                         onClick={() => setPaymentMethod('credit_card')}
                         className={`p-3 border rounded-lg text-center transition-colors ${
                           paymentMethod === 'credit_card'
-                            ? 'border-blue-500 bg-blue-50 text-blue-700'
+                            ? `border-${themeColor}-500 bg-${themeColor}-50 text-${themeColor}-700`
                             : 'border-gray-300 hover:border-gray-400'
                         }`}
                       >
@@ -381,7 +383,7 @@ const CreatePurchase = () => {
                   {/* Complete Purchase Button */}
                   <button
                     onClick={handleCompletePurchase}
-                    className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors flex items-center justify-center"
+                    className={`w-full bg-${themeColor}-600 text-white py-3 rounded-lg font-semibold hover:bg-${themeColor}-700 transition-colors flex items-center justify-center`}
                   >
                     <ShoppingCart className="h-5 w-5 mr-2" />
                     Complete Purchase

@@ -17,8 +17,10 @@ import {
   Ticket
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useThemeColor } from '../../hooks/useThemeColor';
 
 const LocationManagerDashboard: React.FC = () => {
+  const { themeColor, fullColor } = useThemeColor();
   const [currentWeek, setCurrentWeek] = useState(new Date());
   const [selectedStatus, setSelectedStatus] = useState('all');
 
@@ -61,7 +63,7 @@ const LocationManagerDashboard: React.FC = () => {
       change: '+15% from last week',
       trend: 'up',
       icon: Users,
-      accent: 'bg-blue-100 text-blue-800',
+      accent: `bg-${themeColor}-100 text-${fullColor}`,
     },
     {
       title: 'New Customers',
@@ -69,7 +71,7 @@ const LocationManagerDashboard: React.FC = () => {
       change: '23% conversion rate',
       trend: 'up',
       icon: TrendingUp,
-      accent: 'bg-blue-100 text-blue-800',
+      accent: `bg-${themeColor}-100 text-${fullColor}`,
     },
     {
       title: 'Revenue',
@@ -77,7 +79,7 @@ const LocationManagerDashboard: React.FC = () => {
       change: '+8% from last week',
       trend: 'up',
       icon: DollarSign,
-      accent: 'bg-blue-100 text-blue-800',
+      accent: `bg-${themeColor}-100 text-${fullColor}`,
     },
     {
       title: 'Repeat Customers',
@@ -85,7 +87,7 @@ const LocationManagerDashboard: React.FC = () => {
       change: 'High loyalty rate',
       trend: 'neutral',
       icon: Users,
-      accent: 'bg-blue-100 text-blue-800',
+      accent: `bg-${themeColor}-100 text-${fullColor}`,
     },
     {
       title: 'Customer Satisfaction',
@@ -93,7 +95,7 @@ const LocationManagerDashboard: React.FC = () => {
       change: 'Based on 142 reviews',
       trend: 'neutral',
       icon: AlertCircle,
-      accent: 'bg-blue-100 text-blue-800',
+      accent: `bg-${themeColor}-100 text-${fullColor}`,
     },
   ];
 
@@ -143,30 +145,36 @@ const LocationManagerDashboard: React.FC = () => {
 
   // Quick actions for Location Manager
   const quickActions = [
-  { title: 'New Booking', icon: Plus, accent: 'bg-blue-800 hover:bg-blue-800' },
-  { title: 'Check-in', icon: CheckCircle, accent: 'bg-blue-800 hover:bg-blue-800' },
-  { title: 'Customer Insights', icon: Users, accent: 'bg-blue-800 hover:bg-blue-800' },
-  { title: 'Generate Report', icon: Download, accent: 'bg-blue-800 hover:bg-blue-800' },
-  { title: 'View Calendar', icon: Calendar, accent: 'bg-blue-800 hover:bg-blue-800' },
-  { title: 'Manage Attendants', icon: Users, accent: 'bg-blue-800 hover:bg-blue-800' },
+  { title: 'New Booking', icon: Plus, accent: `bg-${themeColor}-500 hover:bg-${fullColor}` },
+  { title: 'Check-in', icon: CheckCircle, accent: `bg-${themeColor}-500 hover:bg-${fullColor}` },
+  { title: 'Customer Insights', icon: Users, accent: `bg-${themeColor}-500 hover:bg-${fullColor}` },
+  { title: 'Generate Report', icon: Download, accent: `bg-${themeColor}-500 hover:bg-${fullColor}` },
+  { title: 'View Calendar', icon: Calendar, accent: `bg-${themeColor}-500 hover:bg-${fullColor}` },
+  { title: 'Manage Attendants', icon: Users, accent: `bg-${themeColor}-500 hover:bg-${fullColor}` },
   ];
 
   // Status colors
-  const statusColors = {
-    Confirmed: 'bg-emerald-100 text-emerald-800',
-    Pending: 'bg-blue-100 text-blue-800',
-    Cancelled: 'bg-rose-100 text-rose-800',
-    Completed: 'bg-emerald-100 text-emerald-800',
+  const getStatusColor = (status: string) => {
+    const colors: Record<string, string> = {
+      Confirmed: 'bg-emerald-100 text-emerald-800',
+      Pending: `bg-${themeColor}-100 text-${fullColor}`,
+      Cancelled: 'bg-rose-100 text-rose-800',
+      Completed: 'bg-emerald-100 text-emerald-800',
+    };
+    return colors[status] || `bg-${themeColor}-100 text-${fullColor}`;
   };
 
   // Payment status colors
-  const paymentColors = {
-    Paid: 'bg-emerald-100 text-emerald-800',
-    Partial: 'bg-blue-100 text-blue-800',
-    Refunded: 'bg-rose-100 text-rose-800',
-    'Credit Card': 'bg-blue-100 text-blue-800',
-    PayPal: 'bg-blue-100 text-blue-800',
-    Cash: 'bg-gray-100 text-gray-800',
+  const getPaymentColor = (payment: string) => {
+    const colors: Record<string, string> = {
+      Paid: 'bg-emerald-100 text-emerald-800',
+      Partial: `bg-${themeColor}-100 text-${fullColor}`,
+      Refunded: 'bg-rose-100 text-rose-800',
+      'Credit Card': `bg-${themeColor}-100 text-${fullColor}`,
+      PayPal: `bg-${themeColor}-100 text-${fullColor}`,
+      Cash: 'bg-gray-100 text-gray-800',
+    };
+    return colors[payment] || `bg-${themeColor}-100 text-${fullColor}`;
   };
 
   // Filter bookings by status for the table
@@ -187,7 +195,7 @@ const LocationManagerDashboard: React.FC = () => {
             <span>{locationInfo.name}</span>
           </div>
         </div>
-        <button className="mt-4 md:mt-0 px-5 py-2.5 bg-blue-800 text-white rounded-xl flex items-center gap-2 hover:bg-blue-800 transition font-semibold shadow-sm">
+        <button className={`mt-4 md:mt-0 px-5 py-2.5 bg-${fullColor} text-white rounded-xl flex items-center gap-2 hover:bg-${fullColor} transition font-semibold shadow-sm`}>
           <Plus size={20} />
           <Link to="/bookings/create">New Booking</Link>
         </button>
@@ -219,34 +227,34 @@ const LocationManagerDashboard: React.FC = () => {
         {/* Location Info Card */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
           <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-            <MapPin className="w-5 h-5 text-blue-800" /> Location Details
+            <MapPin className={`w-5 h-5 text-${fullColor}`} /> Location Details
           </h2>
           <div className="grid grid-cols-1 gap-4">
-            <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg">
-              <MapPin className="w-5 h-5 text-blue-800" />
+            <div className={`flex items-center gap-3 p-3 bg-${themeColor}-50 rounded-lg`}>
+              <MapPin className={`w-5 h-5 text-${fullColor}`} />
               <div>
-                <p className="text-xs font-semibold text-blue-800">Address</p>
+                <p className={`text-xs font-semibold text-${fullColor}`}>Address</p>
                 <p className="text-sm text-gray-900">{locationInfo.address}</p>
               </div>
             </div>
-            <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg">
-              <Calendar className="w-5 h-5 text-blue-800" />
+            <div className={`flex items-center gap-3 p-3 bg-${themeColor}-50 rounded-lg`}>
+              <Calendar className={`w-5 h-5 text-${fullColor}`} />
               <div>
-                <p className="text-xs font-semibold text-blue-800">Operating Hours</p>
+                <p className={`text-xs font-semibold text-${fullColor}`}>Operating Hours</p>
                 <p className="text-sm text-gray-900">{locationInfo.operatingHours}</p>
               </div>
             </div>
-            <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg">
-              <Users className="w-5 h-5 text-blue-800" />
+            <div className={`flex items-center gap-3 p-3 bg-${themeColor}-50 rounded-lg`}>
+              <Users className={`w-5 h-5 text-${fullColor}`} />
               <div>
-                <p className="text-xs font-semibold text-blue-800">Capacity</p>
+                <p className={`text-xs font-semibold text-${fullColor}`}>Capacity</p>
                 <p className="text-sm text-gray-900">{locationInfo.capacity} people</p>
               </div>
             </div>
-            <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg">
-              <Mail className="w-5 h-5 text-blue-800" />
+            <div className={`flex items-center gap-3 p-3 bg-${themeColor}-50 rounded-lg`}>
+              <Mail className={`w-5 h-5 text-${fullColor}`} />
               <div>
-                <p className="text-xs font-semibold text-blue-800">Contact</p>
+                <p className={`text-xs font-semibold text-${fullColor}`}>Contact</p>
                 <p className="text-sm text-gray-900">{locationInfo.contact}</p>
               </div>
             </div>
@@ -256,25 +264,25 @@ const LocationManagerDashboard: React.FC = () => {
         {/* Customer Statistics */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
           <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-            <Users className="w-5 h-5 text-blue-800" /> Customer Statistics
+            <Users className={`w-5 h-5 text-${fullColor}`} /> Customer Statistics
           </h2>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
-              <div className="bg-blue-50 p-3 rounded-lg">
-                <p className="text-xs text-blue-800">Total Customers</p>
-                <p className="text-2xl font-bold text-blue-800">{customerStats.total}</p>
+              <div className={`bg-${themeColor}-50 p-3 rounded-lg`}>
+                <p className={`text-xs text-${fullColor}`}>Total Customers</p>
+                <p className={`text-2xl font-bold text-${fullColor}`}>{customerStats.total}</p>
               </div>
-              <div className="bg-blue-50 p-3 rounded-lg">
-                <p className="text-xs text-blue-800">New This Week</p>
-                <p className="text-2xl font-bold text-blue-800">+{customerStats.newThisWeek}</p>
+              <div className={`bg-${themeColor}-50 p-3 rounded-lg`}>
+                <p className={`text-xs text-${fullColor}`}>New This Week</p>
+                <p className={`text-2xl font-bold text-${fullColor}`}>+{customerStats.newThisWeek}</p>
               </div>
-              <div className="bg-blue-50 p-3 rounded-lg col-span-2">
-                <p className="text-xs text-blue-800">Returning Customers</p>
-                <p className="text-2xl font-bold text-blue-800">{customerStats.returning}</p>
+              <div className={`bg-${themeColor}-50 p-3 rounded-lg col-span-2`}>
+                <p className={`text-xs text-${fullColor}`}>Returning Customers</p>
+                <p className={`text-2xl font-bold text-${fullColor}`}>{customerStats.returning}</p>
               </div>
-              <div className="bg-blue-50 p-3 rounded-lg col-span-2">
-                <p className="text-xs text-blue-800">Avg. Satisfaction</p>
-                <p className="text-2xl font-bold text-blue-800">{customerStats.satisfaction}/5</p>
+              <div className={`bg-${themeColor}-50 p-3 rounded-lg col-span-2`}>
+                <p className={`text-xs text-${fullColor}`}>Avg. Satisfaction</p>
+                <p className={`text-2xl font-bold text-${fullColor}`}>{customerStats.satisfaction}/5</p>
               </div>
             </div>
             
@@ -286,7 +294,7 @@ const LocationManagerDashboard: React.FC = () => {
         {/* Quick Actions */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 flex flex-col gap-4">
           <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-            <Zap className="w-5 h-5 text-blue-800" /> Quick Actions
+            <Zap className={`w-5 h-5 text-${fullColor}`} /> Quick Actions
           </h2>
           <div className="grid grid-cols-2 gap-3">
             {quickActions.map((action, index) => {
@@ -309,7 +317,7 @@ const LocationManagerDashboard: React.FC = () => {
       <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
           <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-            <Calendar className="w-5 h-5 text-blue-800" /> Weekly Calendar
+            <Calendar className={`w-5 h-5 text-${fullColor}`} /> Weekly Calendar
           </h2>
           <div className="flex items-center space-x-2 mt-4 md:mt-0">
             <button 
@@ -328,7 +336,7 @@ const LocationManagerDashboard: React.FC = () => {
             >
               <ChevronRight size={18} />
             </button>
-            <button className="ml-2 px-3 py-2 text-sm bg-blue-100 text-blue-800 rounded-lg hover:bg-blue-200" onClick={() => setCurrentWeek(new Date())}>
+            <button className={`ml-2 px-3 py-2 text-sm bg-${themeColor}-100 text-${fullColor} rounded-lg hover:bg-${themeColor}-200`} onClick={() => setCurrentWeek(new Date())}>
               Today
             </button>
           </div>
@@ -380,7 +388,7 @@ const LocationManagerDashboard: React.FC = () => {
                                     booking.status === 'Confirmed'
                                       ? 'bg-emerald-50 border-emerald-200'
                                       : booking.status === 'Pending'
-                                      ? 'bg-blue-50 border-blue-200'
+                                      ? `bg-${themeColor}-50 border-${themeColor}-200`
                                       : 'bg-rose-50 border-rose-200'
                                   }`}
                                 >
@@ -414,7 +422,7 @@ const LocationManagerDashboard: React.FC = () => {
       <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
           <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-            <Ticket className="w-5 h-5 text-blue-800" /> Recent Ticket Purchases
+            <Ticket className={`w-5 h-5 text-${fullColor}`} /> Recent Ticket Purchases
           </h2>
           <div className="flex flex-wrap gap-2 mt-4 md:mt-0">
             <div className="relative">
@@ -422,7 +430,7 @@ const LocationManagerDashboard: React.FC = () => {
               <input
                 type="text"
                 placeholder="Search purchases..."
-                className="pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                className={`pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-${themeColor}-400`}
               />
             </div>
           </div>
@@ -456,12 +464,12 @@ const LocationManagerDashboard: React.FC = () => {
                   <td className="px-4 py-3">{purchase.quantity}</td>
                   <td className="px-4 py-3 font-medium">{purchase.amount}</td>
                   <td className="px-4 py-3">
-                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusColors[purchase.status as keyof typeof statusColors]}`}>
+                    <span className={getStatusColor(purchase.status) + ' px-2 py-1 text-xs font-medium rounded-full'}>
                       {purchase.status}
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${paymentColors[purchase.payment as keyof typeof paymentColors]}`}>
+                    <span className={getPaymentColor(purchase.payment) + ' px-2 py-1 text-xs font-medium rounded-full'}>
                       {purchase.payment}
                     </span>
                   </td>
@@ -482,13 +490,13 @@ const LocationManagerDashboard: React.FC = () => {
               <input
                 type="text"
                 placeholder="Search bookings..."
-                className="pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                className={`pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-${themeColor}-400`}
               />
             </div>
             <select 
               value={selectedStatus}
               onChange={(e) => setSelectedStatus(e.target.value)}
-              className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+              className={`px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-${themeColor}-400`}
             >
               <option value="all">All Statuses</option>
               <option value="Confirmed">Confirmed</option>
@@ -532,19 +540,19 @@ const LocationManagerDashboard: React.FC = () => {
                   </td>
                   <td className="px-4 py-3">{booking.participants}</td>
                   <td className="px-4 py-3">
-                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusColors[booking.status as keyof typeof statusColors]}`}>
+                    <span className={getStatusColor(booking.status) + ' px-2 py-1 text-xs font-medium rounded-full'}>
                       {booking.status}
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${paymentColors[booking.payment as keyof typeof paymentColors]}`}>
+                    <span className={getPaymentColor(booking.payment) + ' px-2 py-1 text-xs font-medium rounded-full'}>
                       {booking.payment}
                     </span>
                   </td>
                   <td className="px-4 py-3 font-medium">{booking.amount}</td>
                   <td className="px-4 py-3">
                     <div className="flex space-x-2">
-                      <button className="p-1 text-blue-800 hover:text-blue-800" title="Check-in">
+                      <button className={`p-1 text-${fullColor} hover:text-${fullColor}`} title="Check-in">
                         <CheckCircle size={16} />
                       </button>
                       <button className="p-1 text-gray-600 hover:text-gray-800" title="Send reminder">

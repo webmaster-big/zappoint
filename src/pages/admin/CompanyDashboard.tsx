@@ -23,8 +23,10 @@ import {
   Target
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useThemeColor } from '../../hooks/useThemeColor';
 
 const CompanyDashboard: React.FC = () => {
+  const { themeColor, fullColor } = useThemeColor();
   const [currentWeek, setCurrentWeek] = useState(new Date());
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [selectedLocation, setSelectedLocation] = useState('all');
@@ -82,7 +84,7 @@ const CompanyDashboard: React.FC = () => {
       change: '+18% from last month',
       trend: 'up',
       icon: Calendar,
-      accent: 'bg-blue-100 text-blue-800',
+      accent: `bg-${themeColor}-100 text-${fullColor}`,
     },
     {
       title: 'Active Locations',
@@ -90,7 +92,7 @@ const CompanyDashboard: React.FC = () => {
       change: 'All locations operational',
       trend: 'stable',
       icon: Building,
-      accent: 'bg-blue-100 text-blue-800',
+      accent: `bg-${themeColor}-100 text-${fullColor}`,
     },
     {
       title: 'Total Revenue',
@@ -98,7 +100,7 @@ const CompanyDashboard: React.FC = () => {
       change: '+15% from last month',
       trend: 'up',
       icon: DollarSign,
-      accent: 'bg-blue-100 text-blue-800',
+      accent: `bg-${themeColor}-100 text-${fullColor}`,
     },
     {
       title: 'Participants',
@@ -106,7 +108,7 @@ const CompanyDashboard: React.FC = () => {
       change: '+12% from last month',
       trend: 'up',
       icon: Users,
-      accent: 'bg-blue-100 text-blue-800',
+      accent: `bg-${themeColor}-100 text-${fullColor}`,
     },
     {
       title: 'Avg. Booking Value',
@@ -114,7 +116,7 @@ const CompanyDashboard: React.FC = () => {
       change: '+3% from last month',
       trend: 'up',
       icon: CreditCard,
-      accent: 'bg-blue-100 text-blue-800',
+      accent: `bg-${themeColor}-100 text-${fullColor}`,
     },
   ];
 
@@ -203,10 +205,10 @@ const CompanyDashboard: React.FC = () => {
 
   // Quick actions
   const quickActions = [
-    { title: 'New Booking', icon: Plus, accent: 'bg-blue-500 hover:bg-blue-800' },
-    { title: 'View Reports', icon: BarChart3, accent: 'bg-blue-500 hover:bg-blue-800' },
-    { title: 'Manage Locations', icon: MapPin, accent: 'bg-blue-500 hover:bg-blue-800' },
-    { title: 'Export Data', icon: Download, accent: 'bg-blue-500 hover:bg-blue-800' },
+    { title: 'New Booking', icon: Plus, accent: `bg-${themeColor}-500 hover:bg-${fullColor}` },
+    { title: 'View Reports', icon: BarChart3, accent: `bg-${themeColor}-500 hover:bg-${fullColor}` },
+    { title: 'Manage Locations', icon: MapPin, accent: `bg-${themeColor}-500 hover:bg-${fullColor}` },
+    { title: 'Export Data', icon: Download, accent: `bg-${themeColor}-500 hover:bg-${fullColor}` },
   ];
 
   // Status colors
@@ -312,14 +314,14 @@ const CompanyDashboard: React.FC = () => {
               setSelectedLocation(e.target.value);
               setCurrentPage(1);
             }}
-            className="px-3 py-2 md:px-4 md:py-2.5 border border-gray-200 rounded-lg md:rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+            className="px-3 py-2 md:px-4 md:py-2.5 border border-gray-200 rounded-lg md:rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-${themeColor}-500"
           >
             <option value="all">All Locations</option>
             {locations.map(location => (
               <option key={location} value={location}>{location}</option>
             ))}
           </select>
-          <button className="px-3 py-2 md:px-5 md:py-2.5 bg-blue-800 text-white rounded-lg md:rounded-xl flex items-center gap-2 hover:bg-blue-800 transition font-semibold shadow-sm text-sm md:text-base">
+          <button className={`px-3 py-2 md:px-5 md:py-2.5 bg-${fullColor} text-white rounded-lg md:rounded-xl flex items-center gap-2 hover:bg-${themeColor}-900 transition font-semibold shadow-sm text-sm md:text-base`}>
             <Plus size={16} className="md:size-5" />
             <Link to="/bookings">New Booking</Link>
           </button>
@@ -352,7 +354,7 @@ const CompanyDashboard: React.FC = () => {
       <div className="bg-white rounded-xl shadow-sm p-4 md:p-6 border border-gray-100">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 md:mb-6">
           <h2 className="text-lg md:text-xl font-bold text-gray-900 flex items-center gap-2">
-            <Target className="w-5 h-5 md:w-6 md:h-6 text-blue-800" /> Location Performance
+            <Target className="w-5 h-5 md:w-6 md:h-6 text-${fullColor}" /> Location Performance
           </h2>
           <div className="flex items-center gap-2 mt-2 md:mt-0">
             <span className="text-sm text-gray-500">Week of {weekDates[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} to {weekDates[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
@@ -363,15 +365,15 @@ const CompanyDashboard: React.FC = () => {
           {/* Modern Leaderboard for Top Locations */}
           <div className="flex-1">
             <h3 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-blue-800" /> Top Performing Locations
+              <TrendingUp className="w-4 h-4 text-${fullColor}" /> Top Performing Locations
             </h3>
             <div className="space-y-4">
               {topLocations.map(([location, stats], index) => (
                 <div key={location} className={
-                  `flex items-center justify-between p-4 rounded-xl shadow-sm border-2 transition-all bg-gradient-to-r from-blue-100 to-blue-50 border-blue-400`
+                  `flex items-center justify-between p-4 rounded-xl shadow-sm border-2 transition-all bg-gradient-to-r from-${themeColor}-100 to-${themeColor}-50 border-${themeColor}-400`
                 }>
                   <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-lg bg-gradient-to-r from-blue-500 to-blue-700">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-lg bg-gradient-to-r from-${themeColor}-500 to-${themeColor}-700`}>
                       {index + 1}
                     </div>
                     <div>
@@ -380,11 +382,11 @@ const CompanyDashboard: React.FC = () => {
                     </div>
                   </div>
                   <div className="text-right min-w-[120px]">
-                    <div className="font-bold text-blue-800 text-lg">${stats.revenue}</div>
+                    <div className={`font-bold text-${fullColor} text-lg`}>${stats.revenue}</div>
                     <div className="flex items-center gap-2 mt-1">
-                      <span className="text-xs text-blue-800 font-semibold">{stats.utilization}%</span>
-                      <div className="w-24 h-2 bg-blue-100 rounded-full overflow-hidden">
-                        <div className="h-2 rounded-full bg-blue-500" style={{ width: `${stats.utilization}%` }}></div>
+                      <span className={`text-xs text-${fullColor} font-semibold`}>{stats.utilization}%</span>
+                      <div className={`w-24 h-2 bg-${themeColor}-100 rounded-full overflow-hidden`}>
+                        <div className={`h-2 rounded-full bg-${themeColor}-500`} style={{ width: `${stats.utilization}%` }}></div>
                       </div>
                     </div>
                   </div>
@@ -401,29 +403,29 @@ const CompanyDashboard: React.FC = () => {
                 <div key={location} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow bg-gray-50">
                   <div className="flex items-center justify-between mb-2">
                     <span className="font-medium text-gray-900 text-sm">{location}</span>
-                    <div className="w-3 h-3 rounded-full bg-blue-500" title={`${stats.utilization}% utilization`}></div>
+                    <div className={`w-3 h-3 rounded-full bg-${themeColor}-500`} title={`${stats.utilization}% utilization`}></div>
                   </div>
                   <div className="flex items-center gap-4 mb-2">
                     <div className="flex-1">
                       <div className="text-xs text-gray-500">Bookings</div>
-                      <div className="font-bold text-blue-800 text-lg">{stats.bookings}</div>
+                      <div className={`font-bold text-${fullColor} text-lg`}>{stats.bookings}</div>
                     </div>
                     <div className="flex-1">
                       <div className="text-xs text-gray-500">Revenue</div>
-                      <div className="font-bold text-blue-800 text-lg">${stats.revenue}</div>
+                      <div className={`font-bold text-${fullColor} text-lg`}>${stats.revenue}</div>
                     </div>
                   </div>
                   <div className="flex items-center gap-4 mb-2">
                     <div className="flex-1">
                       <div className="text-xs text-gray-500">Guests</div>
-                      <div className="font-bold text-blue-800 text-lg">{stats.participants}</div>
+                      <div className={`font-bold text-${fullColor} text-lg`}>{stats.participants}</div>
                     </div>
                     <div className="flex-1">
                       <div className="text-xs text-gray-500">Utilization</div>
                       <div className="flex items-center gap-2">
-                        <span className="text-xs text-blue-800 font-semibold">{stats.utilization}%</span>
-                        <div className="w-16 h-2 bg-blue-100 rounded-full overflow-hidden">
-                          <div className="h-2 rounded-full bg-blue-500" style={{ width: `${stats.utilization}%` }}></div>
+                        <span className={`text-xs text-${fullColor} font-semibold`}>{stats.utilization}%</span>
+                        <div className={`w-16 h-2 bg-${themeColor}-100 rounded-full overflow-hidden`}>
+                          <div className={`h-2 rounded-full bg-${themeColor}-500`} style={{ width: `${stats.utilization}%` }}></div>
                         </div>
                       </div>
                     </div>
@@ -434,7 +436,7 @@ const CompanyDashboard: React.FC = () => {
             {sortedLocations.length > 4 && (
               <div className="flex justify-center mt-4">
                 <button
-                  className="px-4 py-2 text-sm rounded-lg bg-blue-100 text-blue-800 hover:bg-blue-200 font-medium"
+                  className="px-4 py-2 text-sm rounded-lg bg-${themeColor}-100 text-${fullColor} hover:bg-${themeColor}-200 font-medium"
                   onClick={() => setShowAllLocations(v => !v)}
                 >
                   {showAllLocations ? 'Show Less' : `Show All (${sortedLocations.length})`}
@@ -449,7 +451,7 @@ const CompanyDashboard: React.FC = () => {
       <div className="bg-white rounded-xl shadow-sm p-4 md:p-6 border border-gray-100">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 md:mb-6">
           <h2 className="text-xl md:text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <Calendar className="w-5 h-5 md:w-6 md:h-6 text-blue-800" /> Weekly Calendar
+            <Calendar className="w-5 h-5 md:w-6 md:h-6 text-${fullColor}" /> Weekly Calendar
           </h2>
           <div className="flex items-center space-x-2 mt-4 md:mt-0">
             <button 
@@ -468,7 +470,7 @@ const CompanyDashboard: React.FC = () => {
             >
               <ChevronRight size={16} className="md:size-5" />
             </button>
-            <button className="ml-2 px-3 py-2 text-sm bg-blue-100 text-blue-800 rounded-lg hover:bg-blue-200" onClick={() => setCurrentWeek(new Date())}>
+            <button className="ml-2 px-3 py-2 text-sm bg-${themeColor}-100 text-${fullColor} rounded-lg hover:bg-${themeColor}-200" onClick={() => setCurrentWeek(new Date())}>
               Today
             </button>
             
@@ -477,14 +479,14 @@ const CompanyDashboard: React.FC = () => {
               onClick={() => setShowFilterPanel(!showFilterPanel)}
               className={`ml-2 px-3 py-2 text-sm rounded-lg flex items-center ${
                 calendarFilter.type !== 'all' 
-                  ? 'bg-blue-100 text-blue-800 border border-blue-300' 
+                  ? 'bg-${themeColor}-100 text-${fullColor} border border-${themeColor}-300' 
                   : 'bg-gray-100 text-gray-800 border border-gray-200'
               }`}
             >
               <Filter size={16} className="mr-1" />
               Filter
               {calendarFilter.type !== 'all' && (
-                <span className="ml-1 bg-blue-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs">
+                <span className="ml-1 bg-${themeColor}-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs">
                   !
                 </span>
               )}
@@ -575,7 +577,7 @@ const CompanyDashboard: React.FC = () => {
               {calendarFilter.type !== 'all' && (
                 <button
                   onClick={clearCalendarFilter}
-                  className="ml-auto text-sm text-blue-800 hover:text-blue-800 flex items-center"
+                  className="ml-auto text-sm text-${fullColor} hover:text-${fullColor} flex items-center"
                 >
                   <X size={14} className="mr-1" />
                   Clear Filter
@@ -662,7 +664,7 @@ const CompanyDashboard: React.FC = () => {
         {/* Quick Actions */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 md:p-5 flex flex-col gap-3 md:gap-4">
           <h2 className="text-lg md:text-xl font-bold text-gray-900 mb-2 md:mb-4 flex items-center gap-2">
-            <Activity className="w-5 h-5 text-blue-800" /> Quick Actions
+            <Activity className="w-5 h-5 text-${fullColor}" /> Quick Actions
           </h2>
           <div className="grid grid-cols-2 gap-2 md:gap-3">
             {quickActions.map((action, index) => {
@@ -684,9 +686,9 @@ const CompanyDashboard: React.FC = () => {
         <div className="lg:col-span-2 bg-white rounded-xl border border-gray-100 shadow-sm p-4 md:p-5">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg md:text-xl font-bold text-gray-900 flex items-center gap-2">
-              <Star className="w-5 h-5 text-blue-800" /> Recent Activity
+              <Star className="w-5 h-5 text-${fullColor}" /> Recent Activity
             </h2>
-            <button className="text-sm text-blue-800 hover:text-blue-800 font-medium flex items-center gap-1">
+            <button className="text-sm text-${fullColor} hover:text-${fullColor} font-medium flex items-center gap-1">
               <ChevronRight size={16} /> View all
             </button>
           </div>
@@ -706,7 +708,7 @@ const CompanyDashboard: React.FC = () => {
             </div>
           
             <div className="p-3 md:p-4 border border-gray-100 rounded-lg flex gap-3 md:gap-4 items-center bg-gray-50">
-              <DollarSign className="w-5 h-5 md:w-6 md:h-6 text-blue-500" />
+              <DollarSign className="w-5 h-5 md:w-6 md:h-6 text-${themeColor}-500" />
               <div className="flex-1">
                 <h4 className="font-semibold text-gray-900 text-sm md:text-base">Payment Received</h4>
                 <p className="text-xs md:text-sm text-gray-500">Birthday Package - $450</p>
@@ -719,7 +721,7 @@ const CompanyDashboard: React.FC = () => {
             </div>
           
             <div className="p-3 md:p-4 border border-gray-100 rounded-lg flex gap-3 md:gap-4 items-center bg-gray-50">
-              <MapPin className="w-5 h-5 md:w-6 md:h-6 text-blue-500" />
+              <MapPin className="w-5 h-5 md:w-6 md:h-6 text-${themeColor}-500" />
               <div className="flex-1">
                 <h4 className="font-semibold text-gray-900 text-sm md:text-base">Location Update</h4>
                 <p className="text-xs md:text-sm text-gray-500">New Package Created</p>
@@ -727,7 +729,7 @@ const CompanyDashboard: React.FC = () => {
               </div>
               <div className="text-right min-w-[70px] md:min-w-[90px]">
                 <span className="text-xs text-gray-500">Today, 8:15 AM</span>
-                <span className="block text-xs font-semibold text-blue-800 mt-1">Completed</span>
+                <span className="block text-xs font-semibold text-${fullColor} mt-1">Completed</span>
               </div>
             </div>
           </div>
@@ -749,7 +751,7 @@ const CompanyDashboard: React.FC = () => {
                   setSearchQuery(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 w-full md:w-auto"
+                className="pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-${themeColor}-500 w-full md:w-auto"
               />
             </div>
             <select 
@@ -758,7 +760,7 @@ const CompanyDashboard: React.FC = () => {
                 setSelectedStatus(e.target.value);
                 setCurrentPage(1);
               }}
-              className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+              className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-${themeColor}-500"
             >
               <option value="all">All Statuses</option>
               <option value="Confirmed">Confirmed</option>
@@ -771,7 +773,7 @@ const CompanyDashboard: React.FC = () => {
                 setSelectedLocation(e.target.value);
                 setCurrentPage(1);
               }}
-              className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+              className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-${themeColor}-500"
             >
               <option value="all">All Locations</option>
               {locations.map(location => (
@@ -841,10 +843,10 @@ const CompanyDashboard: React.FC = () => {
                   </td>
                   <td className="px-3 md:px-4 py-2 md:py-3">
                     <div className="flex space-x-2">
-                      <button className="text-blue-800 hover:text-blue-800">
+                      <button className="text-${fullColor} hover:text-${fullColor}">
                         <Eye size={16} />
                       </button>
-                      <button className="text-blue-800 hover:text-blue-800">
+                      <button className="text-${fullColor} hover:text-${fullColor}">
                         <Edit size={16} />
                       </button>
                       <button className="text-red-800 hover:text-red-800">
@@ -897,7 +899,7 @@ const CompanyDashboard: React.FC = () => {
                     onClick={() => paginate(pageNum)}
                     className={`px-3 py-1 border rounded-md text-sm ${
                       currentPage === pageNum
-                        ? 'bg-blue-800 text-white border-blue-800'
+                        ? 'bg-${fullColor} text-white border-${fullColor}'
                         : 'border-gray-300'
                     }`}
                   >

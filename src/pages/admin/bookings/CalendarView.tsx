@@ -14,9 +14,11 @@ import {
   PackageIcon,
   Gift
 } from 'lucide-react';
+import { useThemeColor } from '../../../hooks/useThemeColor';
 import type { CalendarViewBooking, CalendarViewFilterOptions } from '../../../types/calendarView.types';
 
 const CalendarView: React.FC = () => {
+  const { themeColor, fullColor } = useThemeColor();
   const [bookings, setBookings] = useState<CalendarViewBooking[]>([]);
   const [filteredBookings, setFilteredBookings] = useState<CalendarViewBooking[]>([]);
   const [loading, setLoading] = useState(true);
@@ -337,7 +339,7 @@ const CalendarView: React.FC = () => {
   };
 
   const getBookingColor = () => {
-    return 'bg-blue-100 text-blue-800';
+    return `bg-${themeColor}-100 text-${fullColor}`;
   };
 
   const renderDayView = () => {
@@ -366,7 +368,7 @@ const CalendarView: React.FC = () => {
                       booking.status === 'confirmed' ? 'bg-green-100 text-green-800' :
                       booking.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
                       booking.status === 'cancelled' ? 'bg-red-100 text-red-800' :
-                      booking.status === 'checked-in' ? 'bg-blue-100 text-blue-800' :
+                      booking.status === 'checked-in' ? `bg-${themeColor}-100 text-${fullColor}` :
                       'bg-gray-100 text-gray-800'
                     }`}>
                       {booking.status}
@@ -409,7 +411,7 @@ const CalendarView: React.FC = () => {
               <div 
                 key={day.toISOString()} 
                 className={`border border-gray-200 rounded-lg p-3 min-h-40 ${
-                  day.toDateString() === new Date().toDateString() ? 'bg-blue-50' : ''
+                  day.toDateString() === new Date().toDateString() ? `bg-${themeColor}-50` : ''
                 }`}
               >
                 <div className="text-sm font-medium mb-2">
@@ -480,7 +482,7 @@ const CalendarView: React.FC = () => {
               <div 
                 key={day.toISOString()} 
                 className={`border border-gray-200 rounded-lg p-3 h-32 overflow-hidden ${
-                  day.toDateString() === new Date().toDateString() ? 'bg-blue-50' : ''
+                  day.toDateString() === new Date().toDateString() ? `bg-${themeColor}-50` : ''
                 }`}
                 onClick={() => setSelectedDate(day.toISOString().split('T')[0])}
               >
@@ -600,7 +602,7 @@ const CalendarView: React.FC = () => {
   if (loading) {
     return (
         <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-800"></div>
+          <div className={`animate-spin rounded-full h-12 w-12 border-b-2 border-${fullColor}`}></div>
         </div>
     );
   }
@@ -622,7 +624,7 @@ const CalendarView: React.FC = () => {
             </Link>
             <Link
               to="/packages"
-              className="inline-flex items-center px-4 py-2 bg-blue-800 text-white rounded-lg hover:bg-blue-800"
+              className={`inline-flex items-center px-4 py-2 bg-${fullColor} text-white rounded-lg hover:bg-${themeColor}-900`}
             >
               <PackageIcon className="h-5 w-5 mr-2" />
               Packages
@@ -664,7 +666,7 @@ const CalendarView: React.FC = () => {
               <select
                 value={filters.view}
                 onChange={(e) => handleFilterChange('view', e.target.value as 'day' | 'week' | 'month' | 'range')}
-                className="border border-gray-300 rounded-lg px-3 py-1 text-sm focus:ring-2 focus:ring-blue-800"
+                className={`border border-gray-300 rounded-lg px-3 py-1 text-sm focus:ring-2 focus:ring-${fullColor}`}
               >
                 <option value="day">Day</option>
                 <option value="week">Week</option>
@@ -708,7 +710,7 @@ const CalendarView: React.FC = () => {
                     placeholder="Search bookings..."
                     value={filters.search}
                     onChange={(e) => handleFilterChange('search', e.target.value)}
-                    className="pl-9 pr-3 py-2 border border-gray-300 rounded-lg w-full text-sm focus:ring-2 focus:ring-blue-800"
+                    className={`pl-9 pr-3 py-2 border border-gray-300 rounded-lg w-full text-sm focus:ring-2 focus:ring-${fullColor}`}
                   />
                 </div>
               </div>
@@ -721,7 +723,7 @@ const CalendarView: React.FC = () => {
                       type="date"
                       value={filters.dateRange.start}
                       onChange={(e) => handleDateRangeChange('start', e.target.value)}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-800"
+                      className={`w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-${fullColor}`}
                     />
                   </div>
                   <div>
@@ -730,7 +732,7 @@ const CalendarView: React.FC = () => {
                       type="date"
                       value={filters.dateRange.end}
                       onChange={(e) => handleDateRangeChange('end', e.target.value)}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-800"
+                      className={`w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-${fullColor}`}
                     />
                   </div>
                 </>
@@ -746,7 +748,7 @@ const CalendarView: React.FC = () => {
                     onClick={() => handlePackageToggle(pkg)}
                     className={`px-3 py-1 rounded-full text-xs ${
                       filters.packages.includes(pkg)
-                        ? 'bg-blue-100 text-blue-800'
+                        ? `bg-${themeColor}-100 text-${fullColor}`
                         : 'bg-gray-100 text-gray-800'
                     }`}
                   >
@@ -807,7 +809,7 @@ const CalendarView: React.FC = () => {
                               booking.status === 'confirmed' ? 'bg-green-100 text-green-800' :
                               booking.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
                               booking.status === 'cancelled' ? 'bg-red-100 text-red-800' :
-                              booking.status === 'checked-in' ? 'bg-blue-100 text-blue-800' :
+                              booking.status === 'checked-in' ? `bg-${themeColor}-100 text-${fullColor}` :
                               'bg-gray-100 text-gray-800'
                             }`}>
                               {booking.status}
@@ -918,10 +920,10 @@ const CalendarView: React.FC = () => {
                     selectedBooking.status === 'confirmed' ? 'text-green-600' :
                     selectedBooking.status === 'pending' ? 'text-yellow-600' :
                     selectedBooking.status === 'cancelled' ? 'text-red-600' :
-                    selectedBooking.status === 'checked-in' ? 'text-blue-800' :
+                    selectedBooking.status === 'checked-in' ? `text-${fullColor}` :
                     'text-gray-600'
                   }`}>{selectedBooking.status}</span></div>
-                  <div className="text-sm text-gray-500">Type: <span className="font-semibold text-blue-800">Package</span></div>
+                  <div className="text-sm text-gray-500">Type: <span className={`font-semibold text-${fullColor}`}>Package</span></div>
                 </div>
                 {selectedBooking.attractions && selectedBooking.attractions.length > 0 && (
                   <div className="mt-4">

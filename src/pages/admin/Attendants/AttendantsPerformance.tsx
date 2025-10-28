@@ -11,6 +11,7 @@ import {
   ChevronDown,
   ChevronUp,
 } from 'lucide-react';
+import { useThemeColor } from '../../../hooks/useThemeColor';
 import type {
   AttendantsPerformanceAttendant,
   AttendantsPerformanceMetric,
@@ -19,6 +20,7 @@ import type {
 } from '../../../types/AttendantsPerformance.types';
 
 const AttendantsPerformance = () => {
+  const { themeColor, fullColor } = useThemeColor();
   const [performanceData, setPerformanceData] = useState<AttendantsPerformanceData[]>([]);
   const [filteredData, setFilteredData] = useState<AttendantsPerformanceData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,21 +45,21 @@ const AttendantsPerformance = () => {
 
   // Department colors
   const departmentColors: Record<string, string> = {
-    'Guest Services': 'bg-blue-100 text-blue-800',
-    'Entertainment': 'bg-blue-100 text-blue-800',
-    'Food & Beverage': 'bg-blue-100 text-blue-800',
-    'Maintenance': 'bg-blue-100 text-blue-800',
+    'Guest Services': `bg-${themeColor}-100 text-${fullColor}`,
+    'Entertainment': `bg-${themeColor}-100 text-${fullColor}`,
+    'Food & Beverage': `bg-${themeColor}-100 text-${fullColor}`,
+    'Maintenance': `bg-${themeColor}-100 text-${fullColor}`,
     'Security': 'bg-red-100 text-red-800',
-    'Administration': 'bg-blue-100 text-blue-800'
+    'Administration': `bg-${themeColor}-100 text-${fullColor}`
   };
 
   // Metric icons and colors
   const metricConfig = {
-    revenue: { icon: DollarSign, color: 'text-blue-600', bgColor: 'bg-blue-50' },
-    bookings: { icon: Users, color: 'text-blue-600', bgColor: 'bg-blue-50' },
-    purchases: { icon: ShoppingCart, color: 'text-blue-600', bgColor: 'bg-blue-50' },
-    customers: { icon: Users, color: 'text-blue-600', bgColor: 'bg-blue-50' },
-    hours: { icon: Clock, color: 'text-blue-600', bgColor: 'bg-blue-50' }
+    revenue: { icon: DollarSign, color: `text-${themeColor}-600`, bgColor: `bg-${themeColor}-50` },
+    bookings: { icon: Users, color: `text-${themeColor}-600`, bgColor: `bg-${themeColor}-50` },
+    purchases: { icon: ShoppingCart, color: `text-${themeColor}-600`, bgColor: `bg-${themeColor}-50` },
+    customers: { icon: Users, color: `text-${themeColor}-600`, bgColor: `bg-${themeColor}-50` },
+    hours: { icon: Clock, color: `text-${themeColor}-600`, bgColor: `bg-${themeColor}-50` }
   };
 
   // Load performance data
@@ -314,7 +316,7 @@ const AttendantsPerformance = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-800"></div>
+        <div className={`animate-spin rounded-full h-12 w-12 border-b-2 border-${fullColor}`}></div>
       </div>
     );
   }
@@ -337,7 +339,7 @@ const AttendantsPerformance = () => {
             <Calendar className="h-4 w-4 text-gray-400" />
             <span className="text-sm font-medium text-gray-700">Period</span>
           </div>
-          <span className="text-sm text-blue-800 font-medium">
+          <span className={`text-sm text-${fullColor} font-medium`}>
             {timeRangeLabels[filters.timeRange]}
           </span>
         </div>
@@ -349,7 +351,7 @@ const AttendantsPerformance = () => {
               onClick={() => handleFilterChange('timeRange', period)}
               className={`flex-1 px-2 py-2 text-xs font-medium rounded-md transition-colors ${
                 filters.timeRange === period
-                  ? 'bg-white text-blue-800 shadow-sm'
+                  ? `bg-white text-${fullColor} shadow-sm`
                   : 'text-gray-600 hover:text-gray-800'
               }`}
             >
@@ -371,7 +373,7 @@ const AttendantsPerformance = () => {
               placeholder="Search attendants..."
               value={filters.search}
               onChange={(e) => handleFilterChange('search', e.target.value)}
-              className="pl-9 pr-3 py-2 border border-gray-200 rounded-lg w-full focus:ring-2 focus:ring-blue-400 focus:border-blue-400 text-sm"
+              className={`pl-9 pr-3 py-2 border border-gray-200 rounded-lg w-full focus:ring-2 focus:ring-${themeColor}-400 focus:border-${themeColor}-400 text-sm`}
             />
           </div>
           <button
@@ -396,7 +398,7 @@ const AttendantsPerformance = () => {
               <select
                 value={filters.department}
                 onChange={(e) => handleFilterChange('department', e.target.value)}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400 focus:border-blue-400 text-sm"
+                className={`w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-400 focus:border-${themeColor}-400 text-sm`}
               >
                 <option value="all">All Departments</option>
                 {[...new Set(performanceData.map(d => d.attendant.department))].map(dept => (
@@ -411,7 +413,7 @@ const AttendantsPerformance = () => {
                 <button
                   onClick={() => handleSort('revenue')}
                   className={`flex-1 px-2 py-1 text-xs font-medium rounded transition-colors ${
-                    sortBy === 'revenue' ? 'bg-white text-blue-800 shadow-sm' : 'text-gray-600'
+                    sortBy === 'revenue' ? `bg-white text-${fullColor} shadow-sm` : 'text-gray-600'
                   }`}
                 >
                   Revenue {sortBy === 'revenue' && (sortOrder === 'desc' ? '↓' : '↑')}
@@ -419,7 +421,7 @@ const AttendantsPerformance = () => {
                 <button
                   onClick={() => handleSort('bookings')}
                   className={`flex-1 px-2 py-1 text-xs font-medium rounded transition-colors ${
-                    sortBy === 'bookings' ? 'bg-white text-blue-800 shadow-sm' : 'text-gray-600'
+                    sortBy === 'bookings' ? `bg-white text-${fullColor} shadow-sm` : 'text-gray-600'
                   }`}
                 >
                   Bookings {sortBy === 'bookings' && (sortOrder === 'desc' ? '↓' : '↑')}
@@ -427,7 +429,7 @@ const AttendantsPerformance = () => {
                 <button
                   onClick={() => handleSort('purchases')}
                   className={`flex-1 px-2 py-1 text-xs font-medium rounded transition-colors ${
-                    sortBy === 'purchases' ? 'bg-white text-blue-800 shadow-sm' : 'text-gray-600'
+                    sortBy === 'purchases' ? `bg-white text-${fullColor} shadow-sm` : 'text-gray-600'
                   }`}
                 >
                   Sales {sortBy === 'purchases' && (sortOrder === 'desc' ? '↓' : '↑')}
@@ -442,8 +444,8 @@ const AttendantsPerformance = () => {
       <div className="grid grid-cols-2 gap-3 mb-4">
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-3">
           <div className="flex items-center gap-2">
-            <div className="p-1.5 bg-blue-100 rounded-lg">
-              <DollarSign className="h-3 w-3 text-blue-800" />
+            <div className={`p-1.5 bg-${themeColor}-100 rounded-lg`}>
+              <DollarSign className={`h-3 w-3 text-${fullColor}`} />
             </div>
             <div>
               <p className="text-xs font-medium text-gray-600">Revenue</p>
@@ -453,8 +455,8 @@ const AttendantsPerformance = () => {
         </div>
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-3">
           <div className="flex items-center gap-2">
-            <div className="p-1.5 bg-blue-100 rounded-lg">
-              <Users className="h-3 w-3 text-blue-800" />
+            <div className={`p-1.5 bg-${themeColor}-100 rounded-lg`}>
+              <Users className={`h-3 w-3 text-${fullColor}`} />
             </div>
             <div>
               <p className="text-xs font-medium text-gray-600">Bookings</p>
@@ -464,8 +466,8 @@ const AttendantsPerformance = () => {
         </div>
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-3">
           <div className="flex items-center gap-2">
-            <div className="p-1.5 bg-blue-100 rounded-lg">
-              <ShoppingCart className="h-3 w-3 text-blue-800" />
+            <div className={`p-1.5 bg-${themeColor}-100 rounded-lg`}>
+              <ShoppingCart className={`h-3 w-3 text-${fullColor}`} />
             </div>
             <div>
               <p className="text-xs font-medium text-gray-600">Purchases</p>
@@ -475,8 +477,8 @@ const AttendantsPerformance = () => {
         </div>
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-3">
           <div className="flex items-center gap-2">
-            <div className="p-1.5 bg-blue-100 rounded-lg">
-              <Clock className="h-3 w-3 text-blue-800" />
+            <div className={`p-1.5 bg-${themeColor}-100 rounded-lg`}>
+              <Clock className={`h-3 w-3 text-${fullColor}`} />
             </div>
             <div>
               <p className="text-xs font-medium text-gray-600">Hours</p>
@@ -522,7 +524,7 @@ const AttendantsPerformance = () => {
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-800 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                      <div className={`w-12 h-12 bg-gradient-to-br from-${themeColor}-500 to-${fullColor} rounded-full flex items-center justify-center text-white font-bold text-sm`}>
                         {data.attendant.firstName[0]}{data.attendant.lastName[0]}
                       </div>
                       <div>

@@ -16,9 +16,11 @@ import {
   Plus,
   Tag,
 } from 'lucide-react';
+import { useThemeColor } from '../../../hooks/useThemeColor';
 import type { CustomersCustomer } from '../../../types/Customers.types';
 
 const CustomerListing: React.FC = () => {
+  const { themeColor, fullColor } = useThemeColor();
   const [customers, setCustomers] = useState<CustomersCustomer[]>([]);
   const [filteredCustomers, setFilteredCustomers] = useState<CustomersCustomer[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
@@ -323,7 +325,7 @@ const CustomerListing: React.FC = () => {
     const statusConfig = {
       active: { color: 'bg-green-100 text-green-800', label: 'Active' },
       inactive: { color: 'bg-gray-100 text-gray-800', label: 'Inactive' },
-      new: { color: 'bg-blue-100 text-blue-800', label: 'New' }
+      new: { color: `bg-${themeColor}-100 text-${fullColor}`, label: 'New' }
     };
 
     const config = statusConfig[status as keyof typeof statusConfig];
@@ -340,7 +342,7 @@ const CustomerListing: React.FC = () => {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-gray-900 flex items-center gap-2 mb-1">
-            <Users className="w-6 h-6 text-blue-600" />
+            <Users className={`w-6 h-6 text-${themeColor}-600`} />
             Customers
           </h1>
           <p className="text-sm md:text-base text-gray-600">
@@ -352,7 +354,7 @@ const CustomerListing: React.FC = () => {
             <Download className="w-4 h-4" />
             Export
           </button>
-          <button className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm flex items-center gap-2 hover:bg-blue-700 w-full sm:w-auto">
+          <button className={`px-4 py-2 bg-${themeColor}-600 text-white rounded-lg text-sm flex items-center gap-2 hover:bg-${themeColor}-700 w-full sm:w-auto`}>
             <Plus className="w-4 h-4" />
             Add Customer
           </button>
@@ -370,7 +372,7 @@ const CustomerListing: React.FC = () => {
               placeholder="Search customers..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className={`w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-${themeColor}-500`}
             />
           </div>
 
@@ -378,7 +380,7 @@ const CustomerListing: React.FC = () => {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-full"
+            className={`px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-${themeColor}-500 w-full`}
           >
             <option value="all">All Statuses</option>
             <option value="active">Active</option>
@@ -390,7 +392,7 @@ const CustomerListing: React.FC = () => {
           <select
             value={itemsPerPage}
             onChange={(e) => handleItemsPerPageChange(Number(e.target.value))}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-full"
+            className={`px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-${themeColor}-500 w-full`}
           >
             <option value="5">5 per page</option>
             <option value="10">10 per page</option>
@@ -443,7 +445,7 @@ const CustomerListing: React.FC = () => {
                 <div className="flex items-center gap-1">
                   Customer
                   {sortBy === 'name' && (
-                    <span className="text-blue-600">{sortOrder === 'asc' ? '↑' : '↓'}</span>
+                    <span className={`text-${themeColor}-600`}>{sortOrder === 'asc' ? '↑' : '↓'}</span>
                   )}
                 </div>
               </th>
@@ -457,7 +459,7 @@ const CustomerListing: React.FC = () => {
                 <div className="flex items-center gap-1">
                   Join Date
                   {sortBy === 'joinDate' && (
-                    <span className="text-blue-600">{sortOrder === 'asc' ? '↑' : '↓'}</span>
+                    <span className={`text-${themeColor}-600`}>{sortOrder === 'asc' ? '↑' : '↓'}</span>
                   )}
                 </div>
               </th>
@@ -468,7 +470,7 @@ const CustomerListing: React.FC = () => {
                 <div className="flex items-center gap-1">
                   Total Spent
                   {sortBy === 'totalSpent' && (
-                    <span className="text-blue-600">{sortOrder === 'asc' ? '↑' : '↓'}</span>
+                    <span className={`text-${themeColor}-600`}>{sortOrder === 'asc' ? '↑' : '↓'}</span>
                   )}
                 </div>
               </th>
@@ -479,7 +481,7 @@ const CustomerListing: React.FC = () => {
                 <div className="flex items-center gap-1">
                   Bookings
                   {sortBy === 'bookings' && (
-                    <span className="text-blue-600">{sortOrder === 'asc' ? '↑' : '↓'}</span>
+                    <span className={`text-${themeColor}-600`}>{sortOrder === 'asc' ? '↑' : '↓'}</span>
                   )}
                 </div>
               </th>
@@ -490,7 +492,7 @@ const CustomerListing: React.FC = () => {
                 <div className="flex items-center gap-1">
                   Tickets <br/> Purchased
                   {sortBy === 'ticketsPurchased' && (
-                    <span className="text-blue-600">{sortOrder === 'asc' ? '↑' : '↓'}</span>
+                    <span className={`text-${themeColor}-600`}>{sortOrder === 'asc' ? '↑' : '↓'}</span>
                   )}
                 </div>
               </th>
@@ -520,7 +522,7 @@ const CustomerListing: React.FC = () => {
                           {customer.tags.map((tag, index) => (
                             <span
                               key={index}
-                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-blue-100 text-blue-800"
+                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-${themeColor}-100 text-${fullColor}`}
                             >
                               <Tag className="w-3 h-3" />
                               {tag}
@@ -565,7 +567,7 @@ const CustomerListing: React.FC = () => {
                   </td>
                   <td className="px-4 py-4">
                     <div className="flex items-center gap-2">
-                      <button className="p-1 text-blue-600 hover:text-blue-800" title="View">
+                      <button className={`p-1 text-${themeColor}-600 hover:text-${themeColor}-800`} title="View">
                         <Eye className="w-4 h-4" />
                       </button>
                       <button className="p-1 text-gray-600 hover:text-gray-800" title="Edit">
@@ -624,7 +626,7 @@ const CustomerListing: React.FC = () => {
                     onClick={() => goToPage(pageNum)}
                     className={`px-3 py-1 border rounded-md text-sm ${
                       currentPage === pageNum
-                        ? 'bg-blue-600 text-white border-blue-600'
+                        ? `bg-${themeColor}-600 text-white border-${themeColor}-600`
                         : 'border-gray-300 hover:bg-gray-100'
                     }`}
                   >

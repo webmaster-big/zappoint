@@ -18,6 +18,7 @@ import {
   Shield,
   UserCheck
 } from 'lucide-react';
+import { useThemeColor } from '../../../hooks/useThemeColor';
 import type { 
   ManageAccountsAccount, 
   ManageAccountsFilterOptions, 
@@ -32,6 +33,7 @@ const InvitationModal: React.FC<ManageAccountsInvitationModalProps> = ({
   defaultEmail = '',
   defaultUserType = 'attendant'
 }) => {
+  const { themeColor, fullColor } = useThemeColor();
   const [email, setEmail] = useState(defaultEmail);
   const [userType, setUserType] = useState<'attendant' | 'manager'>(defaultUserType);
   const [generatedLink, setGeneratedLink] = useState('');
@@ -83,7 +85,7 @@ const InvitationModal: React.FC<ManageAccountsInvitationModalProps> = ({
             <select
               value={userType}
               onChange={(e) => setUserType(e.target.value as 'attendant' | 'manager')}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-800 focus:border-blue-800"
+              className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
             >
               <option value="attendant">Attendant</option>
               <option value="manager">Location Manager</option>
@@ -99,7 +101,7 @@ const InvitationModal: React.FC<ManageAccountsInvitationModalProps> = ({
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="Enter email address"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-800 focus:border-blue-800"
+              className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
             />
           </div>
 
@@ -140,7 +142,7 @@ const InvitationModal: React.FC<ManageAccountsInvitationModalProps> = ({
           <button
             onClick={handleSend}
             disabled={!email || loading}
-            className="flex-1 px-4 py-2 bg-blue-800 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className={`flex-1 px-4 py-2 bg-${fullColor} text-white rounded-lg hover:bg-${themeColor}-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2`}
           >
             {loading ? (
               <>
@@ -161,6 +163,7 @@ const InvitationModal: React.FC<ManageAccountsInvitationModalProps> = ({
 };
 
 const ManageAccounts = () => {
+  const { themeColor, fullColor } = useThemeColor();
   const [accounts, setAccounts] = useState<ManageAccountsAccount[]>([]);
   const [filteredAccounts, setFilteredAccounts] = useState<ManageAccountsAccount[]>([]);
   const [loading, setLoading] = useState(true);
@@ -191,20 +194,17 @@ const ManageAccounts = () => {
     inactive: 'bg-gray-100 text-gray-800'
   };
 
-  // User type colors
-  const userTypeColors = {
-    attendant: 'bg-blue-100 text-blue-800',
-    manager: 'bg-blue-100 text-blue-800'
+  // User type colors - using function to avoid template literal issues in object
+  const getUserTypeColor = (userType: 'attendant' | 'manager') => {
+    return `bg-${themeColor}-100 text-${fullColor}`;
   };
 
-  // Department colors
-  const departmentColors: Record<string, string> = {
-    'Guest Services': 'bg-blue-100 text-blue-800',
-    'Entertainment': 'bg-blue-100 text-blue-800',
-    'Food & Beverage': 'bg-yellow-100 text-yellow-800',
-    'Maintenance': 'bg-blue-100 text-blue-800',
-    'Security': 'bg-blue-100 text-blue-800',
-    'Administration': 'bg-blue-100 text-blue-800'
+  // Department colors - using function
+  const getDepartmentColor = (department: string) => {
+    if (department === 'Food & Beverage') {
+      return 'bg-yellow-100 text-yellow-800';
+    }
+    return `bg-${themeColor}-100 text-${fullColor}`;
   };
 
   // Calculate metrics data
@@ -221,28 +221,28 @@ const ManageAccounts = () => {
       title: 'Total Accounts',
       value: accounts.length.toString(),
       change: `${accounts.filter(a => a.status === 'active').length} active`,
-      accent: 'bg-blue-100 text-blue-800',
+      accent: `bg-${themeColor}-100 text-${fullColor}`,
       icon: Users,
     },
     {
       title: 'Location Managers',
       value: accounts.filter(a => a.userType === 'manager').length.toString(),
       change: `${accounts.filter(a => a.userType === 'manager' && a.status === 'active').length} active`,
-      accent: 'bg-blue-100 text-blue-800',
+      accent: `bg-${themeColor}-100 text-${fullColor}`,
       icon: Shield,
     },
     {
       title: 'Attendants',
       value: accounts.filter(a => a.userType === 'attendant').length.toString(),
       change: `${accounts.filter(a => a.userType === 'attendant' && a.status === 'active').length} active`,
-      accent: 'bg-blue-100 text-blue-800',
+      accent: `bg-${themeColor}-100 text-${fullColor}`,
       icon: UserCheck,
     },
     {
       title: 'New Accounts',
       value: newAccountsCount.toString(),
       change: 'Last 30 days',
-      accent: 'bg-blue-100 text-blue-800',
+      accent: `bg-${themeColor}-100 text-${fullColor}`,
       icon: Plus,
     }
   ];
@@ -613,7 +613,7 @@ const ManageAccounts = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-800"></div>
+        <div className={`animate-spin rounded-full h-12 w-12 border-b-2 border-${fullColor}`}></div>
       </div>
     );
   }
@@ -636,7 +636,7 @@ const ManageAccounts = () => {
           </button>
           <Link
             to="/accounts/create"
-            className="inline-flex items-center px-4 py-2 bg-blue-800 text-white rounded-lg hover:bg-blue-900 transition-colors"
+            className={`inline-flex items-center px-4 py-2 bg-${fullColor} text-white rounded-lg hover:bg-${themeColor}-900 transition-colors`}
           >
             <Plus className="h-5 w-5 mr-2" />
             Create Account
@@ -680,7 +680,7 @@ const ManageAccounts = () => {
               placeholder="Search accounts..."
               value={filters.search}
               onChange={(e) => handleFilterChange('search', e.target.value)}
-              className="pl-9 pr-3 py-2 border border-gray-200 rounded-lg w-full focus:ring-2 focus:ring-blue-800 focus:border-blue-800"
+              className={`pl-9 pr-3 py-2 border border-gray-200 rounded-lg w-full focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
             />
           </div>
           <div className="flex gap-2">
@@ -709,7 +709,7 @@ const ManageAccounts = () => {
                 <select
                   value={filters.status}
                   onChange={(e) => handleFilterChange('status', e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-800 focus:border-blue-800"
+                  className={`w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
                 >
                   <option value="all">All Statuses</option>
                   <option value="active">Active</option>
@@ -721,7 +721,7 @@ const ManageAccounts = () => {
                 <select
                   value={filters.userType}
                   onChange={(e) => handleFilterChange('userType', e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-800 focus:border-blue-800"
+                  className={`w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
                 >
                   <option value="all">All Types</option>
                   <option value="manager">Managers</option>
@@ -733,7 +733,7 @@ const ManageAccounts = () => {
                 <select
                   value={filters.department}
                   onChange={(e) => handleFilterChange('department', e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-800 focus:border-blue-800"
+                  className={`w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
                 >
                   <option value="all">All Departments</option>
                   {getUniqueDepartments().map(dept => (
@@ -746,7 +746,7 @@ const ManageAccounts = () => {
                 <select
                   value={filters.location}
                   onChange={(e) => handleFilterChange('location', e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-800 focus:border-blue-800"
+                  className={`w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
                 >
                   <option value="all">All Locations</option>
                   {locations.map(location => (
@@ -769,14 +769,14 @@ const ManageAccounts = () => {
 
       {/* Bulk Actions */}
       {selectedAccounts.length > 0 && (
-        <div className="bg-blue-50 p-4 rounded-lg mb-6 flex flex-wrap items-center gap-4">
-          <span className="text-blue-800 font-medium">
+        <div className={`bg-${themeColor}-50 p-4 rounded-lg mb-6 flex flex-wrap items-center gap-4`}>
+          <span className={`text-${fullColor} font-medium`}>
             {selectedAccounts.length} account(s) selected
           </span>
           <div className="flex gap-2">
             <select
               onChange={(e) => handleBulkStatusChange(e.target.value as ManageAccountsAccount['status'])}
-              className="border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-800"
+              className={`border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-500`}
             >
               <option value="">Change Status</option>
               <option value="active">Activate</option>
@@ -804,7 +804,7 @@ const ManageAccounts = () => {
                     type="checkbox"
                     checked={selectedAccounts.length === currentAccounts.length && currentAccounts.length > 0}
                     onChange={handleSelectAll}
-                    className="rounded border-gray-300 text-blue-800 focus:ring-blue-800"
+                    className={`rounded border-gray-300 text-${fullColor} focus:ring-${themeColor}-500`}
                   />
                 </th>
                 <th scope="col" className="px-6 py-4 font-medium">Account</th>
@@ -832,7 +832,7 @@ const ManageAccounts = () => {
                         type="checkbox"
                         checked={selectedAccounts.includes(account.id)}
                         onChange={() => handleSelectAccount(account.id)}
-                        className="rounded border-gray-300 text-blue-800 focus:ring-blue-800"
+                        className={`rounded border-gray-300 text-${fullColor} focus:ring-${themeColor}-500`}
                       />
                     </td>
                     <td className="px-6 py-4">
@@ -861,7 +861,7 @@ const ManageAccounts = () => {
                     </td>
                     <td className="px-6 py-4">
                       <div className="space-y-2">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${userTypeColors[account.userType]}`}>
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getUserTypeColor(account.userType)}`}>
                           {account.userType === 'manager' ? 'Location Manager' : 'Attendant'}
                         </span>
                         <div className="flex items-center gap-1 text-xs text-gray-600">
@@ -871,7 +871,7 @@ const ManageAccounts = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${departmentColors[account.department] || 'bg-gray-100 text-gray-800'}`}>
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getDepartmentColor(account.department)}`}>
                         {account.department}
                       </span>
                     </td>
@@ -883,7 +883,7 @@ const ManageAccounts = () => {
                       <select
                         value={account.status}
                         onChange={(e) => handleStatusChange(account.id, e.target.value as ManageAccountsAccount['status'])}
-                        className={`text-xs font-medium px-3 py-1 rounded-full ${statusColors[account.status]} border-none focus:ring-2 focus:ring-blue-800`}
+                        className={`text-xs font-medium px-3 py-1 rounded-full ${statusColors[account.status]} border-none focus:ring-2 focus:ring-${themeColor}-500`}
                       >
                         <option value="active">Active</option>
                         <option value="inactive">Inactive</option>
@@ -894,7 +894,7 @@ const ManageAccounts = () => {
                         {/* No invite button, all accounts are created */}
                         <Link
                           to={`/accounts/${account.id}`}
-                          className="text-blue-800 hover:text-blue-800"
+                          className={`text-${fullColor} hover:text-${fullColor}`}
                           title="View Profile"
                         >
                           <Eye className="h-4 w-4" />
@@ -948,7 +948,7 @@ const ManageAccounts = () => {
                     onClick={() => paginate(page)}
                     className={`px-3 py-2 border rounded-lg text-sm font-medium ${
                       currentPage === page
-                        ? 'border-blue-800 bg-blue-800 text-white'
+                        ? `border-${fullColor} bg-${fullColor} text-white`
                         : 'border-gray-200 text-gray-800 hover:bg-gray-50'
                     }`}
                   >

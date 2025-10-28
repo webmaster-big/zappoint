@@ -17,6 +17,7 @@ import {
   X,
   Copy
 } from 'lucide-react';
+import { useThemeColor } from '../../../hooks/useThemeColor';
 import type {
   ManageAttendantsAttendant,
   ManageAttendantsFilterOptions,
@@ -37,6 +38,7 @@ const InvitationModal: React.FC<InvitationModalProps> = ({
   onSendInvitation, 
   loading = false 
 }) => {
+  const { themeColor } = useThemeColor();
   const [email, setEmail] = useState('');
   const [generatedLink, setGeneratedLink] = useState('');
 
@@ -92,7 +94,7 @@ const InvitationModal: React.FC<InvitationModalProps> = ({
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="Enter attendant's email address"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
             />
           </div>
 
@@ -133,7 +135,7 @@ const InvitationModal: React.FC<InvitationModalProps> = ({
           <button
             onClick={handleSend}
             disabled={!email || loading}
-            className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className={`flex-1 px-4 py-2 bg-${themeColor}-600 text-white rounded-lg hover:bg-${themeColor}-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2`}
           >
             {loading ? (
               <>
@@ -154,6 +156,7 @@ const InvitationModal: React.FC<InvitationModalProps> = ({
 };
 
 const ManageAttendants = () => {
+  const { themeColor, fullColor } = useThemeColor();
   const [attendants, setAttendants] = useState<ManageAttendantsAttendant[]>([]);
   const [filteredAttendants, setFilteredAttendants] = useState<ManageAttendantsAttendant[]>([]);
   const [loading, setLoading] = useState(true);
@@ -172,18 +175,18 @@ const ManageAttendants = () => {
 
   // Status colors
   const statusColors = {
-    active: 'bg-blue-100 text-blue-800',
+    active: `bg-${themeColor}-100 text-${fullColor}`,
     inactive: 'bg-gray-100 text-gray-800'
   };
 
   // Department colors
   const departmentColors: Record<string, string> = {
-    'Guest Services': 'bg-blue-100 text-blue-800',
-    'Entertainment': 'bg-blue-100 text-blue-800',
-    'Food & Beverage': 'bg-blue-100 text-blue-800',
-    'Maintenance': 'bg-blue-100 text-blue-800',
+    'Guest Services': `bg-${themeColor}-100 text-${fullColor}`,
+    'Entertainment': `bg-${themeColor}-100 text-${fullColor}`,
+    'Food & Beverage': `bg-${themeColor}-100 text-${fullColor}`,
+    'Maintenance': `bg-${themeColor}-100 text-${fullColor}`,
     'Security': 'bg-red-100 text-red-800',
-    'Administration': 'bg-blue-100 text-blue-800'
+    'Administration': `bg-${themeColor}-100 text-${fullColor}`
   };
 
   // Calculate metrics data
@@ -200,14 +203,14 @@ const ManageAttendants = () => {
       title: 'Total Attendants',
       value: attendants.length.toString(),
       change: `${attendants.filter(a => a.status === 'active').length} active`,
-      accent: 'bg-blue-100 text-blue-800',
+      accent: `bg-${themeColor}-100 text-${fullColor}`,
       icon: Users,
     },
     {
       title: 'Active Attendants',
       value: attendants.filter(a => a.status === 'active').length.toString(),
       change: `${attendants.filter(a => a.status === 'inactive').length} inactive`,
-      accent: 'bg-blue-100 text-blue-800',
+      accent: `bg-${themeColor}-100 text-${fullColor}`,
       icon: User,
     },
     {
@@ -221,7 +224,7 @@ const ManageAttendants = () => {
       title: 'Departments',
       value: [...new Set(attendants.map(a => a.department))].length.toString(),
       change: 'Different departments',
-      accent: 'bg-blue-100 text-blue-800',
+      accent: `bg-${themeColor}-100 text-${fullColor}`,
       icon: MapPin,
     }
   ];
@@ -500,7 +503,7 @@ const ManageAttendants = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-800"></div>
+        <div className={`animate-spin rounded-full h-12 w-12 border-b-2 border-${fullColor}`}></div>
       </div>
     );
   }
@@ -523,7 +526,7 @@ const ManageAttendants = () => {
           </button>
           <Link
             to="/manager/attendants/create"
-            className="inline-flex items-center px-4 py-2 bg-blue-800 text-white rounded-lg hover:bg-blue-900 transition-colors"
+            className={`inline-flex items-center px-4 py-2 bg-${fullColor} text-white rounded-lg hover:bg-${themeColor}-900 transition-colors`}
           >
             <Plus className="h-5 w-5 mr-2" />
             New Attendant
@@ -567,7 +570,7 @@ const ManageAttendants = () => {
               placeholder="Search attendants..."
               value={filters.search}
               onChange={(e) => handleFilterChange('search', e.target.value)}
-              className="pl-9 pr-3 py-2 border border-gray-200 rounded-lg w-full focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
+              className={`pl-9 pr-3 py-2 border border-gray-200 rounded-lg w-full focus:ring-2 focus:ring-${themeColor}-400 focus:border-${themeColor}-400`}
             />
           </div>
           <div className="flex gap-2">
@@ -596,7 +599,7 @@ const ManageAttendants = () => {
                 <select
                   value={filters.status}
                   onChange={(e) => handleFilterChange('status', e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
+                  className={`w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-400 focus:border-${themeColor}-400`}
                 >
                   <option value="all">All Statuses</option>
                   <option value="active">Active</option>
@@ -608,7 +611,7 @@ const ManageAttendants = () => {
                 <select
                   value={filters.department}
                   onChange={(e) => handleFilterChange('department', e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
+                  className={`w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-400 focus:border-${themeColor}-400`}
                 >
                   <option value="all">All Departments</option>
                   {getUniqueDepartments().map(dept => (
@@ -631,14 +634,14 @@ const ManageAttendants = () => {
 
       {/* Bulk Actions */}
       {selectedAttendants.length > 0 && (
-        <div className="bg-blue-50 p-4 rounded-lg mb-6 flex flex-wrap items-center gap-4">
-          <span className="text-blue-800 font-medium">
+        <div className={`bg-${themeColor}-50 p-4 rounded-lg mb-6 flex flex-wrap items-center gap-4`}>
+          <span className={`text-${fullColor} font-medium`}>
             {selectedAttendants.length} attendant(s) selected
           </span>
           <div className="flex gap-2">
             <select
               onChange={(e) => handleBulkStatusChange(e.target.value as ManageAttendantsAttendant['status'])}
-              className="border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400"
+              className={`border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-400`}
             >
               <option value="">Change Status</option>
               <option value="active">Activate</option>
@@ -666,7 +669,7 @@ const ManageAttendants = () => {
                     type="checkbox"
                     checked={selectedAttendants.length === currentAttendants.length && currentAttendants.length > 0}
                     onChange={handleSelectAll}
-                    className="rounded border-gray-300 text-blue-800 focus:ring-blue-400"
+                    className={`rounded border-gray-300 text-${fullColor} focus:ring-${themeColor}-400`}
                   />
                 </th>
                 <th scope="col" className="px-6 py-4 font-medium">Attendant</th>
@@ -694,7 +697,7 @@ const ManageAttendants = () => {
                         type="checkbox"
                         checked={selectedAttendants.includes(attendant.id)}
                         onChange={() => handleSelectAttendant(attendant.id)}
-                        className="rounded border-gray-300 text-blue-800 focus:ring-blue-400"
+                        className={`rounded border-gray-300 text-${fullColor} focus:ring-${themeColor}-400`}
                       />
                     </td>
                     <td className="px-6 py-4">
@@ -735,7 +738,7 @@ const ManageAttendants = () => {
                       <select
                         value={attendant.status}
                         onChange={(e) => handleStatusChange(attendant.id, e.target.value as ManageAttendantsAttendant['status'])}
-                        className={`text-xs font-medium px-3 py-1 rounded-full ${statusColors[attendant.status]} border-none focus:ring-2 focus:ring-blue-400`}
+                        className={`text-xs font-medium px-3 py-1 rounded-full ${statusColors[attendant.status]} border-none focus:ring-2 focus:ring-${themeColor}-400`}
                       >
                         <option value="active">Active</option>
                         <option value="inactive">Inactive</option>
@@ -746,7 +749,7 @@ const ManageAttendants = () => {
                         {/* No invite button, all accounts are created */}
                         <Link
                           to={`/attendants/${attendant.id}`}
-                          className="text-blue-600 hover:text-blue-800"
+                          className={`text-${themeColor}-600 hover:text-${fullColor}`}
                           title="View Profile"
                         >
                           <Eye className="h-4 w-4" />
@@ -800,7 +803,7 @@ const ManageAttendants = () => {
                     onClick={() => paginate(page)}
                     className={`px-3 py-2 border rounded-lg text-sm font-medium ${
                       currentPage === page
-                        ? 'border-blue-800 bg-blue-800 text-white'
+                        ? `border-${fullColor} bg-${fullColor} text-white`
                         : 'border-gray-200 text-gray-800 hover:bg-gray-50'
                     }`}
                   >

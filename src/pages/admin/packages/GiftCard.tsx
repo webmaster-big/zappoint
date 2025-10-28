@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { Plus, X, Edit2, Trash2, Eye, EyeOff, Copy } from "lucide-react";
 import type { GiftCardStatus, GiftCardType, GiftCardItem } from '../../../types/GiftCard.types';
+import { useThemeColor } from '../../../hooks/useThemeColor';
 
 const GiftCard: React.FC = () => {
+  const { themeColor, fullColor } = useThemeColor();
   const [giftCards, setGiftCards] = useState<GiftCardItem[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState<{
@@ -172,7 +174,7 @@ const GiftCard: React.FC = () => {
       case 'active': return 'bg-green-100 text-green-800';
       case 'inactive': return 'bg-gray-100 text-gray-800';
       case 'expired': return 'bg-red-100 text-red-800';
-      case 'redeemed': return 'bg-blue-100 text-blue-800';
+      case 'redeemed': return `bg-${themeColor}-100 text-${fullColor}`;
       case 'cancelled': return 'bg-yellow-100 text-yellow-800';
       case 'deleted': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
@@ -193,7 +195,7 @@ const GiftCard: React.FC = () => {
               <p className="text-gray-500 mt-1">Create and manage gift cards for your customers</p>
             </div>
             <button
-              className="bg-blue-800 text-white rounded-lg px-4 py-2.5 flex items-center gap-2 hover:bg-blue-800 transition-colors shadow-sm"
+              className={`bg-${fullColor} text-white rounded-lg px-4 py-2.5 flex items-center gap-2 hover:bg-${themeColor}-900 transition-colors shadow-sm`}
               onClick={() => setShowModal(true)}
             >
               <Plus className="w-5 h-5" /> New Gift Card
@@ -203,7 +205,7 @@ const GiftCard: React.FC = () => {
           {/* Filter Section */}
           <div className="mb-6 flex flex-wrap gap-2">
             <button 
-              className={`px-3 py-1.5 rounded-full text-sm ${filterStatus === "all" ? "bg-blue-100 text-blue-800" : "bg-gray-100 text-gray-800"}`}
+              className={`px-3 py-1.5 rounded-full text-sm ${filterStatus === "all" ? `bg-${themeColor}-100 text-${fullColor}` : "bg-gray-100 text-gray-800"}`}
               onClick={() => setFilterStatus("all")}
             >
               All
@@ -247,7 +249,7 @@ const GiftCard: React.FC = () => {
                       </div>
                       <div className="flex gap-1">
                         <button 
-                          className="p-1.5 text-gray-500 hover:text-blue-800 hover:bg-blue-50 rounded-md"
+                          className={`p-1.5 text-gray-500 hover:text-${fullColor} hover:bg-${themeColor}-50 rounded-md`}
                           onClick={() => openEditModal(originalIndex)}
                         >
                           <Edit2 className="w-4 h-4" />
@@ -284,7 +286,7 @@ const GiftCard: React.FC = () => {
                         <h3 className="font-semibold text-gray-900">Gift Card Code</h3>
                         <button 
                           onClick={() => copyToClipboard(gc.code)}
-                          className="text-blue-800 hover:text-blue-800"
+                          className={`text-${fullColor} hover:text-${themeColor}-900`}
                           title="Copy code"
                         >
                           <Copy className="w-4 h-4" />
@@ -337,7 +339,7 @@ const GiftCard: React.FC = () => {
               <div className="text-gray-400 mb-2">No gift cards found</div>
               <p className="text-gray-500 text-sm mb-4">Create your first gift card to get started</p>
               <button
-                className="bg-blue-800 text-white rounded-lg px-4 py-2 flex items-center gap-2 hover:bg-blue-800 transition-colors mx-auto shadow-sm"
+                className={`bg-${fullColor} text-white rounded-lg px-4 py-2 flex items-center gap-2 hover:bg-${themeColor}-900 transition-colors mx-auto shadow-sm`}
                 onClick={() => setShowModal(true)}
               >
                 <Plus className="w-4 h-4" /> Create Gift Card
@@ -360,7 +362,7 @@ const GiftCard: React.FC = () => {
                     name="type" 
                     value={form.type} 
                     onChange={handleChange} 
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-800 focus:border-blue-800"
+                    className={`w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
                   >
                     <option value="fixed">Fixed Value</option>
                     <option value="percentage">Percentage</option>
@@ -375,7 +377,7 @@ const GiftCard: React.FC = () => {
                     name="initial_value" 
                     value={form.initial_value} 
                     onChange={handleChange} 
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-800 focus:border-blue-800" 
+                    className={`w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
                     min="0" 
                     required 
                     placeholder={form.type === "fixed" ? "0.00" : "0"}
@@ -390,7 +392,7 @@ const GiftCard: React.FC = () => {
                     name="balance" 
                     value={form.balance} 
                     onChange={handleChange} 
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-800 focus:border-blue-800" 
+                    className={`w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
                     min="0" 
                     required 
                     placeholder={form.type === "fixed" ? "0.00" : "0"}
@@ -403,7 +405,7 @@ const GiftCard: React.FC = () => {
                     name="max_usage" 
                     value={form.max_usage} 
                     onChange={handleChange} 
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-800 focus:border-blue-800" 
+                    className={`w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
                     min="1" 
                     required 
                   />
@@ -415,7 +417,7 @@ const GiftCard: React.FC = () => {
                     name="expiry_date" 
                     value={form.expiry_date} 
                     onChange={handleChange} 
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-800 focus:border-blue-800" 
+                    className={`w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
                   />
                 </div>
                 <div>
@@ -424,14 +426,14 @@ const GiftCard: React.FC = () => {
                     name="description" 
                     value={form.description} 
                     onChange={handleChange} 
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-800 focus:border-blue-800" 
+                    className={`w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
                     rows={2} 
                     placeholder="Optional description"
                   />
                 </div>
                 <button 
                   type="submit" 
-                  className="w-full bg-blue-800 text-white py-2.5 rounded-lg font-medium mt-2 hover:bg-blue-800 transition-colors"
+                  className={`w-full bg-${fullColor} text-white py-2.5 rounded-lg font-medium mt-2 hover:bg-${themeColor}-900 transition-colors`}
                 >
                   Create Gift Card
                 </button>
@@ -456,7 +458,7 @@ const GiftCard: React.FC = () => {
                       name="type" 
                       value={editForm.type || ''} 
                       onChange={handleEditChange} 
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-800 focus:border-blue-800"
+                      className={`w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
                     >
                       <option value="fixed">Fixed Value</option>
                       <option value="percentage">Percentage</option>
@@ -469,7 +471,7 @@ const GiftCard: React.FC = () => {
                       name="initial_value" 
                       value={editForm.initial_value || ''} 
                       onChange={handleEditChange} 
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-800 focus:border-blue-800" 
+                      className={`w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
                       min="0" 
                       required 
                       placeholder={editForm.type === "fixed" ? "0.00" : "0"}
@@ -482,7 +484,7 @@ const GiftCard: React.FC = () => {
                       name="balance" 
                       value={editForm.balance || ''} 
                       onChange={handleEditChange} 
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-800 focus:border-blue-800" 
+                      className={`w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
                       min="0" 
                       required 
                       placeholder={editForm.type === "fixed" ? "0.00" : "0"}
@@ -495,7 +497,7 @@ const GiftCard: React.FC = () => {
                       name="max_usage" 
                       value={editForm.max_usage || ''} 
                       onChange={handleEditChange} 
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-800 focus:border-blue-800" 
+                      className={`w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
                       min="1" 
                       required 
                     />
@@ -507,7 +509,7 @@ const GiftCard: React.FC = () => {
                       name="expiry_date" 
                       value={editForm.expiry_date || ''} 
                       onChange={handleEditChange} 
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-800 focus:border-blue-800" 
+                      className={`w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
                     />
                   </div>
                 </div>
@@ -517,7 +519,7 @@ const GiftCard: React.FC = () => {
                     name="description" 
                     value={editForm.description || ''} 
                     onChange={handleEditChange} 
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-800 focus:border-blue-800" 
+                    className={`w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
                     rows={2} 
                     placeholder="Optional description"
                   />
@@ -528,7 +530,7 @@ const GiftCard: React.FC = () => {
                     name="status" 
                     value={editForm.status || ''} 
                     onChange={handleEditChange} 
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-800 focus:border-blue-800"
+                    className={`w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
                   >
                     <option value="active">Active</option>
                     <option value="inactive">Inactive</option>
@@ -541,7 +543,7 @@ const GiftCard: React.FC = () => {
                 <div className="flex gap-3 mt-6">
                   <button 
                     onClick={handleEditSave} 
-                    className="flex-1 bg-blue-800 hover:bg-blue-800 text-white font-medium py-2.5 rounded-lg transition text-base"
+                    className={`flex-1 bg-${fullColor} hover:bg-${themeColor}-900 text-white font-medium py-2.5 rounded-lg transition text-base`}
                   >
                     Save Changes
                   </button>

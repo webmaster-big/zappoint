@@ -11,9 +11,11 @@ import {
   XCircle,
   Clock
 } from 'lucide-react';
+import { useThemeColor } from '../../../hooks/useThemeColor';
 import type { AttractionPurchasesPurchase, AttractionPurchasesFilterOptions } from '../../../types/AttractionPurchases.types';
 
 const ManagePurchases = () => {
+  const { themeColor, fullColor } = useThemeColor();
   const [purchases, setPurchases] = useState<AttractionPurchasesPurchase[]>([]);
   const [filteredPurchases, setFilteredPurchases] = useState<AttractionPurchasesPurchase[]>([]);
   const [loading, setLoading] = useState(true);
@@ -30,10 +32,10 @@ const ManagePurchases = () => {
 
   // Status colors and icons
   const statusConfig = {
-    confirmed: { color: 'bg-blue-100 text-blue-800', icon: CheckCircle },
+    confirmed: { color: `bg-${themeColor}-100 text-${fullColor}`, icon: CheckCircle },
     pending: { color: 'bg-yellow-100 text-yellow-800', icon: Clock },
     cancelled: { color: 'bg-red-100 text-red-800', icon: XCircle },
-    refunded: { color: 'bg-blue-100 text-blue-800', icon: CheckCircle }
+    refunded: { color: `bg-${themeColor}-100 text-${fullColor}`, icon: CheckCircle }
   };
 
   // Calculate metrics data
@@ -42,14 +44,14 @@ const ManagePurchases = () => {
       title: 'Total Purchases',
       value: purchases.length.toString(),
       change: `${purchases.filter(p => p.status === 'confirmed').length} confirmed`,
-      accent: 'bg-blue-100 text-blue-800',
+      accent: `bg-${themeColor}-100 text-${fullColor}`,
       icon: CreditCard,
     },
     {
       title: 'Total Revenue',
       value: `$${purchases.reduce((sum, p) => sum + p.totalAmount, 0).toFixed(2)}`,
       change: 'All time revenue',
-      accent: 'bg-blue-100 text-blue-800',
+      accent: `bg-${themeColor}-100 text-${fullColor}`,
       icon: CheckCircle,
     },
     {
@@ -58,14 +60,14 @@ const ManagePurchases = () => {
         ? `$${(purchases.reduce((sum, p) => sum + p.totalAmount, 0) / purchases.length).toFixed(2)}` 
         : '$0.00',
       change: 'Per transaction',
-      accent: 'bg-blue-100 text-blue-800',
+      accent: `bg-${themeColor}-100 text-${fullColor}`,
       icon: Download,
     },
     {
       title: 'Unique Customers',
       value: new Set(purchases.map(p => p.email)).size.toString(),
       change: 'Total customers',
-      accent: 'bg-blue-100 text-blue-800',
+      accent: `bg-${themeColor}-100 text-${fullColor}`,
       icon: User,
     }
   ];
@@ -353,7 +355,7 @@ const ManagePurchases = () => {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-800"></div>
+        <div className={`animate-spin rounded-full h-12 w-12 border-b-2 border-${fullColor}`}></div>
       </div>
     );
   }
@@ -369,7 +371,7 @@ const ManagePurchases = () => {
         <div className="mt-4 sm:mt-0 flex gap-2">
           <button
             onClick={exportToCSV}
-            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            className={`inline-flex items-center px-4 py-2 bg-${themeColor}-600 text-white rounded-lg hover:bg-${themeColor}-700 transition-colors`}
           >
             <Download className="h-5 w-5 mr-2" />
             Export CSV
@@ -413,7 +415,7 @@ const ManagePurchases = () => {
               placeholder="Search purchases..."
               value={filters.search}
               onChange={(e) => handleFilterChange('search', e.target.value)}
-              className="pl-9 pr-3 py-2 border border-gray-200 rounded-lg w-full focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
+              className={`pl-9 pr-3 py-2 border border-gray-200 rounded-lg w-full focus:ring-2 focus:ring-${themeColor}-400 focus:border-${themeColor}-400`}
             />
           </div>
           <div className="flex gap-2">
@@ -442,7 +444,7 @@ const ManagePurchases = () => {
                 <select
                   value={filters.status}
                   onChange={(e) => handleFilterChange('status', e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
+                  className={`w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-400 focus:border-${themeColor}-400`}
                 >
                   <option value="all">All Statuses</option>
                   <option value="confirmed">Confirmed</option>
@@ -456,7 +458,7 @@ const ManagePurchases = () => {
                 <select
                   value={filters.paymentMethod}
                   onChange={(e) => handleFilterChange('paymentMethod', e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
+                  className={`w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-400 focus:border-${themeColor}-400`}
                 >
                   <option value="all">All Methods</option>
                   <option value="credit_card">Credit Card</option>
@@ -468,7 +470,7 @@ const ManagePurchases = () => {
                 <select
                   value={filters.dateRange}
                   onChange={(e) => handleFilterChange('dateRange', e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
+                  className={`w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-400 focus:border-${themeColor}-400`}
                 >
                   <option value="all">All Time</option>
                   <option value="today">Today</option>
@@ -491,14 +493,14 @@ const ManagePurchases = () => {
 
       {/* Bulk Actions */}
       {selectedPurchases.length > 0 && (
-        <div className="bg-blue-50 p-4 rounded-lg mb-6 flex flex-wrap items-center gap-4">
-          <span className="text-blue-800 font-medium">
+        <div className={`bg-${themeColor}-50 p-4 rounded-lg mb-6 flex flex-wrap items-center gap-4`}>
+          <span className={`text-${fullColor} font-medium`}>
             {selectedPurchases.length} purchase(s) selected
           </span>
           <div className="flex gap-2">
             <select
               onChange={(e) => handleBulkStatusChange(e.target.value as AttractionPurchasesPurchase['status'])}
-              className="border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400"
+              className={`border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-400`}
             >
               <option value="">Change Status</option>
               <option value="confirmed">Confirm</option>
@@ -527,7 +529,7 @@ const ManagePurchases = () => {
                     type="checkbox"
                     checked={selectedPurchases.length === currentPurchases.length && currentPurchases.length > 0}
                     onChange={handleSelectAll}
-                    className="rounded border-gray-300 text-blue-800 focus:ring-blue-400"
+                    className={`rounded border-gray-300 text-${fullColor} focus:ring-${themeColor}-400`}
                   />
                 </th>
                 <th scope="col" className="px-6 py-4 font-medium">Customer</th>
@@ -556,7 +558,7 @@ const ManagePurchases = () => {
                           type="checkbox"
                           checked={selectedPurchases.includes(purchase.id)}
                           onChange={() => handleSelectPurchase(purchase.id)}
-                          className="rounded border-gray-300 text-blue-800 focus:ring-blue-400"
+                          className={`rounded border-gray-300 text-${fullColor} focus:ring-${themeColor}-400`}
                         />
                       </td>
                       <td className="px-6 py-4">
@@ -585,7 +587,7 @@ const ManagePurchases = () => {
                         <select
                           value={purchase.status}
                           onChange={(e) => handleStatusChange(purchase.id, e.target.value as AttractionPurchasesPurchase['status'])}
-                          className={`text-xs font-medium px-3 py-1 rounded-full ${statusConfig[purchase.status].color} border-none focus:ring-2 focus:ring-blue-400`}
+                          className={`text-xs font-medium px-3 py-1 rounded-full ${statusConfig[purchase.status].color} border-none focus:ring-2 focus:ring-${themeColor}-400`}
                         >
                           <option value="confirmed">Confirmed</option>
                           <option value="pending">Pending</option>
@@ -637,7 +639,7 @@ const ManagePurchases = () => {
                     onClick={() => paginate(page)}
                     className={`px-3 py-2 border rounded-lg text-sm font-medium ${
                       currentPage === page
-                        ? 'border-blue-800 bg-blue-800 text-white'
+                        ? `border-${fullColor} bg-${fullColor} text-white`
                         : 'border-gray-200 text-gray-800 hover:bg-gray-50'
                     }`}
                   >

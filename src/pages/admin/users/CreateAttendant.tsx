@@ -14,9 +14,11 @@ import {
   Users,
   Check
 } from 'lucide-react';
+import { useThemeColor } from '../../../hooks/useThemeColor';
 import type { CreateAttendantFormData } from '../../../types/CreateAttendant.types';
 
 const CreateAttendant = () => {
+  const { themeColor, fullColor } = useThemeColor();
   const [formData, setFormData] = useState<CreateAttendantFormData>({
     // Personal Information
     firstName: '',
@@ -197,7 +199,7 @@ const CreateAttendant = () => {
         {/* Header */}
         <div className="mb-6">
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 flex items-center gap-3">
-            <UserPlus className="w-6 h-6 sm:w-8 sm:h-8 text-blue-800" />
+            <UserPlus className="w-6 h-6 sm:w-8 sm:h-8 text-${fullColor}" />
             Create New Attendant
           </h1>
           <p className="text-gray-600 mt-1 sm:mt-2 text-sm sm:text-base">Add a new staff member to your location</p>
@@ -218,7 +220,7 @@ const CreateAttendant = () => {
                     <div key={step.number} className="flex items-center flex-1 justify-center">
                       <div className={`flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-full border-2 ${
                         isActive || isCompleted
-                          ? 'bg-blue-800 border-blue-800 text-white'
+                          ? 'bg-${fullColor} border-${fullColor} text-white'
                           : 'border-gray-300 text-gray-400'
                       }`}>
                         {isCompleted ? (
@@ -229,7 +231,7 @@ const CreateAttendant = () => {
                       </div>
                       {index < steps.length && (
                         <div className={`w-10 h-0.5 mx-1 sm:mx-2 ${
-                          isCompleted ? 'bg-blue-800' : 'bg-gray-300'
+                          isCompleted ? `bg-${fullColor}` : 'bg-gray-300'
                         }`} />
                       )}
                     </div>
@@ -257,7 +259,7 @@ const CreateAttendant = () => {
                         required
                         value={formData.firstName}
                         onChange={(e) => handleInputChange('firstName', e.target.value)}
-                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 ${
                           errors.firstName ? 'border-red-500' : 'border-gray-300'
                         }`}
                         placeholder="Enter first name"
@@ -273,7 +275,7 @@ const CreateAttendant = () => {
                         required
                         value={formData.lastName}
                         onChange={(e) => handleInputChange('lastName', e.target.value)}
-                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 ${
                           errors.lastName ? 'border-red-500' : 'border-gray-300'
                         }`}
                         placeholder="Enter last name"
@@ -292,7 +294,7 @@ const CreateAttendant = () => {
                         required
                         value={formData.email}
                         onChange={(e) => handleInputChange('email', e.target.value)}
-                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 ${
                           errors.email ? 'border-red-500' : 'border-gray-300'
                         }`}
                         placeholder="attendant@zapzone.com"
@@ -307,7 +309,7 @@ const CreateAttendant = () => {
                         type="tel"
                         value={formData.phone}
                         onChange={(e) => handleInputChange('phone', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500"
                         placeholder="(555) 123-4567"
                       />
                     </div>
@@ -320,7 +322,7 @@ const CreateAttendant = () => {
                         type="date"
                         value={formData.hireDate}
                         onChange={(e) => handleInputChange('hireDate', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500"
                       />
                     </div>
                     <div>
@@ -328,7 +330,7 @@ const CreateAttendant = () => {
                       <select
                         value={formData.position}
                         onChange={(e) => handleInputChange('position', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500"
                       >
                         {positions.map(pos => (
                           <option key={pos} value={pos}>{pos}</option>
@@ -348,7 +350,7 @@ const CreateAttendant = () => {
                       <select
                         value={formData.department}
                         onChange={(e) => handleInputChange('department', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500"
                       >
                         {departments.map(dept => (
                           <option key={dept} value={dept}>{dept}</option>
@@ -360,7 +362,7 @@ const CreateAttendant = () => {
                       <select
                         value={formData.shift}
                         onChange={(e) => handleInputChange('shift', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500"
                       >
                         {shifts.map(shift => (
                           <option key={shift} value={shift}>{shift}</option>
@@ -378,7 +380,7 @@ const CreateAttendant = () => {
                             type="checkbox"
                             checked={formData.assignedAreas.includes(area)}
                             onChange={() => handleAreaToggle(area)}
-                            className="rounded border-gray-300 text-blue-800 focus:ring-blue-500"
+                            className={`rounded border-gray-300 text-${fullColor} focus:ring-${themeColor}-500`}
                           />
                           <span className="text-sm text-gray-700">{area}</span>
                         </label>
@@ -396,7 +398,7 @@ const CreateAttendant = () => {
                           value="active"
                           checked={formData.status === 'active'}
                           onChange={(e) => handleInputChange('status', e.target.value)}
-                          className="text-blue-800 focus:ring-blue-500"
+                          className={`text-${fullColor} focus:ring-${themeColor}-500`}
                         />
                         <span className="ml-2 text-sm text-gray-700">Active</span>
                       </label>
@@ -407,7 +409,7 @@ const CreateAttendant = () => {
                           value="inactive"
                           checked={formData.status === 'inactive'}
                           onChange={(e) => handleInputChange('status', e.target.value)}
-                          className="text-blue-800 focus:ring-blue-500"
+                          className={`text-${fullColor} focus:ring-${themeColor}-500`}
                         />
                         <span className="ml-2 text-sm text-gray-700">Inactive</span>
                       </label>
@@ -419,8 +421,8 @@ const CreateAttendant = () => {
               {/* Step 3: Review */}
               {currentStep === 3 && (
                 <div className="space-y-4 sm:space-y-6">
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4">
-                    <p className="text-sm text-blue-800">
+                  <div className={`bg-${themeColor}-50 border border-${themeColor}-200 rounded-lg p-3 sm:p-4`}>
+                    <p className={`text-sm text-${fullColor}`}>
                       <strong>Ready to create:</strong> Review all information before creating the attendant account.
                     </p>
                   </div>
@@ -534,7 +536,7 @@ const CreateAttendant = () => {
                   <button
                     type="button"
                     onClick={handleNextStep}
-                    className="px-4 sm:px-6 py-2 bg-blue-800 text-white rounded-lg hover:bg-blue-700 text-sm sm:text-base"
+                    className="px-4 sm:px-6 py-2 bg-${fullColor} text-white rounded-lg hover:bg-${themeColor}-900 text-sm sm:text-base"
                   >
                     Next
                   </button>
@@ -544,7 +546,7 @@ const CreateAttendant = () => {
                       type="button"
                       onClick={handleConfirmCreate}
                       disabled={isSubmitting}
-                      className="px-4 sm:px-6 py-2 bg-blue-800 text-white rounded-lg hover:bg-blue-900 disabled:opacity-50 flex items-center text-sm sm:text-base"
+                      className="px-4 sm:px-6 py-2 bg-${fullColor} text-white rounded-lg hover:bg-${themeColor}-900 disabled:opacity-50 flex items-center text-sm sm:text-base"
                     >
                       <Save size={16} className="mr-2" />
                       {isSubmitting ? 'Creating...' : 'Create Attendant'}
@@ -553,7 +555,7 @@ const CreateAttendant = () => {
                     <button
                       type="submit"
                       disabled={isSubmitting}
-                      className="px-4 sm:px-6 py-2 bg-blue-800 text-white rounded-lg hover:bg-blue-900 disabled:opacity-50 flex items-center text-sm sm:text-base"
+                      className="px-4 sm:px-6 py-2 bg-${fullColor} text-white rounded-lg hover:bg-${themeColor}-900 disabled:opacity-50 flex items-center text-sm sm:text-base"
                     >
                       <Save size={16} className="mr-2" />
                       Create Attendant
@@ -569,7 +571,7 @@ const CreateAttendant = () => {
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 sticky top-4">
               <div className="p-4 sm:p-6 border-b border-gray-200">
                 <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                  <Eye size={18} className="text-blue-800" />
+                  <Eye size={18} className="text-${fullColor}" />
                   Live Preview
                 </h3>
                 <p className="text-sm text-gray-600">How the attendant profile will appear</p>
@@ -578,12 +580,12 @@ const CreateAttendant = () => {
               <div className="p-4 sm:p-6">
                 {/* Profile Header */}
                 <div className="text-center mb-4 sm:mb-6">
-                  <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br from-blue-500 to-blue-800 rounded-full flex items-center justify-center text-white text-xl sm:text-2xl font-bold mx-auto mb-2 sm:mb-3">
+                  <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br from-${themeColor}-500 to-${fullColor} rounded-full flex items-center justify-center text-white text-xl sm:text-2xl font-bold mx-auto mb-2 sm:mb-3">
                     {previewData.name.split(' ').map(n => n[0]).join('')}
                   </div>
                   <h4 className="text-lg sm:text-xl font-bold text-gray-900">{previewData.name}</h4>
                   <p className="text-gray-600 flex items-center justify-center gap-1 text-sm sm:text-base">
-                    <Zap size={12} className="text-blue-500" />
+                    <Zap size={12} className="text-${fullColor}" />
                     {previewData.position} • {previewData.department}
                   </p>
                 </div>
@@ -591,11 +593,11 @@ const CreateAttendant = () => {
                 {/* Status Badge */}
                 <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium mb-3 sm:mb-4 ${
                   previewData.status === 'active' 
-                    ? 'bg-blue-100 text-blue-800' 
+                    ? `bg-${themeColor}-100 text-${fullColor}` 
                     : 'bg-gray-100 text-gray-800'
                 }`}>
                   <div className={`w-1.5 h-1.5 rounded-full mr-1.5 ${
-                    previewData.status === 'active' ? 'bg-blue-500' : 'bg-gray-500'
+                    previewData.status === 'active' ? `bg-${fullColor}` : 'bg-gray-500'
                   }`} />
                   {previewData.status === 'active' ? 'Active' : 'Inactive'}
                 </div>
@@ -628,7 +630,7 @@ const CreateAttendant = () => {
                   </div>
                   <div className="flex flex-wrap gap-1">
                     {previewData.areas.map((area, index) => (
-                      <span key={index} className="px-1.5 py-0.5 bg-blue-100 text-blue-800 rounded-full text-xs">
+                      <span key={index} className={`px-1.5 py-0.5 bg-${themeColor}-100 text-${fullColor} rounded-full text-xs`}>
                         {area}
                       </span>
                     ))}
