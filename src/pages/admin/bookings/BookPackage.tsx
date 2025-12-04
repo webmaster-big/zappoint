@@ -41,7 +41,7 @@ const BookPackage: React.FC = () => {
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [paymentError, setPaymentError] = useState("");
   const [authorizeApiLoginId, setAuthorizeApiLoginId] = useState("");
-  const [authorizeEnvironment, setAuthorizeEnvironment] = useState<'sandbox' | 'production'>('sandbox');
+  const [authorizeEnvironment] = useState<'sandbox' | 'production'>('sandbox');
   const [showNoAuthAccountModal, setShowNoAuthAccountModal] = useState(false);
   
   // Date and time selection
@@ -529,7 +529,7 @@ const BookPackage: React.FC = () => {
         duration_unit: pkg.duration_unit,
         total_amount: total,
         amount_paid: amountToPay,
-        payment_method: 'credit' as const,
+        payment_method: 'card' as const,
         payment_status: (paymentType === 'full' ? 'paid' : 'partial') as 'paid' | 'partial',
         status: 'confirmed' as const,
         additional_attractions: additionalAttractions.length > 0 ? additionalAttractions : undefined,

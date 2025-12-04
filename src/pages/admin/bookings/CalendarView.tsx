@@ -359,12 +359,12 @@ const CalendarView: React.FC = () => {
                 </div>
                 <div className="mt-2 text-sm space-y-1">
                   <p>Participants: {booking.participants}</p>
-                  {booking.location && (
+                  {booking.location ? (
                     <p className="flex items-center text-gray-600">
                       <MapPin className="h-3 w-3 mr-1" />
-                      {(booking.location as { name?: string }).name || 'N/A'}
+                      {String((booking.location as { name?: string }).name || 'N/A')}
                     </p>
-                  )}
+                  ) : null}
                   <p>Ref: #{booking.reference_number}</p>
                 </div>
               </div>
@@ -551,12 +551,12 @@ const CalendarView: React.FC = () => {
                 </div>
                 <div className="mt-2 text-sm space-y-1">
                   <p>Participants: {booking.participants}</p>
-                  {booking.location && (
+                  {booking.location ? (
                     <p className="flex items-center text-gray-600">
                       <MapPin className="h-3 w-3 mr-1" />
-                      {(booking.location as { name?: string }).name || 'N/A'}
+                      {String((booking.location as { name?: string }).name || 'N/A')}
                     </p>
-                  )}
+                  ) : null}
                   <p>Ref: #{booking.reference_number}</p>
                 </div>
               </div>
@@ -893,12 +893,12 @@ const CalendarView: React.FC = () => {
                             <PackageIcon className="h-4 w-4 text-gray-400 mr-2" />
                             <span className="truncate">{booking.package?.name || 'N/A'}</span>
                           </div>
-                          {booking.location && (
+                          {booking.location ? (
                             <div className="flex items-center text-gray-600">
                               <MapPin className="h-4 w-4 text-gray-400 mr-2" />
-                              <span className="truncate">{(booking.location as { name?: string }).name || 'N/A'}</span>
+                              <span className="truncate">{String((booking.location as { name?: string }).name || 'N/A')}</span>
                             </div>
-                          )}
+                          ) : null}
                         </div>
 
                         {(booking.attractions?.length || booking.addOns?.length) && (
@@ -1008,29 +1008,27 @@ const CalendarView: React.FC = () => {
                 </div>
 
                 {/* Date & Time */}
-                <>
-                  <div className="mb-6">
-                    <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Date & Time</h4>
-                    <div className="bg-gray-50 rounded-lg p-4 space-y-3">
-                      <div className="flex items-center">
-                        <CalendarIcon className="h-4 w-4 text-gray-400 mr-3" />
-                        <span className="text-sm text-gray-900">{new Date(selectedBooking.booking_date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span>
-                      </div>
-                      <div className="flex items-center">
-                        <Clock className="h-4 w-4 text-gray-400 mr-3" />
-                        <span className="text-sm text-gray-900">{selectedBooking.booking_time}</span>
-                      </div>
-                      <div className="flex justify-between items-center pt-2 border-t border-gray-200">
-                        <span className="text-sm text-gray-600">Duration</span>
-                        <span className="text-sm font-medium text-gray-900">{selectedBooking.duration} {selectedBooking.duration_unit}</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-gray-600">Participants</span>
-                        <span className="text-sm font-medium text-gray-900">{selectedBooking.participants}</span>
-                      </div>
+                <div className="mb-6">
+                  <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Date & Time</h4>
+                  <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+                    <div className="flex items-center">
+                      <CalendarIcon className="h-4 w-4 text-gray-400 mr-3" />
+                      <span className="text-sm text-gray-900">{new Date(selectedBooking.booking_date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                    </div>
+                    <div className="flex items-center">
+                      <Clock className="h-4 w-4 text-gray-400 mr-3" />
+                      <span className="text-sm text-gray-900">{selectedBooking.booking_time}</span>
+                    </div>
+                    <div className="flex justify-between items-center pt-2 border-t border-gray-200">
+                      <span className="text-sm text-gray-600">Duration</span>
+                      <span className="text-sm font-medium text-gray-900">{selectedBooking.duration} {selectedBooking.duration_unit}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Participants</span>
+                      <span className="text-sm font-medium text-gray-900">{selectedBooking.participants}</span>
                     </div>
                   </div>
-                </>
+                </div>
 
                 {/* Package Details */}
                 <div className="mb-6">
@@ -1052,32 +1050,32 @@ const CalendarView: React.FC = () => {
                 </div>
 
                 {/* Location */}
-                {selectedBooking.location && (
+                {selectedBooking.location ? (
                   <div className="mb-6">
                     <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Location</h4>
                     <div className="bg-gray-50 rounded-lg p-4">
                       <div className="flex items-center">
                         <MapPin className="h-4 w-4 text-gray-400 mr-3" />
-                        <span className="font-medium text-gray-900">{(selectedBooking.location as { name?: string }).name || 'N/A'}</span>
+                        <span className="font-medium text-gray-900">{String((selectedBooking.location as { name?: string }).name || 'N/A')}</span>
                       </div>
                     </div>
                   </div>
-                )}
+                ) : null}
 
                 {/* Room */}
-                {selectedBooking.room && (
+                {selectedBooking.room ? (
                   <div className="mb-6">
                     <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Room</h4>
                     <div className="bg-gray-50 rounded-lg p-4">
                       <div className="flex items-center justify-between">
-                        <span className="font-medium text-gray-900">{(selectedBooking.room as { name?: string }).name || 'N/A'}</span>
+                        <span className="font-medium text-gray-900">{String((selectedBooking.room as { name?: string }).name || 'N/A')}</span>
                         {(selectedBooking.room as { capacity?: number }).capacity && (
                           <span className="text-sm text-gray-600">Capacity: {(selectedBooking.room as { capacity?: number }).capacity}</span>
                         )}
                       </div>
                     </div>
                   </div>
-                )}
+                ) : null}
 
                 {/* Attractions */}
                 {selectedBooking.attractions && Array.isArray(selectedBooking.attractions) && selectedBooking.attractions.length > 0 && (

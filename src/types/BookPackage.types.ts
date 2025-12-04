@@ -74,6 +74,8 @@ export interface BookPackagePackage {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  partial_payment_percentage?: number | null;
+  partial_payment_fixed?: number | null;
   location?: {
     id: number;
     company_id: number;

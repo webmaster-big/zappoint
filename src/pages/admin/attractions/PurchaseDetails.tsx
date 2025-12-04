@@ -53,7 +53,7 @@ const PurchaseDetails = () => {
 
   const handleStatusChange = async (newStatus: string) => {
     try {
-      await attractionPurchaseService.updatePurchase(Number(id), { status: newStatus });
+      await attractionPurchaseService.updatePurchase(Number(id), { status: newStatus as 'pending' | 'completed' | 'cancelled' });
       setToast({ message: 'Status updated successfully', type: 'success' });
       loadPurchaseDetails();
     } catch (error) {
@@ -97,7 +97,6 @@ const PurchaseDetails = () => {
   }
 
   const status = purchase.status === 'completed' ? 'completed' : purchase.status;
-  const StatusIcon = statusConfig[status as keyof typeof statusConfig]?.icon || CheckCircle;
 
   return (
     <div className="min-h-screen px-6 py-8 animate-fade-in-up">

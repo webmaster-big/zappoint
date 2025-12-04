@@ -4,6 +4,8 @@ export interface AttendantActivityLogsLog {
   id: string;
   attendantId: string;
   attendantName: string;
+  userId?: string;
+  userType?: string;
   action: string;
   resourceType: 'package' | 'customer' | 'purchase' | 'attraction' | 'booking' | 'attendant';
   resourceId?: string;

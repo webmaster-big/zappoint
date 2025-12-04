@@ -47,7 +47,6 @@ const LocationActivityLogs = () => {
     dateRange: 'all',
     search: ''
   });
-  const [exportLocation, setExportLocation] = useState<string>('all');
   const [exportSelectedLocations, setExportSelectedLocations] = useState<string[]>([]);
   const [showAllLocations, setShowAllLocations] = useState(false);
   const [exportSelectedUsers, setExportSelectedUsers] = useState<string[]>([]);
@@ -373,30 +372,30 @@ const LocationActivityLogs = () => {
     setCurrentPage(1);
   };
 
-  const exportLogs = () => {
-    const csvContent = [
-      ['Timestamp', 'Location', 'User', 'User Type', 'Action', 'Resource Type', 'Resource Name', 'Details', 'Severity'],
-      ...filteredLogs.map(log => [
-        new Date(log.timestamp).toLocaleString(),
-        log.location,
-        log.userName,
-        log.userType,
-        log.action,
-        log.resourceType,
-        log.resourceName || '',
-        log.details,
-        log.severity
-      ])
-    ].map(row => row.join(',')).join('\n');
+  // const exportLogs = () => {
+  //   const csvContent = [
+  //     ['Timestamp', 'Location', 'User', 'User Type', 'Action', 'Resource Type', 'Resource Name', 'Details', 'Severity'],
+  //     ...filteredLogs.map(log => [
+  //       new Date(log.timestamp).toLocaleString(),
+  //       log.location,
+  //       log.userName,
+  //       log.userType,
+  //       log.action,
+  //       log.resourceType,
+  //       log.resourceName || '',
+  //       log.details,
+  //       log.severity
+  //     ])
+  //   ].map(row => row.join(',')).join('\n');
 
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `location-activity-logs-${selectedLocation}-${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-    window.URL.revokeObjectURL(url);
-  };
+  //   const blob = new Blob([csvContent], { type: 'text/csv' });
+  //   const url = window.URL.createObjectURL(blob);
+  //   const a = document.createElement('a');
+  //   a.href = url;
+  //   a.download = `location-activity-logs-${selectedLocation}-${new Date().toISOString().split('T')[0]}.csv`;
+  //   a.click();
+  //   window.URL.revokeObjectURL(url);
+  // };
 
   const handleExportWithFilters = async () => {
     setIsExporting(true);

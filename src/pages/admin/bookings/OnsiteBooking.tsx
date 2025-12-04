@@ -220,9 +220,9 @@ const OnsiteBooking: React.FC = () => {
         const user = JSON.parse(localStorage.getItem('zapzone_user') || '{}');
         const locationId = user.location_id || 1;
         const settings = await getAuthorizeNetPublicKey(locationId);
-        if (settings) {
-          setAuthorizeApiLoginId(settings.api_login_id);
-          setAuthorizeEnvironment(settings.environment);
+        if (settings && settings.data) {
+          setAuthorizeApiLoginId(settings.data.api_login_id);
+          setAuthorizeEnvironment(settings.data.environment);
         } else {
           setShowNoAuthAccountModal(true);
         }
@@ -603,7 +603,7 @@ const OnsiteBooking: React.FC = () => {
     
     // Attractions
     bookingData.selectedAttractions.forEach(({ id, quantity }) => {
-      const attraction = selectedPackage?.attractions?.find(a => a.id === id);
+      const attraction = selectedPackage?.attractions?.find(a => a.id === Number(id));
       if (attraction) {
         if (attraction.pricingType === 'per_person') {
           total += attraction.price * quantity * bookingData.participants;
@@ -705,7 +705,7 @@ const OnsiteBooking: React.FC = () => {
       const additionalAttractions = bookingData.selectedAttractions
         .filter(({ quantity }) => quantity > 0)
         .map(({ id, quantity }) => {
-          const attraction = selectedPackage?.attractions?.find(a => a.id === id);
+          const attraction = selectedPackage?.attractions?.find(a => a.id === Number(id));
           const numId = typeof id === 'number' ? id : parseInt(id, 10);
           
           if (isNaN(numId) || !attraction) {
@@ -795,23 +795,25 @@ const OnsiteBooking: React.FC = () => {
           await loadAcceptJS(authorizeEnvironment);
           
           // Process payment
-          const paymentResult = await processCardPayment({
+        const paymentResult = await processCardPayment(
+          {
             cardNumber: cardNumber.replace(/\s/g, ''),
-            cardMonth,
-            cardYear,
-            cardCVV,
-            amount: amountPaid,
-            apiLoginId: authorizeApiLoginId,
-            environment: authorizeEnvironment
-          });
-          
-          if (!paymentResult.success) {
-            setPaymentError(paymentResult.error || 'Payment processing failed');
+            month: cardMonth,
+            year: cardYear,
+            cardCode: cardCVV
+          },
+          {
+            location_id: 1,
+            amount: amountPaid
+          },
+          authorizeApiLoginId
+        );          if (!paymentResult.success) {
+            setPaymentError(paymentResult.message || 'Payment processing failed');
             setIsProcessingPayment(false);
             return;
           }
           
-          console.log('✅ Payment processed successfully:', paymentResult.transactionId);
+          console.log('✅ Payment processed successfully:', paymentResult.transaction_id);
         } catch (paymentErr: any) {
           console.error('❌ Payment processing error:', paymentErr);
           
@@ -952,7 +954,7 @@ const OnsiteBooking: React.FC = () => {
               <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Attractions</h4>
               <div className="space-y-1.5">
                 {bookingData.selectedAttractions.map(({ id, quantity }) => {
-                  const attraction = selectedPackage?.attractions?.find(a => a.id === id);
+                  const attraction = selectedPackage?.attractions?.find(a => a.id === Number(id));
                   if (!attraction) return null;
                   const price = attraction.price * quantity * (attraction.pricingType === 'per_person' ? bookingData.participants : 1);
                   return (
@@ -1389,8 +1391,8 @@ const OnsiteBooking: React.FC = () => {
           <p className="text-sm text-gray-600 mb-4">Enhance your experience with individual attraction tickets</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {selectedPackage.attractions.map(attraction => {
-            const isSelected = bookingData.selectedAttractions.some(a => a.id === attraction.id);
-            const selectedQty = bookingData.selectedAttractions.find(a => a.id === attraction.id)?.quantity || 0;
+            const isSelected = bookingData.selectedAttractions.some(a => a.id === String(attraction.id));
+            const selectedQty = bookingData.selectedAttractions.find(a => a.id === String(attraction.id))?.quantity || 0;
             
             return (
               <div
@@ -1421,7 +1423,7 @@ const OnsiteBooking: React.FC = () => {
                   </div>
                   <button
                     type="button"
-                    onClick={() => handleAttractionToggle(attraction.id)}
+                    onClick={() => handleAttractionToggle(String(attraction.id))}
                     className={`ml-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                       isSelected
                         ? 'bg-red-100 text-red-700 hover:bg-red-200'
@@ -1438,7 +1440,7 @@ const OnsiteBooking: React.FC = () => {
                     <div className="flex items-center gap-3">
                       <button
                         type="button"
-                        onClick={() => handleAttractionQuantityChange(attraction.id, selectedQty - 1)}
+                        onClick={() => handleAttractionQuantityChange(String(attraction.id), selectedQty - 1)}
                         className={`p-2 rounded-lg bg-white border-2 border-gray-300 hover:border-${themeColor}-400 transition-colors`}
                       >
                         <Minus size={16} className="text-gray-600" />
@@ -1446,7 +1448,7 @@ const OnsiteBooking: React.FC = () => {
                       <span className="font-bold text-lg text-gray-900 w-8 text-center">{selectedQty}</span>
                       <button
                         type="button"
-                        onClick={() => handleAttractionQuantityChange(attraction.id, selectedQty + 1)}
+                        onClick={() => handleAttractionQuantityChange(String(attraction.id), selectedQty + 1)}
                         className={`p-2 rounded-lg bg-white border-2 border-gray-300 hover:border-${themeColor}-400 transition-colors`}
                       >
                         <Plus size={16} className="text-gray-600" />
@@ -1793,7 +1795,7 @@ const OnsiteBooking: React.FC = () => {
               <h4 className="font-semibold text-gray-900 mb-3">Additional Attractions</h4>
               <div className="space-y-2">
                 {bookingData.selectedAttractions.map(({ id, quantity }) => {
-                  const attraction = selectedPackage?.attractions?.find(a => a.id === id);
+                  const attraction = selectedPackage?.attractions?.find(a => String(a.id) === id);
                   const price = attraction ? attraction.price * quantity * (attraction.pricingType === 'per_person' ? bookingData.participants : 1) : 0;
                   return (
                     <div key={id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
@@ -2088,7 +2090,7 @@ const OnsiteBooking: React.FC = () => {
               <span className="text-gray-600">Attractions</span>
               <span className="font-medium">
                 ${bookingData.selectedAttractions.reduce((sum, { id, quantity }) => {
-                  const attraction = selectedPackage?.attractions?.find(a => a.id === id);
+                  const attraction = selectedPackage?.attractions?.find(a => String(a.id) === id);
                   return sum + (attraction ? attraction.price * quantity * (attraction.pricingType === 'per_person' ? bookingData.participants : 1) : 0);
                 }, 0).toFixed(2)}
               </span>

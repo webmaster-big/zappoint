@@ -216,10 +216,6 @@ const Packages: React.FC = () => {
     return "Not specified";
   };
 
-  // Domain for booking links
-//   or how about using an the url 
-  const bookingDomain = window.location.origin; 
-
   // Export functionality
   const handleOpenExportModal = () => {
     setSelectedForExport(packages.map(pkg => pkg.id));

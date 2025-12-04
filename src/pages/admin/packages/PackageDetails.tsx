@@ -11,7 +11,6 @@ import {
   MapPin, 
   Clock,
   DollarSign,
-  Package as PackageIcon,
   CheckCircle,
   XCircle,
   Copy
@@ -276,7 +275,7 @@ const PackageDetails = () => {
               <h2 className="text-xl font-bold text-gray-900 mb-4">Weekly Availability</h2>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {daysOfWeek.map((day) => {
-                  const isAvailable = packageData.available_days?.includes(day);
+                  const isAvailable = packageData.available_days?.includes(day as never);
                   return (
                     <div
                       key={day}

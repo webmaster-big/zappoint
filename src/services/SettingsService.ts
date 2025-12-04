@@ -7,7 +7,8 @@ import type {
   SettingsUpdatePasswordData,
   SettingsUser,
   SettingsApiResponse,
-} from '../types/Settings.types';
+  SettingsAuthorizeNetAccount,
+} from '../types/settings.types';
 
 // Create axios instance with base configuration
 const api = axios.create({
@@ -94,8 +95,8 @@ export const disconnectAuthorizeNetAccount = async (locationId?: number): Promis
  * @param locationId - The location ID to get the public key for
  * @returns API Login ID (public key only, transaction key never exposed)
  */
-export const getAuthorizeNetPublicKey = async (locationId: number): Promise<SettingsApiResponse<{ api_login_id: string }>> => {
-  const response = await api.get<SettingsApiResponse<{ api_login_id: string }>>(`/authorize-net/public-key/${locationId}`);
+export const getAuthorizeNetPublicKey = async (locationId: number): Promise<SettingsApiResponse<{ api_login_id: string; environment: 'sandbox' | 'production' }>> => {
+  const response = await api.get<SettingsApiResponse<{ api_login_id: string; environment: 'sandbox' | 'production' }>>(`/authorize-net/public-key/${locationId}`);
   return response.data;
 };
 

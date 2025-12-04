@@ -47,7 +47,7 @@ export interface Attraction {
   capacity: number;
   rating: number;
   image: string;
-  category: 'adventure' | 'technology' | 'sports' | 'games';
+  category: 'adventure' | 'technology' | 'sports' | 'games' | string;
   availableLocations: string[];
   duration?: string;
   pricingType?: string;
@@ -72,7 +72,7 @@ export interface Package {
   includes: string[];
   rating: number;
   image: string;
-  category: 'celebration' | 'corporate' | 'family' | 'adventure' | 'romance' | 'premium';
+  category: 'celebration' | 'corporate' | 'family' | 'adventure' | 'romance' | 'premium' | string;
   availableLocations: string[];
   bookingLinks?: PackageBookingLink[];
 }

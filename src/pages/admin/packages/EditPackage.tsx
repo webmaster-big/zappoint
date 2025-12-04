@@ -27,6 +27,7 @@ const EditPackage: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const [submitting, setSubmitting] = useState(false);
+    const [loading, setLoading] = useState(true);
     const [notFound, setNotFound] = useState(false);
     
     // State for fetched data from backend

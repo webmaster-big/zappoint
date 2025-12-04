@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import type { CreatePurchaseAttraction, CreatePurchaseCustomerInfo } from '../../../types/CreatePurchase.types';
-import { attractionService } from '../../../services/AttractionService';
+import { attractionService, type Attraction } from '../../../services/AttractionService';
 import { attractionPurchaseService } from '../../../services/AttractionPurchaseService';
 import { customerService, type Customer } from '../../../services/CustomerService';
 import { generatePurchaseQRCode } from '../../../utils/qrcode';
@@ -54,7 +54,7 @@ const CreatePurchase = () => {
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [paymentError, setPaymentError] = useState('');
   const [authorizeApiLoginId, setAuthorizeApiLoginId] = useState('');
-  const [authorizeEnvironment, setAuthorizeEnvironment] = useState<'sandbox' | 'production'>('sandbox');
+  const [authorizeEnvironment] = useState<'sandbox' | 'production'>('sandbox');
   const [showNoAuthAccountModal, setShowNoAuthAccountModal] = useState(false);
 
   // Load attractions from backend
@@ -69,7 +69,7 @@ const CreatePurchase = () => {
         });
         
         // Convert API format to component format
-        const convertedAttractions: CreatePurchaseAttraction[] = response.data.attractions.map(attr => ({
+        const convertedAttractions: CreatePurchaseAttraction[] = response.data.attractions.map((attr: Attraction & { location?: { id: number; name: string } }) => ({
           id: attr.id.toString(),
           name: attr.name,
           description: attr.description,
@@ -298,7 +298,8 @@ const CreatePurchase = () => {
         amount: totalAmount,
         currency: 'USD',
         method: paymentMethod as 'card' | 'cash',
-        status: paymentMethod === 'cash' ? 'pending' : 'completed', // Card (manual or Authorize.Net) is completed, cash is pending
+        payment_method: paymentMethod as 'card' | 'cash',
+        status: (paymentMethod === 'cash' ? 'pending' : 'completed') as 'pending' | 'completed' | 'cancelled',
         payment_id: transactionId, // Only present if Authorize.Net was used
         location_id: selectedAttraction.locationId || 1,
         purchase_date: new Date().toISOString().split('T')[0],

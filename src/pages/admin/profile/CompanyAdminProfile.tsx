@@ -29,8 +29,6 @@ const CompanyAdminProfile = () => {
   const [isFetching, setIsFetching] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [userId, setUserId] = useState<number | null>(null);
-  const [companyId, setCompanyId] = useState<number | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   // Profile data state
@@ -112,9 +110,6 @@ const CompanyAdminProfile = () => {
         setError('User has no company assigned. Please contact support.');
         return;
       }
-      
-      setUserId(user.id);
-      setCompanyId(user.company_id);
 
       // Check if we have complete user data in localStorage
       const hasCompleteUserData = user.first_name && user.last_name && user.email;
@@ -395,15 +390,15 @@ const CompanyAdminProfile = () => {
     }));
   };
 
-  const handleBusinessChange = (field: string, value: string | number) => {
-    setEditedData(prev => ({
-      ...prev,
-      business: {
-        ...prev.business,
-        [field]: value
-      }
-    }));
-  };
+  // const handleBusinessChange = (field: string, value: string | number) => {
+  //   setEditedData(prev => ({
+  //     ...prev,
+  //     business: {
+  //       ...prev.business,
+  //       [field]: value
+  //     }
+  //   }));
+  // };
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

@@ -8,7 +8,6 @@ import {
   ChevronLeft,
   Plus,
   Download,
-  Mail,
   Zap,
   TrendingUp,
   Ticket,
@@ -24,8 +23,7 @@ import { useThemeColor } from '../../hooks/useThemeColor';
 import CounterAnimation from '../../components/ui/CounterAnimation';
 import { getStoredUser } from '../../utils/storage';
 import bookingService from '../../services/bookingService';
-import { attractionPurchaseService } from '../../services/AttractionPurchaseService';
-import { locationService, type Location } from '../../services/LocationService';
+import { locationService } from '../../services/LocationService';
 import { metricsService } from '../../services/MetricsService';
 
 const LocationManagerDashboard: React.FC = () => {
@@ -34,7 +32,6 @@ const LocationManagerDashboard: React.FC = () => {
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [loading, setLoading] = useState(true);
   const [locationId, setLocationId] = useState<number>(1);
-  const [locationDetails, setLocationDetails] = useState<Location | null>(null);
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<{ date: Date; hour: number; minute: string; bookings: any[] } | null>(null);
   const [selectedBooking, setSelectedBooking] = useState<any | null>(null);
 
@@ -95,8 +92,8 @@ const LocationManagerDashboard: React.FC = () => {
         console.log('🔄 Starting metrics fetch for location:', locationId);
         
         // Fetch location details
-        const locationResponse = await locationService.getLocation(locationId);
-        setLocationDetails(locationResponse.data);
+        await locationService.getLocation(locationId);
+        // setLocationDetails(locationResponse.data);
         
         // Fetch ALL TIME metrics (no date filter for main metrics)
         console.log('📊 Fetching all-time metrics...');

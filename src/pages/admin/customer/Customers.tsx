@@ -22,7 +22,6 @@ import { getStoredUser } from '../../../utils/storage';
 
 const CustomerListing: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
-  const [customers, setCustomers] = useState<CustomersCustomer[]>([]);
   const [filteredCustomers, setFilteredCustomers] = useState<CustomersCustomer[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -91,12 +90,11 @@ const CustomerListing: React.FC = () => {
             totalSpent: customer.total_spent || 0,
             bookings: customer.total_bookings || 0,
             ticketsPurchased: customer.total_ticket_quantity || 0,
-            status: determineStatus(customer),
+            status: determineStatus(customer) as 'active' | 'inactive' | 'new' | 'guest',
             satisfaction: customer.satisfaction || 0,
             tags: customer.status === 'guest' ? ['Guest'] : (customer.tags || [])
           }));
 
-        setCustomers(formattedCustomers);
         setFilteredCustomers(formattedCustomers);
         setTotalCustomers(response.data.pagination.total);
       }

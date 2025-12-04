@@ -148,6 +148,7 @@ const ManageAttractions = () => {
   const statusColors = {
     active: `bg-${themeColor}-100 text-${fullColor}`,
     inactive: 'bg-gray-100 text-gray-800',
+    maintenance: 'bg-yellow-100 text-yellow-800',
   };
 
   // Calculate metrics data
@@ -225,7 +226,7 @@ const ManageAttractions = () => {
         location: attr.location?.name || '',
         locationId: attr.location_id,
         locationName: attr.location?.name || '',
-        images: attr.image ? [attr.image] : [],
+        images: attr.image ? (Array.isArray(attr.image) ? attr.image : [attr.image]) : [],
         status: attr.is_active ? 'active' : 'inactive',
         createdAt: attr.created_at,
         availability: typeof attr.availability === 'object' ? attr.availability as Record<string, boolean> : {

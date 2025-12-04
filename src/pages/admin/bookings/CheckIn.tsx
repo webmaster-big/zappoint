@@ -945,7 +945,7 @@ const CheckIn: React.FC = () => {
                       </div>
                     )}
 
-                    {verifiedBooking.location && typeof verifiedBooking.location === 'object' && (
+                    {(verifiedBooking.location && typeof verifiedBooking.location === 'object') ? (
                       <div className="flex items-center gap-3 col-span-full">
                         <div className={`p-2 bg-${themeColor}-100 rounded-lg`}>
                           <Home className={`h-5 w-5 text-${fullColor}`} />
@@ -960,9 +960,9 @@ const CheckIn: React.FC = () => {
                           )}
                         </div>
                       </div>
-                    )}
+                    ) : null}
 
-                    {verifiedBooking.room && typeof verifiedBooking.room === 'object' && (
+                    {(verifiedBooking.room && typeof verifiedBooking.room === 'object') ? (
                       <div className="flex items-center gap-3 col-span-full">
                         <div className={`p-2 bg-${themeColor}-100 rounded-lg`}>
                           <Home className={`h-5 w-5 text-${fullColor}`} />
@@ -972,7 +972,7 @@ const CheckIn: React.FC = () => {
                           <p className="font-medium text-gray-800">{(verifiedBooking.room as { name: string })?.name || 'N/A'}</p>
                         </div>
                       </div>
-                    )}
+                    ) : null}
 
                     
 
@@ -984,7 +984,7 @@ const CheckIn: React.FC = () => {
                         <div>
                           <p className="text-xs text-gray-500">Attractions ({verifiedBooking.attractions.length})</p>
                           <div className="space-y-1 mt-1">
-                            {verifiedBooking.attractions.map((attraction: Record<string, unknown>, index: number) => (
+                            {(verifiedBooking.attractions as Record<string, unknown>[]).map((attraction, index: number) => (
                               <p key={index} className="font-medium text-gray-800">
                                 • {attraction.name as string} - ${Number(attraction.price).toFixed(2)}
                               </p>
@@ -1002,7 +1002,7 @@ const CheckIn: React.FC = () => {
                         <div>
                           <p className="text-xs text-gray-500">Add-Ons ({verifiedBooking.addOns.length})</p>
                           <div className="space-y-1 mt-1">
-                            {verifiedBooking.addOns.map((addon: Record<string, unknown>, index: number) => (
+                            {(verifiedBooking.addOns as Record<string, unknown>[]).map((addon, index: number) => (
                               <p key={index} className="font-medium text-gray-800">
                                 • {addon.name as string} - ${Number(addon.price).toFixed(2)}
                               </p>
@@ -1392,7 +1392,7 @@ const CheckIn: React.FC = () => {
                       </div>
                     )}
 
-                    {selectedBooking.location && typeof selectedBooking.location === 'object' && (
+                    {(selectedBooking.location && typeof selectedBooking.location === 'object') ? (
                       <div className="flex items-center gap-3 col-span-full">
                         <div className={`p-2 bg-${themeColor}-100 rounded-lg`}>
                           <Home className={`h-5 w-5 text-${fullColor}`} />
@@ -1407,9 +1407,9 @@ const CheckIn: React.FC = () => {
                           )}
                         </div>
                       </div>
-                    )}
+                    ) : null}
 
-                    {selectedBooking.room && typeof selectedBooking.room === 'object' && (
+                    {(selectedBooking.room && typeof selectedBooking.room === 'object') ? (
                       <div className="flex items-center gap-3 col-span-full">
                         <div className={`p-2 bg-${themeColor}-100 rounded-lg`}>
                           <Home className={`h-5 w-5 text-${fullColor}`} />
@@ -1419,7 +1419,7 @@ const CheckIn: React.FC = () => {
                           <p className="font-medium text-gray-800">{(selectedBooking.room as { name: string })?.name || 'N/A'}</p>
                         </div>
                       </div>
-                    )}
+                    ) : null}
 
                     {selectedBooking.attractions && Array.isArray(selectedBooking.attractions) && selectedBooking.attractions.length > 0 && (
                       <div className="flex items-start gap-3 col-span-full">
@@ -1429,7 +1429,7 @@ const CheckIn: React.FC = () => {
                         <div>
                           <p className="text-xs text-gray-500">Attractions ({selectedBooking.attractions.length})</p>
                           <div className="space-y-1 mt-1">
-                            {selectedBooking.attractions.map((attraction: Record<string, unknown>, index: number) => (
+                            {(selectedBooking.attractions as Record<string, unknown>[]).map((attraction, index: number) => (
                               <p key={index} className="font-medium text-gray-800">
                                 • {attraction.name as string} - ${Number(attraction.price).toFixed(2)}
                               </p>
@@ -1447,7 +1447,7 @@ const CheckIn: React.FC = () => {
                         <div>
                           <p className="text-xs text-gray-500">Add-Ons ({selectedBooking.addOns.length})</p>
                           <div className="space-y-1 mt-1">
-                            {selectedBooking.addOns.map((addon: Record<string, unknown>, index: number) => (
+                            {(selectedBooking.addOns as Record<string, unknown>[]).map((addon, index: number) => (
                               <p key={index} className="font-medium text-gray-800">
                                 • {addon.name as string} - ${Number(addon.price).toFixed(2)}
                               </p>

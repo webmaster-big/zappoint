@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Edit, Trash2, Utensils, Download, Upload, X, CheckSquare, Square, MapPin } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Utensils, Download, Upload, X, CheckSquare, Square } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { addOnService } from '../../../services';
 import Toast from '../../../components/ui/Toast';
@@ -112,7 +112,7 @@ const ManageAddons = () => {
           name: addon.name,
           price: addon.price || 0,
           image: addon.image ? `${ASSET_URL}${addon.image}` : '/api/placeholder/200/200',
-          location: addon.location || null,
+          location: addon.location && typeof addon.location === 'object' ? addon.location : null,
         }));
         setAddons(formattedAddons);
       }

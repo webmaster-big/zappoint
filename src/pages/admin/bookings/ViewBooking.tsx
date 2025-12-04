@@ -193,7 +193,7 @@ const ViewBooking: React.FC = () => {
               </div>
 
               {/* Package */}
-              {booking.package && (
+              {booking.package ? (
                 <div className="flex items-start gap-3">
                   <div className={`p-2 bg-${themeColor}-100 rounded-lg`}>
                     <Package className={`h-5 w-5 text-${fullColor}`} />
@@ -204,7 +204,7 @@ const ViewBooking: React.FC = () => {
                     {booking.package.category && <p className="text-sm text-gray-600">{booking.package.category}</p>}
                   </div>
                 </div>
-              )}
+              ) : null}
 
               {/* Date & Time */}
               <div className="flex items-start gap-3">
@@ -248,7 +248,7 @@ const ViewBooking: React.FC = () => {
               </div>
 
               {/* Location */}
-              {booking.location && typeof booking.location === 'object' && (
+              {(booking.location && typeof booking.location === 'object') ? (
                 <div className="flex items-start gap-3">
                   <div className={`p-2 bg-${themeColor}-100 rounded-lg`}>
                     <MapPin className={`h-5 w-5 text-${fullColor}`} />
@@ -263,10 +263,10 @@ const ViewBooking: React.FC = () => {
                     )}
                   </div>
                 </div>
-              )}
+              ) : null}
 
               {/* Room */}
-              {booking.room && typeof booking.room === 'object' && (
+              {(booking.room && typeof booking.room === 'object') ? (
                 <div className="flex items-start gap-3">
                   <div className={`p-2 bg-${themeColor}-100 rounded-lg`}>
                     <Home className={`h-5 w-5 text-${fullColor}`} />
@@ -276,7 +276,7 @@ const ViewBooking: React.FC = () => {
                     <p className="font-medium text-gray-900">{(booking.room as any)?.name}</p>
                   </div>
                 </div>
-              )}
+              ) : null}
 
               {/* Status */}
               <div className="flex items-start gap-3">

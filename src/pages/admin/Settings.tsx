@@ -16,7 +16,7 @@ import type {
   SettingsColorOption,
   SettingsAuthorizeNetAccount,
   SettingsLocation,
-} from '../../types/Settings.types';
+} from '../../types/settings.types';
 import { getStoredUser } from '../../utils/storage';
 
 

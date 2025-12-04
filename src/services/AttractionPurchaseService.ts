@@ -62,9 +62,16 @@ export interface CreatePurchaseData {
   guest_email?: string;
   guest_phone?: string;
   quantity: number;
-  payment_method: 'card' | 'cash' ;
+  payment_method: 'card' | 'cash';
   purchase_date: string;
   notes?: string;
+  // Optional fields for payment tracking
+  amount?: number;
+  currency?: string;
+  method?: string;
+  status?: 'pending' | 'completed' | 'cancelled';
+  payment_id?: string;
+  location_id?: number;
 }
 
 export interface UpdatePurchaseData extends Partial<CreatePurchaseData> {

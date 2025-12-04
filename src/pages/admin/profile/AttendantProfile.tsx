@@ -244,18 +244,18 @@ const AttendantProfile = () => {
     }));
   };
 
-  const handleAddressChange = (field: string, value: string) => {
-    setEditedData(prev => ({
-      ...prev,
-      location: {
-        ...prev.location,
-        address: {
-          ...prev.location.address,
-          [field]: value
-        }
-      }
-    }));
-  };
+  // const handleAddressChange = (field: string, value: string) => {
+  //   setEditedData(prev => ({
+  //     ...prev,
+  //     location: {
+  //       ...prev.location,
+  //       address: {
+  //         ...prev.location.address,
+  //         [field]: value
+  //       }
+  //     }
+  //   }));
+  // };
 
   const handlePhotoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];

@@ -14,6 +14,15 @@ export interface OnsiteBookingAddOn {
   image?: string;
 }
 
+export interface OnsiteBookingAttraction {
+  id: number;
+  name: string;
+  price: number;
+  description?: string;
+  pricingType?: string;
+  image?: string;
+}
+
 export interface OnsiteBookingPackage {
   id: number;
   name: string;
@@ -27,7 +36,7 @@ export interface OnsiteBookingPackage {
   availableDays: string[];
   availableWeekDays: string[];
   availableMonthDays: string[];
-  attractions: string[];
+  attractions: OnsiteBookingAttraction[];
   addOns: OnsiteBookingAddOn[];
   giftCards: OnsiteBookingGiftCard[];
   promos: OnsiteBookingPromo[];
@@ -65,16 +74,6 @@ export interface OnsiteBookingPromo {
   usage_limit_per_user: number;
   usage_limit_total: number;
   description: string;
-}
-
-export interface OnsiteBookingAttraction {
-  id: string;
-  name: string;
-  description: string;
-  price: number;
-  pricingType: 'per_person' | 'per_unit' | 'fixed' | 'per_lane';
-  maxCapacity: number;
-  category: string;
 }
 
 export interface OnsiteBookingData {

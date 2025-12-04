@@ -35,7 +35,6 @@ type ErrorCallback = (error: Event) => void;
 
 class NotificationStreamService {
   private eventSource: EventSource | null = null;
-  private locationId: number | null = null;
   private onNotificationCallback: NotificationCallback | null = null;
   private onErrorCallback: ErrorCallback | null = null;
 
@@ -55,7 +54,6 @@ class NotificationStreamService {
       this.disconnect();
     }
 
-    this.locationId = locationId;
     this.onNotificationCallback = onNotification;
     this.onErrorCallback = onError || null;
 
@@ -153,7 +151,6 @@ class NotificationStreamService {
       console.log('[NotificationStream] Disconnecting from SSE');
       this.eventSource.close();
       this.eventSource = null;
-      this.locationId = null;
       this.onNotificationCallback = null;
       this.onErrorCallback = null;
     }

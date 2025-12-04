@@ -4,7 +4,6 @@ import {
   Calendar, 
   Users, 
   Clock, 
-  Star, 
   Zap,
   Ticket,
   Package,
@@ -33,15 +32,6 @@ const EntertainmentLandingPage = () => {
   const [packages, setPackages] = useState<PackageType[]>([]);
   const [locations, setLocations] = useState<string[]>(['All Locations']);
   const [loading, setLoading] = useState(true);
-
-  // Get customer from localStorage
-  const getCustomer = () => {
-    const customerData = localStorage.getItem('zapzone_customer');
-    return customerData ? JSON.parse(customerData) : null;
-  };
-
-  const customer = getCustomer();
-  const isLoggedIn = customer && customer.token;
 
   // Load data from backend on mount
   useEffect(() => {

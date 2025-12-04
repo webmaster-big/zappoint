@@ -10,8 +10,7 @@ import {
   CheckCircle,
   Clock,
   Filter,
-  Trash2,
-  RefreshCcw
+  Trash2
 } from 'lucide-react';
 import { useThemeColor } from '../../hooks/useThemeColor';
 import type { NotificationsNotification } from '../../types/Notifications.types';

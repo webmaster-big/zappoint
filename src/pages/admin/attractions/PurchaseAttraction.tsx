@@ -7,12 +7,10 @@ import {
   Star,
   Shield,
   Zap,
-  CreditCard,
-  Wallet,
   ShoppingCart
 } from 'lucide-react';
 import type { PurchaseAttractionAttraction, PurchaseAttractionCustomerInfo } from '../../../types/PurchaseAttraction.types';
-import { attractionService } from '../../../services/AttractionService';
+import { attractionService, type Attraction } from '../../../services/AttractionService';
 import { attractionPurchaseService } from '../../../services/AttractionPurchaseService';
 import { customerService, type Customer } from '../../../services/CustomerService';
 import { generatePurchaseQRCode } from '../../../utils/qrcode';
@@ -45,12 +43,11 @@ const PurchaseAttraction = () => {
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [paymentError, setPaymentError] = useState('');
   const [authorizeApiLoginId, setAuthorizeApiLoginId] = useState('');
-  const [authorizeEnvironment, setAuthorizeEnvironment] = useState<'sandbox' | 'production'>('sandbox');
+  const [authorizeEnvironment] = useState<'sandbox' | 'production'>('sandbox');
   const [showNoAuthAccountModal, setShowNoAuthAccountModal] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [qrCodeImage, setQrCodeImage] = useState<string | null>(null);
   const [showQRModal, setShowQRModal] = useState(false);
-  const [purchaseId, setPurchaseId] = useState<number | null>(null);
   const [foundCustomers, setFoundCustomers] = useState<Customer[]>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null);
   const [searchingCustomer, setSearchingCustomer] = useState(false);
@@ -100,7 +97,7 @@ const PurchaseAttraction = () => {
         // If location parameter exists, use it (future enhancement for location-based filtering)
         // For now, we fetch by ID directly
         const response = await attractionService.getAttraction(Number(id));
-        const attr = response.data;
+        const attr = response.data as Attraction & { location?: { id: number; name: string } };
         
         // Convert API format to component format
         const convertedAttraction: PurchaseAttractionAttraction = {
@@ -137,6 +134,8 @@ const PurchaseAttraction = () => {
   // Initialize Authorize.Net
   useEffect(() => {
     const initializeAuthorizeNet = async () => {
+      if (!attraction) return;
+      
       try {
         const locationId = attraction.locationId || 1;
         const response = await getAuthorizeNetPublicKey(locationId);
@@ -311,7 +310,8 @@ const PurchaseAttraction = () => {
         amount: totalAmount,
         currency: 'USD',
         method: 'card',
-        status: 'completed',
+        payment_method: 'card' as 'card' | 'cash',
+        status: 'completed' as 'pending' | 'completed' | 'cancelled',
         payment_id: transactionId,
         location_id: attraction.locationId || 1, // Use attraction's location_id from API
         purchase_date: new Date().toISOString().split('T')[0],
@@ -322,8 +322,6 @@ const PurchaseAttraction = () => {
       // Create purchase via API
       const response = await attractionPurchaseService.createPurchase(purchaseData);
       const createdPurchase = response.data;
-
-      setPurchaseId(createdPurchase.id);
 
       // Generate QR code
       const qrData = await generatePurchaseQRCode(createdPurchase.id);

@@ -39,6 +39,7 @@ const EditAttraction = () => {
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [customCategory, setCustomCategory] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [, setLoading] = useState(true);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
   // Load attraction data

@@ -286,7 +286,7 @@ const CustomerReservations = () => {
                 </div>
                 <div style="background: #f1f5f9; padding: 10px; border-radius: 4px;">
                   <div style="font-size: 11px; color: #64748b; text-transform: uppercase;">Package Price</div>
-                  <div style="font-size: 14px; font-weight: 600; color: #1e293b; margin-top: 2px;">$${typeof pkg.price === 'string' ? parseFloat(pkg.price).toFixed(2) : pkg.price.toFixed(2)}</div>
+                  <div style="font-size: 14px; font-weight: 600; color: #1e293b; margin-top: 2px;">$${typeof pkg.price === 'string' ? parseFloat(pkg.price).toFixed(2) : (pkg.price as number).toFixed(2)}</div>
                 </div>
               </div>
             </div>

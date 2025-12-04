@@ -97,7 +97,8 @@ const AttendantActivityLogs = () => {
     return colors[resourceType] || `bg-${themeColor}-100 text-${fullColor}`;
   };
 
-  const getUserTypeColors = (userType: string) => {
+  const getUserTypeColors = (userType?: string) => {
+    if (!userType) return 'bg-gray-100 text-gray-800';
     const colors: Record<string, string> = {
       company_admin: 'bg-purple-100 text-purple-800',
       location_manager: 'bg-blue-100 text-blue-800',
@@ -119,7 +120,7 @@ const AttendantActivityLogs = () => {
   const getLocationMetrics = () => {
     const locationLogs = filteredLogs;
     const todayLogs = locationLogs.filter(log => isToday(new Date(log.timestamp)));
-    const attendantLogs = locationLogs.filter(log => log.userType === 'attendant');
+    // const attendantLogs = locationLogs.filter(log => log.userType === 'attendant');
 
     return [
       {
@@ -478,7 +479,8 @@ const AttendantActivityLogs = () => {
   // Get unique values for filters
   const getUniqueUsers = () => {
     const users = filteredLogs
-      .map(log => ({ id: log.userId, name: log.attendantName, type: log.userType }));
+      .filter(log => log.userId && log.userType)
+      .map(log => ({ id: log.userId!, name: log.attendantName, type: log.userType! }));
     return [...new Map(users.map(item => [item.id, item])).values()];
   };
 
@@ -583,7 +585,7 @@ const AttendantActivityLogs = () => {
                     const filteredUsers = userSearchQuery
                       ? allUsers.filter(user => 
                           user.name.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
-                          user.type.toLowerCase().includes(userSearchQuery.toLowerCase())
+                          user.type?.toLowerCase().includes(userSearchQuery.toLowerCase())
                         )
                       : allUsers;
                     
@@ -650,7 +652,7 @@ const AttendantActivityLogs = () => {
                                 />
                                 <span className="text-sm text-gray-700 flex-1">{user.name}</span>
                                 <span className={`text-xs px-2 py-0.5 rounded-full ${getUserTypeColors(user.type)}`}>
-                                  {user.type.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+                                  {user.type?.split('_').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') || 'Unknown'}
                                 </span>
                               </label>
                             ))
@@ -936,7 +938,7 @@ const AttendantActivityLogs = () => {
                       <div className="flex items-center gap-3 flex-wrap mb-2">
                         <span className="font-medium text-gray-900">{log.attendantName}</span>
                         <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getUserTypeColors(log.userType)}`}>
-                          {log.userType.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+                          {log.userType?.split('_').map((word: string) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
                         </span>
                         <span className="text-gray-400">•</span>
                         <span className="text-sm text-gray-600">{log.details}</span>

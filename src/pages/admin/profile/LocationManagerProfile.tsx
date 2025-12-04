@@ -206,7 +206,7 @@ const LocationManagerProfile = () => {
         throw new Error('Failed to update personal information');
       }
       
-      const userData = await userResponse.json();
+      // const userData = await userResponse.json();
       
       // Update location data
       const locationResponse = await fetch(`${API_BASE_URL}/locations/${locationId}`, {

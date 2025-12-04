@@ -10,7 +10,7 @@ export interface CustomersCustomer {
   totalSpent: number;
   bookings: number;
   ticketsPurchased: number;
-  status: 'active' | 'inactive' | 'new';
+  status: 'active' | 'inactive' | 'new' | 'guest';
   satisfaction: number;
   tags: string[];
 }

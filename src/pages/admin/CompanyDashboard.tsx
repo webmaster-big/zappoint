@@ -8,7 +8,6 @@ import {
   Plus,
   Search,
   Filter,
-  Download,
   X,
   Activity,
   MapPin,
@@ -29,7 +28,6 @@ import { Link } from 'react-router-dom';
 import { useThemeColor } from '../../hooks/useThemeColor';
 import CounterAnimation from '../../components/ui/CounterAnimation';
 import bookingService from '../../services/bookingService';
-import { attractionPurchaseService } from '../../services/AttractionPurchaseService';
 import { locationService, type Location } from '../../services/LocationService';
 import { metricsService } from '../../services/MetricsService';
 
@@ -53,10 +51,9 @@ const CompanyDashboard: React.FC = () => {
   // Data states
   const [locations, setLocations] = useState<Location[]>([]);
   const [weeklyBookings, setWeeklyBookings] = useState<any[]>([]);
-  const [ticketPurchases, setTicketPurchases] = useState<any[]>([]);
   // All data (unfiltered) for location performance
   const [allWeeklyBookings, setAllWeeklyBookings] = useState<any[]>([]);
-  const [allTicketPurchases, setAllTicketPurchases] = useState<any[]>([]);
+  const [allTicketPurchases] = useState<any[]>([]);
   // Location stats from API (for company_admin)
   const [apiLocationStats, setApiLocationStats] = useState<any>(null);
   const [metrics, setMetrics] = useState({
@@ -117,7 +114,7 @@ const CompanyDashboard: React.FC = () => {
         setLocations(locationsList);
       } catch (error) {
         console.error('Error fetching locations:', error);
-        console.error('Error details:', error.response || error.message);
+        console.error('Error details:', (error as { response?: unknown; message?: string }).response || (error as { response?: unknown; message?: string }).message);
       }
     };
     
@@ -153,9 +150,9 @@ const CompanyDashboard: React.FC = () => {
         }
         
         // Set recent purchases from API response
-        if (metricsResponse.recentPurchases) {
-          setTicketPurchases(metricsResponse.recentPurchases as any);
-        }
+        // if (metricsResponse.recentPurchases) {
+        //   setTicketPurchases(metricsResponse.recentPurchases as any);
+        // }
         
         // For company_admin, we get locationStats directly from API
         // Location stats should be for current week only
@@ -536,7 +533,7 @@ const CompanyDashboard: React.FC = () => {
   // Get top performing locations (top 3)
   const getTopLocations = () => {
     return Object.entries(locationStats)
-      .sort(([, a], [, b]) => b.revenue - a.revenue)
+      .sort(([, a], [, b]) => (b as { revenue: number }).revenue - (a as { revenue: number }).revenue)
       .slice(0, 3);
   };
   const topLocations = getTopLocations();
@@ -546,7 +543,7 @@ const CompanyDashboard: React.FC = () => {
 
   // For All Locations Overview: show top 6 by revenue, with expand/collapse
   const [showAllLocations, setShowAllLocations] = useState(false);
-  const sortedLocations = Object.entries(locationStats).sort(([, a], [, b]) => b.revenue - a.revenue);
+  const sortedLocations = Object.entries(locationStats).sort(([, a], [, b]) => (b as { revenue: number }).revenue - (a as { revenue: number }).revenue);
   const displayedLocations = showAllLocations ? sortedLocations : sortedLocations.slice(0, 4);
 
   // Pagination controls
@@ -623,28 +620,31 @@ const CompanyDashboard: React.FC = () => {
             </h3>
             {topLocations.length > 0 ? (
               <div className="space-y-4">
-                {topLocations.map(([locationId, stats], index) => (
+                {topLocations.map(([locationId, stats], index) => {
+                  const typedStats = stats as { name: string; bookings: number; purchases: number; participants: number; revenue: number; utilization: number };
+                  return (
                   <div key={locationId} className={`flex items-center justify-between p-4 rounded-xl shadow-sm border-2 transition-all bg-${themeColor}-50 border-${fullColor}`}>
                     <div className="flex items-center gap-4">
                       <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-lg bg-${fullColor}`}>
                         {index + 1}
                       </div>
                       <div>
-                        <div className="font-bold text-gray-900 text-lg">{stats.name}</div>
-                        <div className="text-xs text-gray-500">{stats.bookings} bookings • {stats.purchases} tickets • {stats.participants} guests</div>
+                        <div className="font-bold text-gray-900 text-lg">{typedStats.name}</div>
+                        <div className="text-xs text-gray-500">{typedStats.bookings} bookings • {typedStats.purchases} tickets • {typedStats.participants} guests</div>
                       </div>
                     </div>
                     <div className="text-right min-w-[120px]">
-                      <div className={`font-bold text-lg text-${fullColor}`}>${stats.revenue.toFixed(2)}</div>
+                      <div className={`font-bold text-lg text-${fullColor}`}>${typedStats.revenue.toFixed(2)}</div>
                       <div className="flex items-center gap-2 mt-1">
-                        <span className={`text-xs font-semibold text-${fullColor}`}>{stats.utilization}%</span>
+                        <span className={`text-xs font-semibold text-${fullColor}`}>{typedStats.utilization}%</span>
                         <div className={`w-24 h-2 rounded-full overflow-hidden bg-${themeColor}-200`}>
-                          <div className={`h-2 rounded-full bg-${fullColor}`} style={{ width: `${stats.utilization}%` }}></div>
+                          <div className={`h-2 rounded-full bg-${fullColor}`} style={{ width: `${typedStats.utilization}%` }}></div>
                         </div>
                       </div>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <div className="text-center py-8 text-gray-500">
@@ -660,39 +660,42 @@ const CompanyDashboard: React.FC = () => {
             {displayedLocations.length > 0 ? (
               <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {displayedLocations.map(([locationId, stats]) => (
+                  {displayedLocations.map(([locationId, stats]) => {
+                    const typedStats = stats as { name: string; bookings: number; purchases: number; participants: number; revenue: number; utilization: number };
+                    return (
                     <div key={locationId} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow bg-gray-50">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="font-medium text-gray-900 text-sm">{stats.name}</span>
-                        <div className={`w-3 h-3 rounded-full bg-${fullColor}`} title={`${stats.utilization}% utilization`}></div>
+                        <span className="font-medium text-gray-900 text-sm">{typedStats.name}</span>
+                        <div className={`w-3 h-3 rounded-full bg-${fullColor}`} title={`${typedStats.utilization}% utilization`}></div>
                       </div>
                       <div className="flex items-center gap-4 mb-2">
                         <div className="flex-1">
                           <div className="text-xs text-gray-500">Bookings</div>
-                          <div className={`font-bold text-lg text-${fullColor}`}>{stats.bookings}</div>
+                          <div className={`font-bold text-lg text-${fullColor}`}>{typedStats.bookings}</div>
                         </div>
                         <div className="flex-1">
                           <div className="text-xs text-gray-500">Tickets</div>
-                          <div className={`font-bold text-lg text-${fullColor}`}>{stats.purchases}</div>
+                          <div className={`font-bold text-lg text-${fullColor}`}>{typedStats.purchases}</div>
                         </div>
                       </div>
                       <div className="flex items-center gap-4 mb-2">
                         <div className="flex-1">
                           <div className="text-xs text-gray-500">Revenue</div>
-                          <div className={`font-bold text-lg text-${fullColor}`}>${stats.revenue.toFixed(2)}</div>
+                          <div className={`font-bold text-lg text-${fullColor}`}>${typedStats.revenue.toFixed(2)}</div>
                         </div>
                         <div className="flex-1">
                           <div className="text-xs text-gray-500">Utilization</div>
                           <div className="flex items-center gap-2">
-                            <span className={`text-xs font-semibold text-${fullColor}`}>{stats.utilization}%</span>
+                            <span className={`text-xs font-semibold text-${fullColor}`}>{typedStats.utilization}%</span>
                             <div className={`w-16 h-2 rounded-full overflow-hidden bg-${themeColor}-200`}>
-                              <div className={`h-2 rounded-full bg-${fullColor}`} style={{ width: `${stats.utilization}%` }}></div>
+                              <div className={`h-2 rounded-full bg-${fullColor}`} style={{ width: `${typedStats.utilization}%` }}></div>
                             </div>
                           </div>
                         </div>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
                 {sortedLocations.length > 4 && (
                   <div className="flex justify-center mt-4">

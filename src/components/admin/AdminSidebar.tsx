@@ -344,7 +344,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
     }
 
     // Handle incoming notifications
-    const handleNotification = (notification: NotificationObject) => {
+    const handleNotification = async (notification: NotificationObject) => {
       // Get existing notifications from localStorage
       const stored = localStorage.getItem('zapzone_notifications');
       const notifications = stored ? JSON.parse(stored) : [];
@@ -361,7 +361,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
       localStorage.setItem('zapzone_notifications', JSON.stringify(trimmed));
       
       // Update unread count
-      const newUnreadCount = getUnreadCount();
+      const newUnreadCount = await getUnreadCount();
       setUnreadNotifications(newUnreadCount);
       
       // Dispatch custom event for other components

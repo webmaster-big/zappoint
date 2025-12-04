@@ -94,13 +94,13 @@ const sampleNotifications: Notification[] = [
 
 const CustomerNotifications = () => {
   // Get customer from localStorage
-  const getCustomer = () => {
-    const customerData = localStorage.getItem('zapzone_customer');
-    return customerData ? JSON.parse(customerData) : null;
-  };
+  // const getCustomer = () => {
+  //   const customerData = localStorage.getItem('zapzone_customer');
+  //   return customerData ? JSON.parse(customerData) : null;
+  // };
 
-  const customer = getCustomer();
-  const isLoggedIn = customer && customer.token;
+  // const customer = getCustomer();
+  // const isLoggedIn = customer && customer.token;
 
   const [notifications, setNotifications] = useState<Notification[]>(sampleNotifications);
   const [filteredNotifications, setFilteredNotifications] = useState<Notification[]>(sampleNotifications);
