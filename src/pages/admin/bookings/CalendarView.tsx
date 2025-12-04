@@ -1,5 +1,5 @@
 // src/pages/admin/bookings/CalendarView.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   ChevronLeft, 
@@ -12,15 +12,30 @@ import {
   Users,
   CreditCard,
   PackageIcon,
-  Gift
+  RefreshCw,
+  MapPin
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
-import type { CalendarViewBooking, CalendarViewFilterOptions } from '../../../types/calendarView.types';
+import bookingService from '../../../services/bookingService';
+import type { Booking } from '../../../services/bookingService';
+import type { CalendarViewFilterOptions } from '../../../types/calendarView.types';
+import Toast from '../../../components/ui/Toast';
+import type { ToastMessage } from './../../../types/Toast';
+import { getStoredUser } from '../../../utils/storage';
+
+
+interface UserData {
+  name: string;
+  company: string;
+  subcompany?: string;
+  position: string;
+  role: 'attendant' | 'location_manager' | 'company_admin';
+}
 
 const CalendarView: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
-  const [bookings, setBookings] = useState<CalendarViewBooking[]>([]);
-  const [filteredBookings, setFilteredBookings] = useState<CalendarViewBooking[]>([]);
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [filteredBookings, setFilteredBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [filters, setFilters] = useState<CalendarViewFilterOptions>({
@@ -34,153 +49,25 @@ const CalendarView: React.FC = () => {
   });
   const [showFilters, setShowFilters] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [selectedBooking, setSelectedBooking] = useState<CalendarViewBooking | null>(null);
+  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
+  const [toast, setToast] = useState<ToastMessage | null>(null);
+  const [userData, setUserData] = useState<UserData | null>(null);
+  const [filterLocation, setFilterLocation] = useState<string>('all');
 
-  // Load bookings from localStorage
+  // Load user data from localStorage
   useEffect(() => {
-    loadBookings();
+    const stored = localStorage.getItem('zapzone_user');
+    if (stored) {
+      setUserData(JSON.parse(stored));
+    }
   }, []);
 
-  // Apply filters when bookings or filters change
-  useEffect(() => {
-    applyFilters();
-  }, [bookings, filters, currentDate]);
-
-  const loadBookings = () => {
+  // Load bookings from API
+  const loadBookings = useCallback(async () => {
     try {
-      const storedBookings = localStorage.getItem('zapzone_bookings');
-      if (storedBookings) {
-        const parsedBookings = JSON.parse(storedBookings);
-        // Filter out any attraction bookings, keep only packages
-        const packageBookings = parsedBookings.filter((booking: any) => booking.type === 'package');
-        setBookings(packageBookings);
-        
-        // Set current date to the first booking date if available
-        if (packageBookings.length > 0) {
-          const firstBookingDate = new Date(packageBookings[0].date);
-          if (!isNaN(firstBookingDate.getTime())) {
-            setCurrentDate(firstBookingDate);
-          }
-        }
-      } else {
-        // Sample data for 2025 with only package bookings
-        const sampleBookings: CalendarViewBooking[] = [
-          {
-            id: '1',
-            type: 'package',
-            packageName: 'Family Fun Package',
-            customerName: 'John Doe',
-            email: 'john@example.com',
-            phone: '555-1234',
-            date: '2025-09-18',
-            time: '2:00 PM',
-            participants: 4,
-            status: 'confirmed',
-            totalAmount: 199.99,
-            amountPaid: 199.99,
-            createdAt: '2025-01-10T10:30:00Z',
-            paymentMethod: 'credit_card',
-            attractions: [
-              { name: 'Laser Tag', quantity: 2 },
-              { name: 'Bowling', quantity: 1 }
-            ],
-            addOns: [
-              { name: 'Extra Pizza', quantity: 1, price: 12.99 }
-            ],
-            duration: '2 hours',
-            notes: 'Allergy: None'
-          },
-          {
-            id: '2',
-            type: 'package',
-            packageName: 'Corporate Event',
-            customerName: 'Jane Smith',
-            email: 'jane@company.com',
-            phone: '555-5678',
-            date: '2025-09-19',
-            time: '6:00 PM',
-            participants: 12,
-            status: 'pending',
-            totalAmount: 599.99,
-            amountPaid: 300.00,
-            createdAt: '2025-01-12T14:45:00Z',
-            paymentMethod: 'paypal',
-            attractions: [
-              { name: 'Arcade', quantity: 5 },
-              { name: 'Axe Throwing', quantity: 3 }
-            ],
-            addOns: [],
-            duration: '4 hours',
-            notes: 'Need projector for presentation'
-          },
-          {
-            id: '5',
-            type: 'package',
-            packageName: 'Birthday Party',
-            customerName: 'Robert Brown',
-            email: 'robert@example.com',
-            phone: '555-7890',
-            date: '2025-09-23',
-            time: '1:00 PM',
-            participants: 10,
-            status: 'checked-in',
-            totalAmount: 350.00,
-            amountPaid: 350.00,
-            createdAt: '2025-01-18T11:45:00Z',
-            paymentMethod: 'credit_card',
-            attractions: [
-              { name: 'Party Room', quantity: 1 },
-              { name: 'Laser Tag', quantity: 2 }
-            ],
-            addOns: [
-              { name: 'Birthday Cake', quantity: 1, price: 25.99 },
-              { name: 'Balloons', quantity: 1, price: 15.99 }
-            ],
-            duration: '3 hours',
-            notes: 'Birthday boy is 10 years old'
-          }
-        ];
-        setBookings(sampleBookings);
-        localStorage.setItem('zapzone_bookings', JSON.stringify(sampleBookings));
-        
-        // Set current date to September 2025 to match the sample data
-        setCurrentDate(new Date(2025, 8, 1)); // September 2025
-      }
-    } catch (error) {
-      console.error('Error loading bookings:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const applyFilters = () => {
-    let result = [...bookings];
-
-    // Apply search filter
-    if (filters.search) {
-      const searchTerm = filters.search.toLowerCase();
-      result = result.filter(booking =>
-        booking.customerName.toLowerCase().includes(searchTerm) ||
-        booking.email.toLowerCase().includes(searchTerm) ||
-        booking.packageName.toLowerCase().includes(searchTerm) ||
-        booking.phone.includes(searchTerm)
-      );
-    }
-
-    // Apply packages filter
-    if (filters.packages.length > 0) {
-      result = result.filter(booking => 
-        filters.packages.includes(booking.packageName)
-      );
-    }
-
-    // Apply date range filter based on view
-    if (filters.view === 'range' && filters.dateRange.start && filters.dateRange.end) {
-      result = result.filter(booking => 
-        booking.date >= filters.dateRange.start && booking.date <= filters.dateRange.end
-      );
-    } else {
-      // Filter based on current view (day, week, month)
+      setLoading(true);
+      
+      // Calculate date range based on current view
       const startDate = new Date(currentDate);
       let endDate = new Date(currentDate);
 
@@ -202,18 +89,81 @@ const CalendarView: React.FC = () => {
         
         endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0);
         endDate.setHours(23, 59, 59, 999);
+      } else if (filters.view === 'range' && filters.dateRange.start && filters.dateRange.end) {
+        // Use custom range
+        const response = await bookingService.getBookings({
+          date_from: filters.dateRange.start,
+          date_to: filters.dateRange.end,
+          per_page: 1000,
+        });
+        
+        if (response.success && response.data) {
+          setBookings(response.data.bookings);
+        }
+        return;
       }
 
-      const startDateString = startDate.toISOString().split('T')[0];
-      const endDateString = endDate.toISOString().split('T')[0];
-
-      result = result.filter(booking => {
-        return booking.date >= startDateString && booking.date <= endDateString;
+      const response = await bookingService.getBookings({
+        date_from: startDate.toISOString().split('T')[0],
+        date_to: endDate.toISOString().split('T')[0],
+        per_page: 1000,
+        user_id: getStoredUser()?.id,
       });
+      
+      if (response.success && response.data) {
+        console.log('Loaded Bookings:', response.data.bookings);
+        console.log('Date range:', startDate.toISOString().split('T')[0], 'to', endDate.toISOString().split('T')[0]);
+        console.log('Total bookings loaded:', response.data.bookings.length);
+        setBookings(response.data.bookings);
+      } else {
+        console.log('No bookings data in response');
+        setBookings([]);
+      }
+    } catch (error) {
+      console.error('Error loading bookings:', error);
+      setToast({ message: 'Failed to load bookings', type: 'error' });
+      setBookings([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [currentDate, filters.view, filters.dateRange]);
+
+  useEffect(() => {
+    loadBookings();
+  }, [loadBookings]);
+
+  // Apply filters when bookings or filters change
+  useEffect(() => {
+    let result = [...bookings];
+
+    // Filter by location (for company-admin users)
+    if (filterLocation !== 'all') {
+      const locationId = parseInt(filterLocation);
+      result = result.filter(booking => booking.location_id === locationId);
+    }
+
+    // Apply search filter
+    if (filters.search) {
+      const searchTerm = filters.search.toLowerCase();
+      result = result.filter(booking =>
+        (booking.guest_name?.toLowerCase().includes(searchTerm) ||
+        booking.guest_email?.toLowerCase().includes(searchTerm) ||
+        booking.guest_phone?.includes(searchTerm) ||
+        booking.reference_number.toLowerCase().includes(searchTerm) ||
+        booking.package?.name?.toLowerCase().includes(searchTerm))
+      );
+    }
+
+    // Apply packages filter
+    if (filters.packages.length > 0) {
+      result = result.filter(booking => 
+        booking.package?.name && filters.packages.includes(booking.package.name)
+      );
     }
 
     setFilteredBookings(result);
-  };
+    console.log('Filtered bookings:', result.length, 'of', bookings.length);
+  }, [bookings, filters.search, filters.packages, filterLocation]);
 
   const handleFilterChange = (key: keyof CalendarViewFilterOptions, value: string | string[]) => {
     setFilters(prev => ({
@@ -252,6 +202,7 @@ const CalendarView: React.FC = () => {
       },
       search: ''
     });
+    setFilterLocation('all');
   };
 
   const navigateDate = (direction: 'prev' | 'next') => {
@@ -322,20 +273,48 @@ const CalendarView: React.FC = () => {
   };
 
   const getBookingsForDate = (date: Date) => {
-    const dateString = date.toISOString().split('T')[0];
-    return filteredBookings.filter(booking => booking.date === dateString);
+    // Use local date string to avoid timezone issues
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const dateString = `${year}-${month}-${day}`;
+    
+    const bookingsForDate = filteredBookings.filter(booking => {
+      // Extract date part from booking_date (handles both "2025-11-29" and "2025-11-29T00:00:00.000000Z" formats)
+      const bookingDatePart = booking.booking_date.split('T')[0];
+      return bookingDatePart === dateString;
+    });
+    console.log(`Bookings for ${dateString}:`, bookingsForDate.length, bookingsForDate.map(b => ({ ref: b.reference_number, date: b.booking_date })));
+    return bookingsForDate;
   };
 
   const getUniquePackages = () => {
     const packages = bookings
-      .map(booking => booking.packageName)
+      .map(booking => booking.package?.name)
       .filter((pkg): pkg is string => !!pkg);
     
     return [...new Set(packages)];
   };
 
-  const getBookingTitle = (booking: CalendarViewBooking) => {
-    return booking.packageName || 'Package Booking';
+  // Get unique locations for filtering (for company-admin)
+  const getUniqueLocations = () => {
+    const locations = bookings
+      .filter(booking => booking.location)
+      .reduce((acc, booking) => {
+        if (booking.location && !acc.find(loc => loc.id === (booking.location as { id: number; name: string }).id)) {
+          const location = booking.location as { id: number; name: string };
+          acc.push({ id: location.id, name: location.name });
+        }
+        return acc;
+      }, [] as Array<{ id: number; name: string }>);
+    
+    return locations;
+  };
+
+  const isCompanyAdmin = userData?.role === 'company_admin';
+
+  const getBookingTitle = (booking: Booking) => {
+    return booking.package?.name || 'Package Booking';
   };
 
   const getBookingColor = () => {
@@ -359,9 +338,9 @@ const CalendarView: React.FC = () => {
               <div key={booking.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer" onClick={() => setSelectedBooking(booking)}>
                 <div className="flex justify-between items-start">
                   <div>
-                    <h4 className="font-medium text-gray-900">{booking.customerName}</h4>
+                    <h4 className="font-medium text-gray-900">{booking.guest_name || 'Guest'}</h4>
                     <p className="text-sm text-gray-500">{getBookingTitle(booking)}</p>
-                    <p className="text-sm text-gray-500">{booking.time}</p>
+                    <p className="text-sm text-gray-500">{booking.booking_time}</p>
                   </div>
                   <div className="flex flex-col items-end gap-2">
                     <span className={`px-2 py-1 text-xs font-medium rounded-full ${
@@ -378,11 +357,15 @@ const CalendarView: React.FC = () => {
                     </span>
                   </div>
                 </div>
-                <div className="mt-2 text-sm">
+                <div className="mt-2 text-sm space-y-1">
                   <p>Participants: {booking.participants}</p>
-                  {booking.attractions && booking.attractions.length > 0 && (
-                    <p>Includes: {booking.attractions.map(a => `${a.name} (${a.quantity})`).join(', ')}</p>
+                  {booking.location && (
+                    <p className="flex items-center text-gray-600">
+                      <MapPin className="h-3 w-3 mr-1" />
+                      {(booking.location as { name?: string }).name || 'N/A'}
+                    </p>
                   )}
+                  <p>Ref: #{booking.reference_number}</p>
                 </div>
               </div>
             ))}
@@ -417,22 +400,18 @@ const CalendarView: React.FC = () => {
                 <div className="text-sm font-medium mb-2">
                   {day.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                 </div>
-                {dayBookings.slice(0, 3).map(booking => (
+                {dayBookings.map(booking => (
                   <div 
                     key={booking.id} 
                     className={`text-xs rounded p-2 mb-2 cursor-pointer ${getBookingColor()}`}
-                    title={`${booking.customerName} - ${booking.time}`}
+                    title={`${booking.guest_name || 'Guest'} - ${booking.booking_time}`}
                     onClick={() => setSelectedBooking(booking)}
                   >
-                    <div className="font-medium truncate">{booking.time} - {booking.customerName}</div>
+                    <div className="font-medium truncate">{booking.booking_time} - {booking.guest_name || 'Guest'}</div>
                     <div className="truncate">{getBookingTitle(booking)}</div>
                   </div>
                 ))}
-                {dayBookings.length > 3 && (
-                  <div className="text-xs text-gray-500 mt-2 text-center">
-                    +{dayBookings.length - 3} more
-                  </div>
-                )}
+               
               </div>
             );
           })}
@@ -481,35 +460,35 @@ const CalendarView: React.FC = () => {
             return (
               <div 
                 key={day.toISOString()} 
-                className={`border border-gray-200 rounded-lg p-3 h-32 overflow-hidden ${
+                className={`border border-gray-200 rounded-lg p-3 h-32 overflow-y-auto ${
                   day.toDateString() === new Date().toDateString() ? `bg-${themeColor}-50` : ''
                 }`}
                 onClick={() => setSelectedDate(day.toISOString().split('T')[0])}
               >
-                <div className="text-sm font-medium mb-2">
+                <div className="text-sm font-medium mb-2 sticky top-0">
                   {day.getDate()}
                 </div>
                 
-                {dayBookings.slice(0, 2).map(booking => (
+                {dayBookings.map(booking => (
                   <div 
                     key={booking.id} 
                     className={`text-xs rounded p-2 mb-2 cursor-pointer ${getBookingColor()}`}
-                    title={`${booking.customerName} - ${booking.time}`}
+                    title={`${booking.guest_name || 'Guest'} - ${booking.booking_time}`}
                     onClick={e => {
                       e.stopPropagation();
                       setSelectedBooking(booking);
                     }}
                   >
-                    <div className="font-medium truncate">{booking.time} - {booking.customerName}</div>
+                    <div className="font-medium truncate">{booking.booking_time} - {booking.guest_name || 'Guest'}</div>
                     <div className="truncate">{getBookingTitle(booking)}</div>
                   </div>
                 ))}
                 
-                {dayBookings.length > 2 && (
+                {/* {dayBookings.length > 2 && (
                   <div className="text-xs text-gray-500 text-center">
                     +{dayBookings.length - 2} more
                   </div>
-                )}
+                )} */}
               </div>
             );
           })}
@@ -549,10 +528,10 @@ const CalendarView: React.FC = () => {
               <div key={booking.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer" onClick={() => setSelectedBooking(booking)}>
                 <div className="flex justify-between items-start">
                   <div>
-                    <h4 className="font-medium text-gray-900">{booking.customerName}</h4>
+                    <h4 className="font-medium text-gray-900">{booking.guest_name || 'Guest'}</h4>
                     <p className="text-sm text-gray-500">{getBookingTitle(booking)}</p>
                     <p className="text-sm text-gray-500">
-                      {new Date(booking.date).toLocaleDateString()} at {booking.time}
+                      {new Date(booking.booking_date).toLocaleDateString()} at {booking.booking_time}
                     </p>
                   </div>
                   <div className="flex flex-col items-end gap-2">
@@ -570,11 +549,15 @@ const CalendarView: React.FC = () => {
                     </span>
                   </div>
                 </div>
-                <div className="mt-2 text-sm">
+                <div className="mt-2 text-sm space-y-1">
                   <p>Participants: {booking.participants}</p>
-                  {booking.attractions && booking.attractions.length > 0 && (
-                    <p>Includes: {booking.attractions.map(a => `${a.name} (${a.quantity})`).join(', ')}</p>
+                  {booking.location && (
+                    <p className="flex items-center text-gray-600">
+                      <MapPin className="h-3 w-3 mr-1" />
+                      {(booking.location as { name?: string }).name || 'N/A'}
+                    </p>
                   )}
+                  <p>Ref: #{booking.reference_number}</p>
                 </div>
               </div>
             ))}
@@ -601,9 +584,11 @@ const CalendarView: React.FC = () => {
 
   if (loading) {
     return (
+      <div className="px-6 py-8">
         <div className="flex justify-center items-center h-64">
           <div className={`animate-spin rounded-full h-12 w-12 border-b-2 border-${fullColor}`}></div>
         </div>
+      </div>
     );
   }
 
@@ -612,10 +597,25 @@ const CalendarView: React.FC = () => {
         {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Package Booking Calendar</h1>
-            <p className="text-gray-600 mt-2">View and manage package bookings with attraction options</p>
+            <h1 className="text-3xl font-bold text-gray-900">Booking Calendar</h1>
+            <p className="text-gray-600 mt-2">
+              View and manage bookings
+              {filteredBookings.length > 0 && (
+                <span className={`ml-2 px-2 py-1 text-xs font-medium rounded-full bg-${themeColor}-100 text-${fullColor}`}>
+                  {filteredBookings.length} booking{filteredBookings.length !== 1 ? 's' : ''} found
+                </span>
+              )}
+            </p>
           </div>
           <div className="flex gap-2 mt-4 sm:mt-0">
+            <button
+              onClick={loadBookings}
+              disabled={loading}
+              className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-gray-800 hover:bg-gray-50 disabled:opacity-50"
+              title="Refresh bookings"
+            >
+              <RefreshCw className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} />
+            </button>
             <Link
               to="/bookings"
               className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-gray-800 hover:bg-gray-50"
@@ -699,6 +699,29 @@ const CalendarView: React.FC = () => {
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Location Filter (Company Admin only) */}
+              {isCompanyAdmin && getUniqueLocations().length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-800 mb-2">
+                    <MapPin className="h-4 w-4 inline mr-1" />
+                    Location
+                  </label>
+                  <select
+                    value={filterLocation}
+                    onChange={(e) => setFilterLocation(e.target.value)}
+                    className={`w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-${fullColor}`}
+                  >
+                    <option value="all">All Locations</option>
+                    {getUniqueLocations().map((location) => (
+                      <option key={location.id} value={location.id}>
+                        {location.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Search */}
               <div>
                 <label className="block text-sm font-medium text-gray-800 mb-2">Search</label>
                 <div className="relative">
@@ -771,41 +794,78 @@ const CalendarView: React.FC = () => {
 
         {/* Calendar View */}
         <div className="flex-1 overflow-hidden">
-          {renderView()}
+          {bookings.length === 0 ? (
+            <div className="bg-white rounded-lg shadow-sm p-8 text-center">
+              <CalendarIcon className="mx-auto h-12 w-12 text-gray-400" />
+              <h3 className="mt-4 text-lg font-medium text-gray-900">No bookings found</h3>
+              <p className="mt-2 text-gray-500">
+                There are no package bookings in the selected date range.
+              </p>
+              <button
+                onClick={() => setCurrentDate(new Date())}
+                className="mt-4 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+              >
+                Go to Today
+              </button>
+            </div>
+          ) : filteredBookings.length === 0 && filters.search ? (
+            <div className="bg-white rounded-lg shadow-sm p-8 text-center">
+              <Search className="mx-auto h-12 w-12 text-gray-400" />
+              <h3 className="mt-4 text-lg font-medium text-gray-900">No matching bookings</h3>
+              <p className="mt-2 text-gray-500">
+                Try adjusting your search or filters.
+              </p>
+              <button
+                onClick={clearFilters}
+                className="mt-4 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+              >
+                Clear Filters
+              </button>
+            </div>
+          ) : (
+            renderView()
+          )}
         </div>
 
         {/* Day Detail Modal (month view) */}
         {selectedDate && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-backdrop-fade">
+            <div className="bg-white rounded-lg shadow-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto animate-scale-in">
               <div className="p-6">
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-lg font-semibold">
+                <div className="flex justify-between items-center mb-6">
+                  <h3 className="text-xl font-semibold text-gray-900">
                     Bookings for {new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
                   </h3>
                   <button
                     onClick={() => setSelectedDate(null)}
                     className="text-gray-500 hover:text-gray-800"
                   >
-                    <X className="h-5 w-5" />
+                    <X className="h-6 w-6" />
                   </button>
                 </div>
                 {getBookingsForDate(new Date(selectedDate)).length === 0 ? (
                   <div className="text-center text-gray-500 py-8">
-                    No bookings for this day
+                    <CalendarIcon className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                    <p>No bookings for this day</p>
                   </div>
                 ) : (
-                  <div className="space-y-6">
+                  <div className="space-y-4">
                     {getBookingsForDate(new Date(selectedDate)).map(booking => (
-                      <div key={booking.id} className="border border-gray-200 rounded-lg p-6">
-                        <div className="flex justify-between items-start mb-4">
+                      <div 
+                        key={booking.id} 
+                        className="border border-gray-200 rounded-lg p-5 hover:shadow-md transition-shadow cursor-pointer"
+                        onClick={() => {
+                          setSelectedDate(null);
+                          setSelectedBooking(booking);
+                        }}
+                      >
+                        <div className="flex justify-between items-start mb-3">
                           <div>
-                            <h4 className="font-medium text-gray-900 text-lg">{booking.customerName}</h4>
-                            <p className="text-sm text-gray-500">{booking.email}</p>
-                            <p className="text-sm text-gray-500">{booking.phone}</p>
+                            <h4 className="font-medium text-gray-900 text-base">{booking.guest_name || 'Guest'}</h4>
+                            <p className="text-sm text-gray-500">{booking.guest_email || 'No email'}</p>
                           </div>
                           <div className="flex flex-col items-end gap-2">
-                            <span className={`px-3 py-1 text-sm font-medium rounded-full ${
+                            <span className={`px-3 py-1 text-xs font-medium rounded-full ${
                               booking.status === 'confirmed' ? 'bg-green-100 text-green-800' :
                               booking.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
                               booking.status === 'cancelled' ? 'bg-red-100 text-red-800' :
@@ -814,76 +874,71 @@ const CalendarView: React.FC = () => {
                             }`}>
                               {booking.status}
                             </span>
-                            <span className={`px-3 py-1 text-sm font-medium rounded-full ${getBookingColor()}`}>
-                              Package
-                            </span>
-                            <span className="text-xs text-gray-500 mt-1">
-                              {booking.packageName}
+                            <span className="text-xs text-gray-500 font-mono">
+                              #{booking.reference_number}
                             </span>
                           </div>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                          <div className="flex items-center">
-                            <Clock className="h-5 w-5 text-gray-400 mr-2" />
-                            <span className="text-sm">{booking.time} • {booking.duration}</span>
+                        
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+                          <div className="flex items-center text-gray-600">
+                            <Clock className="h-4 w-4 text-gray-400 mr-2" />
+                            <span>{booking.booking_time}</span>
                           </div>
-                          <div className="flex items-center">
-                            <Users className="h-5 w-5 text-gray-400 mr-2" />
-                            <span className="text-sm">{booking.participants} participants</span>
+                          <div className="flex items-center text-gray-600">
+                            <Users className="h-4 w-4 text-gray-400 mr-2" />
+                            <span>{booking.participants} participants</span>
                           </div>
-                          <div className="flex items-center">
-                            <PackageIcon className="h-5 w-5 text-gray-400 mr-2" />
-                            <span className="text-sm">{booking.packageName}</span>
+                          <div className="flex items-center text-gray-600">
+                            <PackageIcon className="h-4 w-4 text-gray-400 mr-2" />
+                            <span className="truncate">{booking.package?.name || 'N/A'}</span>
                           </div>
+                          {booking.location && (
+                            <div className="flex items-center text-gray-600">
+                              <MapPin className="h-4 w-4 text-gray-400 mr-2" />
+                              <span className="truncate">{(booking.location as { name?: string }).name || 'N/A'}</span>
+                            </div>
+                          )}
                         </div>
-                        {booking.attractions && booking.attractions.length > 0 && (
-                          <div className="mb-4">
-                            <h5 className="font-medium text-gray-800 mb-2">Attractions</h5>
-                            <div className="flex flex-wrap gap-2">
-                              {booking.attractions.map((attraction, index) => (
-                                <span key={index} className="bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded">
-                                  {attraction.name} ({attraction.quantity})
+
+                        {(booking.attractions?.length || booking.addOns?.length) && (
+                          <div className="mt-3 pt-3 border-t border-gray-100">
+                            <div className="flex flex-wrap gap-2 text-xs">
+                              {booking.attractions && booking.attractions.length > 0 && (
+                                <span className="bg-purple-50 text-purple-700 px-2 py-1 rounded">
+                                  {booking.attractions.length} attraction{booking.attractions.length !== 1 ? 's' : ''}
                                 </span>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                        {booking.addOns && booking.addOns.length > 0 && (
-                          <div className="mb-4">
-                            <h5 className="font-medium text-gray-800 mb-2 flex items-center">
-                              <Gift className="h-4 w-4 mr-1" /> Add-ons
-                            </h5>
-                            <ul className="space-y-1">
-                              {booking.addOns.map((addOn, index) => (
-                                <li key={index} className="text-sm flex justify-between">
-                                  <span>{addOn.name} ({addOn.quantity})</span>
-                                  <span>${addOn.price.toFixed(2)}</span>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                        <div className="border-t pt-4">
-                          <div className="flex justify-between items-center mb-2">
-                            <div className="flex items-center">
-                              <CreditCard className="h-5 w-5 text-gray-400 mr-2" />
-                              <span className="text-sm font-medium">Payment</span>
-                            </div>
-                            <div className="text-right">
-                              <div className="text-sm">
-                                {booking.paymentMethod.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                              </div>
-                              {booking.status === 'pending' ? (
-                                <div className="text-xs text-yellow-600">
-                                  Partial payment: ${booking.amountPaid.toFixed(2)} of ${booking.totalAmount.toFixed(2)}
-                                </div>
-                              ) : (
-                                <div className="text-xs text-green-600">
-                                  Paid: ${booking.totalAmount.toFixed(2)}
-                                </div>
+                              )}
+                              {booking.addOns && booking.addOns.length > 0 && (
+                                <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded">
+                                  {booking.addOns.length} add-on{booking.addOns.length !== 1 ? 's' : ''}
+                                </span>
                               )}
                             </div>
                           </div>
+                        )}
+
+                        <div className="mt-3 pt-3 border-t border-gray-100 flex justify-between items-center">
+                          <div className="text-sm text-gray-600">
+                            <CreditCard className="h-4 w-4 inline text-gray-400 mr-1" />
+                            <span className="capitalize">{booking.payment_method || 'N/A'}</span>
+                          </div>
+                          <div className="text-right">
+                            <div className={`text-sm font-medium ${
+                              booking.payment_status === 'paid' ? 'text-green-600' : 'text-yellow-600'
+                            }`}>
+                              ${Number(booking.total_amount).toFixed(2)}
+                            </div>
+                            {booking.payment_status === 'partial' && (
+                              <div className="text-xs text-gray-500">
+                                (Paid: ${Number(booking.amount_paid).toFixed(2)})
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="mt-3 text-xs text-gray-400 text-center">
+                          Click to view full details
                         </div>
                       </div>
                     ))}
@@ -895,87 +950,282 @@ const CalendarView: React.FC = () => {
         )}
         {/* Booking Detail Modal for daily/weekly view */}
         {selectedBooking && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-backdrop-fade">
+            <div className="bg-white rounded-lg shadow-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto animate-scale-in">
               <div className="p-6">
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-lg font-semibold">
+                <div className="flex justify-between items-center mb-6">
+                  <h3 className="text-xl font-semibold text-gray-900">
                     Booking Details
                   </h3>
                   <button
                     onClick={() => setSelectedBooking(null)}
                     className="text-gray-500 hover:text-gray-800"
                   >
-                    <X className="h-5 w-5" />
+                    <X className="h-6 w-6" />
                   </button>
                 </div>
-                <div className="space-y-2">
-                  <div className="font-medium text-gray-900 text-lg">{selectedBooking.customerName}</div>
-                  <div className="text-sm text-gray-500">{selectedBooking.email}</div>
-                  <div className="text-sm text-gray-500">{selectedBooking.phone}</div>
-                  <div className="text-sm text-gray-500">{selectedBooking.date} {selectedBooking.time}</div>
-                  <div className="text-sm text-gray-500">{getBookingTitle(selectedBooking)}</div>
-                  <div className="text-sm text-gray-500">Participants: {selectedBooking.participants}</div>
-                  <div className="text-sm text-gray-500">Status: <span className={`font-semibold ${
-                    selectedBooking.status === 'confirmed' ? 'text-green-600' :
-                    selectedBooking.status === 'pending' ? 'text-yellow-600' :
-                    selectedBooking.status === 'cancelled' ? 'text-red-600' :
-                    selectedBooking.status === 'checked-in' ? `text-${fullColor}` :
-                    'text-gray-600'
-                  }`}>{selectedBooking.status}</span></div>
-                  <div className="text-sm text-gray-500">Type: <span className={`font-semibold text-${fullColor}`}>Package</span></div>
-                </div>
-                {selectedBooking.attractions && selectedBooking.attractions.length > 0 && (
-                  <div className="mt-4">
-                    <h5 className="font-medium text-gray-800 mb-2">Attractions</h5>
-                    <div className="flex flex-wrap gap-2">
-                      {selectedBooking.attractions.map((attraction, index) => (
-                        <span key={index} className="bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded">
-                          {attraction.name} ({attraction.quantity})
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {selectedBooking.addOns && selectedBooking.addOns.length > 0 && (
-                  <div className="mt-4">
-                    <h5 className="font-medium text-gray-800 mb-2 flex items-center">
-                      <Gift className="h-4 w-4 mr-1" /> Add-ons
-                    </h5>
-                    <ul className="space-y-1">
-                      {selectedBooking.addOns.map((addOn, index) => (
-                        <li key={index} className="text-sm flex justify-between">
-                          <span>{addOn.name} ({addOn.quantity})</span>
-                          <span>${addOn.price.toFixed(2)}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                <div className="border-t pt-4 mt-4">
-                  <div className="flex justify-between items-center mb-2">
+
+                {/* Customer Information */}
+                <div className="mb-6">
+                  <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Customer Information</h4>
+                  <div className="bg-gray-50 rounded-lg p-4 space-y-2">
                     <div className="flex items-center">
-                      <CreditCard className="h-5 w-5 text-gray-400 mr-2" />
-                      <span className="text-sm font-medium">Payment</span>
+                      <Users className="h-4 w-4 text-gray-400 mr-3" />
+                      <span className="font-medium text-gray-900">{selectedBooking.guest_name || 'Guest'}</span>
                     </div>
-                    <div className="text-right">
-                      <div className="text-sm">
-                        {selectedBooking.paymentMethod.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                    <div className="text-sm text-gray-600 ml-7">{selectedBooking.guest_email || 'No email provided'}</div>
+                    <div className="text-sm text-gray-600 ml-7">{selectedBooking.guest_phone || 'No phone provided'}</div>
+                  </div>
+                </div>
+
+                {/* Booking Information */}
+                <div className="mb-6">
+                  <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Booking Information</h4>
+                  <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Reference Number</span>
+                      <span className="font-mono font-medium text-gray-900">#{selectedBooking.reference_number}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Status</span>
+                      <span className={`px-3 py-1 text-xs font-medium rounded-full ${
+                        selectedBooking.status === 'confirmed' ? 'bg-green-100 text-green-800' :
+                        selectedBooking.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                        selectedBooking.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                        selectedBooking.status === 'checked-in' ? `bg-${themeColor}-100 text-${fullColor}` :
+                        'bg-gray-100 text-gray-800'
+                      }`}>
+                        {selectedBooking.status}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Type</span>
+                      <span className={`px-3 py-1 text-xs font-medium rounded-full bg-${themeColor}-100 text-${fullColor}`}>
+                        Package Booking
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Date & Time */}
+                <>
+                  <div className="mb-6">
+                    <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Date & Time</h4>
+                    <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+                      <div className="flex items-center">
+                        <CalendarIcon className="h-4 w-4 text-gray-400 mr-3" />
+                        <span className="text-sm text-gray-900">{new Date(selectedBooking.booking_date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span>
                       </div>
-                      {selectedBooking.status === 'pending' ? (
-                        <div className="text-xs text-yellow-600">
-                          Partial payment: ${selectedBooking.amountPaid.toFixed(2)} of ${selectedBooking.totalAmount.toFixed(2)}
+                      <div className="flex items-center">
+                        <Clock className="h-4 w-4 text-gray-400 mr-3" />
+                        <span className="text-sm text-gray-900">{selectedBooking.booking_time}</span>
+                      </div>
+                      <div className="flex justify-between items-center pt-2 border-t border-gray-200">
+                        <span className="text-sm text-gray-600">Duration</span>
+                        <span className="text-sm font-medium text-gray-900">{selectedBooking.duration} {selectedBooking.duration_unit}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Participants</span>
+                        <span className="text-sm font-medium text-gray-900">{selectedBooking.participants}</span>
+                      </div>
+                    </div>
+                  </div>
+                </>
+
+                {/* Package Details */}
+                <div className="mb-6">
+                  <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Package</h4>
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center">
+                        <PackageIcon className="h-4 w-4 text-gray-400 mr-3" />
+                        <span className="font-medium text-gray-900">{selectedBooking.package?.name || 'N/A'}</span>
+                      </div>
+                      {selectedBooking.package?.price && (
+                        <span className="text-sm font-medium text-gray-900">${Number(selectedBooking.package.price).toFixed(2)}</span>
+                      )}
+                    </div>
+                    {selectedBooking.package?.description && (
+                      <p className="text-sm text-gray-600 mt-2 ml-7">{selectedBooking.package.description}</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Location */}
+                {selectedBooking.location && (
+                  <div className="mb-6">
+                    <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Location</h4>
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <div className="flex items-center">
+                        <MapPin className="h-4 w-4 text-gray-400 mr-3" />
+                        <span className="font-medium text-gray-900">{(selectedBooking.location as { name?: string }).name || 'N/A'}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Room */}
+                {selectedBooking.room && (
+                  <div className="mb-6">
+                    <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Room</h4>
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium text-gray-900">{(selectedBooking.room as { name?: string }).name || 'N/A'}</span>
+                        {(selectedBooking.room as { capacity?: number }).capacity && (
+                          <span className="text-sm text-gray-600">Capacity: {(selectedBooking.room as { capacity?: number }).capacity}</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Attractions */}
+                {selectedBooking.attractions && Array.isArray(selectedBooking.attractions) && selectedBooking.attractions.length > 0 && (
+                  <div className="mb-6">
+                    <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Additional Attractions</h4>
+                    <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+                      {(selectedBooking.attractions as Array<{ name?: string; description?: string; quantity?: number; price?: string | number }>).map((attraction, index: number) => (
+                        <div key={index} className="flex items-center justify-between py-2 border-b border-gray-200 last:border-0">
+                          <div className="flex-1">
+                            <span className="text-sm font-medium text-gray-900">{attraction.name || 'Unknown Attraction'}</span>
+                            {attraction.description && (
+                              <p className="text-xs text-gray-500 mt-1">{attraction.description}</p>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-4 ml-4">
+                            {attraction.quantity && (
+                              <span className="text-sm text-gray-600">Qty: {attraction.quantity}</span>
+                            )}
+                            {attraction.price && (
+                              <span className="text-sm font-medium text-gray-900">${Number(attraction.price).toFixed(2)}</span>
+                            )}
+                          </div>
                         </div>
-                      ) : (
-                        <div className="text-xs text-green-600">
-                          Paid: ${selectedBooking.totalAmount.toFixed(2)}
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Add-Ons */}
+                {selectedBooking.addOns && Array.isArray(selectedBooking.addOns) && selectedBooking.addOns.length > 0 && (
+                  <div className="mb-6">
+                    <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Add-Ons</h4>
+                    <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+                      {(selectedBooking.addOns as Array<{ name?: string; description?: string; quantity?: number; price?: string | number }>).map((addon, index: number) => (
+                        <div key={index} className="flex items-center justify-between py-2 border-b border-gray-200 last:border-0">
+                          <div className="flex-1">
+                            <span className="text-sm font-medium text-gray-900">{addon.name || 'Unknown Add-On'}</span>
+                            {addon.description && (
+                              <p className="text-xs text-gray-500 mt-1">{addon.description}</p>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-4 ml-4">
+                            {addon.quantity && (
+                              <span className="text-sm text-gray-600">Qty: {addon.quantity}</span>
+                            )}
+                            {addon.price && (
+                              <span className="text-sm font-medium text-gray-900">${Number(addon.price).toFixed(2)}</span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Special Requests & Notes */}
+                {(selectedBooking.special_requests || selectedBooking.notes) && (
+                  <div className="mb-6">
+                    <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Notes & Requests</h4>
+                    <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+                      {selectedBooking.special_requests && (
+                        <div>
+                          <span className="text-xs font-medium text-gray-600 uppercase">Special Requests</span>
+                          <p className="text-sm text-gray-900 mt-1">{selectedBooking.special_requests}</p>
                         </div>
                       )}
+                      {selectedBooking.notes && (
+                        <div className={selectedBooking.special_requests ? 'pt-3 border-t border-gray-200' : ''}>
+                          <span className="text-xs font-medium text-gray-600 uppercase">Internal Notes</span>
+                          <p className="text-sm text-gray-900 mt-1">{selectedBooking.notes}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Payment Information */}
+                <div className="border-t pt-6">
+                  <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Payment Details</h4>
+                  <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center">
+                        <CreditCard className="h-4 w-4 text-gray-400 mr-3" />
+                        <span className="text-sm text-gray-600">Payment Method</span>
+                      </div>
+                      <span className="text-sm font-medium text-gray-900 capitalize">
+                        {selectedBooking.payment_method || 'N/A'}
+                      </span>
+                    </div>
+                    
+                    <div className="flex justify-between items-center pt-3 border-t border-gray-200">
+                      <span className="text-sm text-gray-600">Subtotal</span>
+                      <span className="text-sm text-gray-900">${Number(selectedBooking.total_amount).toFixed(2)}</span>
+                    </div>
+                    
+                    {selectedBooking.discount_amount && Number(selectedBooking.discount_amount) > 0 && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Discount</span>
+                        <span className="text-sm text-red-600">-${Number(selectedBooking.discount_amount).toFixed(2)}</span>
+                      </div>
+                    )}
+                    
+                    <div className="flex justify-between items-center pt-3 border-t border-gray-200">
+                      <span className="text-base font-semibold text-gray-900">Total Amount</span>
+                      <span className="text-base font-bold text-gray-900">${Number(selectedBooking.total_amount).toFixed(2)}</span>
+                    </div>
+                    
+                    <div className="flex justify-between items-center pt-3 border-t border-gray-200">
+                      <span className="text-sm text-gray-600">Amount Paid</span>
+                      <span className={`text-sm font-medium ${
+                        selectedBooking.payment_status === 'paid' ? 'text-green-600' : 'text-yellow-600'
+                      }`}>
+                        ${Number(selectedBooking.amount_paid).toFixed(2)}
+                      </span>
+                    </div>
+                    
+                    {selectedBooking.payment_status === 'partial' && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Balance Due</span>
+                        <span className="text-sm font-medium text-red-600">
+                          ${(Number(selectedBooking.total_amount) - Number(selectedBooking.amount_paid)).toFixed(2)}
+                        </span>
+                      </div>
+                    )}
+                    
+                    <div className="flex justify-between items-center pt-3 border-t border-gray-200">
+                      <span className="text-sm text-gray-600">Payment Status</span>
+                      <span className={`px-3 py-1 text-xs font-medium rounded-full ${
+                        selectedBooking.payment_status === 'paid' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                      }`}>
+                        {selectedBooking.payment_status === 'paid' ? 'Fully Paid' : 'Partial Payment'}
+                      </span>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
+          </div>
+        )}
+        
+        {/* Toast Notification */}
+        {toast && (
+          <div className="fixed top-4 right-4 z-50 animate-fade-in-up">
+            <Toast
+              message={toast.message}
+              type={toast.type}
+              onClose={() => setToast(null)}
+            />
           </div>
         )}
       </div>

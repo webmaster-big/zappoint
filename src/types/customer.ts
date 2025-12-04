@@ -31,6 +31,13 @@ export interface CustomerDemographic {
 }
 
 // Attraction types
+export interface AttractionPurchaseLink {
+  location: string;
+  url: string;
+  attraction_id: number;
+  location_id: number;
+}
+
 export interface Attraction {
   id: number;
   name: string;
@@ -43,9 +50,18 @@ export interface Attraction {
   category: 'adventure' | 'technology' | 'sports' | 'games';
   availableLocations: string[];
   duration?: string;
+  pricingType?: string;
+  purchaseLinks?: AttractionPurchaseLink[];
 }
 
 // Package types
+export interface PackageBookingLink {
+  location: string;
+  url: string;
+  package_id: number;
+  location_id: number;
+}
+
 export interface Package {
   id: number;
   name: string;
@@ -58,6 +74,7 @@ export interface Package {
   image: string;
   category: 'celebration' | 'corporate' | 'family' | 'adventure' | 'romance' | 'premium';
   availableLocations: string[];
+  bookingLinks?: PackageBookingLink[];
 }
 
 // Reservation types

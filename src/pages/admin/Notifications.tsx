@@ -15,13 +15,27 @@ import {
 } from 'lucide-react';
 import { useThemeColor } from '../../hooks/useThemeColor';
 import type { NotificationsNotification } from '../../types/Notifications.types';
+import { API_BASE_URL } from '../../utils/storage';
 
 const Notifications = () => {
   const { themeColor, fullColor } = useThemeColor();
   const [notifications, setNotifications] = useState<NotificationsNotification[]>([]);
   const [filter, setFilter] = useState<'all' | 'unread' | 'bookings' | 'purchases'>('all');
-  const [loading, setLoading] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalNotifications, setTotalNotifications] = useState(0);
+
+  // Helper function to get user auth data
+  const getUserAuth = () => {
+    const user = JSON.parse(localStorage.getItem('zapzone_user') || '{}');
+    return {
+      token: user.token,
+      isCompanyAdmin: user.role === 'company_admin',
+      locationId: user.location_id,
+    };
+  };
 
   // Notification type configurations
   const getNotificationConfig = (type: string) => {
@@ -75,18 +89,64 @@ const Notifications = () => {
   // Load notifications from localStorage
   useEffect(() => {
     loadNotifications();
-  }, []);
+  }, [filter, currentPage]);
 
-  const loadNotifications = () => {
+  const loadNotifications = async () => {
+    setLoading(true);
     try {
-      const storedNotifications = localStorage.getItem('zapzone_notifications');
-      if (storedNotifications) {
-        setNotifications(JSON.parse(storedNotifications));
-      } else {
-        // Generate sample notifications
-        const sampleNotifications = generateSampleNotifications();
-        setNotifications(sampleNotifications);
-        localStorage.setItem('zapzone_notifications', JSON.stringify(sampleNotifications));
+      const { token, isCompanyAdmin, locationId } = getUserAuth();
+
+      if (!token) {
+        console.error('No auth token found');
+        setLoading(false);
+        return;
+      }
+
+      // Build query parameters
+      const params = new URLSearchParams({
+        per_page: '15',
+        page: currentPage.toString(),
+      });
+
+      // Only add location_id if not company_admin
+      if (!isCompanyAdmin && locationId) {
+        params.append('location_id', locationId.toString());
+      }
+
+      // Add filter parameters
+      if (filter === 'unread') {
+        params.append('unread', 'true');
+      } else if (filter === 'bookings') {
+        params.append('type', 'booking');
+      } else if (filter === 'purchases') {
+        params.append('type', 'purchase');
+      }
+
+      const response = await fetch(`${API_BASE_URL}/notifications?${params.toString()}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Transform API response to match component format
+        const transformedNotifications = data.data.notifications.map((notif: any) => ({
+          id: notif.id.toString(),
+          type: notif.type,
+          title: notif.title,
+          message: notif.message,
+          timestamp: notif.created_at,
+          read: notif.status === 'read',
+          priority: notif.priority || 'medium',
+          metadata: notif.metadata || {},
+        }));
+
+        setNotifications(transformedNotifications);
+        setTotalPages(data.data.pagination.last_page);
+        setTotalNotifications(data.data.pagination.total);
       }
     } catch (error) {
       console.error('Error loading notifications:', error);
@@ -95,196 +155,120 @@ const Notifications = () => {
     }
   };
 
-  const generateSampleNotifications = (): NotificationsNotification[] => {
-    const sampleData: NotificationsNotification[] = [
-      // Booking notifications
-      {
-        id: 'notif_1',
-        type: 'booking',
-        title: 'New Package Booking',
-        message: 'Weekend Family Package booked by Sarah Johnson',
-        timestamp: new Date(Date.now() - 5 * 60 * 1000).toISOString(), // 5 minutes ago
-        read: false,
-        priority: 'high',
-        metadata: {
-          bookingId: 'BK-001',
-          customerName: 'Sarah Johnson',
-          packageName: 'Weekend Family Package',
-          amount: 199
-        }
-      },
-      {
-        id: 'notif_2',
-        type: 'booking',
-        title: 'Package Booking',
-        message: 'VR Experience Pack booked by Mike Chen',
-        timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), // 2 hours ago
-        read: true,
-        priority: 'medium',
-        metadata: {
-          bookingId: 'BK-002',
-          customerName: 'Mike Chen',
-          packageName: 'VR Experience Pack',
-          amount: 89
-        }
-      },
-      // Purchase notifications
-      {
-        id: 'notif_3',
-        type: 'purchase',
-        title: 'New Ticket Purchase',
-        message: 'Laser Tag tickets purchased by Emma Wilson',
-        timestamp: new Date(Date.now() - 15 * 60 * 1000).toISOString(), // 15 minutes ago
-        read: false,
-        priority: 'high',
-        metadata: {
-          purchaseId: 'TKT-001',
-          customerName: 'Emma Wilson',
-          attractionName: 'Laser Tag Arena',
-          amount: 75
-        }
-      },
-      {
-        id: 'notif_4',
-        type: 'purchase',
-        title: 'Ticket Purchase',
-        message: 'Bowling tickets purchased by Alex Rodriguez',
-        timestamp: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(), // 1 hour ago
-        read: false,
-        priority: 'medium',
-        metadata: {
-          purchaseId: 'TKT-002',
-          customerName: 'Alex Rodriguez',
-          attractionName: 'Bowling Lanes',
-          amount: 60
-        }
-      },
-      // System notifications
-      {
-        id: 'notif_5',
-        type: 'system',
-        title: 'System Update',
-        message: 'Scheduled maintenance tonight at 2:00 AM',
-        timestamp: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(), // 3 hours ago
-        read: true,
-        priority: 'medium'
-      },
-      {
-        id: 'notif_6',
-        type: 'system',
-        title: 'New Feature',
-        message: 'Mobile booking now available for customers',
-        timestamp: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(), // 6 hours ago
-        read: true,
-        priority: 'low'
-      },
-      // Attendant notifications
-      {
-        id: 'notif_7',
-        type: 'attendant',
-        title: 'Staff Update',
-        message: 'New attendant profile created: Lisa Wang',
-        timestamp: new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString(), // 8 hours ago
-        read: true,
-        priority: 'low'
-      },
-      // Customer notifications
-      {
-        id: 'notif_8',
-        type: 'customer',
-        title: 'Customer Check-in',
-        message: 'John Smith checked in with party of 4',
-        timestamp: new Date(Date.now() - 25 * 60 * 1000).toISOString(), // 25 minutes ago
-        read: false,
-        priority: 'medium'
-      },
-      {
-        id: 'notif_9',
-        type: 'purchase',
-        title: 'New Ticket Purchase',
-        message: 'Escape Room tickets purchased by David Kim',
-        timestamp: new Date(Date.now() - 45 * 60 * 1000).toISOString(), // 45 minutes ago
-        read: false,
-        priority: 'high',
-        metadata: {
-          purchaseId: 'TKT-003',
-          customerName: 'David Kim',
-          attractionName: 'Escape Room',
-          amount: 120
-        }
-      },
-      {
-        id: 'notif_10',
-        type: 'booking',
-        title: 'New Package Booking',
-        message: 'Birthday Bundle booked by Maria Garcia',
-        timestamp: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString(), // 12 hours ago
-        read: true,
-        priority: 'high',
-        metadata: {
-          bookingId: 'BK-003',
-          customerName: 'Maria Garcia',
-          packageName: 'Birthday Bundle',
-          amount: 299
-        }
+  const markAsRead = async (id: string) => {
+    try {
+      const { token } = getUserAuth();
+
+      const response = await fetch(`${API_BASE_URL}/notifications/${id}/mark-as-read`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Update local state
+        const updatedNotifications = notifications.map(notification =>
+          notification.id === id ? { ...notification, read: true } : notification
+        );
+        setNotifications(updatedNotifications);
+        window.dispatchEvent(new Event('zapzone_notifications_updated'));
       }
-    ];
-
-    return sampleData.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+    }
   };
 
-  const markAsRead = (id: string) => {
-    const updatedNotifications = notifications.map(notification =>
-      notification.id === id ? { ...notification, read: true } : notification
-    );
-    setNotifications(updatedNotifications);
-    localStorage.setItem('zapzone_notifications', JSON.stringify(updatedNotifications));
-    window.dispatchEvent(new Event('zapzone_notifications_updated'));
+  const markAllAsRead = async () => {
+    try {
+      const { token, isCompanyAdmin, locationId } = getUserAuth();
+
+      // Build query parameters
+      const params = new URLSearchParams();
+      
+      // Only add location_id if not company_admin
+      if (!isCompanyAdmin && locationId) {
+        params.append('location_id', locationId.toString());
+      }
+
+      const url = `${API_BASE_URL}/notifications/mark-all-as-read${params.toString() ? `?${params.toString()}` : ''}`;
+
+      const response = await fetch(url, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Reload notifications to get updated data
+        await loadNotifications();
+        window.dispatchEvent(new Event('zapzone_notifications_updated'));
+      }
+    } catch (error) {
+      console.error('Error marking all notifications as read:', error);
+    }
   };
 
-  const markAllAsRead = () => {
-    const updatedNotifications = notifications.map(notification => ({
-      ...notification,
-      read: true
-    }));
-    setNotifications(updatedNotifications);
-    localStorage.setItem('zapzone_notifications', JSON.stringify(updatedNotifications));
-    window.dispatchEvent(new Event('zapzone_notifications_updated'));
+  const deleteNotification = async (id: string) => {
+    try {
+      const { token } = getUserAuth();
+
+      const response = await fetch(`${API_BASE_URL}/notifications/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Update local state
+        const updatedNotifications = notifications.filter(notification => notification.id !== id);
+        setNotifications(updatedNotifications);
+        window.dispatchEvent(new Event('zapzone_notifications_updated'));
+      }
+    } catch (error) {
+      console.error('Error deleting notification:', error);
+    }
   };
 
-  const deleteNotification = (id: string) => {
-    const updatedNotifications = notifications.filter(notification => notification.id !== id);
-    setNotifications(updatedNotifications);
-    localStorage.setItem('zapzone_notifications', JSON.stringify(updatedNotifications));
-    window.dispatchEvent(new Event('zapzone_notifications_updated'));
-  };
-
-  const clearAllNotifications = () => {
+  const clearAllNotifications = async () => {
     if (window.confirm('Are you sure you want to clear all notifications?')) {
-      setNotifications([]);
-      localStorage.setItem('zapzone_notifications', JSON.stringify([]));
-      window.dispatchEvent(new Event('zapzone_notifications_updated'));
+      try {
+        const { token } = getUserAuth();
+
+        // Delete all notifications one by one (or implement a bulk delete endpoint)
+        const deletePromises = notifications.map(notification =>
+          fetch(`${API_BASE_URL}/notifications/${notification.id}`, {
+            method: 'DELETE',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          })
+        );
+
+        await Promise.all(deletePromises);
+        setNotifications([]);
+        window.dispatchEvent(new Event('zapzone_notifications_updated'));
+      } catch (error) {
+        console.error('Error clearing all notifications:', error);
+      }
     }
   };
 
   const getFilteredNotifications = () => {
-    let filtered = notifications;
-
-    switch (filter) {
-      case 'unread':
-        filtered = filtered.filter(notification => !notification.read);
-        break;
-      case 'bookings':
-        filtered = filtered.filter(notification => notification.type === 'booking');
-        break;
-      case 'purchases':
-        filtered = filtered.filter(notification => notification.type === 'purchase');
-        break;
-      default:
-        filtered = notifications;
-    }
-
-    return filtered;
+    // Filtering is now handled by the API
+    return notifications;
   };
 
   const formatTimestamp = (timestamp: string) => {
@@ -309,8 +293,11 @@ const Notifications = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className={`animate-spin rounded-full h-12 w-12 border-b-2 border-${fullColor}`}></div>
+      <div className="min-h-screen px-4 py-6 flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-800 mb-4"></div>
+          <p className="text-gray-600">Loading notifications...</p>
+        </div>
       </div>
     );
   }
@@ -530,25 +517,42 @@ const Notifications = () => {
         )}
       </div>
 
-      {/* Empty State for No Notifications */}
-      {notifications.length === 0 && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center mt-8">
-          <div className={`w-16 h-16 bg-${themeColor}-100 rounded-full flex items-center justify-center mx-auto mb-4`}>
-            <Bell className={`h-8 w-8 text-${fullColor}`} />
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mt-4">
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-gray-600">
+              Showing page {currentPage} of {totalPages} ({totalNotifications} total)
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+                className={`px-3 py-2 text-sm rounded-lg transition-colors ${
+                  currentPage === 1
+                    ? 'text-gray-400 cursor-not-allowed'
+                    : `text-${fullColor} hover:bg-${themeColor}-50`
+                }`}
+              >
+                Previous
+              </button>
+              <button
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages}
+                className={`px-3 py-2 text-sm rounded-lg transition-colors ${
+                  currentPage === totalPages
+                    ? 'text-gray-400 cursor-not-allowed'
+                    : `text-${fullColor} hover:bg-${themeColor}-50`
+                }`}
+              >
+                Next
+              </button>
+            </div>
           </div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">No notifications yet</h3>
-          <p className="text-gray-600 text-sm mb-4">
-            Notifications about bookings, purchases, and system updates will appear here.
-          </p>
-          <button
-            onClick={loadNotifications}
-            className={`inline-flex items-center gap-2 px-4 py-2 bg-${fullColor} text-white rounded-lg hover:bg-${fullColor} transition-colors`}
-          >
-            <RefreshCcw className="h-4 w-4" />
-            Load Sample Notifications
-          </button>
         </div>
       )}
+
+      {/* Empty State for No Notifications */}
     </div>
   );
 };

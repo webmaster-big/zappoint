@@ -2,10 +2,13 @@ import React, { useState, useEffect } from "react";
 import { Plus, X, Edit2, Trash2, Eye, EyeOff, Copy } from "lucide-react";
 import type { GiftCardStatus, GiftCardType, GiftCardItem } from '../../../types/GiftCard.types';
 import { useThemeColor } from '../../../hooks/useThemeColor';
+import { giftCardService } from '../../../services';
+import Toast from '../../../components/ui/Toast';
 
 const GiftCard: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
   const [giftCards, setGiftCards] = useState<GiftCardItem[]>([]);
+  const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState<{
     type: GiftCardType;
@@ -27,28 +30,52 @@ const GiftCard: React.FC = () => {
   const [editForm, setEditForm] = useState<null | Partial<Record<string, string>>>(null);
   const [filterStatus, setFilterStatus] = useState<string>("all");
 
-  useEffect(() => {
-    const stored = localStorage.getItem("zapzone_giftcards");
-    if (stored) setGiftCards(JSON.parse(stored));
-  }, []);
+  // Toast state
+  const [toast, setToast] = useState<{ message: string; type?: "success" | "error" | "info" } | null>(null);
+  const showToast = (message: string, type?: "success" | "error" | "info") => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  };
 
   useEffect(() => {
-    // On mount, update status to 'inactive' for expired cards
-    const now = new Date();
-    let updated = false;
-    const updatedCards = giftCards.map(card => {
-      if (card.expiry_date && new Date(card.expiry_date) < now && card.status !== 'inactive') {
-        updated = true;
-        return { ...card, status: 'inactive' as GiftCardStatus };
-      }
-      return card;
-    });
-    if (updated) {
-      setGiftCards(updatedCards);
-      localStorage.setItem("zapzone_giftcards", JSON.stringify(updatedCards));
-    }
-    // eslint-disable-next-line
+    loadGiftCards();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const loadGiftCards = async () => {
+    try {
+      setLoading(true);
+      const response = await giftCardService.getGiftCards();
+      
+      if (response.data && response.data.gift_cards) {
+        const formattedCards: GiftCardItem[] = response.data.gift_cards.map(card => ({
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          ...(card as any), // Keep all backend fields including id
+          code: card.code,
+          type: card.type as GiftCardType,
+          initial_value: Number(card.initial_value),
+          balance: Number(card.balance),
+          max_usage: Number(card.max_usage),
+          description: card.description || '',
+          status: card.status as GiftCardStatus,
+          expiry_date: card.expiry_date,
+          created_by: card.created_by?.toString() || 'admin',
+          created_at: card.created_at,
+          updated_at: card.updated_at,
+          deleted: card.deleted || false
+        }));
+        setGiftCards(formattedCards);
+      }
+    } catch (error) {
+      console.error('Error loading gift cards:', error);
+      showToast('Error loading gift cards', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Note: Status updates for expired cards should be handled by the backend
+  // This useEffect is removed to avoid localStorage dependency
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -65,33 +92,46 @@ const GiftCard: React.FC = () => {
     );
   }
 
-  const handleAdd = (e: React.FormEvent) => {
+  const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.initial_value.trim() || isNaN(Number(form.initial_value))) return;
-    if (!form.balance.trim() || isNaN(Number(form.balance))) return;
-    if (!form.max_usage.trim() || isNaN(Number(form.max_usage))) return;
-    const now = new Date().toISOString();
-    const code = generateGiftCardCode();
-    const initialValue = Number(form.initial_value);
-    const balanceValue = Number(form.balance);
-    const maxUsage = Number(form.max_usage);
-    const newCard: GiftCardItem = {
-      code,
-      type: form.type,
-      initial_value: initialValue,
-      balance: balanceValue,
-      max_usage: maxUsage,
-      description: form.description,
-      status: "active",
-      expiry_date: form.expiry_date ? new Date(form.expiry_date).toISOString() : undefined,
-      created_by: "admin1",
-      created_at: now,
-    };
-    const updated = [...giftCards, newCard];
-    setGiftCards(updated);
-    localStorage.setItem("zapzone_giftcards", JSON.stringify(updated));
-    setForm({ type: "fixed", initial_value: "", balance: "", expiry_date: "", description: "", max_usage: "1" });
-    setShowModal(false);
+    if (!form.initial_value.trim() || isNaN(Number(form.initial_value))) {
+      showToast('Please enter a valid initial value', 'error');
+      return;
+    }
+    if (!form.balance.trim() || isNaN(Number(form.balance))) {
+      showToast('Please enter a valid balance', 'error');
+      return;
+    }
+    if (!form.max_usage.trim() || isNaN(Number(form.max_usage))) {
+      showToast('Please enter a valid max usage', 'error');
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      const code = generateGiftCardCode();
+      
+      await giftCardService.createGiftCard({
+        code,
+        type: form.type,
+        initial_value: Number(form.initial_value),
+        balance: Number(form.balance),
+        max_usage: Number(form.max_usage),
+        description: form.description,
+        status: 'active',
+        created_by: 1 // Default user ID
+      });
+
+      showToast('Gift card created successfully!', 'success');
+      await loadGiftCards();
+      setForm({ type: "fixed", initial_value: "", balance: "", expiry_date: "", description: "", max_usage: "1" });
+      setShowModal(false);
+    } catch (error) {
+      console.error('Error creating gift card:', error);
+      showToast('Error creating gift card', 'error');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const openEditModal = (index: number) => {
@@ -153,16 +193,26 @@ const GiftCard: React.FC = () => {
     setGiftCards(updatedCards);
     localStorage.setItem("zapzone_giftcards", JSON.stringify(updatedCards));
   };
-  const handleDelete = (index: number) => {
-    const updatedCards = [...giftCards];
-    updatedCards[index] = {
-      ...updatedCards[index],
-      status: "deleted" as GiftCardStatus,
-      deleted: true,
-      updated_at: new Date().toISOString(),
-    };
-    setGiftCards(updatedCards);
-    localStorage.setItem("zapzone_giftcards", JSON.stringify(updatedCards));
+  const handleDelete = async (index: number) => {
+    const card = giftCards[index];
+    if (!window.confirm(`Are you sure you want to delete gift card "${card.code}"?`)) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const cardId = (card as unknown as { id?: number }).id;
+      if (cardId) {
+        await giftCardService.deleteGiftCard(cardId);
+        showToast('Gift card deleted successfully!', 'success');
+        await loadGiftCards();
+      }
+    } catch (error) {
+      console.error('Error deleting gift card:', error);
+      showToast('Error deleting gift card', 'error');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const copyToClipboard = (text: string) => {
@@ -432,10 +482,11 @@ const GiftCard: React.FC = () => {
                   />
                 </div>
                 <button 
-                  type="submit" 
-                  className={`w-full bg-${fullColor} text-white py-2.5 rounded-lg font-medium mt-2 hover:bg-${themeColor}-900 transition-colors`}
+                  type="submit"
+                  disabled={loading}
+                  className={`w-full bg-${fullColor} text-white py-2.5 rounded-lg font-medium mt-2 hover:bg-${themeColor}-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed`}
                 >
-                  Create Gift Card
+                  {loading ? 'Creating...' : 'Create Gift Card'}
                 </button>
               </form>
             </div>
@@ -556,6 +607,17 @@ const GiftCard: React.FC = () => {
                 </div>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Toast Notification */}
+        {toast && (
+          <div className="fixed top-4 right-4 z-50">
+            <Toast 
+              message={toast.message} 
+              type={toast.type} 
+              onClose={() => setToast(null)} 
+            />
           </div>
         )}
       </div>

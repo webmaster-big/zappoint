@@ -11,8 +11,11 @@ export interface CreatePurchaseAttraction {
   duration: string;
   durationUnit: string;
   location: string;
+  locationId?: number; // Location ID from the API
   images: string[];
   status: string;
+  createdAt?: string;
+  availability?: Record<string, boolean>;
 }
 
 export interface CreatePurchaseCustomerInfo {

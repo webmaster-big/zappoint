@@ -1,8 +1,16 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Toast from "../../../components/ui/Toast";
 import { Info, Plus, RefreshCcw, Calendar, Clock, Gift, Tag, Home } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useThemeColor } from '../../../hooks/useThemeColor';
+import { 
+    attractionService, 
+    addOnService, 
+    roomService, 
+    promoService, 
+    giftCardService,
+    packageService 
+} from '../../../services';
 import type { 
     CreatePackageAttraction, 
     CreatePackageAddOn, 
@@ -10,61 +18,92 @@ import type {
     CreatePackagePromo,
     CreatePackageGiftCard
 } from '../../../types/createPackage.types';
+import { getStoredUser } from "../../../utils/storage";
 
-// Mock data tables (simulate fetch)
-const initialAttractions = ["Laser Tag", "Arcade", "Bowling", "Axe Throwing", "Party Room"];
-const initialAddOns = [
-    { name: "Pizza", price: 350 },
-    { name: "Soda", price: 50 },
-    { name: "Extra Game", price: 100 }
-];
-const initialCategories = ["Birthday", "Special", "Event", "Arcade Party", "Corporate", "Other"];
-const initialRooms = [
-    { name: "Main Hall" },
-    { name: "VIP Room" },
-    { name: "Party Room A" },
-    { name: "Party Room B" },
-    { name: "Conference Room" }
-];
-
-// Get active promos and gift cards from localStorage
-const getActivePromos = () => {
-    try {
-        const promos = JSON.parse(localStorage.getItem("zapzone_promos") || "[]");
-        return promos.filter((p: any) => p.status === "active" && !p.deleted);
-    } catch {
-        return [];
-    }
-};
-
-const getActiveGiftCards = () => {
-    try {
-        const giftCards = JSON.parse(localStorage.getItem("zapzone_giftcards") || "[]");
-        return giftCards.filter((gc: any) => gc.status === "active" && !gc.deleted);
-    } catch {
-        return [];
-    }
-};
+// Only categories remain in localStorage
+const initialCategories = ["Birthday", "Special", "Event"];
 
 const CreatePackage: React.FC = () => {
     const navigate = useNavigate();
     const { themeColor, fullColor } = useThemeColor();
     
-    // Option tables (simulate fetch)
-    const [attractions, setAttractions] = useState<CreatePackageAttraction[]>(() => {
-        const stored = localStorage.getItem("zapzone_attractions");
-        if (stored) return JSON.parse(stored);
-        // If old format, convert
-        if (Array.isArray(initialAttractions) && typeof initialAttractions[0] === "string") {
-            return initialAttractions.map((name) => ({ name, price: 0 }));
-        }
-        return initialAttractions;
-    });
-    const [addOns, setAddOns] = useState<CreatePackageAddOn[]>(() => JSON.parse(localStorage.getItem("zapzone_addons") || JSON.stringify(initialAddOns)));
+    // State for fetched data
+    const [attractions, setAttractions] = useState<CreatePackageAttraction[]>([]); // must include id
+    const [addOns, setAddOns] = useState<CreatePackageAddOn[]>([]); // must include id
     const [categories, setCategories] = useState<string[]>(() => JSON.parse(localStorage.getItem("zapzone_categories") || JSON.stringify(initialCategories)));
-    const [rooms, setRooms] = useState<CreatePackageRoom[]>(() => JSON.parse(localStorage.getItem("zapzone_rooms") || JSON.stringify(initialRooms)));
-    const [promos, setPromos] = useState<CreatePackagePromo[]>(getActivePromos);
-    const [giftCards, setGiftCards] = useState<CreatePackageGiftCard[]>(getActiveGiftCards);
+    const [rooms, setRooms] = useState<CreatePackageRoom[]>([]); // must include id
+    const [promos, setPromos] = useState<CreatePackagePromo[]>([]); // must include id
+    const [giftCards, setGiftCards] = useState<CreatePackageGiftCard[]>([]); // must include id
+    const [loading, setLoading] = useState(true);
+    const [submitting, setSubmitting] = useState(false);
+
+    // Fetch data from database on component mount
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                setLoading(true);
+                
+                // Fetch all data in parallel
+                const [attractionsRes, addOnsRes, roomsRes, promosRes, giftCardsRes] = await Promise.all([
+                    attractionService.getAttractions({user_id: getStoredUser()?.id}),
+                    addOnService.getAddOns({user_id: getStoredUser()?.id}),
+                    roomService.getRooms({user_id: getStoredUser()?.id}),
+                    promoService.getPromos(),
+                    giftCardService.getGiftCards()
+                ]);
+
+                // Transform data to match component types (include id)
+                const attractionsData = attractionsRes.data?.attractions?.map(attr => ({
+                    id: attr.id,
+                    name: attr.name,
+                    price: attr.price || 0,
+                    unit: attr.unit || ''
+                })) || [];
+
+                const addOnsData = addOnsRes.data?.add_ons?.map(addon => ({
+                    id: addon.id,
+                    name: addon.name,
+                    price: addon.price || 0
+                })) || [];
+
+                const roomsData = roomsRes.data?.rooms?.map(room => ({
+                    id: room.id,
+                    name: room.name
+                })) || [];
+
+                const promosData = promosRes.data?.promos?.filter(promo => 
+                    promo.status === "active" && !promo.deleted
+                ).map(promo => ({
+                    id: promo.id,
+                    name: promo.name,
+                    code: promo.code,
+                    description: promo.description || ''
+                })) || [];
+
+                const giftCardsData = giftCardsRes.data?.gift_cards?.filter(gc => 
+                    gc.status === "active" && !gc.deleted
+                ).map(gc => ({
+                    id: gc.id,
+                    name: gc.code, // Use code as display name
+                    code: gc.code,
+                    description: gc.description || ''
+                })) || [];
+
+                setAttractions(attractionsData);
+                setAddOns(addOnsData);
+                setRooms(roomsData);
+                setPromos(promosData);
+                setGiftCards(giftCardsData);
+            } catch (error) {
+                console.error('Error fetching data:', error);
+                showToast('Error loading data from server', 'error');
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchData();
+    }, []);
 
     // Form state
     const [form, setForm] = useState({
@@ -85,9 +124,15 @@ const CreatePackage: React.FC = () => {
         availabilityType: "daily" as "daily" | "weekly" | "monthly",
         availableDays: [] as string[],
         availableWeekDays: [] as string[],
-        availableMonthDays: [] as string[],
+        availableMonthDays: [] as string[], // Format: "Monday-1", "Tuesday-2", "Wednesday-last", etc.
         image: "" as string, // base64 or data url
+        timeSlotStart: "09:00", // Start time for available time slots
+        timeSlotEnd: "17:00", // End time for available time slots
+        timeSlotInterval: "30", // Interval between time slots in minutes
+        partialPaymentPercentage: "0", // Percentage for partial payments
+        partialPaymentFixed: "0", // Fixed amount for partial payments
     });
+
 
     // Image preview state
     const [imagePreview, setImagePreview] = useState<string>("");
@@ -165,117 +210,223 @@ const CreatePackage: React.FC = () => {
         }
     };
 
-    // Add option with code and description for promos/gift cards
-    const handleAddOption = (type: string, value: string, code?: string, extra?: string, unit?: string) => {
+    // Add option with API calls instead of localStorage
+    const handleAddOption = async (type: string, value: string, code?: string, extra?: string) => {
         if (!value.trim() || ((type === 'promo' || type === 'giftcard') && !code?.trim())) return;
-        switch(type) {
-            case 'activity': {
-                const price = Number(extra) || 0;
-                const attractionUnit = unit || '';
-                if (!attractions.some(a => a.name === value)) {
-                    const updated = [...attractions, { name: value, price, unit: attractionUnit }];
-                    setAttractions(updated);
-                    localStorage.setItem("zapzone_attractions", JSON.stringify(updated));
-                    showToast("Attraction added!", "success");
-                }
-                break;
+        
+        try {
+            switch(type) {
+                case 'addon':
+                    if (!addOns.some(a => a.name === value)) {
+                        const priceValue = parseFloat(extra || '0');
+                        
+                        if (isNaN(priceValue) || priceValue < 0) {
+                            showToast("Please enter a valid price for the add-on", "error");
+                            return;
+                        }
+                        
+                        const price = Number(priceValue.toFixed(2)); // Ensure 2 decimal places
+                        
+                        await addOnService.createAddOn({
+                            location_id: 1, // Default location
+                            name: value,
+                            price,
+                            description: '',
+                            is_active: true
+                        });
+                        const tempId = Date.now();
+                        const updated = [...addOns, { id: tempId, name: value, price }];
+                        setAddOns(updated);
+                        showToast("Add-on added!", "success");
+                    }
+                    break;
+                case 'category':
+                    if (!categories.includes(value)) {
+                        const updated = [...categories, value];
+                        setCategories(updated);
+                        localStorage.setItem("zapzone_categories", JSON.stringify(updated));
+                        showToast("Category added!", "success");
+                    }
+                    break;
+                case 'room':
+                    if (!rooms.some(r => r.name === value)) {
+                        await roomService.createRoom({
+                            location_id: 1, // Default location
+                            name: value,
+                            capacity: 20,
+                            is_available: true
+                        });
+                        const tempId = Date.now();
+                        const updated = [...rooms, { id: tempId, name: value }];
+                        setRooms(updated);
+                        showToast("Room added!", "success");
+                    }
+                    break;
+                case 'promo':
+                    if (!promos.some(p => p.name === value)) {
+                        const description = extra || '';
+                        await promoService.createPromo({
+                            name: value,
+                            code: code || '',
+                            description,
+                            type: 'fixed' as const,
+                            value: 0,
+                            start_date: new Date().toISOString().split('T')[0],
+                            end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                            usage_limit_per_user: 1,
+                            status: 'active' as const,
+                            created_by: 1 // Default user ID
+                        });
+                        const tempId = Date.now();
+                        const updated = [...promos, { id: tempId, name: value, code: code || '', description }];
+                        setPromos(updated);
+                        showToast("Promo added!", "success");
+                    }
+                    break;
+                case 'giftcard':
+                    if (!giftCards.some(g => g.code === code)) {
+                        const description = extra || '';
+                        const initialValue = 100;
+                        await giftCardService.createGiftCard({
+                            code: code || '',
+                            type: 'fixed' as const,
+                            initial_value: initialValue,
+                            balance: initialValue,
+                            max_usage: 1,
+                            description,
+                            status: 'active' as const,
+                            created_by: 1 // Default user ID
+                        });
+                        const tempId = Date.now();
+                        const updated = [...giftCards, { id: tempId, name: code || '', code: code || '', description }];
+                        setGiftCards(updated);
+                        showToast("Gift card added!", "success");
+                    }
+                    break;
             }
-            case 'addon':
-                if (!addOns.some(a => a.name === value)) {
-                    const price = Number(extra) || 0;
-                    const updated = [...addOns, { name: value, price }];
-                    setAddOns(updated);
-                    localStorage.setItem("zapzone_addons", JSON.stringify(updated));
-                    showToast("Add-on added!", "success");
-                }
-                break;
-            case 'category':
-                if (!categories.includes(value)) {
-                    const updated = [...categories, value];
-                    setCategories(updated);
-                    localStorage.setItem("zapzone_categories", JSON.stringify(updated));
-                    showToast("Category added!", "success");
-                }
-                break;
-            case 'room':
-                if (!rooms.some(r => r.name === value)) {
-                    const updated = [...rooms, { name: value }];
-                    setRooms(updated);
-                    localStorage.setItem("zapzone_rooms", JSON.stringify(updated));
-                    showToast("Room added!", "success");
-                }
-                break;
-            case 'promo':
-                if (!promos.some(p => p.name === value)) {
-                    const description = extra || '';
-                    const updated = [...promos, { name: value, code: code || '', description }];
-                    setPromos(updated);
-                    localStorage.setItem("zapzone_promos", JSON.stringify(updated));
-                    showToast("Promo added!", "success");
-                }
-                break;
-            case 'giftcard':
-                if (!giftCards.some(g => g.name === value)) {
-                    const description = extra || '';
-                    const updated = [...giftCards, { name: value, code: code || '', description }];
-                    setGiftCards(updated);
-                    localStorage.setItem("zapzone_giftcards", JSON.stringify(updated));
-                    showToast("Gift card added!", "success");
-                }
-                break;
+        } catch (error) {
+            console.error(`Error adding ${type}:`, error);
+            showToast(`Error adding ${type}`, "error");
         }
     };
 
-    // On submit, save form data to localStorage (append to zapzone_packages)
-    const handleSubmit = (e: React.FormEvent) => {
+    // On submit, save form data using API instead of localStorage
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        // Get existing packages
-        const existing = JSON.parse(localStorage.getItem("zapzone_packages") || "[]");
-        // Save a copy of the form, but promos/giftCards/addOns as objects with code/description/price
-        const promoObjs = form.promos.map(code => promos.find(p => p.code === code)).filter(Boolean);
-        const giftCardObjs = form.giftCards.map(code => giftCards.find(g => g.code === code)).filter(Boolean);
-        const addOnObjs = form.addOns.map(name => addOns.find(a => a.name === name)).filter(Boolean);
-        const roomObjs = form.rooms.map(name => rooms.find(r => r.name === name)).filter(Boolean);
+        
+        setSubmitting(true);
+        try {
+            // Validate required numeric fields
+            const price = parseFloat(form.price);
+            const maxParticipants = parseInt(form.maxParticipants);
+            const pricePerAdditional = form.pricePerAdditional ? parseFloat(form.pricePerAdditional) : 0;
+            const duration = parseInt(form.duration);
+            const timeSlotInterval = parseInt(form.timeSlotInterval);
 
-        // Generate a temporary unique id
-        const tempId = `pkg_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
+            if (isNaN(price) || price < 0) {
+                showToast("Please enter a valid price", "error");
+                setSubmitting(false);
+                return;
+            }
 
-        const newPackage = {
-            id: tempId,
-            ...form,
-            promos: promoObjs,
-            giftCards: giftCardObjs,
-            addOns: addOnObjs,
-            rooms: roomObjs,
-            pricePerAdditional: form.pricePerAdditional,
-            image: form.image,
-        };
+            if (isNaN(maxParticipants) || maxParticipants < 1) {
+                showToast("Please enter a valid max participants (minimum 1)", "error");
+                setSubmitting(false);
+                return;
+            }
 
-        // Append and save
-        localStorage.setItem("zapzone_packages", JSON.stringify([...existing, newPackage]));
-        showToast("Package saved!", "success");
-        setForm({
-            name: "",
-            description: "",
-            category: "",
-            features: "",
-            attractions: [],
-            rooms: [],
-            price: "",
-            maxParticipants: "",
-            pricePerAdditional: "",
-            duration: "",
-            durationUnit: "hours",
-            promos: [],
-            giftCards: [],
-            addOns: [],
-            availabilityType: "daily",
-            availableDays: [],
-            availableWeekDays: [],
-            availableMonthDays: [],
-            image: "",
-        });
-        setImagePreview("");
+            if (isNaN(duration) || duration < 1) {
+                showToast("Please enter a valid duration", "error");
+                setSubmitting(false);
+                return;
+            }
+
+            // Prepare package data for API (send IDs)
+            const packageData = {
+                name: form.name,
+                description: form.description,
+                category: form.category,
+                features: form.features,
+                price: Number(price.toFixed(2)), // Ensure 2 decimal places
+                max_participants: maxParticipants,
+                price_per_additional: Number(pricePerAdditional.toFixed(2)), // Ensure 2 decimal places
+                duration: duration,
+                duration_unit: form.durationUnit,
+                image: form.image,
+                status: 'active' as const,
+                location_id: 1, // Default location ID - you may want to make this configurable
+                availability_type: form.availabilityType,
+                available_days: form.availabilityType === 'daily' ? form.availableDays : [],
+                available_week_days: form.availabilityType === 'weekly' ? form.availableWeekDays : [],
+                available_month_days: form.availabilityType === 'monthly' ? form.availableMonthDays : [],
+                time_slot_start: form.timeSlotStart,
+                time_slot_end: form.timeSlotEnd,
+                time_slot_interval: timeSlotInterval,
+                partial_payment_percentage: form.partialPaymentPercentage ? parseInt(form.partialPaymentPercentage) : undefined,
+                partial_payment_fixed: form.partialPaymentFixed ? parseInt(form.partialPaymentFixed) : undefined,
+                attraction_ids: form.attractions.map(name => {
+                    const found = attractions.find(a => a.name === name);
+                    return found?.id;
+                }).filter(Boolean),
+                room_ids: form.rooms.map(name => {
+                    const found = rooms.find(r => r.name === name);
+                    return found?.id;
+                }).filter(Boolean),
+                addon_ids: form.addOns.map(name => {
+                    const found = addOns.find(a => a.name === name);
+                    return found?.id;
+                }).filter(Boolean),
+                promo_ids: form.promos.map(code => {
+                    const found = promos.find(p => p.code === code);
+                    return found?.id;
+                }).filter(Boolean),
+                gift_card_ids: form.giftCards.map(code => {
+                    const found = giftCards.find(g => g.code === code);
+                    return found?.id;
+                }).filter(Boolean)
+            };
+
+                        console.log("Package created:", packageData);
+
+
+            await packageService.createPackage(packageData);
+            showToast("Package created successfully!", "success");
+            
+            // Reset form
+            setForm({
+                name: "",
+                description: "",
+                category: "",
+                features: "",
+                attractions: [],
+                rooms: [],
+                price: "",
+                maxParticipants: "",
+                pricePerAdditional: "",
+                duration: "",
+                durationUnit: "hours",
+                promos: [],
+                giftCards: [],
+                addOns: [],
+                availabilityType: "daily",
+                availableDays: [],
+                availableWeekDays: [],
+                availableMonthDays: [],
+                image: "",
+                timeSlotStart: "09:00",
+                timeSlotEnd: "17:00",
+                timeSlotInterval: "30",
+                partialPaymentPercentage: "0",
+                partialPaymentFixed: "0",
+            });
+            setImagePreview("");
+            
+        } catch (error) {
+            console.error('Error creating package:', error);
+            showToast("Error creating package", "error");
+        } finally {
+            setSubmitting(false);
+        }
     };
 
     // Format availability for display
@@ -289,10 +440,11 @@ const CreatePackage: React.FC = () => {
             return form.availableWeekDays.map(day => `Every ${day}`).join(", ");
         } else if (form.availabilityType === "monthly") {
             if (form.availableMonthDays.length === 0) return "No days selected";
-            return form.availableMonthDays.map(day => {
-                if (day === "last") return "Last day of month";
-                const suffix = day === "1" ? "st" : day === "2" ? "nd" : day === "3" ? "rd" : "th";
-                return `${day}${suffix}`;
+            return form.availableMonthDays.map(dayWeek => {
+                const [day, week] = dayWeek.split('-');
+                const weekSuffix = week === "1" ? "st" : week === "2" ? "nd" : week === "3" ? "rd" : week === "4" ? "th" : "last";
+                const weekText = week === "last" ? "Last week" : `${week}${weekSuffix} week`;
+                return `${day.substring(0, 3)} (${weekText})`;
             }).join(", ");
         }
         return "Not specified";
@@ -303,6 +455,16 @@ const CreatePackage: React.FC = () => {
         if (!form.duration) return "Not specified";
         return `${form.duration} ${form.durationUnit}`;
     };
+
+    if (loading) {
+        return (
+            <div className="w-full mx-auto sm:px-4 md:mt-8 pb-6 flex justify-center items-center min-h-64">
+                <div className="text-center">
+                    <div className={`animate-spin rounded-full h-12 w-12 border-b-2 border-${fullColor} mx-auto mb-4`}></div>
+                </div>
+            </div>
+        );
+    }
 
     return (
             <div className="w-full mx-auto sm:px-4 md:mt-8 pb-6 flex flex-col md:flex-row gap-8 md:gap-12">
@@ -329,8 +491,11 @@ const CreatePackage: React.FC = () => {
                             </div>
                             {/* Details Section */}
                             <div>
-                                <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2">
+                                <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2 relative group">
                                     <Info className="w-5 h-5 text-primary" /> Details
+                                    <span className="absolute z-20 left-0 top-full mt-2 min-w-[250px] max-w-xs bg-gray-900 text-white text-xs rounded-md px-3 py-2 opacity-0 group-hover:opacity-100 pointer-events-none transition-all">
+                                        Basic package information including name, duration, participants, and pricing details
+                                    </span>
                                 </h3>
                                 <div className="space-y-5">
                                     <div>
@@ -422,10 +587,10 @@ const CreatePackage: React.FC = () => {
                                                     type="text"
                                                     placeholder="Add category"
                                                     className="rounded-md border border-gray-200 px-3 py-2 bg-white text-base min-w-0 w-32 transition-all"
-                                                    onKeyDown={e => {
+                                                    onKeyDown={async (e) => {
                                                         if (e.key === 'Enter') {
                                                             e.preventDefault();
-                                                            handleAddOption('category', (e.target as HTMLInputElement).value);
+                                                            await handleAddOption('category', (e.target as HTMLInputElement).value);
                                                             (e.target as HTMLInputElement).value = '';
                                                         }
                                                     }}
@@ -465,8 +630,11 @@ const CreatePackage: React.FC = () => {
                             
                             {/* Availability Section */}
                             <div>
-                                <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2">
+                                <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2 relative group">
                                     <Calendar className="w-5 h-5 text-primary" /> Availability
+                                    <span className="absolute z-20 left-0 top-full mt-2 min-w-[250px] max-w-xs bg-gray-900 text-white text-xs rounded-md px-3 py-2 opacity-0 group-hover:opacity-100 pointer-events-none transition-all">
+                                        Configure when this package is available for booking (daily, weekly, or monthly schedules)
+                                    </span>
                                 </h3>
                                 <div className="space-y-4">
                                     <div>
@@ -545,84 +713,187 @@ const CreatePackage: React.FC = () => {
                                     )}
                                     
                                     {form.availabilityType === "monthly" && (
-                                        <div>
-                                            <label className="block font-semibold mb-2 text-base text-neutral-800">Available On</label>
-                                            <div className="flex flex-wrap gap-2">
-                                                {["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "last"].map(day => (
-                                                    <button
-                                                        type="button"
-                                                        key={day}
-                                                        className={`px-3 py-1.5 rounded-full border text-sm font-medium transition-all duration-150 hover:bg-${themeColor}-50 hover:border-${themeColor}-400 focus:outline-none focus:ring-2 focus:ring-${themeColor}-200 ${form.availableMonthDays.includes(day) ? `bg-${themeColor}-50 border-${themeColor}-500 text-${fullColor}` : "bg-white border-gray-200 text-neutral-800"}`}
-                                                        onClick={() => handleAvailabilityChange("monthly", day)}
-                                                    >
-                                                        {day === "last" ? "Last" : day}
-                                                    </button>
-                                                ))}
+                                        <div className="space-y-4">
+                                            <div>
+                                                <label className="block font-semibold mb-3 text-base text-neutral-800">Select Day and Week of Month</label>
+                                                <p className="text-sm text-gray-500 mb-4">Choose which day(s) of the week and which week(s) of the month this package is available.</p>
+                                                
+                                                <div className="space-y-4">
+                                                    {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].map(day => (
+                                                        <div key={day} className="border border-gray-200 rounded-lg p-4">
+                                                            <div className="flex items-center justify-between mb-3">
+                                                                <span className="font-medium text-gray-900">{day}</span>
+                                                                <span className="text-sm text-gray-500">
+                                                                    {form.availableMonthDays.filter(item => item.startsWith(day)).length > 0 
+                                                                        ? `${form.availableMonthDays.filter(item => item.startsWith(day)).length} week(s) selected`
+                                                                        : 'No weeks selected'
+                                                                    }
+                                                                </span>
+                                                            </div>
+                                                            <div className="flex flex-wrap gap-2">
+                                                                {["1", "2", "3", "4", "last"].map(week => {
+                                                                    const value = `${day}-${week}`;
+                                                                    const isSelected = form.availableMonthDays.includes(value);
+                                                                    return (
+                                                                        <button
+                                                                            type="button"
+                                                                            key={value}
+                                                                            className={`px-3 py-1.5 rounded-full border text-sm font-medium transition-all duration-150 hover:bg-${themeColor}-50 hover:border-${themeColor}-400 focus:outline-none focus:ring-2 focus:ring-${themeColor}-200 ${isSelected ? `bg-${themeColor}-50 border-${themeColor}-500 text-${fullColor}` : "bg-white border-gray-200 text-neutral-800"}`}
+                                                                            onClick={() => {
+                                                                                setForm(prev => {
+                                                                                    const arr = prev.availableMonthDays;
+                                                                                    if (arr.includes(value)) {
+                                                                                        return { ...prev, availableMonthDays: arr.filter(v => v !== value) };
+                                                                                    } else {
+                                                                                        return { ...prev, availableMonthDays: [...arr, value] };
+                                                                                    }
+                                                                                });
+                                                                            }}
+                                                                        >
+                                                                            {week === "last" ? "Last Week" : `${week}${week === "1" ? "st" : week === "2" ? "nd" : week === "3" ? "rd" : "th"} Week`}
+                                                                        </button>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
                                             </div>
                                         </div>
                                     )}
+                                    
+                                    {/* Time Slot Configuration */}
+                                    <div className="mt-6 border-t border-gray-200 pt-6">
+                                        <h4 className="text-lg font-semibold mb-4 text-neutral-900 flex items-center gap-2 relative group">
+                                            <Clock className="w-5 h-5 text-primary" /> Time Slot Configuration
+                                            <span className="absolute z-20 left-0 top-full mt-2 min-w-[250px] max-w-xs bg-gray-900 text-white text-xs rounded-md px-3 py-2 opacity-0 group-hover:opacity-100 pointer-events-none transition-all">
+                                                Set the time range and intervals for available booking slots throughout the day
+                                            </span>
+                                        </h4>
+                                        <p className="text-sm text-gray-500 mb-4">Configure the available booking time slots for this package.</p>
+                                        
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                            <div>
+                                                <label className="block font-semibold mb-2 text-base text-neutral-800">Start Time</label>
+                                                <input
+                                                    type="time"
+                                                    name="timeSlotStart"
+                                                    value={form.timeSlotStart}
+                                                    onChange={handleChange}
+                                                    className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all`}
+                                                />
+                                                <p className="text-xs text-gray-500 mt-1">First available time slot</p>
+                                            </div>
+                                            
+                                            <div>
+                                                <label className="block font-semibold mb-2 text-base text-neutral-800">End Time</label>
+                                                <input
+                                                    type="time"
+                                                    name="timeSlotEnd"
+                                                    value={form.timeSlotEnd}
+                                                    onChange={handleChange}
+                                                    className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all`}
+                                                />
+                                                <p className="text-xs text-gray-500 mt-1">Last available time slot</p>
+                                            </div>
+                                            
+                                            <div>
+                                                <label className="block font-semibold mb-2 text-base text-neutral-800">Interval (minutes)</label>
+                                                <select
+                                                    name="timeSlotInterval"
+                                                    value={form.timeSlotInterval}
+                                                    onChange={handleChange}
+                                                    className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all`}
+                                                >
+                                                    <option value="15">15 minutes</option>
+                                                    <option value="30">30 minutes</option>
+                                                    <option value="45">45 minutes</option>
+                                                    <option value="60">1 hour</option>
+                                                    <option value="90">1.5 hours</option>
+                                                    <option value="120">2 hours</option>
+                                                </select>
+                                                <p className="text-xs text-gray-500 mt-1">Time between slots</p>
+                                            </div>
+                                        </div>
+                                        
+                                        {/* Preview time slots */}
+                                        <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                                            <p className="text-sm font-medium text-gray-700 mb-2">Preview Time Slots:</p>
+                                            <div className="flex flex-wrap gap-2">
+                                                {(() => {
+                                                    const slots = [];
+                                                    const [startHour, startMin] = form.timeSlotStart.split(':').map(Number);
+                                                    const [endHour, endMin] = form.timeSlotEnd.split(':').map(Number);
+                                                    const startMinutes = startHour * 60 + startMin;
+                                                    const endMinutes = endHour * 60 + endMin;
+                                                    const interval = parseInt(form.timeSlotInterval);
+                                                    
+                                                    for (let time = startMinutes; time <= endMinutes - interval; time += interval) {
+                                                        const hours = Math.floor(time / 60);
+                                                        const mins = time % 60;
+                                                        const displayTime = `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+                                                        slots.push(
+                                                            <span key={time} className="px-2 py-1 bg-white border border-gray-300 rounded text-xs text-gray-700">
+                                                                {displayTime}
+                                                            </span>
+                                                        );
+                                                    }
+                                                    
+                                                    if (slots.length === 0) {
+                                                        return <span className="text-xs text-gray-500">No time slots generated. Please check your start/end times.</span>;
+                                                    }
+                                                    
+                                                    return slots;
+                                                })()}
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                             
                             <div className="border-b border-gray-100 my-2" />
                             
-                            {/* Attractions Section */}
+            {/* Attractions Section */}
+            <div>
+                <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2 relative group">
+                    <Info className="w-5 h-5 text-primary" /> Additional Attractions
+                    <span className="absolute z-20 left-0 top-full mt-2 min-w-[250px] max-w-xs bg-gray-900 text-white text-xs rounded-md px-3 py-2 opacity-0 group-hover:opacity-100 pointer-events-none transition-all">
+                        Select extra attractions that customers can add to this package during booking
+                    </span>
+                </h3>
+                {attractions.length === 0 ? (
+                    <div className="bg-gray-50 rounded-lg p-4 text-center border border-dashed border-gray-300">
+                        <p className="text-gray-500 mb-3 text-sm">No attractions available yet</p>
+                        <button
+                            type="button"
+                            onClick={() => navigate('/admin/attractions/create')}
+                            className={`inline-flex items-center gap-2 bg-${fullColor} text-xs hover:bg-${themeColor}-900 text-white px-4 py-2 rounded-md transition`}
+                        >
+                            <Plus className="w-4 h-4" />
+                            Create Attraction
+                        </button>
+                    </div>
+                ) : (
+                    <div className="flex flex-wrap gap-2 mb-2">
+                        {attractions.map((act) => (
+                            <button
+                                type="button"
+                                key={act.name}
+                                className={`px-3 py-1 rounded-full border text-sm font-medium transition-all duration-150 hover:bg-${themeColor}-50 hover:border-${themeColor}-400 focus:outline-none focus:ring-2 focus:ring-${themeColor}-200 ${form.attractions.includes(act.name) ? `bg-${themeColor}-50 border-${themeColor}-500 text-${fullColor}` : "bg-white border-gray-200 text-neutral-800"}`}
+                                onClick={() => handleMultiSelect("attractions", act.name)}
+                            >
+                                {act.name} <span className="text-xs text-gray-400 ml-1">${act.price}</span>
+                            </button>
+                        ))}
+                    </div>
+                )}
+            </div>                            {/* Rooms Section */}
                             <div>
-                                <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2">
-                                    <Info className="w-5 h-5 text-primary" /> Attractions
-                                </h3>
-                                <div className="flex flex-wrap gap-2 mb-2">
-                                    {attractions.map((act) => (
-                                        <button
-                                            type="button"
-                                            key={act.name}
-                                            className={`px-3 py-1 rounded-full border text-sm font-medium transition-all duration-150 hover:bg-${themeColor}-50 hover:border-${themeColor}-400 focus:outline-none focus:ring-2 focus:ring-${themeColor}-200 ${form.attractions.includes(act.name) ? `bg-${themeColor}-50 border-${themeColor}-500 text-${fullColor}` : "bg-white border-gray-200 text-neutral-800"}`}
-                                            onClick={() => handleMultiSelect("attractions", act.name)}
-                                        >
-                                            {act.name} <span className="text-xs text-gray-400 ml-1">${act.price}</span>
-                                        </button>
-                                    ))}
-                                    <input
-                                        type="text"
-                                        placeholder="Add attraction"
-                                        className="rounded-md border border-gray-200 px-2 py-1 w-28 bg-white text-sm transition-all placeholder:text-gray-400"
-                                        id="activity-name"
-                                    />
-                                    <input
-                                        type="number"
-                                        placeholder="Price"
-                                        className="rounded-md border border-gray-200 px-2 py-1 w-16 bg-white text-sm transition-all placeholder:text-gray-400"
-                                        id="activity-price"
-                                        min="0"
-                                    />
-                                    <input
-                                        type="text"
-                                        placeholder="Unit (e.g. per person, per table)"
-                                        className="rounded-md border border-gray-200 px-2 py-1 w-32 bg-white text-sm transition-all placeholder:text-gray-400"
-                                        id="activity-unit"
-                                    />
-                                    <button type="button" className="p-2 rounded-md hover:bg-gray-100 transition" title="Add attraction"
-                                        onClick={() => {
-                                            const nameInput = document.getElementById('activity-name') as HTMLInputElement;
-                                            const priceInput = document.getElementById('activity-price') as HTMLInputElement;
-                                            const unitInput = document.getElementById('activity-unit') as HTMLInputElement;
-                                            if (nameInput.value) {
-                                                handleAddOption('activity', nameInput.value, undefined, priceInput.value, unitInput.value);
-                                                nameInput.value = '';
-                                                priceInput.value = '';
-                                                unitInput.value = '';
-                                            }
-                                        }}
-                                    >
-                                        <Plus className="w-4 h-4 text-primary" />
-                                    </button>
-                                </div>
-                            </div>
-                            
-                            {/* Rooms Section */}
-                            <div>
-                                <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2">
+                                <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2 relative group">
                                     <Home className="w-5 h-5 text-primary" /> Rooms
+                                    <span className="absolute z-20 left-0 top-full mt-2 min-w-[250px] max-w-xs bg-gray-900 text-white text-xs rounded-md px-3 py-2 opacity-0 group-hover:opacity-100 pointer-events-none transition-all">
+                                        Assign specific rooms or spaces where this package can be booked
+                                    </span>
                                 </h3>
                                 <div className="flex flex-wrap gap-2 mb-2">
                                     {rooms.map((room) => (
@@ -642,10 +913,10 @@ const CreatePackage: React.FC = () => {
                                         id="room-name"
                                     />
                                     <button type="button" className="p-2 rounded-md hover:bg-blue-50 transition" title="Add room"
-                                        onClick={() => {
+                                        onClick={async () => {
                                             const nameInput = document.getElementById('room-name') as HTMLInputElement;
                                             if (nameInput.value) {
-                                                handleAddOption('room', nameInput.value);
+                                                await handleAddOption('room', nameInput.value);
                                                 nameInput.value = '';
                                             }
                                         }}
@@ -657,8 +928,11 @@ const CreatePackage: React.FC = () => {
                             
                             {/* Add-ons Section */}
                             <div>
-                                <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2">
+                                <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2 relative group">
                                     <Info className="w-5 h-5 text-primary" /> Add-ons
+                                    <span className="absolute z-20 left-0 top-full mt-2 min-w-[250px] max-w-xs bg-gray-900 text-white text-xs rounded-md px-3 py-2 opacity-0 group-hover:opacity-100 pointer-events-none transition-all">
+                                        Optional extras like food, decorations, or party favors that enhance this package
+                                    </span>
                                 </h3>
                                 <div className="flex flex-wrap gap-2 mb-2">
                                     {addOns.map((add) => (
@@ -685,11 +959,11 @@ const CreatePackage: React.FC = () => {
                                         min="0"
                                     />
                                     <button type="button" className="p-2 rounded-md hover:bg-emerald-50 transition" title="Add add-on"
-                                        onClick={() => {
+                                        onClick={async () => {
                                             const nameInput = document.getElementById('addon-name') as HTMLInputElement;
                                             const priceInput = document.getElementById('addon-price') as HTMLInputElement;
                                             if (nameInput.value) {
-                                                handleAddOption('addon', nameInput.value, priceInput.value);
+                                                await handleAddOption('addon', nameInput.value, '', priceInput.value);
                                                 nameInput.value = '';
                                                 priceInput.value = '';
                                             }
@@ -702,8 +976,11 @@ const CreatePackage: React.FC = () => {
                             
                             {/* Promos Section */}
                             <div>
-                                <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2">
+                                <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2 relative group">
                                     <Tag className="w-5 h-5 text-primary" /> Promos
+                                    <span className="absolute z-20 left-0 top-full mt-2 min-w-[250px] max-w-xs bg-gray-900 text-white text-xs rounded-md px-3 py-2 opacity-0 group-hover:opacity-100 pointer-events-none transition-all">
+                                        Link promotional codes that can be applied as discounts for this package
+                                    </span>
                                 </h3>
                                 {promos.length === 0 ? (
                                     <div className="bg-gray-50 rounded-lg p-4 text-center border border-dashed border-gray-300">
@@ -747,8 +1024,11 @@ const CreatePackage: React.FC = () => {
                             
                             {/* Gift Cards Section */}
                             <div>
-                                <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2">
+                                <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2 relative group">
                                     <Gift className="w-5 h-5 text-primary" /> Gift Cards
+                                    <span className="absolute z-20 left-0 top-full mt-2 min-w-[250px] max-w-xs bg-gray-900 text-white text-xs rounded-md px-3 py-2 opacity-0 group-hover:opacity-100 pointer-events-none transition-all">
+                                        Associate gift card codes that can be redeemed when booking this package
+                                    </span>
                                 </h3>
                                 {giftCards.length === 0 ? (
                                     <div className="bg-gray-50 rounded-lg p-4 text-center border border-dashed border-gray-300">
@@ -792,8 +1072,11 @@ const CreatePackage: React.FC = () => {
                             
                             {/* Pricing Section */}
                             <div>
-                                <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2">
+                                <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2 relative group">
                                     <Info className="w-5 h-5 text-primary" /> Pricing
+                                    <span className="absolute z-20 left-0 top-full mt-2 min-w-[250px] max-w-xs bg-gray-900 text-white text-xs rounded-md px-3 py-2 opacity-0 group-hover:opacity-100 pointer-events-none transition-all">
+                                        Set the base price for this package (before any add-ons or additional participants)
+                                    </span>
                                 </h3>
                                 <label className="block font-semibold mb-2 text-base text-neutral-800">Price</label>
                                 <input
@@ -807,13 +1090,54 @@ const CreatePackage: React.FC = () => {
                                     required
                                 />
                             </div>
+                            {/* Partial Payment Section */}
+                            <div>
+                                <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2 relative group">
+                                    <Info className="w-5 h-5 text-primary" /> Partial Payment Options
+                                    <span className="absolute z-20 left-0 top-full mt-2 min-w-[250px] max-w-xs bg-gray-900 text-white text-xs rounded-md px-3 py-2 opacity-0 group-hover:opacity-100 pointer-events-none transition-all">
+                                        Configure partial payment options for customers (percentage or fixed amount)
+                                    </span>
+                                </h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block font-semibold mb-2 text-base text-neutral-800">Partial Payment Percentage (%)</label>
+                                        <input
+                                            type="number"
+                                            name="partialPaymentPercentage"
+                                            value={form.partialPaymentPercentage}
+                                            onChange={handleChange}
+                                            className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400`}
+                                            min="0"
+                                            max="100"
+                                            placeholder="e.g. 20 for 20%"
+                                        />
+                                        <p className="text-xs text-gray-500 mt-1">Leave 0 to disable percentage-based partial payment</p>
+                                    </div>
+                                    <div>
+                                        <label className="block font-semibold mb-2 text-base text-neutral-800">Partial Payment Fixed Amount ($)</label>
+                                        <input
+                                            type="number"
+                                            name="partialPaymentFixed"
+                                            value={form.partialPaymentFixed}
+                                            onChange={handleChange}
+                                            className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400`}
+                                            min="0"
+                                            placeholder="e.g. 50 for $50"
+                                        />
+                                        <p className="text-xs text-gray-500 mt-1">Leave 0 to disable fixed amount partial payment</p>
+                                    </div>
+                                </div>
+                            </div>
+
                             
                             <div className="flex gap-2 mt-6">
                                 <button
                                     type="submit"
-                                    className={`flex-1 bg-${fullColor} hover:bg-${themeColor}-900 text-white font-semibold py-2 rounded-md transition text-base flex items-center justify-center gap-2 visible`}
+                                    disabled={submitting || loading}
+                                    className={`flex-1 bg-${fullColor} hover:bg-${themeColor}-900 text-white font-semibold py-2 rounded-md transition text-base flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed`}
                                 >
-                                    <Plus className="w-5 h-5" /> Submit
+                                    <Plus className="w-5 h-5" /> 
+                                    {submitting ? 'Creating...' : 'Submit'}
                                 </button>
                                 <button
                                     type="button"
@@ -838,6 +1162,11 @@ const CreatePackage: React.FC = () => {
                                         availableWeekDays: [],
                                         availableMonthDays: [],
                                         image: "",
+                                        timeSlotStart: "09:00",
+                                        timeSlotEnd: "17:00",
+                                        timeSlotInterval: "30",
+                                        partialPaymentPercentage: "0",
+                                        partialPaymentFixed: "0",
                                     })}
                                 >
                                     <RefreshCcw className="w-5 h-5" /> Reset

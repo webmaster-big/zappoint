@@ -3,6 +3,9 @@ import type { ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import type { CreateAttractionsFormData } from '../../../types/createAttractions.types';
+import { attractionService } from '../../../services/AttractionService';
+import type { CreateAttractionData } from '../../../services/AttractionService';
+import Toast from '../../../components/ui/Toast';
 
 const CreateAttraction = () => {
   const navigate = useNavigate();
@@ -33,6 +36,8 @@ const CreateAttraction = () => {
 
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [customCategory, setCustomCategory] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   // const [customLocation, setCustomLocation] = useState('');
 
   const handleInputChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -53,7 +58,7 @@ const CreateAttraction = () => {
     }));
   };
 
-  const handleImageUpload = (e: ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
 
@@ -63,13 +68,33 @@ const CreateAttraction = () => {
       return;
     }
 
+    // Create previews using object URLs
     const newImagePreviews = fileArray.map(file => URL.createObjectURL(file));
     setImagePreviews(prev => [...prev, ...newImagePreviews]);
 
-    setFormData(prev => ({
-      ...prev,
-      images: [...prev.images, ...fileArray.map(file => file.name)]
-    }));
+    // Convert files to base64 for backend
+    const base64Promises = fileArray.map(file => {
+      return new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const base64String = reader.result as string;
+          resolve(base64String);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    });
+
+    try {
+      const base64Images = await Promise.all(base64Promises);
+      setFormData(prev => ({
+        ...prev,
+        images: [...prev.images, ...base64Images]
+      }));
+    } catch (error) {
+      console.error('Error converting images to base64:', error);
+      alert('Failed to process images. Please try again.');
+    }
   };
 
   const removeImage = (index: number) => {
@@ -102,23 +127,53 @@ const CreateAttraction = () => {
 
   // Location handlers removed
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const newId = `attr_${Date.now()}`;
-    const existingAttractions = JSON.parse(localStorage.getItem('zapzone_attractions') || '[]');
-    const newAttraction = {
-      id: newId,
-      ...formData,
-      createdAt: new Date().toISOString(),
-      status: 'active'
-    };
+    try {
+      setIsSubmitting(true);
 
-    // TODO: Send newAttraction to backend API instead of localStorage
-    localStorage.setItem('zapzone_attractions', JSON.stringify([...existingAttractions, newAttraction]));
+      // Convert form data to API format
+      // Note: location_id is automatically set by backend from auth user
+      const attractionData: Omit<CreateAttractionData, 'location_id'> = {
+        name: formData.name,
+        description: formData.description,
+        price: Number(formData.price),
+        pricing_type: formData.pricingType,
+        max_capacity: Number(formData.maxCapacity),
+        category: formData.category,
+        duration: formData.duration ? Number(formData.duration) : undefined,
+        duration_unit: formData.durationUnit as 'hours' | 'minutes',
+        availability: formData.availability,
+        image: formData.images.length > 0 ? formData.images : undefined, // Send all images as array
+        is_active: true,
+      };
 
-    alert('Attraction created successfully!');
-    navigate('/manage-attractions');
+      console.log('Submitting attraction data:', attractionData);
+
+      const response = await attractionService.createAttraction(attractionData as CreateAttractionData);
+      
+      console.log('Attraction created:', response);
+      
+      setToast({ message: 'Attraction created successfully!', type: 'success' });
+      
+      // Navigate after a short delay to show success message
+      setTimeout(() => {
+        navigate('/attractions');
+      }, 1500);
+    } catch (error: unknown) {
+      console.error('Error creating attraction:', error);
+      
+      let errorMessage = 'Failed to create attraction. Please try again.';
+      if (error && typeof error === 'object' && 'response' in error) {
+        const axiosError = error as { response?: { data?: { message?: string } } };
+        errorMessage = axiosError.response?.data?.message || errorMessage;
+      }
+      
+      setToast({ message: errorMessage, type: 'error' });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const daysOfWeek = [
@@ -477,16 +532,18 @@ const CreateAttraction = () => {
               <div className="px-6 py-5 bg-gray-50 text-right space-x-3">
                 <button
                   type="button"
-                  onClick={() => navigate('/attractions')}
-                  className={`px-5 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-800 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-${themeColor}-500 transition-colors`}
+                  onClick={() => navigate('/manage-attractions')}
+                  disabled={isSubmitting}
+                  className={`px-5 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-800 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-${themeColor}-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed`}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className={`px-5 py-2.5 bg-${fullColor} border border-transparent rounded-lg shadow-sm text-sm font-medium text-white hover:from-${fullColor} hover:to-${fullColor} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-${themeColor}-500 transition-all`}
+                  disabled={isSubmitting}
+                  className={`px-5 py-2.5 bg-${fullColor} border border-transparent rounded-lg shadow-sm text-sm font-medium text-white hover:from-${fullColor} hover:to-${fullColor} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-${themeColor}-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed`}
                 >
-                  Create Attraction
+                  {isSubmitting ? 'Creating...' : 'Create Attraction'}
                 </button>
               </div>
             </form>
@@ -500,6 +557,17 @@ const CreateAttraction = () => {
           </div>
         </div>
       </div>
+
+      {/* Toast Notification */}
+      {toast && (
+        <div className="fixed top-4 right-4 z-50 animate-fade-in-up">
+          <Toast
+            message={toast.message}
+            type={toast.type}
+            onClose={() => setToast(null)}
+          />
+        </div>
+      )}
     </div>
   );
 };

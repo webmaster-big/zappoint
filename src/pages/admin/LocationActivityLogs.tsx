@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { 
   Search, 
   Filter, 
@@ -17,20 +17,43 @@ import {
   MapPin,
   User,
   Settings,
-  Building
+  Building,
+  X
 } from 'lucide-react';
-import { useThemeColor } from '../../hooks/useThemeColor';
 import type { 
   LocationActivityLogsActivityLog, 
   LocationActivityLogsFilterOptions, 
   LocationActivityLogsLocationData 
 } from '../../types/LocationActivityLogs.types';
+import { useThemeColor } from '../../hooks/useThemeColor';
+import CounterAnimation from '../../components/ui/CounterAnimation';
+import { API_BASE_URL, getStoredUser } from '../../utils/storage';
+import { getAuthToken } from '../../services';
 
 const LocationActivityLogs = () => {
   const { themeColor, fullColor } = useThemeColor();
-  const [logs, setLogs] = useState<LocationActivityLogsActivityLog[]>([]);
+  const currentUser = getStoredUser();
+  const isCompanyAdmin = currentUser?.role === 'company_admin';
+  
   const [filteredLogs, setFilteredLogs] = useState<LocationActivityLogsActivityLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportFilters, setExportFilters] = useState<LocationActivityLogsFilterOptions>({
+    action: 'all',
+    resourceType: 'all',
+    user: 'all',
+    userType: 'all',
+    dateRange: 'all',
+    search: ''
+  });
+  const [exportLocation, setExportLocation] = useState<string>('all');
+  const [exportSelectedLocations, setExportSelectedLocations] = useState<string[]>([]);
+  const [showAllLocations, setShowAllLocations] = useState(false);
+  const [exportSelectedUsers, setExportSelectedUsers] = useState<string[]>([]);
+  const [showAllUsers, setShowAllUsers] = useState(false);
+  const [userSearchQuery, setUserSearchQuery] = useState('');
+  const [isExporting, setIsExporting] = useState(false);
   const [filters, setFilters] = useState<LocationActivityLogsFilterOptions>({
     action: 'all',
     resourceType: 'all',
@@ -43,46 +66,9 @@ const LocationActivityLogs = () => {
   const [itemsPerPage] = useState(20);
   const [showFilters, setShowFilters] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState<string>('all');
-
-  // Locations data
-  const locations: LocationActivityLogsLocationData[] = [
-    {
-      name: 'Brighton',
-      managers: ['John Smith', 'Sarah Wilson'],
-      attendants: ['Mike Chen', 'Emily Rodriguez', 'David Kim'],
-      recentActivity: 47
-    },
-    {
-      name: 'Canton',
-      managers: ['Robert Brown', 'Lisa Garcia'],
-      attendants: ['Alex Johnson', 'Maria Martinez', 'James Wilson'],
-      recentActivity: 32
-    },
-    {
-      name: 'Farmington',
-      managers: ['Michael Davis'],
-      attendants: ['Jennifer Lee', 'Thomas Anderson'],
-      recentActivity: 28
-    },
-    {
-      name: 'Lansing',
-      managers: ['Patricia Miller'],
-      attendants: ['Christopher Taylor', 'Amanda White'],
-      recentActivity: 41
-    },
-    {
-      name: 'Taylor',
-      managers: ['Daniel Clark'],
-      attendants: ['Michelle Harris', 'Kevin Martin'],
-      recentActivity: 23
-    },
-    {
-      name: 'Escape Room Zone',
-      managers: ['Jessica Thompson'],
-      attendants: ['Brian Wilson', 'Rachel Green'],
-      recentActivity: 56
-    }
-  ];
+  const [locations, setLocations] = useState<LocationActivityLogsLocationData[]>([]);
+  const [totalLogs, setTotalLogs] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
 
   // Action icons and colors
   const actionIcons = {
@@ -128,8 +114,9 @@ const LocationActivityLogs = () => {
 
   const getUserTypeColors = (userType: string) => {
     const colors: Record<string, string> = {
+      company_admin: 'bg-purple-100 text-purple-800',
+      location_manager: 'bg-blue-100 text-blue-800',
       attendant: `bg-${themeColor}-100 text-${fullColor}`,
-      manager: `bg-${themeColor}-100 text-${fullColor}`,
       system: 'bg-gray-100 text-gray-800'
     };
     return colors[userType] || `bg-${themeColor}-100 text-${fullColor}`;
@@ -144,18 +131,17 @@ const LocationActivityLogs = () => {
 
   // Calculate metrics for selected location
   const getLocationMetrics = () => {
-    const locationLogs = selectedLocation === 'all' 
-      ? logs 
-      : logs.filter(log => log.location === selectedLocation);
+    // Use filteredLogs which contains the current page's data
+    const locationLogs = filteredLogs;
 
     const todayLogs = locationLogs.filter(log => isToday(new Date(log.timestamp)));
-    const managerLogs = locationLogs.filter(log => log.userType === 'manager');
+    const managerLogs = locationLogs.filter(log => log.userType === 'location_manager');
     const attendantLogs = locationLogs.filter(log => log.userType === 'attendant');
 
     return [
       {
         title: 'Total Activities',
-        value: locationLogs.length.toString(),
+        value: totalLogs.toString(),
         change: selectedLocation === 'all' ? 'All locations' : `${selectedLocation} only`,
         accent: `bg-${themeColor}-100 text-${fullColor}`,
         icon: Clock,
@@ -186,222 +172,185 @@ const LocationActivityLogs = () => {
 
   const metrics = getLocationMetrics();
 
-  // Load logs from localStorage
-  useEffect(() => {
-    loadLogs();
-  }, []);
-
-  // Apply filters when logs or filters change
-  useEffect(() => {
-    applyFilters();
-  }, [logs, filters, selectedLocation]);
-
-  const loadLogs = () => {
+  const loadLocations = async () => {
     try {
-      const storedLogs = localStorage.getItem('zapzone_location_activity_logs');
-      if (storedLogs) {
-        const parsedLogs = JSON.parse(storedLogs);
-        setLogs(parsedLogs);
-      } else {
-        // Generate sample activity logs
-        const sampleLogs = generateSampleLogs();
-        setLogs(sampleLogs);
-        localStorage.setItem('zapzone_location_activity_logs', JSON.stringify(sampleLogs));
+      const token = getAuthToken();
+      const response = await fetch(`${API_BASE_URL}/locations`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const locationsData = Array.isArray(data.data) ? data.data : [];
+        
+        // Transform locations data
+        const transformedLocations = locationsData.map((loc: any) => ({
+          name: loc.name,
+          id: loc.id,
+          managers: [], // Will be populated from users if needed
+          attendants: [], // Will be populated from users if needed
+          recentActivity: 0 // Will be calculated from activity logs
+        }));
+        
+        setLocations(transformedLocations);
+      }
+    } catch (error) {
+      console.error('Error loading locations:', error);
+    }
+  };
+
+  const loadLogs = useCallback(async () => {
+    // Only show full loading spinner on initial load
+    if (filteredLogs.length === 0) {
+      setLoading(true);
+    } else {
+      setIsRefreshing(true);
+    }
+    try {
+      const token = getAuthToken();
+      const params = new URLSearchParams();
+      
+      // Pagination
+      params.append('per_page', itemsPerPage.toString());
+      params.append('page', currentPage.toString());
+      
+      // Location filter
+      if (selectedLocation !== 'all') {
+        const location = locations.find(l => l.name === selectedLocation);
+        if (location?.id) {
+          params.append('location_id', location.id.toString());
+        }
+      }
+      
+      // Search filter
+      if (filters.search) {
+        params.append('search', filters.search);
+      }
+      
+      // Action filter
+      if (filters.action !== 'all') {
+        params.append('action', filters.action);
+      }
+      
+      // Category filter (mapped from resourceType)
+      if (filters.resourceType !== 'all') {
+        params.append('category', filters.resourceType);
+      }
+      
+      // User filter
+      if (filters.user !== 'all') {
+        params.append('user_id', filters.user);
+      }
+      
+      // User type filter - handled by filtering on frontend after load
+      // Backend doesn't have a direct user_type filter, so we'll filter after fetching
+      
+      // Date range filter
+      if (filters.dateRange !== 'all') {
+        const now = new Date();
+        let startDate: Date;
+
+        switch (filters.dateRange) {
+          case 'today':
+            startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            params.append('start_date', startDate.toISOString().split('T')[0]);
+            break;
+          case 'yesterday': {
+            startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+            const endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+            params.append('start_date', startDate.toISOString().split('T')[0]);
+            params.append('end_date', endDate.toISOString().split('T')[0]);
+            break;
+          }
+          case 'week':
+            params.append('recent_days', '7');
+            break;
+          case 'month':
+            params.append('recent_days', '30');
+            break;
+        }
+      }
+      
+      // Sort
+      params.append('sort_by', 'created_at');
+      params.append('sort_order', 'desc');
+
+      const response = await fetch(`${API_BASE_URL}/activity-logs?${params.toString()}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        
+        // Backend returns: { success: true, data: { activity_logs: [...], pagination: {...} } }
+        const activityLogs = data.data?.activity_logs || [];
+        const pagination = data.data?.pagination || {};
+        
+        // Transform API data to match component structure
+        let transformedLogs = activityLogs.map((log: any) => ({
+          id: log.id?.toString() || '',
+          userId: log.user_id?.toString() || 'system',
+          userName: log.user?.first_name && log.user?.last_name 
+            ? `${log.user.first_name} ${log.user.last_name}` 
+            : log.user?.email || 'System',
+          userType: log.user?.role || 'system',
+          userRole: log.user?.position || 'System',
+          location: log.location?.name || (log.user?.role === 'company_admin' ? '' : 'Unknown'),
+          action: log.action || 'unknown',
+          resourceType: log.category || log.entity_type || 'general',
+          resourceId: log.entity_id?.toString() || '',
+          resourceName: log.metadata?.resource_name || log.entity_type || '',
+          details: log.description || '',
+          timestamp: log.created_at || new Date().toISOString(),
+          severity: determineSeverity(log.action || '')
+        }));
+        
+        // Apply client-side user type filter (since backend doesn't support this)
+        if (filters.userType !== 'all') {
+          transformedLogs = transformedLogs.filter((log: LocationActivityLogsActivityLog) => log.userType === filters.userType);
+        }
+        
+        setFilteredLogs(transformedLogs);
+        setTotalLogs(pagination.total || 0);
+        setTotalPages(pagination.last_page || 1);
       }
     } catch (error) {
       console.error('Error loading activity logs:', error);
     } finally {
       setLoading(false);
+      setIsRefreshing(false);
     }
-  };
+  }, [itemsPerPage, currentPage, selectedLocation, locations, filters]);
 
-  const generateSampleLogs = (): LocationActivityLogsActivityLog[] => {
-    const managers = locations.flatMap(loc => 
-      loc.managers.map((name: string) => ({
-        id: `mgr_${loc.name.toLowerCase()}_${name.toLowerCase().replace(' ', '_')}`,
-        name,
-        type: 'manager' as const,
-        location: loc.name,
-        role: 'Location Manager'
-      }))
-    );
+  // Load initial data
+  useEffect(() => {
+    const initializeData = async () => {
+      await loadLocations();
+      // loadLogs will be called by the second useEffect when locations are loaded
+    };
+    initializeData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount
 
-    const attendants = locations.flatMap(loc => 
-      loc.attendants.map((name: string) => ({
-        id: `att_${loc.name.toLowerCase()}_${name.toLowerCase().replace(' ', '_')}`,
-        name,
-        type: 'attendant' as const,
-        location: loc.name,
-        role: 'Attendant'
-      }))
-    );
-
-    const allUsers = [...managers, ...attendants];
-
-    type ResourceType = 'package' | 'customer' | 'purchase' | 'attraction' | 'booking' | 'attendant' | 'manager' | 'inventory' | 'settings';
-    
-    const actions: Array<{
-      action: string;
-      resourceType: ResourceType;
-      details: string;
-      severity: 'info' | 'success' | 'warning' | 'error';
-      userTypes: ('manager' | 'attendant')[];
-    }> = [
-      // Manager-specific actions
-      { action: 'managed', resourceType: 'settings', details: 'Updated location settings for {name}', severity: 'info', userTypes: ['manager'] },
-      { action: 'approved', resourceType: 'booking', details: 'Approved booking #{id} for {name}', severity: 'success', userTypes: ['manager'] },
-      { action: 'rejected', resourceType: 'booking', details: 'Rejected booking #{id} for {name}', severity: 'warning', userTypes: ['manager'] },
-      { action: 'reported', resourceType: 'inventory', details: 'Generated inventory report for {name}', severity: 'info', userTypes: ['manager'] },
-      
-      // Shared actions
-      { action: 'created', resourceType: 'package', details: 'Created new package {name}', severity: 'success', userTypes: ['manager', 'attendant'] },
-      { action: 'updated', resourceType: 'package', details: 'Updated package {name}', severity: 'info', userTypes: ['manager', 'attendant'] },
-      { action: 'created', resourceType: 'customer', details: 'Created customer profile for {name}', severity: 'success', userTypes: ['manager', 'attendant'] },
-      { action: 'updated', resourceType: 'customer', details: 'Updated customer {name} profile', severity: 'info', userTypes: ['manager', 'attendant'] },
-      { action: 'checked_in', resourceType: 'customer', details: 'Checked in customer {name}', severity: 'success', userTypes: ['manager', 'attendant'] },
-      { action: 'checked_out', resourceType: 'customer', details: 'Checked out customer {name}', severity: 'info', userTypes: ['manager', 'attendant'] },
-      { action: 'purchased', resourceType: 'purchase', details: 'Processed purchase for {name}', severity: 'success', userTypes: ['manager', 'attendant'] },
-    ];
-
-    const sampleLogs: LocationActivityLogsActivityLog[] = [];
-    const now = new Date();
-    
-    // Generate logs for the last 30 days
-    for (let i = 0; i < 500; i++) {
-      const user = allUsers[Math.floor(Math.random() * allUsers.length)];
-      const availableActions = actions.filter(action => 
-        action.userTypes.includes(user.type)
-      );
-      const actionConfig = availableActions[Math.floor(Math.random() * availableActions.length)];
-      const hoursAgo = Math.floor(Math.random() * 720); // 30 days in hours
-      const timestamp = new Date(now.getTime() - hoursAgo * 60 * 60 * 1000);
-      
-      const resourceNames = {
-        package: ['Weekend Special', 'Family Package', 'VR Experience Pack', 'Birthday Bundle'],
-        customer: ['John Smith', 'Emma Wilson', 'Alex Johnson', 'Sarah Brown', 'Mike Davis'],
-        attraction: ['Laser Tag Arena', 'Bowling Lanes', 'VR Experience', 'Escape Room'],
-        purchase: ['Purchase'],
-        booking: ['Booking'],
-        inventory: ['Inventory'],
-        settings: ['Settings']
-      };
-
-      const resourceType = actionConfig.resourceType as keyof typeof resourceNames;
-      const resourceName = resourceNames[resourceType]
-        ? resourceNames[resourceType][Math.floor(Math.random() * resourceNames[resourceType].length)]
-        : undefined;
-
-      sampleLogs.push({
-        id: `log_${i + 1}`,
-        userId: user.id,
-        userName: user.name,
-        userType: user.type,
-        userRole: user.role,
-        location: user.location,
-        action: actionConfig.action,
-        resourceType: resourceType,
-        resourceId: `res_${Math.random().toString(36).substr(2, 9)}`,
-        resourceName,
-        details: actionConfig.details.replace('{name}', resourceName || 'item').replace('{id}', (i + 1).toString()),
-        timestamp: timestamp.toISOString(),
-        severity: actionConfig.severity
-      });
+  // Reload logs when filters, location, or page change
+  useEffect(() => {
+    if (locations.length > 0 || selectedLocation === 'all') {
+      loadLogs();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters, selectedLocation, currentPage, loadLogs]);
 
-    // Add some system logs
-    for (let i = 0; i < 50; i++) {
-      const location = locations[Math.floor(Math.random() * locations.length)];
-      const hoursAgo = Math.floor(Math.random() * 720);
-      const timestamp = new Date(now.getTime() - hoursAgo * 60 * 60 * 1000);
-
-      sampleLogs.push({
-        id: `sys_${i + 1}`,
-        userId: 'system',
-        userName: 'System',
-        userType: 'system',
-        userRole: 'Automated System',
-        location: location.name,
-        action: 'auto_updated',
-        resourceType: 'settings',
-        resourceId: `sys_${Math.random().toString(36).substr(2, 9)}`,
-        resourceName: 'System Maintenance',
-        details: 'Automated system update completed',
-        timestamp: timestamp.toISOString(),
-        severity: 'info'
-      });
-    }
-
-    // Sort by timestamp descending
-    return sampleLogs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-  };
-
-  const applyFilters = () => {
-    let result = [...logs];
-
-    // Apply location filter
-    if (selectedLocation !== 'all') {
-      result = result.filter(log => log.location === selectedLocation);
-    }
-
-    // Apply search filter
-    if (filters.search) {
-      const searchTerm = filters.search.toLowerCase();
-      result = result.filter(log =>
-        log.userName.toLowerCase().includes(searchTerm) ||
-        log.details.toLowerCase().includes(searchTerm) ||
-        log.resourceType.toLowerCase().includes(searchTerm) ||
-        (log.resourceName && log.resourceName.toLowerCase().includes(searchTerm)) ||
-        log.location.toLowerCase().includes(searchTerm)
-      );
-    }
-
-    // Apply action filter
-    if (filters.action !== 'all') {
-      result = result.filter(log => log.action === filters.action);
-    }
-
-    // Apply resource type filter
-    if (filters.resourceType !== 'all') {
-      result = result.filter(log => log.resourceType === filters.resourceType);
-    }
-
-    // Apply user filter
-    if (filters.user !== 'all') {
-      result = result.filter(log => log.userId === filters.user);
-    }
-
-    // Apply user type filter
-    if (filters.userType !== 'all') {
-      result = result.filter(log => log.userType === filters.userType);
-    }
-
-    // Apply date range filter
-    if (filters.dateRange !== 'all') {
-      const now = new Date();
-      let startDate: Date;
-
-      switch (filters.dateRange) {
-        case 'today':
-          startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-          break;
-        case 'yesterday':
-          startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
-          break;
-        case 'week':
-          startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-          break;
-        case 'month':
-          startDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
-          break;
-        default:
-          startDate = new Date(0);
-      }
-
-      result = result.filter(log => new Date(log.timestamp) >= startDate);
-    }
-
-    setFilteredLogs(result);
-    setCurrentPage(1);
+  const determineSeverity = (action: string): 'info' | 'success' | 'warning' | 'error' => {
+    if (action.includes('delete') || action.includes('reject')) return 'error';
+    if (action.includes('create') || action.includes('approve') || action.includes('purchase')) return 'success';
+    if (action.includes('update') || action.includes('edit')) return 'warning';
+    return 'info';
   };
 
   const handleFilterChange = (key: keyof LocationActivityLogsFilterOptions, value: string) => {
@@ -409,6 +358,7 @@ const LocationActivityLogs = () => {
       ...prev,
       [key]: value
     }));
+    setCurrentPage(1);
   };
 
   const clearFilters = () => {
@@ -420,6 +370,7 @@ const LocationActivityLogs = () => {
       dateRange: 'all',
       search: ''
     });
+    setCurrentPage(1);
   };
 
   const exportLogs = () => {
@@ -447,20 +398,231 @@ const LocationActivityLogs = () => {
     window.URL.revokeObjectURL(url);
   };
 
+  const handleExportWithFilters = async () => {
+    setIsExporting(true);
+    try {
+      const token = getAuthToken();
+      const params = new URLSearchParams();
+      
+      // No pagination limit for export - get all matching records
+      params.append('per_page', '100'); // Backend max, we'll handle pagination
+      
+      // Location filter - multiple locations support
+      if (exportSelectedLocations.length > 0) {
+        const locationIds = exportSelectedLocations
+          .map(locName => locations.find(l => l.name === locName)?.id)
+          .filter(id => id !== undefined);
+        
+        locationIds.forEach(id => {
+          params.append('location_id[]', id!.toString());
+        });
+      }
+      
+      // Search filter
+      if (exportFilters.search) {
+        params.append('search', exportFilters.search);
+      }
+      
+      // Action filter
+      if (exportFilters.action !== 'all') {
+        params.append('action', exportFilters.action);
+      }
+      
+      // Entity type filter (mapped from resourceType)
+      if (exportFilters.resourceType !== 'all') {
+        params.append('entity_type', exportFilters.resourceType);
+      }
+      
+      // User filter - multiple users selected
+      if (exportSelectedUsers.length > 0) {
+        // Note: If backend supports multiple user_id params, send them all
+        // Otherwise, we'll filter on frontend after fetching
+        exportSelectedUsers.forEach(userId => {
+          params.append('user_id[]', userId);
+        });
+      }
+      
+      // Date range filter
+      if (exportFilters.dateRange !== 'all') {
+        const now = new Date();
+        let startDate: Date;
+
+        switch (exportFilters.dateRange) {
+          case 'today':
+            startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            params.append('start_date', startDate.toISOString().split('T')[0]);
+            break;
+          case 'yesterday': {
+            startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+            const endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+            params.append('start_date', startDate.toISOString().split('T')[0]);
+            params.append('end_date', endDate.toISOString().split('T')[0]);
+            break;
+          }
+          case 'week':
+            params.append('recent_days', '7');
+            break;
+          case 'month':
+            params.append('recent_days', '30');
+            break;
+        }
+      }
+      
+      // Sort
+      params.append('sort_by', 'created_at');
+      params.append('sort_order', 'desc');
+
+      // Fetch all pages
+      let allLogs: any[] = [];
+      let currentPage = 1;
+      let hasMorePages = true;
+
+      while (hasMorePages) {
+        params.set('page', currentPage.toString());
+        
+        const response = await fetch(`${API_BASE_URL}/activity-logs?${params.toString()}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const activityLogs = data.data?.activity_logs || [];
+          const pagination = data.data?.pagination || {};
+          
+          allLogs = [...allLogs, ...activityLogs];
+          
+          hasMorePages = currentPage < pagination.last_page;
+          currentPage++;
+        } else {
+          hasMorePages = false;
+        }
+      }
+
+      // Transform and filter logs
+      let transformedLogs = allLogs.map((log: any) => ({
+        timestamp: log.created_at || new Date().toISOString(),
+        location: log.location?.name || (log.user?.role === 'company_admin' ? 'All Locations' : 'Unknown'),
+        userName: log.user?.first_name && log.user?.last_name 
+          ? `${log.user.first_name} ${log.user.last_name}` 
+          : log.user?.email || 'System',
+        userType: log.user?.role || 'system',
+        userId: log.user_id?.toString() || 'system',
+        action: log.action || 'unknown',
+        resourceType: log.category || log.entity_type || 'general',
+        resourceName: log.metadata?.resource_name || log.entity_type || '',
+        details: log.description || '',
+        severity: determineSeverity(log.action || '')
+      }));
+
+      // Apply client-side user type filter
+      if (exportFilters.userType !== 'all') {
+        transformedLogs = transformedLogs.filter((log: any) => log.userType === exportFilters.userType);
+      }
+
+      // Apply client-side user filter if backend doesn't support multiple user_id
+      if (exportSelectedUsers.length > 0) {
+        transformedLogs = transformedLogs.filter((log: any) => 
+          exportSelectedUsers.includes(log.userId)
+        );
+      }
+
+      // Generate CSV
+      const csvContent = [
+        ['Timestamp', 'Location', 'User', 'User Type', 'Action', 'Resource Type', 'Resource Name', 'Details', 'Severity'],
+        ...transformedLogs.map(log => [
+          new Date(log.timestamp).toLocaleString(),
+          log.location,
+          log.userName,
+          log.userType,
+          log.action,
+          log.resourceType,
+          log.resourceName || '',
+          log.details,
+          log.severity
+        ])
+      ].map(row => row.join(',')).join('\n');
+
+      const blob = new Blob([csvContent], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const locationLabel = exportSelectedLocations.length > 0 
+        ? exportSelectedLocations.length === 1 
+          ? exportSelectedLocations[0] 
+          : `${exportSelectedLocations.length}-locations`
+        : 'all-locations';
+      a.download = `activity-logs-${locationLabel}-${new Date().toISOString().split('T')[0]}.csv`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+      
+      setShowExportModal(false);
+    } catch (error) {
+      console.error('Error exporting logs:', error);
+      alert('Failed to export logs. Please try again.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleExportFilterChange = (key: keyof LocationActivityLogsFilterOptions, value: string) => {
+    setExportFilters(prev => ({
+      ...prev,
+      [key]: value
+    }));
+  };
+
+  const handleUserToggle = (userId: string) => {
+    setExportSelectedUsers(prev => {
+      if (prev.includes(userId)) {
+        return prev.filter(id => id !== userId);
+      } else {
+        return [...prev, userId];
+      }
+    });
+  };
+
+  const handleSelectAllUsers = (users: { id: string; name: string; type: string }[]) => {
+    if (exportSelectedUsers.length === users.length) {
+      setExportSelectedUsers([]);
+    } else {
+      setExportSelectedUsers(users.map(u => u.id));
+    }
+  };
+
+  const handleLocationToggle = (locationName: string) => {
+    setExportSelectedLocations(prev => {
+      if (prev.includes(locationName)) {
+        return prev.filter(name => name !== locationName);
+      } else {
+        return [...prev, locationName];
+      }
+    });
+  };
+
+  const handleSelectAllLocations = () => {
+    if (exportSelectedLocations.length === locations.length) {
+      setExportSelectedLocations([]);
+    } else {
+      setExportSelectedLocations(locations.map(l => l.name));
+    }
+  };
+
   // Get unique values for filters
   const getUniqueUsers = () => {
-    const users = logs
-      .filter(log => selectedLocation === 'all' || log.location === selectedLocation)
+    const users = filteredLogs
       .map(log => ({ id: log.userId, name: log.userName, type: log.userType }));
     return [...new Map(users.map(item => [item.id, item])).values()];
   };
 
   const getUniqueActions = () => {
-    return [...new Set(logs.map(log => log.action))];
+    return [...new Set(filteredLogs.map(log => log.action))];
   };
 
   const getUniqueResourceTypes = () => {
-    return [...new Set(logs.map(log => log.resourceType))];
+    return [...new Set(filteredLogs.map(log => log.resourceType))];
   };
 
   // Format timestamp
@@ -481,11 +643,10 @@ const LocationActivityLogs = () => {
     return date.toLocaleDateString();
   };
 
-  // Pagination
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentLogs = filteredLogs.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(filteredLogs.length / itemsPerPage);
+  // Pagination - backend handles slicing, we just display what we get
+  const currentLogs = filteredLogs;
+  const indexOfFirstItem = ((currentPage - 1) * itemsPerPage);
+  const indexOfLastItem = indexOfFirstItem + filteredLogs.length;
 
   const paginate = (pageNumber: number) => setCurrentPage(pageNumber);
 
@@ -513,8 +674,8 @@ const LocationActivityLogs = () => {
         
         <div className="flex gap-2 mt-4 sm:mt-0">
           <button
-            onClick={exportLogs}
-            className="inline-flex items-center px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50"
+            onClick={() => setShowExportModal(true)}
+            className={`inline-flex items-center px-4 py-2 border bg-${fullColor} text-white border-gray-200 rounded-lg hover:bg-${themeColor}-600`}
           >
             <Download className="h-4 w-4 mr-2" />
             Export CSV
@@ -522,17 +683,341 @@ const LocationActivityLogs = () => {
           <button
             onClick={loadLogs}
             className="inline-flex items-center px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50"
+            disabled={isRefreshing}
           >
-            <RefreshCcw className="h-4 w-4" />
+            <RefreshCcw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
           </button>
         </div>
       </div>
 
-      {/* Location Tabs */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-1 mb-6">
-        <div className="flex flex-wrap gap-1">
-          <button
-            onClick={() => setSelectedLocation('all')}
+      {/* Export Modal */}
+      {showExportModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-fadeIn">
+          <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto animate-slideUp">
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+              <h2 className="text-xl font-bold text-gray-900">Export Activity Logs</h2>
+              <button
+                onClick={() => setShowExportModal(false)}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X className="h-5 w-5 text-gray-500" />
+              </button>
+            </div>
+
+            <div className="p-6">
+              <p className="text-sm text-gray-600 mb-6">
+                Configure filters to export specific activity logs. All matching records will be included in the CSV file.
+              </p>
+
+              {/* Location Checklist - Multiple Selection */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-800 mb-2">Locations</label>
+                <div className="border border-gray-200 rounded-lg p-3">
+                  {(() => {
+                    const displayedLocations = showAllLocations || exportSelectedLocations.length <= 3 
+                      ? locations 
+                      : locations.filter(l => exportSelectedLocations.includes(l.name)).slice(0, 3);
+                    const hasMore = locations.length > 3 && !showAllLocations;
+                    const selectedCount = exportSelectedLocations.length;
+
+                    return (
+                      <>
+                        <div className="flex items-center mb-2 pb-2 border-b border-gray-200">
+                          <label className="flex items-center cursor-pointer hover:bg-gray-50 p-1 rounded flex-1">
+                            <input
+                              type="checkbox"
+                              checked={exportSelectedLocations.length === locations.length}
+                              onChange={handleSelectAllLocations}
+                              className={`mr-2 h-4 w-4 rounded border-gray-300 text-${fullColor} focus:ring-${themeColor}-400`}
+                            />
+                            <span className="text-sm font-medium text-gray-700">
+                              Select All ({locations.length})
+                            </span>
+                          </label>
+                          {selectedCount > 0 && (
+                            <span className={`text-xs px-2 py-1 rounded-full bg-${themeColor}-100 text-${fullColor} font-medium`}>
+                              {selectedCount} selected
+                            </span>
+                          )}
+                        </div>
+
+                        <div className={`space-y-1 ${showAllLocations ? 'max-h-60 overflow-y-auto' : ''}`}>
+                          {displayedLocations.map(location => (
+                            <label
+                              key={location.name}
+                              className="flex items-center cursor-pointer hover:bg-gray-50 p-2 rounded transition-colors"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={exportSelectedLocations.includes(location.name)}
+                                onChange={() => handleLocationToggle(location.name)}
+                                className={`mr-2 h-4 w-4 rounded border-gray-300 text-${fullColor} focus:ring-${themeColor}-400`}
+                              />
+                              <MapPin size={14} className="mr-2 text-gray-400" />
+                              <span className="text-sm text-gray-700 flex-1">{location.name}</span>
+                            </label>
+                          ))}
+                        </div>
+
+                        {hasMore && selectedCount > 3 && (
+                          <button
+                            onClick={() => setShowAllLocations(!showAllLocations)}
+                            className={`mt-2 w-full text-sm text-${fullColor} hover:underline py-1`}
+                          >
+                            View More ({locations.length - 3} hidden)
+                          </button>
+                        )}
+
+                        {showAllLocations && locations.length > 3 && (
+                          <button
+                            onClick={() => setShowAllLocations(false)}
+                            className={`mt-2 w-full text-sm text-${fullColor} hover:underline py-1`}
+                          >
+                            Show Less
+                          </button>
+                        )}
+
+                        {locations.length === 0 && (
+                          <p className="text-sm text-gray-500 text-center py-2">
+                            No locations available
+                          </p>
+                        )}
+                      </>
+                    );
+                  })()}
+                </div>
+              </div>
+
+              {/* Users Checklist */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-800 mb-2">Users</label>
+                <div className="border border-gray-200 rounded-lg p-3">
+                  {(() => {
+                    const allUsers = getUniqueUsers();
+                    // Filter users based on search query
+                    const filteredUsers = userSearchQuery
+                      ? allUsers.filter(user => 
+                          user.name.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
+                          user.type.toLowerCase().includes(userSearchQuery.toLowerCase())
+                        )
+                      : allUsers;
+                    
+                    // Show first 5 by default, or all selected users, or all if showAllUsers is true
+                    const displayedUsers = showAllUsers
+                      ? filteredUsers
+                      : [
+                          ...filteredUsers.filter(u => exportSelectedUsers.includes(u.id)),
+                          ...filteredUsers.filter(u => !exportSelectedUsers.includes(u.id)).slice(0, Math.max(0, 5 - exportSelectedUsers.filter(id => filteredUsers.some(u => u.id === id)).length))
+                        ].filter((user, index, self) => 
+                          index === self.findIndex(u => u.id === user.id)
+                        ).slice(0, showAllUsers ? undefined : Math.max(5, exportSelectedUsers.length));
+                    
+                    const selectedCount = exportSelectedUsers.length;
+                    const hasMore = filteredUsers.length > displayedUsers.length;
+
+                    return (
+                      <>
+                        {/* Search Input */}
+                        <div className="mb-3">
+                          <div className="relative">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                              <Search className="h-4 w-4 text-gray-400" />
+                            </div>
+                            <input
+                              type="text"
+                              placeholder="Search users..."
+                              value={userSearchQuery}
+                              onChange={(e) => setUserSearchQuery(e.target.value)}
+                              className={`pl-9 pr-3 py-2 border border-gray-200 rounded-lg w-full text-sm focus:ring-2 focus:ring-${themeColor}-400 focus:border-${themeColor}-400`}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex items-center mb-2 pb-2 border-b border-gray-200">
+                          <label className="flex items-center cursor-pointer hover:bg-gray-50 p-1 rounded flex-1">
+                            <input
+                              type="checkbox"
+                              checked={filteredUsers.length > 0 && exportSelectedUsers.length === filteredUsers.length}
+                              onChange={() => handleSelectAllUsers(filteredUsers)}
+                              className={`mr-2 h-4 w-4 rounded border-gray-300 text-${fullColor} focus:ring-${themeColor}-400`}
+                            />
+                            <span className="text-sm font-medium text-gray-700">
+                              Select All ({filteredUsers.length})
+                            </span>
+                          </label>
+                          {selectedCount > 0 && (
+                            <span className={`text-xs px-2 py-1 rounded-full bg-${themeColor}-100 text-${fullColor} font-medium`}>
+                              {selectedCount} selected
+                            </span>
+                          )}
+                        </div>
+
+                        <div className={`space-y-1 ${showAllUsers ? 'max-h-60 overflow-y-auto' : ''}`}>
+                          {displayedUsers.length > 0 ? (
+                            displayedUsers.map(user => (
+                              <label
+                                key={user.id}
+                                className="flex items-center cursor-pointer hover:bg-gray-50 p-2 rounded transition-colors"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={exportSelectedUsers.includes(user.id)}
+                                  onChange={() => handleUserToggle(user.id)}
+                                  className={`mr-2 h-4 w-4 rounded border-gray-300 text-${fullColor} focus:ring-${themeColor}-400`}
+                                />
+                                <span className="text-sm text-gray-700 flex-1">{user.name}</span>
+                                <span className={`text-xs px-2 py-0.5 rounded-full ${getUserTypeColors(user.type)}`}>
+                                  {user.type.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+                                </span>
+                              </label>
+                            ))
+                          ) : (
+                            <p className="text-sm text-gray-500 text-center py-2">
+                              {userSearchQuery ? 'No users found matching your search' : 'No users available'}
+                            </p>
+                          )}
+                        </div>
+
+                        {hasMore && (
+                          <button
+                            onClick={() => setShowAllUsers(!showAllUsers)}
+                            className={`mt-2 w-full text-sm text-${fullColor} hover:underline py-1`}
+                          >
+                            {showAllUsers ? 'Show Less' : `Show ${filteredUsers.length - displayedUsers.length} More`}
+                          </button>
+                        )}
+                      </>
+                    );
+                  })()}
+                </div>
+              </div>
+
+              {/* Search Filter */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-800 mb-2">Search</label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Search className="h-4 w-4 text-gray-400" />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Search activities, users, or locations..."
+                    value={exportFilters.search}
+                    onChange={(e) => handleExportFilterChange('search', e.target.value)}
+                    className={`pl-9 pr-3 py-2 border border-gray-200 rounded-lg w-full focus:ring-2 focus:ring-${themeColor}-400 focus:border-${themeColor}-400`}
+                  />
+                </div>
+              </div>
+
+              {/* Filter Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-800 mb-2">Action</label>
+                  <select
+                    value={exportFilters.action}
+                    onChange={(e) => handleExportFilterChange('action', e.target.value)}
+                    className={`w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-400 focus:border-${themeColor}-400`}
+                  >
+                    <option value="all">All Actions</option>
+                    <option value="created">Created</option>
+                    <option value="updated">Updated</option>
+                    <option value="deleted">Deleted</option>
+                    <option value="viewed">Viewed</option>
+                    <option value="checked_in">Checked In</option>
+                    <option value="checked_out">Checked Out</option>
+                    <option value="purchased">Purchased</option>
+                    <option value="logged_in">Logged In</option>
+                    <option value="logged_out">Logged Out</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-800 mb-2">Resource Type</label>
+                  <select
+                    value={exportFilters.resourceType}
+                    onChange={(e) => handleExportFilterChange('resourceType', e.target.value)}
+                    className={`w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-400 focus:border-${themeColor}-400`}
+                  >
+                    <option value="all">All Types</option>
+                    <option value="package">Package</option>
+                    <option value="customer">Customer</option>
+                    <option value="purchase">Purchase</option>
+                    <option value="attraction">Attraction</option>
+                    <option value="booking">Booking</option>
+                    <option value="attendant">Attendant</option>
+                    <option value="manager">Manager</option>
+                    <option value="inventory">Inventory</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-800 mb-2">User Type</label>
+                  <select
+                    value={exportFilters.userType}
+                    onChange={(e) => handleExportFilterChange('userType', e.target.value)}
+                    className={`w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-400 focus:border-${themeColor}-400`}
+                  >
+                    <option value="all">All Users</option>
+                    <option value="company_admin">Company Admin</option>
+                    <option value="location_manager">Location Managers</option>
+                    <option value="attendant">Attendants</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-800 mb-2">Date Range</label>
+                  <select
+                    value={exportFilters.dateRange}
+                    onChange={(e) => handleExportFilterChange('dateRange', e.target.value)}
+                    className={`w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-400 focus:border-${themeColor}-400`}
+                  >
+                    <option value="all">All Time</option>
+                    <option value="today">Today</option>
+                    <option value="yesterday">Yesterday</option>
+                    <option value="week">Last 7 Days</option>
+                    <option value="month">Last 30 Days</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 justify-end pt-4 border-t border-gray-200">
+                <button
+                  onClick={() => setShowExportModal(false)}
+                  className="px-4 py-2 border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50"
+                  disabled={isExporting}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleExportWithFilters}
+                  disabled={isExporting}
+                  className={`px-4 py-2 bg-${fullColor} text-white rounded-lg hover:opacity-90 disabled:opacity-50 flex items-center gap-2`}
+                >
+                  {isExporting ? (
+                    <>
+                      <RefreshCcw className="h-4 w-4 animate-spin" />
+                      Exporting...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="h-4 w-4" />
+                      Export CSV
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Location Tabs - Hidden for Company Admin */}
+      {!isCompanyAdmin && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-1 mb-6">
+          <div className="flex flex-wrap gap-1">
+            <button
+              onClick={() => setSelectedLocation('all')}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
               selectedLocation === 'all'
                 ? `bg-${fullColor} text-white`
@@ -564,47 +1049,6 @@ const LocationActivityLogs = () => {
           ))}
         </div>
       </div>
-
-      {/* Location Info Card */}
-      {selectedLocation !== 'all' && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
-          <div className="flex items-center gap-3 mb-4">
-            <MapPin className={`w-5 h-5 text-${fullColor}`} />
-            <h3 className="text-lg font-semibold text-gray-900">
-              {selectedLocation} Location Details
-            </h3>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <h4 className="text-sm font-medium text-gray-700 mb-2">Location Managers</h4>
-              <div className="space-y-2">
-                {locations.find(l => l.name === selectedLocation)?.managers.map((manager: string) => (
-                  <div key={manager} className="flex items-center gap-2 text-sm text-gray-800">
-                    <User className="w-4 h-4 text-green-600" />
-                    {manager}
-                    <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
-                      Manager
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div>
-              <h4 className="text-sm font-medium text-gray-700 mb-2">Attendants</h4>
-              <div className="space-y-2">
-                {locations.find(l => l.name === selectedLocation)?.attendants.map((attendant: string) => (
-                  <div key={attendant} className="flex items-center gap-2 text-sm text-gray-800">
-                    <Users className={`w-4 h-4 text-${themeColor}-600`} />
-                    {attendant}
-                    <span className={`px-2 py-1 bg-${themeColor}-100 text-${fullColor} text-xs rounded-full`}>
-                      Attendant
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
       )}
 
       {/* Metrics Grid */}
@@ -623,7 +1067,7 @@ const LocationActivityLogs = () => {
                 <span className="text-base font-semibold text-gray-800">{metric.title}</span>
               </div>
               <div className="flex items-end gap-2 mt-2">
-                <h3 className="text-2xl font-bold text-gray-900">{metric.value}</h3>
+                <CounterAnimation value={metric.value} className="text-2xl font-bold text-gray-900" />
               </div>
               <p className="text-xs mt-1 text-gray-400">{metric.change}</p>
             </div>
@@ -699,9 +1143,9 @@ const LocationActivityLogs = () => {
                   className={`w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-400 focus:border-${themeColor}-400`}
                 >
                   <option value="all">All Users</option>
-                  <option value="manager">Managers Only</option>
-                  <option value="attendant">Attendants Only</option>
-                  <option value="system">System Only</option>
+                  <option value="company_admin">Company Admin</option>
+                  <option value="location_manager">Location Managers</option>
+                  <option value="attendant">Attendants</option>
                 </select>
               </div>
               <div>
@@ -753,10 +1197,9 @@ const LocationActivityLogs = () => {
             {selectedLocation === 'all' ? 'All Location Activities' : `${selectedLocation} Activities`}
           </h3>
           <p className="text-sm text-gray-600 mt-1">
-            Showing {currentLogs.length} of {filteredLogs.length} activities
+            Showing {currentLogs.length} of {totalLogs} activities
           </p>
         </div>
-
         <div className="divide-y divide-gray-100">
           {currentLogs.length === 0 ? (
             <div className="px-6 py-8 text-center text-gray-800">
@@ -777,13 +1220,17 @@ const LocationActivityLogs = () => {
                       <div className="flex items-center gap-3 flex-wrap mb-2">
                         <span className="font-medium text-gray-900">{log.userName}</span>
                         <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getUserTypeColors(log.userType)}`}>
-                          {log.userType.charAt(0).toUpperCase() + log.userType.slice(1)}
+                          {log.userType.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
                         </span>
-                        <span className="text-gray-400">•</span>
-                        <span className="text-sm text-gray-600 flex items-center gap-1">
-                          <MapPin size={12} />
-                          {log.location}
-                        </span>
+                        {log.userType !== 'company_admin' && (
+                          <>
+                            <span className="text-gray-400">•</span>
+                            <span className="text-sm text-gray-600 flex items-center gap-1">
+                              <MapPin size={12} />
+                              {log.location}
+                            </span>
+                          </>
+                        )}
                         <span className="text-gray-400">•</span>
                         <span className="text-sm text-gray-600">{log.details}</span>
                       </div>
@@ -821,11 +1268,11 @@ const LocationActivityLogs = () => {
               <div className="text-sm text-gray-800">
                 Showing <span className="font-medium">{indexOfFirstItem + 1}</span> to{' '}
                 <span className="font-medium">
-                  {Math.min(indexOfLastItem, filteredLogs.length)}
+                  {Math.min(indexOfLastItem, totalLogs)}
                 </span>{' '}
-                of <span className="font-medium">{filteredLogs.length}</span> activities
+                of <span className="font-medium">{totalLogs}</span> activities
               </div>
-              <div className="flex gap-2">
+              <div className="flex items-center gap-2">
                 <button
                   onClick={() => paginate(Math.max(1, currentPage - 1))}
                   disabled={currentPage === 1}

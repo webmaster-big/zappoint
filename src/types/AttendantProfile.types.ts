@@ -10,6 +10,8 @@ export interface AttendantProfilePersonal {
   hireDate: string;
   employeeId: string;
   department: string;
+  shift: string;
+  status: string;
 }
 
 export interface AttendantProfileAddress {
@@ -21,26 +23,14 @@ export interface AttendantProfileAddress {
 
 export interface AttendantProfileLocation {
   name: string;
-  manager: string;
+  email: string;
+  phone: string;
   address: AttendantProfileAddress;
-  assignedAreas: string[];
-  shift: string;
-}
-
-export interface AttendantProfileScheduleDay {
-  day: string;
-  date: string;
-  shift: string;
-  area: string;
-}
-
-export interface AttendantProfileSchedule {
-  currentWeek: AttendantProfileScheduleDay[];
-  nextWeek: AttendantProfileScheduleDay[];
+  timezone: string;
+  isActive: boolean;
 }
 
 export interface AttendantProfileData {
   personal: AttendantProfilePersonal;
   location: AttendantProfileLocation;
-  schedule: AttendantProfileSchedule;
 }

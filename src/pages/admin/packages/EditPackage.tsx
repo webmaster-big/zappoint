@@ -3,7 +3,14 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 import Toast from "../../../components/ui/Toast";
 import { Info, Plus, Calendar, Clock, Gift, Tag, Home, ArrowLeft, Save } from "lucide-react";
 import { useThemeColor } from '../../../hooks/useThemeColor';
-import type { PackagesPackage } from '../../../types/Packages.types';
+import { 
+    attractionService, 
+    addOnService, 
+    roomService, 
+    promoService, 
+    giftCardService,
+    packageService 
+} from '../../../services';
 import type { 
     CreatePackageAttraction, 
     CreatePackageAddOn, 
@@ -12,65 +19,23 @@ import type {
     CreatePackageGiftCard
 } from '../../../types/createPackage.types';
 
-// Mock data tables (simulate fetch)
-const initialAttractions = ["Laser Tag", "Arcade", "Bowling", "Axe Throwing", "Party Room"];
-const initialAddOns = [
-    { name: "Pizza", price: 350 },
-    { name: "Soda", price: 50 },
-    { name: "Extra Game", price: 100 }
-];
+// Only categories remain in localStorage
 const initialCategories = ["Birthday", "Special", "Event", "Arcade Party", "Corporate", "Other"];
-const initialRooms = [
-    { name: "Main Hall" },
-    { name: "VIP Room" },
-    { name: "Party Room A" },
-    { name: "Party Room B" },
-    { name: "Conference Room" }
-];
-
-// Get active promos and gift cards from localStorage
-const getActivePromos = (): CreatePackagePromo[] => {
-    try {
-        const promos = JSON.parse(localStorage.getItem("zapzone_promos") || "[]");
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        return promos.filter((p: any) => p.status === "active" && !p.deleted);
-    } catch {
-        return [];
-    }
-};
-
-const getActiveGiftCards = (): CreatePackageGiftCard[] => {
-    try {
-        const giftCards = JSON.parse(localStorage.getItem("zapzone_giftcards") || "[]");
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        return giftCards.filter((gc: any) => gc.status === "active" && !gc.deleted);
-    } catch {
-        return [];
-    }
-};
 
 const EditPackage: React.FC = () => {
     const { themeColor, fullColor } = useThemeColor();
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
-    const [loading, setLoading] = useState(true);
+    const [submitting, setSubmitting] = useState(false);
     const [notFound, setNotFound] = useState(false);
     
-    // Option tables (simulate fetch)
-    const [attractions, setAttractions] = useState<CreatePackageAttraction[]>(() => {
-        const stored = localStorage.getItem("zapzone_attractions");
-        if (stored) return JSON.parse(stored);
-        // If old format, convert
-        if (Array.isArray(initialAttractions) && typeof initialAttractions[0] === "string") {
-            return initialAttractions.map((name) => ({ name, price: 0 }));
-        }
-        return initialAttractions;
-    });
-    const [addOns, setAddOns] = useState<CreatePackageAddOn[]>(() => JSON.parse(localStorage.getItem("zapzone_addons") || JSON.stringify(initialAddOns)));
+    // State for fetched data from backend
+    const [attractions, setAttractions] = useState<CreatePackageAttraction[]>([]);
+    const [addOns, setAddOns] = useState<CreatePackageAddOn[]>([]);
     const [categories, setCategories] = useState<string[]>(() => JSON.parse(localStorage.getItem("zapzone_categories") || JSON.stringify(initialCategories)));
-    const [rooms, setRooms] = useState<CreatePackageRoom[]>(() => JSON.parse(localStorage.getItem("zapzone_rooms") || JSON.stringify(initialRooms)));
-    const [promos, setPromos] = useState<CreatePackagePromo[]>(getActivePromos);
-    const [giftCards, setGiftCards] = useState<CreatePackageGiftCard[]>(getActiveGiftCards);
+    const [rooms, setRooms] = useState<CreatePackageRoom[]>([]);
+    const [promos, setPromos] = useState<CreatePackagePromo[]>([]);
+    const [giftCards, setGiftCards] = useState<CreatePackageGiftCard[]>([]);
 
     // Form state
     const [form, setForm] = useState({
@@ -93,17 +58,83 @@ const EditPackage: React.FC = () => {
         availableWeekDays: [] as string[],
         availableMonthDays: [] as string[],
         image: "" as string, // base64 or data url
+        timeSlotStart: "09:00", // Start time for available time slots
+        timeSlotEnd: "17:00", // End time for available time slots
+        timeSlotInterval: "30", // Interval between time slots in minutes
     });
 
     // Image preview state
     const [imagePreview, setImagePreview] = useState<string>("");
 
-    // Load package data
+    // Fetch options data and then load package data
     useEffect(() => {
-        const loadPackage = () => {
+        const initializeData = async () => {
+            if (!id) {
+                setNotFound(true);
+                setLoading(false);
+                return;
+            }
+
             try {
-                const packages: PackagesPackage[] = JSON.parse(localStorage.getItem("zapzone_packages") || "[]");
-                const pkg = packages.find((p: PackagesPackage) => p.id === id);
+                // Step 1: Fetch all reference data first
+                const [attractionsRes, addOnsRes, roomsRes, promosRes, giftCardsRes] = await Promise.all([
+                    attractionService.getAttractions(),
+                    addOnService.getAddOns(),
+                    roomService.getRooms(),
+                    promoService.getPromos(),
+                    giftCardService.getGiftCards()
+                ]);
+
+                // Transform data to match component types (include id)
+                const attractionsData = attractionsRes.data?.attractions?.map(attr => ({
+                    id: attr.id,
+                    name: attr.name,
+                    price: attr.price || 0,
+                    unit: attr.unit || ''
+                })) || [];
+
+                const addOnsData = addOnsRes.data?.add_ons?.map(addon => ({
+                    id: addon.id,
+                    name: addon.name,
+                    price: addon.price || 0
+                })) || [];
+
+                const roomsData = roomsRes.data?.rooms?.map(room => ({
+                    id: room.id,
+                    name: room.name
+                })) || [];
+
+                const promosData = promosRes.data?.promos?.filter(promo => 
+                    promo.status === "active" && !promo.deleted
+                ).map(promo => ({
+                    id: promo.id,
+                    name: promo.name,
+                    code: promo.code,
+                    description: promo.description || ''
+                })) || [];
+
+                const giftCardsData = giftCardsRes.data?.gift_cards?.filter(gc => 
+                    gc.status === "active" && !gc.deleted
+                ).map(gc => ({
+                    id: gc.id,
+                    name: gc.code, // Use code as display name
+                    code: gc.code,
+                    description: gc.description || ''
+                })) || [];
+
+                // Set reference data state
+                setAttractions(attractionsData);
+                setAddOns(addOnsData);
+                setRooms(roomsData);
+                setPromos(promosData);
+                setGiftCards(giftCardsData);
+
+                // Step 2: Now fetch the package data
+                const response = await packageService.getPackage(parseInt(id));
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const pkg = response.data as any; // Using 'any' to handle time slot fields that may not be in type yet
+                
+                console.log("Loaded package data:", pkg);
                 
                 if (!pkg) {
                     setNotFound(true);
@@ -111,32 +142,63 @@ const EditPackage: React.FC = () => {
                     return;
                 }
 
-                // Extract promo codes and gift card codes from objects
-                const promoCodes = pkg.promos?.map(p => p.code) || [];
-                const giftCardCodes = pkg.giftCards?.map(g => g.code) || [];
-                const addOnNames = pkg.addOns?.map(a => a.name) || [];
-                const roomNames = pkg.rooms?.map(r => r.name) || [];
+                // Extract names/codes from relationship objects (backend uses snake_case)
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const attractionNames = pkg.attractions?.map((a: any) => typeof a === 'string' ? a : (a.name || '')) || [];
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const promoCodes = pkg.promos?.map((p: any) => typeof p === 'string' ? p : (p.code || '')) || [];
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const giftCardCodes = pkg.gift_cards?.map((g: any) => typeof g === 'string' ? g : (g.code || '')) || [];
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const addOnNames = pkg.add_ons?.map((a: any) => typeof a === 'string' ? a : (a.name || '')) || [];
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const roomNames = pkg.rooms?.map((r: any) => typeof r === 'string' ? r : (r.name || '')) || [];
+                
+                console.log("Extracted data:", {
+                    attractionNames,
+                    promoCodes,
+                    giftCardCodes,
+                    addOnNames,
+                    roomNames
+                });
+
+                // Convert arrays to strings if needed
+                const availableDays = Array.isArray(pkg.available_days) 
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    ? pkg.available_days.map((d: any) => String(d)) 
+                    : [];
+                const availableWeekDays = Array.isArray(pkg.available_week_days) 
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    ? pkg.available_week_days.map((d: any) => String(d)) 
+                    : [];
+                const availableMonthDays = Array.isArray(pkg.available_month_days) 
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    ? pkg.available_month_days.map((d: any) => String(d)) 
+                    : [];
 
                 setForm({
                     name: pkg.name || "",
                     description: pkg.description || "",
                     category: pkg.category || "",
                     features: pkg.features || "",
-                    attractions: pkg.attractions || [],
+                    attractions: attractionNames,
                     rooms: roomNames,
                     price: String(pkg.price || ""),
-                    maxParticipants: String(pkg.maxParticipants || ""),
-                    pricePerAdditional: String(pkg.pricePerAdditional || ""),
+                    maxParticipants: String(pkg.max_participants || ""),
+                    pricePerAdditional: String(pkg.price_per_additional || ""),
                     duration: String(pkg.duration || ""),
-                    durationUnit: pkg.durationUnit || "hours",
+                    durationUnit: pkg.duration_unit || "hours",
                     promos: promoCodes,
                     giftCards: giftCardCodes,
                     addOns: addOnNames,
-                    availabilityType: pkg.availabilityType || "daily",
-                    availableDays: pkg.availableDays || [],
-                    availableWeekDays: pkg.availableWeekDays || [],
-                    availableMonthDays: pkg.availableMonthDays || [],
+                    availabilityType: pkg.availability_type || "daily",
+                    availableDays: availableDays,
+                    availableWeekDays: availableWeekDays,
+                    availableMonthDays: availableMonthDays,
                     image: pkg.image || "",
+                    timeSlotStart: pkg.time_slot_start || "09:00",
+                    timeSlotEnd: pkg.time_slot_end || "17:00",
+                    timeSlotInterval: String(pkg.time_slot_interval || "30"),
                 });
 
                 if (pkg.image) {
@@ -145,13 +207,14 @@ const EditPackage: React.FC = () => {
 
                 setLoading(false);
             } catch (error) {
-                console.error("Error loading package:", error);
+                console.error("Error loading data:", error);
+                showToast("Failed to load package data", "error");
                 setNotFound(true);
                 setLoading(false);
             }
         };
 
-        loadPackage();
+        initializeData();
     }, [id]);
 
     // Handle image upload
@@ -228,110 +291,226 @@ const EditPackage: React.FC = () => {
         }
     };
 
-    // Add option with code and description for promos/gift cards
-    const handleAddOption = (type: string, value: string, code?: string, extra?: string, unit?: string) => {
+    // Add option with API calls instead of localStorage
+    const handleAddOption = async (type: string, value: string, code?: string, extra?: string) => {
         if (!value.trim() || ((type === 'promo' || type === 'giftcard') && !code?.trim())) return;
-        switch(type) {
-            case 'activity': {
-                const price = Number(extra) || 0;
-                const attractionUnit = unit || '';
-                if (!attractions.some(a => a.name === value)) {
-                    const updated = [...attractions, { name: value, price, unit: attractionUnit }];
-                    setAttractions(updated);
-                    localStorage.setItem("zapzone_attractions", JSON.stringify(updated));
-                    showToast("Attraction added!", "success");
-                }
-                break;
+        
+        try {
+            switch(type) {
+                case 'addon':
+                    if (!addOns.some(a => a.name === value)) {
+                        const priceValue = parseFloat(extra || '0');
+                        
+                        if (isNaN(priceValue) || priceValue < 0) {
+                            showToast("Please enter a valid price for the add-on", "error");
+                            return;
+                        }
+                        
+                        const price = Number(priceValue.toFixed(2)); // Ensure 2 decimal places
+                        
+                        await addOnService.createAddOn({
+                            location_id: 1, // Default location
+                            name: value,
+                            price,
+                            description: '',
+                            is_active: true
+                        });
+                        const tempId = Date.now();
+                        const updated = [...addOns, { id: tempId, name: value, price }];
+                        setAddOns(updated);
+                        showToast("Add-on added!", "success");
+                    }
+                    break;
+                case 'category':
+                    if (!categories.includes(value)) {
+                        const updated = [...categories, value];
+                        setCategories(updated);
+                        localStorage.setItem("zapzone_categories", JSON.stringify(updated));
+                        showToast("Category added!", "success");
+                    }
+                    break;
+                case 'room':
+                    if (!rooms.some(r => r.name === value)) {
+                        await roomService.createRoom({
+                            location_id: 1, // Default location
+                            name: value,
+                            capacity: 20,
+                            is_available: true
+                        });
+                        const tempId = Date.now();
+                        const updated = [...rooms, { id: tempId, name: value }];
+                        setRooms(updated);
+                        showToast("Room added!", "success");
+                    }
+                    break;
+                case 'promo':
+                    if (!promos.some(p => p.name === value)) {
+                        const description = extra || '';
+                        await promoService.createPromo({
+                            name: value,
+                            code: code || '',
+                            description,
+                            type: 'fixed' as const,
+                            value: 0,
+                            start_date: new Date().toISOString().split('T')[0],
+                            end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                            usage_limit_per_user: 1,
+                            status: 'active' as const,
+                            created_by: 1 // Default user ID
+                        });
+                        const tempId = Date.now();
+                        const updated = [...promos, { id: tempId, name: value, code: code || '', description }];
+                        setPromos(updated);
+                        showToast("Promo added!", "success");
+                    }
+                    break;
+                case 'giftcard':
+                    if (!giftCards.some(g => g.code === code)) {
+                        const description = extra || '';
+                        const initialValue = 100;
+                        await giftCardService.createGiftCard({
+                            code: code || '',
+                            type: 'fixed' as const,
+                            initial_value: initialValue,
+                            balance: initialValue,
+                            max_usage: 1,
+                            description,
+                            status: 'active' as const,
+                            created_by: 1 // Default user ID
+                        });
+                        const tempId = Date.now();
+                        const updated = [...giftCards, { id: tempId, name: code || '', code: code || '', description }];
+                        setGiftCards(updated);
+                        showToast("Gift card added!", "success");
+                    }
+                    break;
             }
-            case 'addon':
-                if (!addOns.some(a => a.name === value)) {
-                    const price = Number(extra) || 0;
-                    const updated = [...addOns, { name: value, price }];
-                    setAddOns(updated);
-                    localStorage.setItem("zapzone_addons", JSON.stringify(updated));
-                    showToast("Add-on added!", "success");
-                }
-                break;
-            case 'category':
-                if (!categories.includes(value)) {
-                    const updated = [...categories, value];
-                    setCategories(updated);
-                    localStorage.setItem("zapzone_categories", JSON.stringify(updated));
-                    showToast("Category added!", "success");
-                }
-                break;
-            case 'room':
-                if (!rooms.some(r => r.name === value)) {
-                    const updated = [...rooms, { name: value }];
-                    setRooms(updated);
-                    localStorage.setItem("zapzone_rooms", JSON.stringify(updated));
-                    showToast("Room added!", "success");
-                }
-                break;
-            case 'promo':
-                if (!promos.some(p => p.name === value)) {
-                    const description = extra || '';
-                    const updated = [...promos, { name: value, code: code || '', description }];
-                    setPromos(updated);
-                    localStorage.setItem("zapzone_promos", JSON.stringify(updated));
-                    showToast("Promo added!", "success");
-                }
-                break;
-            case 'giftcard':
-                if (!giftCards.some(g => g.name === value)) {
-                    const description = extra || '';
-                    const updated = [...giftCards, { name: value, code: code || '', description }];
-                    setGiftCards(updated);
-                    localStorage.setItem("zapzone_giftcards", JSON.stringify(updated));
-                    showToast("Gift card added!", "success");
-                }
-                break;
+        } catch (error) {
+            console.error(`Error adding ${type}:`, error);
+            showToast(`Error adding ${type}`, "error");
         }
     };
 
-    // On submit, update the package in localStorage
-    const handleSubmit = (e: React.FormEvent) => {
+    // On submit, update the package via API
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         
+        if (!id) {
+            showToast("Package ID is missing!", "error");
+            return;
+        }
+
+        // Validation
+        if (!form.name.trim()) {
+            showToast("Package name is required", "error");
+            return;
+        }
+
+        if (!form.category) {
+            showToast("Please select a category", "error");
+            return;
+        }
+
+        const price = parseFloat(form.price);
+        const pricePerAdditional = parseFloat(form.pricePerAdditional || '0');
+        const maxParticipants = parseInt(form.maxParticipants || '0');
+        const duration = parseInt(form.duration || '0');
+        const timeSlotInterval = parseInt(form.timeSlotInterval || '30');
+
+        if (isNaN(price) || price < 0) {
+            showToast("Please enter a valid price", "error");
+            return;
+        }
+
+        if (form.maxParticipants && (isNaN(maxParticipants) || maxParticipants < 1)) {
+            showToast("Please enter a valid max participants (minimum 1)", "error");
+            return;
+        }
+
+        if (form.pricePerAdditional && (isNaN(pricePerAdditional) || pricePerAdditional < 0)) {
+            showToast("Please enter a valid price per additional participant", "error");
+            return;
+        }
+
+        if (form.duration && (isNaN(duration) || duration < 1)) {
+            showToast("Please enter a valid duration", "error");
+            return;
+        }
+
+        setSubmitting(true);
         try {
-            // Get existing packages
-            const packages: PackagesPackage[] = JSON.parse(localStorage.getItem("zapzone_packages") || "[]");
-            const packageIndex = packages.findIndex((p: PackagesPackage) => p.id === id);
+            // Get IDs for relationships from the options arrays (matching CreatePackage pattern)
+            const attraction_ids = form.attractions
+                .map(name => attractions.find(a => a.name === name)?.id)
+                .filter(Boolean) as number[];
 
-            if (packageIndex === -1) {
-                showToast("Package not found!", "error");
-                return;
-            }
+            const addon_ids = form.addOns
+                .map(name => addOns.find(a => a.name === name)?.id)
+                .filter(Boolean) as number[];
 
-            // Save a copy of the form, but promos/giftCards/addOns as objects with code/description/price
-            const promoObjs = form.promos.map(code => promos.find(p => p.code === code)).filter((p): p is CreatePackagePromo => p !== undefined);
-            const giftCardObjs = form.giftCards.map(code => giftCards.find(g => g.code === code)).filter((g): g is CreatePackageGiftCard => g !== undefined);
-            const addOnObjs = form.addOns.map(name => addOns.find(a => a.name === name)).filter((a): a is CreatePackageAddOn => a !== undefined);
-            const roomObjs = form.rooms.map(name => rooms.find(r => r.name === name)).filter((r): r is CreatePackageRoom => r !== undefined);
+            const room_ids = form.rooms
+                .map(name => rooms.find(r => r.name === name)?.id)
+                .filter(Boolean) as number[];
 
-            const updatedPackage = {
-                ...packages[packageIndex],
-                ...form,
-                promos: promoObjs,
-                giftCards: giftCardObjs,
-                addOns: addOnObjs,
-                rooms: roomObjs,
-                pricePerAdditional: form.pricePerAdditional,
-                image: form.image,
+            const promo_ids = form.promos
+                .map(code => promos.find(p => p.code === code)?.id)
+                .filter(Boolean) as number[];
+
+            const gift_card_ids = form.giftCards
+                .map(code => giftCards.find(g => g.code === code)?.id)
+                .filter(Boolean) as number[];
+
+            // Prepare data matching CreatePackage structure
+            const updateData = {
+                name: form.name,
+                description: form.description,
+                category: form.category,
+                features: form.features,
+                price: Number(price.toFixed(2)),
+                max_participants: maxParticipants,
+                price_per_additional: Number(pricePerAdditional.toFixed(2)),
+                duration: duration,
+                duration_unit: form.durationUnit,
+                location_id: 1, // Default location ID
+                availability_type: form.availabilityType,
+                available_days: form.availabilityType === 'daily' ? form.availableDays : [],
+                available_week_days: form.availabilityType === 'weekly' ? form.availableWeekDays : [],
+                available_month_days: form.availabilityType === 'monthly' ? form.availableMonthDays : [],
+                time_slot_start: form.timeSlotStart,
+                time_slot_end: form.timeSlotEnd,
+                time_slot_interval: timeSlotInterval,
+                image: form.image || undefined,
+                attraction_ids,
+                addon_ids,
+                room_ids,
+                promo_ids,
+                gift_card_ids,
             };
 
-            // Update and save
-            packages[packageIndex] = updatedPackage;
-            localStorage.setItem("zapzone_packages", JSON.stringify(packages));
+            console.log("Updating package with data:", updateData);
+
+            const response = await packageService.updatePackage(parseInt(id), updateData);
+            console.log("Update response:", response);
+            
             showToast("Package updated successfully!", "success");
             
             // Navigate back after a short delay
             setTimeout(() => {
                 navigate("/packages");
             }, 1000);
-        } catch (error) {
+        } catch (error: unknown) {
             console.error("Error updating package:", error);
-            showToast("Error updating package!", "error");
+            
+            // Better error messaging
+            let errorMessage = "Error updating package. Please try again.";
+            if (error && typeof error === 'object' && 'response' in error) {
+                const axiosError = error as { response?: { data?: { message?: string } } };
+                errorMessage = axiosError.response?.data?.message || errorMessage;
+            }
+            
+            showToast(errorMessage, "error");
+        } finally {
+            setSubmitting(false);
         }
     };
 
@@ -346,10 +525,11 @@ const EditPackage: React.FC = () => {
             return form.availableWeekDays.map(day => `Every ${day}`).join(", ");
         } else if (form.availabilityType === "monthly") {
             if (form.availableMonthDays.length === 0) return "No days selected";
-            return form.availableMonthDays.map(day => {
-                if (day === "last") return "Last day of month";
-                const suffix = day === "1" ? "st" : day === "2" ? "nd" : day === "3" ? "rd" : "th";
-                return `${day}${suffix}`;
+            return form.availableMonthDays.map(dayWeek => {
+                const [day, week] = dayWeek.split('-');
+                const weekSuffix = week === "1" ? "st" : week === "2" ? "nd" : week === "3" ? "rd" : week === "4" ? "th" : "last";
+                const weekText = week === "last" ? "Last week" : `${week}${weekSuffix} week`;
+                return `${day.substring(0, 3)} (${weekText})`;
             }).join(", ");
         }
         return "Not specified";
@@ -360,18 +540,6 @@ const EditPackage: React.FC = () => {
         if (!form.duration) return "Not specified";
         return `${form.duration} ${form.durationUnit}`;
     };
-
-    // Loading state
-    if (loading) {
-        return (
-            <div className="flex items-center justify-center min-h-screen">
-                <div className="text-center">
-                    <div className={`animate-spin rounded-full h-12 w-12 border-b-2 border-${themeColor}-700 mx-auto`}></div>
-                    <p className="mt-4 text-gray-600">Loading package...</p>
-                </div>
-            </div>
-        );
-    }
 
     // Not found state
     if (notFound) {
@@ -606,40 +774,138 @@ const EditPackage: React.FC = () => {
                                 )}
                                 
                                 {form.availabilityType === "monthly" && (
-                                    <div>
-                                        <label className="block font-semibold mb-2 text-base text-neutral-800">Available Month Days</label>
-                                        <div className="flex flex-wrap gap-2">
-                                            {[...Array(31)].map((_, i) => {
-                                                const day = String(i + 1);
-                                                return (
-                                                    <button
-                                                        key={day}
-                                                        type="button"
-                                                        onClick={() => handleAvailabilityChange("monthly", day)}
-                                                        className={`px-3 py-2 rounded-md text-sm font-semibold transition-all ${
-                                                            form.availableMonthDays.includes(day)
-                                                                ? `bg-${themeColor}-50 border border-${themeColor}-500 text-${fullColor}`
-                                                                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                                                        }`}
-                                                    >
-                                                        {day}
-                                                    </button>
-                                                );
-                                            })}
-                                            <button
-                                                type="button"
-                                                onClick={() => handleAvailabilityChange("monthly", "last")}
-                                                className={`px-3 py-2 rounded-md text-sm font-semibold transition-all ${
-                                                    form.availableMonthDays.includes("last")
-                                                        ? `bg-${themeColor}-50 border border-${themeColor}-500 text-${fullColor}`
-                                                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                                                }`}
-                                            >
-                                                Last
-                                            </button>
+                                    <div className="space-y-4">
+                                        <div>
+                                            <label className="block font-semibold mb-3 text-base text-neutral-800">Select Day and Week of Month</label>
+                                            <p className="text-sm text-gray-500 mb-4">Choose which day(s) of the week and which week(s) of the month this package is available.</p>
+                                            
+                                            <div className="space-y-4">
+                                                {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].map(day => (
+                                                    <div key={day} className="border border-gray-200 rounded-lg p-4">
+                                                        <div className="flex items-center justify-between mb-3">
+                                                            <span className="font-medium text-gray-900">{day}</span>
+                                                            <span className="text-sm text-gray-500">
+                                                                {form.availableMonthDays.filter(item => item.startsWith(day)).length > 0 
+                                                                    ? `${form.availableMonthDays.filter(item => item.startsWith(day)).length} week(s) selected`
+                                                                    : 'No weeks selected'
+                                                                }
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex flex-wrap gap-2">
+                                                            {["1", "2", "3", "4", "last"].map(week => {
+                                                                const value = `${day}-${week}`;
+                                                                const isSelected = form.availableMonthDays.includes(value);
+                                                                return (
+                                                                    <button
+                                                                        type="button"
+                                                                        key={value}
+                                                                        className={`px-3 py-1.5 rounded-full border text-sm font-medium transition-all duration-150 hover:bg-${themeColor}-50 hover:border-${themeColor}-400 focus:outline-none focus:ring-2 focus:ring-${themeColor}-200 ${isSelected ? `bg-${themeColor}-50 border-${themeColor}-500 text-${fullColor}` : "bg-white border-gray-200 text-neutral-800"}`}
+                                                                        onClick={() => {
+                                                                            setForm(prev => {
+                                                                                const arr = prev.availableMonthDays;
+                                                                                if (arr.includes(value)) {
+                                                                                    return { ...prev, availableMonthDays: arr.filter(v => v !== value) };
+                                                                                } else {
+                                                                                    return { ...prev, availableMonthDays: [...arr, value] };
+                                                                                }
+                                                                            });
+                                                                        }}
+                                                                    >
+                                                                        {week === "last" ? "Last Week" : `${week}${week === "1" ? "st" : week === "2" ? "nd" : week === "3" ? "rd" : "th"} Week`}
+                                                                    </button>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
                                         </div>
                                     </div>
                                 )}
+                                
+                                {/* Time Slot Configuration */}
+                                <div className="mt-6 border-t border-gray-200 pt-6">
+                                    <h4 className="text-lg font-semibold mb-4 text-neutral-900 flex items-center gap-2">
+                                        <Clock className={`w-5 h-5 text-${themeColor}-600`} /> Time Slot Configuration
+                                    </h4>
+                                    <p className="text-sm text-gray-500 mb-4">Configure the available booking time slots for this package.</p>
+                                    
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div>
+                                            <label className="block font-semibold mb-2 text-base text-neutral-800">Start Time</label>
+                                            <input
+                                                type="time"
+                                                name="timeSlotStart"
+                                                value={form.timeSlotStart}
+                                                onChange={handleChange}
+                                                className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all`}
+                                            />
+                                            <p className="text-xs text-gray-500 mt-1">First available time slot</p>
+                                        </div>
+                                        
+                                        <div>
+                                            <label className="block font-semibold mb-2 text-base text-neutral-800">End Time</label>
+                                            <input
+                                                type="time"
+                                                name="timeSlotEnd"
+                                                value={form.timeSlotEnd}
+                                                onChange={handleChange}
+                                                className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all`}
+                                            />
+                                            <p className="text-xs text-gray-500 mt-1">Last available time slot</p>
+                                        </div>
+                                        
+                                        <div>
+                                            <label className="block font-semibold mb-2 text-base text-neutral-800">Interval (minutes)</label>
+                                            <select
+                                                name="timeSlotInterval"
+                                                value={form.timeSlotInterval}
+                                                onChange={handleChange}
+                                                className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all`}
+                                            >
+                                                <option value="15">15 minutes</option>
+                                                <option value="30">30 minutes</option>
+                                                <option value="45">45 minutes</option>
+                                                <option value="60">1 hour</option>
+                                                <option value="90">1.5 hours</option>
+                                                <option value="120">2 hours</option>
+                                            </select>
+                                            <p className="text-xs text-gray-500 mt-1">Time between slots</p>
+                                        </div>
+                                    </div>
+                                    
+                                    {/* Preview time slots */}
+                                    <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                                        <p className="text-sm font-medium text-gray-700 mb-2">Preview Time Slots:</p>
+                                        <div className="flex flex-wrap gap-2">
+                                            {(() => {
+                                                const slots = [];
+                                                const [startHour, startMin] = form.timeSlotStart.split(':').map(Number);
+                                                const [endHour, endMin] = form.timeSlotEnd.split(':').map(Number);
+                                                const startMinutes = startHour * 60 + startMin;
+                                                const endMinutes = endHour * 60 + endMin;
+                                                const interval = parseInt(form.timeSlotInterval);
+                                                
+                                                for (let time = startMinutes; time <= endMinutes - interval; time += interval) {
+                                                    const hours = Math.floor(time / 60);
+                                                    const mins = time % 60;
+                                                    const displayTime = `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+                                                    slots.push(
+                                                        <span key={time} className="px-2 py-1 bg-white border border-gray-300 rounded text-xs text-gray-700">
+                                                            {displayTime}
+                                                        </span>
+                                                    );
+                                                }
+                                                
+                                                if (slots.length === 0) {
+                                                    return <span className="text-xs text-gray-500">No time slots generated. Please check your start/end times.</span>;
+                                                }
+                                                
+                                                return slots;
+                                            })()}
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                         
@@ -650,55 +916,31 @@ const EditPackage: React.FC = () => {
                             <h3 className={`text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2`}>
                                 <Info className={`w-5 h-5 text-${themeColor}-600`} /> Attractions
                             </h3>
-                            <div className="flex flex-wrap gap-2 mb-2">
-                                {attractions.map((attraction) => (
-                                    <button
-                                        key={attraction.name}
-                                        type="button"
-                                        onClick={() => handleMultiSelect("attractions", attraction.name)}
-                                        className={`px-3 py-1.5 rounded-full text-sm font-semibold transition-all ${
-                                            form.attractions.includes(attraction.name)
-                                                ? `bg-${themeColor}-50 border border-${themeColor}-500 text-${fullColor}`
-                                                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                                        }`}
+                            {attractions.length === 0 ? (
+                                <div className="bg-gray-50 rounded-lg p-4 text-center border border-dashed border-gray-300">
+                                    <p className="text-gray-500 mb-3 text-sm">No attractions available yet</p>
+                                    <Link
+                                        to="/admin/attractions/create"
+                                        className={`inline-flex items-center gap-2 bg-${fullColor} text-xs hover:bg-${themeColor}-900 text-white px-4 py-2 rounded-md transition`}
                                     >
-                                        {attraction.name}
-                                    </button>
-                                ))}
-                                <input
-                                    type="text"
-                                    placeholder="Add attraction"
-                                    className="rounded-md border border-gray-200 px-2 py-1 w-28 bg-white text-sm transition-all placeholder:text-gray-400"
-                                    id="activity-name"
-                                />
-                                <input
-                                    type="number"
-                                    placeholder="Price"
-                                    className="rounded-md border border-gray-200 px-2 py-1 w-16 bg-white text-sm transition-all placeholder:text-gray-400"
-                                    id="activity-price"
-                                    min="0"
-                                />
-                                <input
-                                    type="text"
-                                    placeholder="Unit (e.g. per person, per table)"
-                                    className="rounded-md border border-gray-200 px-2 py-1 w-32 bg-white text-sm transition-all placeholder:text-gray-400"
-                                    id="activity-unit"
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        const nameInput = document.getElementById("activity-name") as HTMLInputElement;
-                                        const priceInput = document.getElementById("activity-price") as HTMLInputElement;
-                                        const unitInput = document.getElementById("activity-unit") as HTMLInputElement;
-                                        handleAddOption("activity", nameInput?.value || "", "", priceInput?.value || "", unitInput?.value || "");
-                                        if (nameInput) nameInput.value = "";
-                                        if (priceInput) priceInput.value = "";
-                                        if (unitInput) unitInput.value = "";
-                                    }}
-                                    className={`px-3 py-1.5 bg-${themeColor}-50 text-${fullColor} rounded-md text-sm font-semibold hover:bg-${themeColor}-100 transition-all flex items-center gap-1`}                                >
-                                    <Plus className="w-4 h-4" /> Add
-                                </button>
-                            </div>
+                                        <Plus className="w-4 h-4" />
+                                        Create Attraction
+                                    </Link>
+                                </div>
+                            ) : (
+                                <div className="flex flex-wrap gap-2 mb-2">
+                                    {attractions.map((act) => (
+                                        <button
+                                            type="button"
+                                            key={act.name}
+                                            className={`px-3 py-1 rounded-full border text-sm font-medium transition-all duration-150 hover:bg-${themeColor}-50 hover:border-${themeColor}-400 focus:outline-none focus:ring-2 focus:ring-${themeColor}-200 ${form.attractions.includes(act.name) ? `bg-${themeColor}-50 border-${themeColor}-500 text-${fullColor}` : "bg-white border-gray-200 text-neutral-800"}`}
+                                            onClick={() => handleMultiSelect("attractions", act.name)}
+                                        >
+                                            {act.name} <span className="text-xs text-gray-400 ml-1">${act.price}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                         
                         {/* Rooms Section */}
@@ -881,9 +1123,10 @@ const EditPackage: React.FC = () => {
                         <div className="flex gap-2 mt-6">
                             <button
                                 type="submit"
-                                className={`flex-1 bg-${fullColor} hover:bg-${themeColor}-900 text-white font-semibold py-2 rounded-md transition text-base flex items-center justify-center gap-2`}
+                                disabled={submitting || loading}
+                                className={`flex-1 bg-${fullColor} hover:bg-${themeColor}-900 text-white font-semibold py-2 rounded-md transition text-base flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed`}
                             >
-                                <Save className="w-5 h-5" /> Update Package
+                                <Save className="w-5 h-5" /> {submitting ? 'Updating...' : 'Update Package'}
                             </button>
                             <Link
                                 to="/packages"
@@ -923,6 +1166,21 @@ const EditPackage: React.FC = () => {
                             <span className="text-neutral-800 text-sm">
                                 {formatAvailability()}
                             </span>
+                        </div>
+                        
+                        {/* Time Slots in Preview */}
+                        <div className="mb-2 flex items-start gap-2">
+                            <Clock className="w-4 h-4 text-gray-500 mt-0.5" />
+                            <div className="flex-1">
+                                <span className="font-semibold">Time Slots:</span>
+                                <div className="text-neutral-800 text-sm mt-1">
+                                    {form.timeSlotStart && form.timeSlotEnd && form.timeSlotInterval ? (
+                                        <span>{form.timeSlotStart} - {form.timeSlotEnd} (every {form.timeSlotInterval} min)</span>
+                                    ) : (
+                                        <span className="text-gray-400">Not configured</span>
+                                    )}
+                                </div>
+                            </div>
                         </div>
                         
                         <div className="mb-4 text-neutral-800 text-base min-h-[48px]">{form.description || "Package description will appear here"}</div>

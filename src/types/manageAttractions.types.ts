@@ -11,6 +11,8 @@ export interface ManageAttractionsAttraction {
   duration: string;
   durationUnit: string;
   location: string;
+  locationId?: number;
+  locationName?: string;
   images: string[];
   status: 'active' | 'inactive' | 'maintenance';
   createdAt: string;

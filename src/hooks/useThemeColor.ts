@@ -25,8 +25,5 @@ export const useThemeColor = () => {
 
   const fullColor = `${themeColor}-${themeShade}`;
 
-  console.log(`Current theme color: ${fullColor}`);
-  console.log(`Theme color: ${themeColor}, Theme shade: ${themeShade}`);
-
   return { themeColor, themeShade, fullColor, setThemeColor, setThemeShade };
 };

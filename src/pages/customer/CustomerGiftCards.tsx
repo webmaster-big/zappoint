@@ -64,6 +64,15 @@ const ownedGiftCards: OwnedGiftCard[] = [
 
 
 const CustomerGiftCards = () => {
+  // Get customer from localStorage
+  const getCustomer = () => {
+    const customerData = localStorage.getItem('zapzone_customer');
+    return customerData ? JSON.parse(customerData) : null;
+  };
+
+  const customer = getCustomer();
+  const isLoggedIn = customer && customer.token;
+
   const [search, setSearch] = useState('');
   const [tab, setTab] = useState<'available' | 'owned'>('available');
   const [showPaymentModal, setShowPaymentModal] = useState<GiftCard | null>(null);
@@ -297,7 +306,7 @@ const CustomerGiftCards = () => {
 
           {/* Payment Modal */}
           {showPaymentModal && (
-            <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
+            <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50 animate-backdrop-fade">
               <div className="bg-white max-w-md w-full shadow-2xl">
                 <div className="bg-gradient-to-r from-blue-800 to-blue-900 p-6 text-white text-center">
                   <Gift className="w-12 h-12 mx-auto mb-3 opacity-90" />

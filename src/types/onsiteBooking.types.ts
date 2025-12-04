@@ -1,19 +1,21 @@
 // Types for: src/pages/admin/bookings/OnsiteBooking.tsx
 
 export interface OnsiteBookingRoom { 
+  id?: number;
   name: string; 
   capacity?: number; 
   price?: number; 
 }
 
 export interface OnsiteBookingAddOn {
+  id?: number;
   name: string;
   price: number;
   image?: string;
 }
 
 export interface OnsiteBookingPackage {
-  id: string;
+  id: number;
   name: string;
   description: string;
   price: number;
@@ -33,11 +35,14 @@ export interface OnsiteBookingPackage {
   durationUnit: "hours" | "minutes";
   pricePerAdditional30min: string;
   pricePerAdditional1hr: string;
+  partialPaymentPercentage?: number;
+  partialPaymentFixed?: number;
   rooms?: (string | OnsiteBookingRoom)[];
   image?: string;
 }
 
 export interface OnsiteBookingGiftCard {
+  id?: number;
   code: string;
   type: 'fixed' | 'percentage';
   value: number;
@@ -50,6 +55,7 @@ export interface OnsiteBookingGiftCard {
 }
 
 export interface OnsiteBookingPromo {
+  id?: number;
   code: string;
   type: 'fixed' | 'percentage';
   value: number;
@@ -72,9 +78,9 @@ export interface OnsiteBookingAttraction {
 }
 
 export interface OnsiteBookingData {
-  packageId: string | null;
+  packageId: number | null;
   selectedAttractions: { id: string; quantity: number }[];
-  selectedAddOns: { name: string; quantity: number }[];
+  selectedAddOns: { id?: number; name: string; quantity: number }[];
   date: string;
   time: string;
   participants: number;

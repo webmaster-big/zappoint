@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
 import type { RegisterFormData } from '../../types/customer';
+import customerService from '../../services/CustomerService';
 
 const CustomerRegister = () => {
   const navigate = useNavigate();
@@ -18,6 +19,8 @@ const CustomerRegister = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showTermsModal, setShowTermsModal] = useState(false);
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -37,8 +40,8 @@ const CustomerRegister = () => {
       setError('Passwords do not match');
       return false;
     }
-    if (formData.password.length < 6) {
-      setError('Password must be at least 6 characters long');
+    if (formData.password.length < 8) {
+      setError('Password must be at least 8 characters long');
       return false;
     }
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -58,21 +61,36 @@ const CustomerRegister = () => {
       return;
     }
     try {
-      // Simulate API call - replace with actual registration
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      // Mock user registration - replace with real API call
-      const newUser = {
-        id: Math.random().toString(36).substr(2, 9),
-        name: formData.firstName + ' ' + formData.lastName,
+      // Call the API to register the customer
+      const response = await customerService.register({
+        first_name: formData.firstName,
+        last_name: formData.lastName,
         email: formData.email,
         phone: formData.phone,
-        createdAt: new Date().toISOString()
-      };
-      localStorage.setItem('customer_user', JSON.stringify(newUser));
-      navigate('/');
-    } catch (err) {
-      console.error(err);
-      setError('Registration failed. Please try again.');
+        password: formData.password,
+        password_confirmation: formData.confirmPassword,
+      });
+
+      if (response.success && response.data) {
+        // Store customer data in localStorage
+        const customerData = {
+          id: response.data.id,
+          name: `${response.data.first_name} ${response.data.last_name}`,
+          email: response.data.email,
+          phone: response.data.phone,
+          createdAt: new Date().toISOString(),
+        };
+        localStorage.setItem('zapzone_customer', JSON.stringify(customerData));
+        
+        // Navigate to home page
+        navigate('/');
+      } else {
+        setError(response.message || 'Registration failed. Please try again.');
+      }
+    } catch (err: any) {
+      console.error('Registration error:', err);
+      const errorMessage = err.response?.data?.message || 'Registration failed. Please try again.';
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -80,31 +98,66 @@ const CustomerRegister = () => {
 
   return (
     <div className="min-h-screen bg-white flex">
-      {/* Left Side - Design Section */}
-      <div className="hidden lg:flex lg:w-3/5 xl:w-2/3 bg-gradient-to-br from-blue-900 to-blue-800 relative overflow-hidden items-center justify-center">
-        <div className="relative z-10 flex flex-col items-center justify-center p-16 text-white h-full w-full">
-          <div className="flex items-center space-x-3 mb-8">
-            <img src="/Zap-Zone.png" alt="Zap Zone Logo" className="w-35 h-14" />
-          </div>
-          <div className="max-w-lg text-center">
-            <h2 className="text-4xl font-extrabold mb-6">Book Your Next Adventure</h2>
-            <p className="text-blue-100 text-lg leading-relaxed">
-              Create your Zap Zone account to reserve attractions, manage your bookings, and unlock exclusive offers. Fast, secure, and easy—your next fun experience is just a few clicks away!
+      {/* Left Side - Design Section with Video */}
+      <div className="hidden lg:flex lg:w-3/5 xl:w-2/3 bg-slate-900 relative overflow-hidden items-center justify-center">
+        {/* Video Background */}
+        <iframe
+          src="https://customer-bu7vnagrw6ivkw73.cloudflarestream.com/ced085083150e980c481a28d1eab6747/iframe?muted=true&loop=true&autoplay=true&poster=https%3A%2F%2Fcustomer-bu7vnagrw6ivkw73.cloudflarestream.com%2Fced085083150e980c481a28d1eab6747%2Fthumbnails%2Fthumbnail.jpg%3Ftime%3D%26height%3D600&controls=false"
+          loading="lazy"
+          className="absolute top-1/2 left-1/2"
+          style={{ 
+            border: 'none', 
+            width: '100vw',
+            height: '100vh',
+            transform: 'translate(-50%, -50%)',
+            minWidth: '100%',
+            minHeight: '100%'
+          }}
+          allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
+          allowFullScreen={true}
+        />
+        <div className="absolute inset-0 bg-slate-900/60 z-10"></div>
+        
+        <div className="relative z-20 flex flex-col items-center justify-center px-16 w-full">
+          <div className="max-w-lg text-center space-y-8">
+            {/* Logo */}
+            <Link to="/">
+              <img src="/Zap-Zone.png" alt="Zap Zone Logo" className="w-40 h-16 object-contain mx-auto mb-8 cursor-pointer hover:opacity-80 transition" />
+            </Link>
+            
+            {/* Main Content */}
+            <h2 className="text-4xl font-bold text-white tracking-tight">
+              Join the Adventure Today!
+            </h2>
+            <p className="text-slate-300 text-lg">
+              Create your account and unlock access to exclusive attractions, special packages, and unforgettable experiences.
             </p>
           </div>
         </div>
-        {/* Decorative Elements */}
-        <div className="absolute top-1/4 -left-10 w-40 h-40 bg-blue-400 rounded-full mix-blend-overlay opacity-20"></div>
-        <div className="absolute bottom-1/4 -right-10 w-60 h-60 bg-purple-400 rounded-full mix-blend-overlay opacity-20"></div>
-        <div className="absolute top-1/2 left-1/4 w-32 h-32 bg-cyan-400 rounded-full mix-blend-overlay opacity-30"></div>
       </div>
 
       {/* Right Side - Register Form */}
-      <div className="flex-1 max-w-full lg:w-2/5 xl:w-1/3 flex flex-col items-center justify-center py-12 px-4 sm:px-6 lg:px-12 xl:px-16">
+      <div className="flex-1 max-w-full lg:w-2/5 xl:w-1/3 flex flex-col">
+        {/* Mobile Header with Back Button and Gradient */}
+        <div className="lg:hidden bg-gradient-to-br from-blue-800 via-blue-700 to-violet-600 px-4 py-6">
+          <Link to="/" className="inline-flex items-center text-white hover:text-blue-100 transition mb-4">
+            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            <span className="font-medium">Back to Home</span>
+          </Link>
+          <div>
+            <h1 className="text-2xl font-bold text-white mb-1">Join the Adventure!</h1>
+            <p className="text-blue-100 text-sm">Create your account to get started</p>
+          </div>
+        </div>
+
+        <div className="flex-1 flex items-start lg:items-center justify-center py-8 lg:py-12 px-4 sm:px-6 lg:px-12 xl:px-16">
         <div className="mx-auto w-full max-w-md">
 
           <div className="mb-8">
-            <h1 className="text-2xl sm:text-3xl font-bold text-zinc-900 mb-2 tracking-tight">Create your account</h1>
+            <h1 className="hidden lg:block text-2xl sm:text-3xl font-bold text-zinc-900 mb-2 tracking-tight">Create your account</h1>
+            <h1 className="lg:hidden text-xl font-bold text-zinc-900 mb-2 tracking-tight">Create account</h1>
             <p className="text-zinc-500 text-sm">
               Already have an account?{' '}
               <Link to="/customer/login" className="font-medium text-blue-800 hover:text-blue-700 transition-colors">
@@ -115,7 +168,7 @@ const CustomerRegister = () => {
 
           {/* Error Message */}
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm mb-4">
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 text-sm mb-4">
               {error}
             </div>
           )}
@@ -131,7 +184,7 @@ const CustomerRegister = () => {
                   required
                   value={formData.firstName}
                   onChange={handleChange}
-                  className="w-full rounded-md border border-zinc-200 px-3 py-2 text-zinc-900 bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-800 focus:border-blue-800 transition text-base"
+                  className="w-full border border-zinc-200 px-3 py-2 text-zinc-900 bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-800 focus:border-blue-800 transition text-base rounded-none"
                   placeholder="First name"
                 />
               </div>
@@ -144,7 +197,7 @@ const CustomerRegister = () => {
                   required
                   value={formData.lastName}
                   onChange={handleChange}
-                  className="w-full rounded-md border border-zinc-200 px-3 py-2 text-zinc-900 bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-800 focus:border-blue-800 transition text-base"
+                  className="w-full border border-zinc-200 px-3 py-2 text-zinc-900 bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-800 focus:border-blue-800 transition text-base rounded-none"
                   placeholder="Last name"
                 />
               </div>
@@ -160,7 +213,7 @@ const CustomerRegister = () => {
                   required
                   value={formData.email}
                   onChange={handleChange}
-                  className="w-full rounded-md border border-zinc-200 px-3 py-2 text-zinc-900 bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-800 focus:border-blue-800 transition text-base"
+                  className="w-full border border-zinc-200 px-3 py-2 text-zinc-900 bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-800 focus:border-blue-800 transition text-base rounded-none"
                   placeholder="you@email.com"
                 />
               </div>
@@ -173,7 +226,7 @@ const CustomerRegister = () => {
                   required
                   value={formData.phone}
                   onChange={handleChange}
-                  className="w-full rounded-md border border-zinc-200 px-3 py-2 text-zinc-900 bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-800 focus:border-blue-800 transition text-base"
+                  className="w-full border border-zinc-200 px-3 py-2 text-zinc-900 bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-800 focus:border-blue-800 transition text-base rounded-none"
                   placeholder="Phone number"
                 />
               </div>
@@ -201,7 +254,7 @@ const CustomerRegister = () => {
                   {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                 </button>
               </div>
-              <p className="mt-1 text-xs text-zinc-500">Must be at least 6 characters long</p>
+              <p className="mt-1 text-xs text-zinc-500">Must be at least 8 characters long</p>
             </div>
 
             <div>
@@ -214,7 +267,7 @@ const CustomerRegister = () => {
                   required
                   value={formData.confirmPassword}
                   onChange={handleChange}
-                  className="w-full rounded-md border border-zinc-200 px-3 py-2 text-zinc-900 bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-800 focus:border-blue-800 transition text-base pr-10"
+                  className="w-full border border-zinc-200 px-3 py-2 text-zinc-900 bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-800 focus:border-blue-800 transition text-base pr-10 rounded-none"
                   placeholder="••••••••"
                 />
                 <button
@@ -238,16 +291,28 @@ const CustomerRegister = () => {
               />
               <label htmlFor="terms" className="block text-sm text-zinc-700">
                 I agree to the{' '}
-                <a href="#" className="text-blue-800 hover:text-blue-700 transition-colors">Terms of Service</a>{' '}
+                <button 
+                  type="button"
+                  onClick={() => setShowTermsModal(true)}
+                  className="text-blue-800 hover:text-blue-700 transition-colors underline"
+                >
+                  Terms of Service
+                </button>{' '}
                 and{' '}
-                <a href="#" className="text-blue-800 hover:text-blue-700 transition-colors">Privacy Policy</a>
+                <button 
+                  type="button"
+                  onClick={() => setShowPrivacyModal(true)}
+                  className="text-blue-800 hover:text-blue-700 transition-colors underline"
+                >
+                  Privacy Policy
+                </button>
               </label>
             </div>
 
             <button
               type="submit"
               disabled={isLoading}
-              className="mt-2 w-full py-3 rounded-lg font-semibold text-base shadow-sm transition-all bg-blue-800 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="mt-2 w-full py-3 font-semibold text-base shadow-sm transition-all bg-blue-800 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-none"
             >
               {isLoading ? (
                 <div className="flex items-center justify-center">
@@ -264,7 +329,147 @@ const CustomerRegister = () => {
             &copy; {new Date().getFullYear()} Zap Zone. All rights reserved.
           </div>
         </div>
+        </div>
       </div>
+
+      {/* Terms of Service Modal */}
+      {showTermsModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-backdrop-fade">
+          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col">
+            <div className="px-6 py-4 border-b border-zinc-200 flex items-center justify-between">
+              <h3 className="text-xl font-bold text-zinc-900">Terms of Service</h3>
+              <button
+                onClick={() => setShowTermsModal(false)}
+                className="text-zinc-400 hover:text-zinc-600 transition"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="px-6 py-4 overflow-y-auto flex-1">
+              <div className="prose prose-sm max-w-none">
+                <p className="text-sm text-zinc-600 mb-4">Last updated: {new Date().toLocaleDateString()}</p>
+                
+                <h4 className="font-semibold text-zinc-900 mt-4 mb-2">1. Acceptance of Terms</h4>
+                <p className="text-zinc-700 mb-3">
+                  By accessing and using Zap Zone's services, you accept and agree to be bound by the terms and provision of this agreement.
+                </p>
+
+                <h4 className="font-semibold text-zinc-900 mt-4 mb-2">2. Use of Services</h4>
+                <p className="text-zinc-700 mb-3">
+                  You agree to use our services only for lawful purposes and in accordance with these Terms. You must be at least 18 years old to create an account.
+                </p>
+
+                <h4 className="font-semibold text-zinc-900 mt-4 mb-2">3. Booking and Reservations</h4>
+                <p className="text-zinc-700 mb-3">
+                  All bookings are subject to availability. We reserve the right to cancel or modify reservations in case of unforeseen circumstances. Cancellation policies apply as stated at the time of booking.
+                </p>
+
+                <h4 className="font-semibold text-zinc-900 mt-4 mb-2">4. Payment Terms</h4>
+                <p className="text-zinc-700 mb-3">
+                  Payment is required at the time of booking unless otherwise specified. All prices are in USD and are subject to change without notice.
+                </p>
+
+                <h4 className="font-semibold text-zinc-900 mt-4 mb-2">5. User Accounts</h4>
+                <p className="text-zinc-700 mb-3">
+                  You are responsible for maintaining the confidentiality of your account credentials. You agree to accept responsibility for all activities that occur under your account.
+                </p>
+
+                <h4 className="font-semibold text-zinc-900 mt-4 mb-2">6. Limitation of Liability</h4>
+                <p className="text-zinc-700 mb-3">
+                  Zap Zone shall not be liable for any indirect, incidental, special, consequential or punitive damages resulting from your use of our services.
+                </p>
+
+                <h4 className="font-semibold text-zinc-900 mt-4 mb-2">7. Changes to Terms</h4>
+                <p className="text-zinc-700 mb-3">
+                  We reserve the right to modify these terms at any time. Continued use of our services after changes constitutes acceptance of the new terms.
+                </p>
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t border-zinc-200 flex justify-end">
+              <button
+                onClick={() => setShowTermsModal(false)}
+                className="px-4 py-2 bg-blue-800 text-white rounded-lg hover:bg-blue-700 transition"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Privacy Policy Modal */}
+      {showPrivacyModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-backdrop-fade">
+          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col">
+            <div className="px-6 py-4 border-b border-zinc-200 flex items-center justify-between">
+              <h3 className="text-xl font-bold text-zinc-900">Privacy Policy</h3>
+              <button
+                onClick={() => setShowPrivacyModal(false)}
+                className="text-zinc-400 hover:text-zinc-600 transition"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="px-6 py-4 overflow-y-auto flex-1">
+              <div className="prose prose-sm max-w-none">
+                <p className="text-sm text-zinc-600 mb-4">Last updated: {new Date().toLocaleDateString()}</p>
+                
+                <h4 className="font-semibold text-zinc-900 mt-4 mb-2">1. Information We Collect</h4>
+                <p className="text-zinc-700 mb-3">
+                  We collect personal information that you provide to us, including your name, email address, phone number, and payment information when you create an account or make a booking.
+                </p>
+
+                <h4 className="font-semibold text-zinc-900 mt-4 mb-2">2. How We Use Your Information</h4>
+                <p className="text-zinc-700 mb-3">
+                  We use your information to process bookings, send confirmations, provide customer support, and improve our services. We may also use your email to send you promotional offers with your consent.
+                </p>
+
+                <h4 className="font-semibold text-zinc-900 mt-4 mb-2">3. Data Security</h4>
+                <p className="text-zinc-700 mb-3">
+                  We implement appropriate technical and organizational security measures to protect your personal information against unauthorized access, alteration, or destruction.
+                </p>
+
+                <h4 className="font-semibold text-zinc-900 mt-4 mb-2">4. Sharing of Information</h4>
+                <p className="text-zinc-700 mb-3">
+                  We do not sell your personal information. We may share your information with service providers who assist us in operating our business, subject to confidentiality agreements.
+                </p>
+
+                <h4 className="font-semibold text-zinc-900 mt-4 mb-2">5. Cookies and Tracking</h4>
+                <p className="text-zinc-700 mb-3">
+                  We use cookies and similar tracking technologies to enhance your browsing experience, analyze site traffic, and understand user behavior.
+                </p>
+
+                <h4 className="font-semibold text-zinc-900 mt-4 mb-2">6. Your Rights</h4>
+                <p className="text-zinc-700 mb-3">
+                  You have the right to access, correct, or delete your personal information. You may also object to processing or request data portability by contacting us.
+                </p>
+
+                <h4 className="font-semibold text-zinc-900 mt-4 mb-2">7. Children's Privacy</h4>
+                <p className="text-zinc-700 mb-3">
+                  Our services are not directed to children under 13. We do not knowingly collect personal information from children under 13.
+                </p>
+
+                <h4 className="font-semibold text-zinc-900 mt-4 mb-2">8. Contact Us</h4>
+                <p className="text-zinc-700 mb-3">
+                  If you have questions about this Privacy Policy, please contact us at privacy@zapzone.com.
+                </p>
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t border-zinc-200 flex justify-end">
+              <button
+                onClick={() => setShowPrivacyModal(false)}
+                className="px-4 py-2 bg-blue-800 text-white rounded-lg hover:bg-blue-700 transition"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

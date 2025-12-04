@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { 
   Trash2, 
   Search, 
@@ -9,10 +10,15 @@ import {
   CreditCard,
   CheckCircle,
   XCircle,
-  Clock
+  Clock,
+  Eye
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
+import CounterAnimation from '../../../components/ui/CounterAnimation';
 import type { AttractionPurchasesPurchase, AttractionPurchasesFilterOptions } from '../../../types/AttractionPurchases.types';
+import { attractionPurchaseService } from '../../../services/AttractionPurchaseService';
+import Toast from '../../../components/ui/Toast';
+import { getStoredUser } from '../../../utils/storage';
 
 const ManagePurchases = () => {
   const { themeColor, fullColor } = useThemeColor();
@@ -29,6 +35,7 @@ const ManagePurchases = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
   const [showFilters, setShowFilters] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
   // Status colors and icons
   const statusConfig = {
@@ -72,112 +79,45 @@ const ManagePurchases = () => {
     }
   ];
 
-  // Load purchases from localStorage
-  useEffect(() => {
-    loadPurchases();
-  }, []);
-
-  // Apply filters when purchases or filters change
-  useEffect(() => {
-    applyFilters();
-  }, [purchases, filters]);
-
-  const loadPurchases = () => {
+  const loadPurchases = async () => {
     try {
-      const storedPurchases = localStorage.getItem('zapzone_purchases');
-      if (storedPurchases) {
-        const parsedPurchases = JSON.parse(storedPurchases);
-        setPurchases(parsedPurchases);
-      } else {
-        // Sample data for demonstration
-        const samplePurchases: AttractionPurchasesPurchase[] = [
-          {
-            id: 'purchase_1',
-            type: 'attraction',
-            attractionName: 'Laser Tag Arena',
-            customerName: 'John Smith',
-            email: 'john.smith@example.com',
-            phone: '(555) 123-4567',
-            quantity: 4,
-            status: 'confirmed',
-            totalAmount: 100.00,
-            createdAt: '2024-01-15T10:30:00Z',
-            paymentMethod: 'credit_card',
-            duration: '30 minutes',
-            activity: 'Laser Tag'
-          },
-          {
-            id: 'purchase_2',
-            type: 'attraction',
-            attractionName: 'Bowling Lanes',
-            customerName: 'Sarah Johnson',
-            email: 'sarah.j@example.com',
-            phone: '(555) 987-6543',
-            quantity: 2,
-            status: 'confirmed',
-            totalAmount: 40.00,
-            createdAt: '2024-01-14T14:45:00Z',
-            paymentMethod: 'paypal',
-            duration: '60 minutes',
-            activity: 'Bowling'
-          },
-          {
-            id: 'purchase_3',
-            type: 'attraction',
-            attractionName: 'VR Experience',
-            customerName: 'Mike Wilson',
-            email: 'mike.wilson@example.com',
-            phone: '(555) 456-7890',
-            quantity: 1,
-            status: 'pending',
-            totalAmount: 35.00,
-            createdAt: '2024-01-13T16:20:00Z',
-            paymentMethod: 'credit_card',
-            duration: '20 minutes',
-            activity: 'VR Experience'
-          },
-          {
-            id: 'purchase_4',
-            type: 'attraction',
-            attractionName: 'Laser Tag Arena',
-            customerName: 'Emily Davis',
-            email: 'emily.d@example.com',
-            phone: '(555) 234-5678',
-            quantity: 6,
-            status: 'cancelled',
-            totalAmount: 150.00,
-            createdAt: '2024-01-12T11:15:00Z',
-            paymentMethod: 'credit_card',
-            duration: '30 minutes',
-            activity: 'Laser Tag'
-          },
-          {
-            id: 'purchase_5',
-            type: 'attraction',
-            attractionName: 'Bowling Lanes',
-            customerName: 'David Brown',
-            email: 'david.b@example.com',
-            phone: '(555) 876-5432',
-            quantity: 3,
-            status: 'refunded',
-            totalAmount: 60.00,
-            createdAt: '2024-01-11T19:30:00Z',
-            paymentMethod: 'paypal',
-            duration: '60 minutes',
-            activity: 'Bowling'
-          }
-        ];
-        setPurchases(samplePurchases);
-        localStorage.setItem('zapzone_purchases', JSON.stringify(samplePurchases));
-      }
+      setLoading(true);
+      const response = await attractionPurchaseService.getPurchases({
+        per_page: 100,
+        user_id: getStoredUser()?.id
+      });
+
+      // Convert API format to component format
+      const convertedPurchases: AttractionPurchasesPurchase[] = response.data.purchases.map((purchase: any) => ({
+        id: purchase.id.toString(),
+        type: 'attraction',
+        attractionName: purchase.attraction?.name || 'Unknown Attraction',
+        customerName: purchase.customer 
+          ? `${purchase.customer.first_name} ${purchase.customer.last_name}`
+          : purchase.guest_name || 'Walk-in Customer',
+        email: purchase.customer?.email || purchase.guest_email || '',
+        phone: purchase.customer?.phone || purchase.guest_phone || '',
+        quantity: purchase.quantity,
+        status: purchase.status === 'completed' ? 'confirmed' : purchase.status as 'confirmed' | 'pending' | 'cancelled' | 'refunded',
+        totalAmount: Number(purchase.total_amount),
+        createdAt: purchase.created_at,
+        paymentMethod: purchase.payment_method === 'e-wallet' ? 'paypal' : 
+                      purchase.payment_method === 'credit' ? 'credit_card' : 
+                      purchase.payment_method as 'credit_card' | 'paypal',
+        duration: purchase.attraction?.duration ? `${purchase.attraction.duration} ${purchase.attraction.duration_unit || 'minutes'}` : '',
+        activity: purchase.attraction?.category || '',
+      }));
+
+      setPurchases(convertedPurchases);
     } catch (error) {
       console.error('Error loading purchases:', error);
+      setToast({ message: 'Failed to load purchases', type: 'error' });
     } finally {
       setLoading(false);
     }
   };
 
-  const applyFilters = () => {
+  const applyFilters = useCallback(() => {
     let result = [...purchases];
 
     // Apply search filter
@@ -227,7 +167,17 @@ const ManagePurchases = () => {
     }
 
     setFilteredPurchases(result);
-  };
+  }, [purchases, filters]);
+
+  // Load purchases from backend
+  useEffect(() => {
+    loadPurchases();
+  }, []);
+
+  // Apply filters when purchases or filters change
+  useEffect(() => {
+    applyFilters();
+  }, [applyFilters]);
 
   const handleFilterChange = (key: keyof AttractionPurchasesFilterOptions, value: string) => {
     setFilters(prev => ({
@@ -261,42 +211,91 @@ const ManagePurchases = () => {
     }
   };
 
-  const handleStatusChange = (id: string, newStatus: AttractionPurchasesPurchase['status']) => {
-    const updatedPurchases = purchases.map(purchase =>
-      purchase.id === id ? { ...purchase, status: newStatus } : purchase
-    );
-    setPurchases(updatedPurchases);
-    localStorage.setItem('zapzone_purchases', JSON.stringify(updatedPurchases));
-  };
+  const handleStatusChange = async (id: string, newStatus: AttractionPurchasesPurchase['status']) => {
+    try {
+      // Map frontend status to backend status
+      let backendStatus: 'pending' | 'completed' | 'cancelled';
+      if (newStatus === 'confirmed') {
+        backendStatus = 'completed';
+      } else if (newStatus === 'refunded') {
+        backendStatus = 'cancelled'; // Map refunded to cancelled in backend
+      } else {
+        backendStatus = newStatus as 'pending' | 'cancelled';
+      }
 
-  const handleDeletePurchase = (id: string) => {
-    if (window.confirm('Are you sure you want to delete this purchase record?')) {
-      const updatedPurchases = purchases.filter(purchase => purchase.id !== id);
-      setPurchases(updatedPurchases);
-      localStorage.setItem('zapzone_purchases', JSON.stringify(updatedPurchases));
+      await attractionPurchaseService.updatePurchase(Number(id), {
+        status: backendStatus,
+      });
+
+      setToast({ message: 'Status updated successfully', type: 'success' });
+      loadPurchases(); // Reload the list
+    } catch (error) {
+      console.error('Error updating status:', error);
+      setToast({ message: 'Failed to update status', type: 'error' });
     }
   };
 
-  const handleBulkDelete = () => {
+  const handleDeletePurchase = async (id: string) => {
+    if (window.confirm('Are you sure you want to delete this purchase record?')) {
+      try {
+        await attractionPurchaseService.deletePurchase(Number(id));
+        setToast({ message: 'Purchase deleted successfully', type: 'success' });
+        loadPurchases(); // Reload the list
+      } catch (error) {
+        console.error('Error deleting purchase:', error);
+        setToast({ message: 'Failed to delete purchase', type: 'error' });
+      }
+    }
+  };
+
+  const handleBulkDelete = async () => {
     if (selectedPurchases.length === 0) return;
     
     if (window.confirm(`Are you sure you want to delete ${selectedPurchases.length} purchase record(s)?`)) {
-      const updatedPurchases = purchases.filter(purchase => !selectedPurchases.includes(purchase.id));
-      setPurchases(updatedPurchases);
-      setSelectedPurchases([]);
-      localStorage.setItem('zapzone_purchases', JSON.stringify(updatedPurchases));
+      try {
+        // Delete each purchase
+        await Promise.all(
+          selectedPurchases.map(id => attractionPurchaseService.deletePurchase(Number(id)))
+        );
+        setToast({ message: `${selectedPurchases.length} purchase(s) deleted successfully`, type: 'success' });
+        setSelectedPurchases([]);
+        loadPurchases(); // Reload the list
+      } catch (error) {
+        console.error('Error deleting purchases:', error);
+        setToast({ message: 'Failed to delete some purchases', type: 'error' });
+      }
     }
   };
 
-  const handleBulkStatusChange = (newStatus: AttractionPurchasesPurchase['status']) => {
+  const handleBulkStatusChange = async (newStatus: AttractionPurchasesPurchase['status']) => {
     if (selectedPurchases.length === 0) return;
     
-    const updatedPurchases = purchases.map(purchase =>
-      selectedPurchases.includes(purchase.id) ? { ...purchase, status: newStatus } : purchase
-    );
-    setPurchases(updatedPurchases);
-    setSelectedPurchases([]);
-    localStorage.setItem('zapzone_purchases', JSON.stringify(updatedPurchases));
+    try {
+      // Map frontend status to backend status
+      let backendStatus: 'pending' | 'completed' | 'cancelled';
+      if (newStatus === 'confirmed') {
+        backendStatus = 'completed';
+      } else if (newStatus === 'refunded') {
+        backendStatus = 'cancelled';
+      } else {
+        backendStatus = newStatus as 'pending' | 'cancelled';
+      }
+
+      // Update each purchase's status
+      await Promise.all(
+        selectedPurchases.map(id => 
+          attractionPurchaseService.updatePurchase(Number(id), {
+            status: backendStatus,
+          })
+        )
+      );
+      setToast({ message: `${selectedPurchases.length} purchase(s) updated successfully`, type: 'success' });
+      setSelectedPurchases([]);
+      loadPurchases(); // Reload the list
+    } catch (error) {
+      console.error('Error updating purchases:', error);
+      setToast({ message: 'Failed to update some purchases', type: 'error' });
+    }
   };
 
   const exportToCSV = () => {
@@ -395,7 +394,7 @@ const ManagePurchases = () => {
                 <span className="text-base font-semibold text-gray-800">{metric.title}</span>
               </div>
               <div className="flex items-end gap-2 mt-2">
-                <h3 className="text-2xl font-bold text-gray-900">{metric.value}</h3>
+                <CounterAnimation value={metric.value} className="text-2xl font-bold text-gray-900" />
               </div>
               <p className="text-xs mt-1 text-gray-400">{metric.change}</p>
             </div>
@@ -597,6 +596,13 @@ const ManagePurchases = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-3">
+                          <Link
+                            to={`/attractions/purchases/${purchase.id}`}
+                            className={`text-${fullColor} hover:text-${themeColor}-900`}
+                            title="View Details"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Link>
                           <button
                             onClick={() => handleDeletePurchase(purchase.id)}
                             className="text-red-600 hover:text-red-800"
@@ -658,6 +664,17 @@ const ManagePurchases = () => {
           </div>
         )}
       </div>
+
+      {/* Toast Notification */}
+      {toast && (
+        <div className="fixed top-4 right-4 z-50 animate-fade-in-up">
+          <Toast
+            message={toast.message}
+            type={toast.type}
+            onClose={() => setToast(null)}
+          />
+        </div>
+      )}
     </div>
   );
 };

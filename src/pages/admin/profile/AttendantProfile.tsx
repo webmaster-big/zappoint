@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   User, 
   MapPin, 
@@ -8,68 +8,158 @@ import {
   Save, 
   X,
   Camera,
-  Clock,
-  Calendar,
-  BadgeCheck,
-  Zap
+  Building,
+  AlertCircle,
+  CheckCircle,
+  BadgeCheck
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
+import { API_BASE_URL, ASSET_URL, getStoredUser, setStoredUser } from '../../../utils/storage';
 import type { AttendantProfileData } from '../../../types/AttendantProfile.types';
+import { getAuthToken } from '../../../services';
 
 const AttendantProfile = () => {
   const { themeColor, fullColor } = useThemeColor();
   const [isEditing, setIsEditing] = useState(false);
   const [activeTab, setActiveTab] = useState('personal');
   const [isLoading, setIsLoading] = useState(false);
+  const [isFetching, setIsFetching] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [userId, setUserId] = useState<number | null>(null);
+  const [locationId, setLocationId] = useState<number | null>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
-  // Sample profile data for Attendant/Staff
+  // Profile data state
   const [profileData, setProfileData] = useState<AttendantProfileData>({
     personal: {
-      firstName: 'Jessica',
-      lastName: 'Rodriguez',
-      email: 'jessica.rodriguez@brighton.zapzone.com',
-      phone: '+1 (555) 234-5678',
-      position: 'Attendant',
-      avatar: '/api/placeholder/100/100',
-      hireDate: '2024-01-10',
-      employeeId: 'ZAP-BTN-0487',
-      department: 'Guest Services'
+      firstName: '',
+      lastName: '',
+      email: '',
+      phone: '',
+      position: '',
+      avatar: '',
+      department: '',
+      employeeId: '',
+      shift: '',
+      hireDate: '',
+      status: ''
     },
     location: {
-      name: 'Zap Zone Brighton',
-      manager: 'Michael Chen',
+      name: '',
+      email: '',
+      phone: '',
       address: {
-        street: '456 Entertainment Avenue',
-        city: 'Brighton',
-        state: 'MI',
-        zipCode: '48116'
+        street: '',
+        city: '',
+        state: '',
+        zipCode: ''
       },
-      assignedAreas: ['Laser Tag Arena', 'Arcade Zone', 'Customer Service'],
-      shift: 'Evening Shift (2:00 PM - 10:00 PM)'
-    },
-    schedule: {
-      currentWeek: [
-        { day: 'Monday', date: '2024-09-16', shift: '2:00 PM - 10:00 PM', area: 'Laser Tag' },
-        { day: 'Tuesday', date: '2024-09-17', shift: '2:00 PM - 10:00 PM', area: 'Arcade' },
-        { day: 'Wednesday', date: '2024-09-18', shift: '2:00 PM - 10:00 PM', area: 'Customer Service' },
-        { day: 'Thursday', date: '2024-09-19', shift: '2:00 PM - 10:00 PM', area: 'Laser Tag' },
-        { day: 'Friday', date: '2024-09-20', shift: '4:00 PM - 12:00 AM', area: 'VR Experience' },
-        { day: 'Saturday', date: '2024-09-21', shift: 'OFF', area: '' },
-        { day: 'Sunday', date: '2024-09-22', shift: 'OFF', area: '' }
-      ],
-      nextWeek: [
-        { day: 'Monday', date: '2024-09-23', shift: '2:00 PM - 10:00 PM', area: 'Arcade' },
-        { day: 'Tuesday', date: '2024-09-24', shift: '2:00 PM - 10:00 PM', area: 'Laser Tag' },
-        { day: 'Wednesday', date: '2024-09-25', shift: '2:00 PM - 10:00 PM', area: 'Customer Service' },
-        { day: 'Thursday', date: '2024-09-26', shift: '2:00 PM - 10:00 PM', area: 'VR Experience' },
-        { day: 'Friday', date: '2024-09-27', shift: '4:00 PM - 12:00 AM', area: 'Laser Tag' },
-        { day: 'Saturday', date: '2024-09-28', shift: '12:00 PM - 8:00 PM', area: 'Arcade' },
-        { day: 'Sunday', date: '2024-09-29', shift: 'OFF', area: '' }
-      ]
+      timezone: '',
+      isActive: true
     }
   });
 
   const [editedData, setEditedData] = useState(profileData);
+
+  // Fetch user and location data on mount
+  useEffect(() => {
+    fetchProfileData();
+  }, []);
+
+  // Update profile picture when localStorage changes
+  useEffect(() => {
+    const user = getStoredUser();
+    if (user?.profile_path && user.profile_path !== profileData.personal.avatar) {
+      setProfileData(prev => ({
+        ...prev,
+        personal: {
+          ...prev.personal,
+          avatar: user.profile_path || ''
+        }
+      }));
+    }
+  }, [profileData.personal.avatar]);
+
+  const fetchProfileData = async () => {
+    setIsFetching(true);
+    setError(null);
+    
+    try {
+      const token = getAuthToken();
+      const user = getStoredUser();
+      
+      if (!token) {
+        setError('No authentication token found. Please log in again.');
+        return;
+      }
+      
+      if (!user) {
+        setError('No user data found. Please log in again.');
+        return;
+      }
+      
+      if (!user.location_id) {
+        setError('User has no location assigned. Please contact support.');
+        return;
+      }
+      
+      setUserId(user.id);
+      setLocationId(user.location_id);
+
+      // Fetch location data
+      const locationResponse = await fetch(`${API_BASE_URL}/locations/${user.location_id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!locationResponse.ok) {
+        throw new Error('Failed to fetch location data');
+      }
+
+      const locationData = await locationResponse.json();
+      const location = locationData.data;
+      
+      const newProfileData = {
+        personal: {
+          firstName: user.first_name || '',
+          lastName: user.last_name || '',
+          email: user.email || '',
+          phone: user.phone || '',
+          position: user.position || '',
+          avatar: user.profile_path || '',
+          department: user.department || '',
+          employeeId: user.employee_id || '',
+          shift: user.shift || '',
+          hireDate: user.hire_date || '',
+          status: user.status || 'active'
+        },
+        location: {
+          name: location.name || '',
+          email: location.email || '',
+          phone: location.phone || '',
+          address: {
+            street: location.address || '',
+            city: location.city || '',
+            state: location.state || '',
+            zipCode: location.zip_code || ''
+          },
+          timezone: location.timezone || '',
+          isActive: location.is_active !== undefined ? location.is_active : true
+        }
+      };
+
+      setProfileData(newProfileData);
+      setEditedData(newProfileData);
+    } catch (err) {
+      console.error('Fetch Profile Error:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load profile data');
+    } finally {
+      setIsFetching(false);
+    }
+  };
 
   const handleEdit = () => {
     setEditedData(profileData);
@@ -83,11 +173,65 @@ const AttendantProfile = () => {
 
   const handleSave = async () => {
     setIsLoading(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    setProfileData(editedData);
-    setIsEditing(false);
-    setIsLoading(false);
+    setError(null);
+    
+    try {
+      const token = getAuthToken();
+      
+      if (!token || !userId || !locationId) {
+        throw new Error('Missing authentication or user data');
+      }
+      
+      // Update user data
+      const userResponse = await fetch(`${API_BASE_URL}/users/${userId}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          first_name: editedData.personal.firstName,
+          last_name: editedData.personal.lastName,
+          email: editedData.personal.email,
+          phone: editedData.personal.phone,
+          position: editedData.personal.position,
+          department: editedData.personal.department,
+          employee_id: editedData.personal.employeeId,
+          shift: editedData.personal.shift,
+          hire_date: editedData.personal.hireDate || null,
+          status: editedData.personal.status
+        })
+      });
+      
+      if (!userResponse.ok) {
+        throw new Error('Failed to update personal information');
+      }
+      
+      // Update localStorage with new user data
+      setStoredUser({
+        ...getStoredUser(),
+        first_name: editedData.personal.firstName,
+        last_name: editedData.personal.lastName,
+        email: editedData.personal.email,
+        phone: editedData.personal.phone,
+        position: editedData.personal.position,
+        department: editedData.personal.department,
+        employee_id: editedData.personal.employeeId,
+        shift: editedData.personal.shift,
+        hire_date: editedData.personal.hireDate,
+        status: editedData.personal.status
+      }, true);
+      
+      setProfileData(editedData);
+      setIsEditing(false);
+      setSuccessMessage('Profile updated successfully!');
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } catch (err) {
+      console.error('Save Error:', err);
+      setError(err instanceof Error ? err.message : 'Failed to save changes');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleInputChange = (section: keyof AttendantProfileData, field: string, value: string) => {
@@ -100,33 +244,172 @@ const AttendantProfile = () => {
     }));
   };
 
+  const handleAddressChange = (field: string, value: string) => {
+    setEditedData(prev => ({
+      ...prev,
+      location: {
+        ...prev.location,
+        address: {
+          ...prev.location.address,
+          [field]: value
+        }
+      }
+    }));
+  };
+
+  const handlePhotoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !userId) return;
+
+    setUploadingPhoto(true);
+    try {
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64String = reader.result as string;
+        
+        const token = getAuthToken();
+        const response = await fetch(`${API_BASE_URL}/users/${userId}/update-profile-path`, {
+          method: 'PATCH',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            profile_path: base64String
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to upload profile picture');
+        }
+
+        const data = await response.json();
+        const newProfilePath = data.data.profile_path;
+        
+        // Update localStorage first
+        const currentUser = getStoredUser();
+        if (currentUser) {
+          setStoredUser({
+            ...currentUser,
+            profile_path: newProfilePath
+          }, true);
+        }
+        
+        // Dispatch custom event to notify other components
+        window.dispatchEvent(new Event('zapzone_profile_updated'));
+        
+        // Then update component state
+        setProfileData(prev => ({
+          ...prev,
+          personal: {
+            ...prev.personal,
+            avatar: newProfilePath
+          }
+        }));
+        
+        setSuccessMessage('Profile picture updated successfully!');
+        setTimeout(() => setSuccessMessage(null), 3000);
+      };
+      reader.readAsDataURL(file);
+    } catch (err) {
+      console.error('Upload Error:', err);
+      setError('Failed to upload profile picture');
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
   const tabs = [
-    { id: 'personal', label: 'Personal Info', icon: User },
-    { id: 'location', label: 'Work Details', icon: MapPin },
-    { id: 'schedule', label: 'My Schedule', icon: Calendar }
+    { id: 'personal', label: 'Personal Information', icon: User },
+    { id: 'location', label: 'Location Details', icon: MapPin }
   ];
+
+  if (isFetching) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading profile...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
       <div className="mx-auto">
+        {/* Success Message */}
+        {successMessage && (
+          <div className="fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-2 z-50 animate-fade-in">
+            <CheckCircle size={20} />
+            <span>{successMessage}</span>
+          </div>
+        )}
+
+        {/* Error Message */}
+        {error && (
+          <div className="fixed top-4 right-4 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-2 z-50 animate-fade-in">
+            <AlertCircle size={20} />
+            <span>{error}</span>
+            <button onClick={() => setError(null)} className="ml-2">
+              <X size={16} />
+            </button>
+          </div>
+        )}
+
         {/* Header */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between">
             <div className="flex items-center space-x-4 mb-4 sm:mb-0">
-              <div className="relative">
-                <div className={`w-16 h-16 bg-gradient-to-br from-${fullColor} to-${fullColor} rounded-full flex items-center justify-center text-white text-2xl font-bold`}>
-                  {profileData.personal.firstName[0]}{profileData.personal.lastName[0]}
-                </div>
-                <button className={`absolute -bottom-1 -right-1 bg-${fullColor} text-white p-1.5 rounded-full hover:bg-${themeColor}-900 transition`}>
-                  <Camera size={14} />
-                </button>
+              <div className="relative group">
+                {profileData.personal.avatar ? (
+                  <div className="relative">
+                    <img 
+                      src={`${ASSET_URL}${profileData.personal.avatar}`}
+                      alt="Profile" 
+                      className="w-20 h-20 rounded-full object-cover border-4 border-white shadow-lg"
+                      onError={(e) => {
+                        console.error('Image failed to load:', `${ASSET_URL}${profileData.personal.avatar}`);
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
+                    <div className="absolute inset-0 rounded-full bg-black opacity-0 group-hover:opacity-20 transition-opacity"></div>
+                  </div>
+                ) : (
+                  <div className="relative">
+                    <div className={`w-20 h-20 bg-gradient-to-br from-${themeColor}-400 via-${themeColor}-600 to-${themeColor}-800 rounded-full flex items-center justify-center text-white shadow-lg border-4 border-white`}>
+                      <span className="text-3xl font-bold tracking-tight">
+                        {profileData.personal.firstName?.[0]?.toUpperCase() || ''}{profileData.personal.lastName?.[0]?.toUpperCase() || ''}
+                      </span>
+                    </div>
+                    <div className="absolute inset-0 rounded-full bg-gradient-to-t from-black/20 to-transparent"></div>
+                  </div>
+                )}
+                <label className={`absolute -bottom-1 -right-1 bg-${fullColor} text-white p-2 rounded-full hover:bg-${themeColor}-900 transition cursor-pointer shadow-lg border-2 border-white group-hover:scale-110 transform`}>
+                  <Camera size={16} />
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    onChange={handlePhotoUpload} 
+                    className="hidden" 
+                    disabled={uploadingPhoto}
+                  />
+                </label>
+                {uploadingPhoto && (
+                  <div className="absolute inset-0 bg-black/60 rounded-full flex items-center justify-center">
+                    <div className="flex flex-col items-center">
+                      <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-t-2 border-white"></div>
+                      <span className="text-white text-xs mt-1">Uploading...</span>
+                    </div>
+                  </div>
+                )}
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">
                   {profileData.personal.firstName} {profileData.personal.lastName}
                 </h1>
                 <p className="text-gray-600 flex items-center">
-                  <Zap size={16} className={`mr-1.5 text-${fullColor}`} />
+                  <Building size={16} className={`mr-1.5 text-${fullColor}`} />
                   {profileData.personal.position} • {profileData.location.name}
                 </p>
                 <div className="flex items-center mt-1 space-x-4 text-sm text-gray-500">
@@ -134,7 +417,6 @@ const AttendantProfile = () => {
                     <BadgeCheck size={14} className={`mr-1 text-${fullColor}`} />
                     ID: {profileData.personal.employeeId}
                   </span>
-                 
                 </div>
               </div>
             </div>
@@ -259,9 +541,21 @@ const AttendantProfile = () => {
                   <label className="block text-sm font-medium text-gray-700 mb-2">Employee ID</label>
                   <input
                     type="text"
-                    value={profileData.personal.employeeId}
-                    disabled
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-500"
+                    value={isEditing ? editedData.personal.employeeId : profileData.personal.employeeId}
+                    onChange={(e) => handleInputChange('personal', 'employeeId', e.target.value)}
+                    disabled={!isEditing}
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 disabled:bg-gray-100 disabled:text-gray-500`}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Position</label>
+                  <input
+                    type="text"
+                    value={isEditing ? editedData.personal.position : profileData.personal.position}
+                    onChange={(e) => handleInputChange('personal', 'position', e.target.value)}
+                    disabled={!isEditing}
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 disabled:bg-gray-100 disabled:text-gray-500`}
                   />
                 </div>
 
@@ -276,7 +570,19 @@ const AttendantProfile = () => {
                   />
                 </div>
 
-                <div className="md:col-span-2">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Shift</label>
+                  <input
+                    type="text"
+                    value={isEditing ? editedData.personal.shift : profileData.personal.shift}
+                    onChange={(e) => handleInputChange('personal', 'shift', e.target.value)}
+                    disabled={!isEditing}
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 disabled:bg-gray-100 disabled:text-gray-500`}
+                    placeholder="e.g., Morning, Evening, Night"
+                  />
+                </div>
+
+                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Hire Date</label>
                   <input
                     type="date"
@@ -286,139 +592,92 @@ const AttendantProfile = () => {
                     className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 disabled:bg-gray-100 disabled:text-gray-500`}
                   />
                 </div>
-              </div>
-            </div>
-          )}
-
-          {/* Work Details Tab */}
-          {activeTab === 'location' && (
-            <div className="space-y-6">
-              <h2 className="text-lg font-semibold text-gray-900 flex items-center">
-                <MapPin size={20} className={`mr-2 text-${themeColor}-600`} />
-                Work Details
-              </h2>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Assigned Location</label>
-                  <input
-                    type="text"
-                    value={profileData.location.name}
-                    disabled
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-500"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Location Manager</label>
-                  <input
-                    type="text"
-                    value={profileData.location.manager}
-                    disabled
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-500"
-                  />
-                </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Regular Shift</label>
-                  <input
-                    type="text"
-                    value={isEditing ? editedData.location.shift : profileData.location.shift}
-                    onChange={(e) => handleInputChange('location', 'shift', e.target.value)}
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+                  <select
+                    value={isEditing ? editedData.personal.status : profileData.personal.status}
+                    onChange={(e) => handleInputChange('personal', 'status', e.target.value)}
                     disabled={!isEditing}
                     className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 disabled:bg-gray-100 disabled:text-gray-500`}
-                  />
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Assigned Work Areas</label>
-                  <div className="flex flex-wrap gap-2">
-                    {profileData.location.assignedAreas.map((area, index) => (
-                      <span key={index} className={`px-3 py-1 bg-${themeColor}-100 text-${fullColor} rounded-full text-sm font-medium`}>
-                        {area}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="md:col-span-2">
-                  <h3 className="text-md font-medium text-gray-900 mb-3 flex items-center">
-                    <MapPin size={18} className={`mr-2 text-${themeColor}-600`} />
-                    Location Address
-                  </h3>
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <p className="text-gray-700">{profileData.location.address.street}</p>
-                    <p className="text-gray-700">{profileData.location.address.city}, {profileData.location.address.state} {profileData.location.address.zipCode}</p>
-                  </div>
+                  >
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                  </select>
                 </div>
               </div>
             </div>
           )}
 
-       
-          {/* Schedule Tab */}
-          {activeTab === 'schedule' && (
+          {/* Location Details Tab */}
+          {activeTab === 'location' && (
             <div className="space-y-6">
-              <h2 className="text-lg font-semibold text-gray-900 flex items-center">
-                <Calendar size={20} className={`mr-2 text-${themeColor}-600`} />
-                My Schedule
-              </h2>
-              
-              <div className="mb-6">
-                <h3 className="font-semibold text-gray-900 mb-4 flex items-center">
-                  <Clock size={18} className={`mr-2 text-${themeColor}-600`} />
-                  Current Week (September 16-22)
-                </h3>
-                <div className="space-y-3">
-                  {profileData.schedule.currentWeek.map((day, index) => (
-                    <div key={index} className={`flex justify-between items-center p-3 rounded-lg border ${
-                      day.shift === 'OFF' 
-                        ? 'bg-gray-50 border-gray-200' 
-                        : `bg-${themeColor}-50 border-${themeColor}-200`
-                    }`}>
-                      <div className="flex items-center space-x-4">
-                        <div className="w-20 font-medium text-gray-700">{day.day}</div>
-                        <div className="text-sm text-gray-500">{new Date(day.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
-                      </div>
-                      <div className="text-right">
-                        <div className={`font-medium ${
-                          day.shift === 'OFF' ? 'text-gray-600' : `text-${themeColor}-700`
-                        }`}>
-                          {day.shift}
-                        </div>
-                        {day.area && <div className="text-sm text-gray-600">{day.area}</div>}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-gray-900 flex items-center">
+                  <Building size={20} className={`mr-2 text-${themeColor}-600`} />
+                  Location Information
+                </h2>
+                <span className={`px-3 py-1.5 rounded-lg text-sm font-medium ${
+                  profileData.location.isActive 
+                    ? `bg-green-100 text-green-700 border border-green-200` 
+                    : 'bg-gray-100 text-gray-700 border border-gray-200'
+                }`}>
+                  {profileData.location.isActive ? 'Active' : 'Inactive'}
+                </span>
               </div>
 
-              <div>
-                <h3 className="font-semibold text-gray-900 mb-4 flex items-center">
-                  <Clock size={18} className={`mr-2 text-${themeColor}-600`} />
-                  Next Week (September 23-29)
-                </h3>
-                <div className="space-y-3">
-                  {profileData.schedule.nextWeek.map((day, index) => (
-                    <div key={index} className={`flex justify-between items-center p-3 rounded-lg border ${
-                      day.shift === 'OFF' 
-                        ? 'bg-gray-50 border-gray-200' 
-                        : `bg-${themeColor}-50 border-${themeColor}-200`
-                    }`}>
-                      <div className="flex items-center space-x-4">
-                        <div className="w-20 font-medium text-gray-700">{day.day}</div>
-                        <div className="text-sm text-gray-500">{new Date(day.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
-                      </div>
-                      <div className="text-right">
-                        <div className={`font-medium ${
-                          day.shift === 'OFF' ? 'text-gray-600' : `text-${themeColor}-700`
-                        }`}>
-                          {day.shift}
+              <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
+                <div className="space-y-6">
+                  {/* Location Name */}
+                  <div>
+                    <h3 className="text-base font-semibold text-gray-900 mb-1">{profileData.location.name}</h3>
+                    <p className="text-sm text-gray-500">Assigned Location</p>
+                  </div>
+
+                  <div className="border-t border-gray-300 pt-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* Email */}
+                      <div className="flex items-start space-x-3">
+                        <Mail size={18} className={`text-${themeColor}-600 mt-0.5`} />
+                        <div>
+                          <p className="text-sm font-medium text-gray-500">Email</p>
+                          <p className="text-gray-900 mt-0.5">{profileData.location.email}</p>
                         </div>
-                        {day.area && <div className="text-sm text-gray-600">{day.area}</div>}
+                      </div>
+
+                      {/* Phone */}
+                      <div className="flex items-start space-x-3">
+                        <Phone size={18} className={`text-${themeColor}-600 mt-0.5`} />
+                        <div>
+                          <p className="text-sm font-medium text-gray-500">Phone</p>
+                          <p className="text-gray-900 mt-0.5">{profileData.location.phone}</p>
+                        </div>
+                      </div>
+
+                      {/* Address */}
+                      <div className="flex items-start space-x-3 md:col-span-2">
+                        <MapPin size={18} className={`text-${themeColor}-600 mt-0.5`} />
+                        <div>
+                          <p className="text-sm font-medium text-gray-500">Address</p>
+                          <p className="text-gray-900 mt-0.5">
+                            {profileData.location.address.street}<br />
+                            {profileData.location.address.city}, {profileData.location.address.state} {profileData.location.address.zipCode}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Timezone */}
+                      <div className="flex items-start space-x-3">
+                        <svg className={`w-[18px] h-[18px] text-${themeColor}-600 mt-0.5`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <div>
+                          <p className="text-sm font-medium text-gray-500">Timezone</p>
+                          <p className="text-gray-900 mt-0.5">{profileData.location.timezone}</p>
+                        </div>
                       </div>
                     </div>
-                  ))}
+                  </div>
                 </div>
               </div>
             </div>

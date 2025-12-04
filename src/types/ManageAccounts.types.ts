@@ -11,7 +11,7 @@ export interface ManageAccountsAccount {
   employeeId: string;
   department: string;
   location: string;
-  userType: 'attendant' | 'manager';
+  userType: 'attendant' | 'manager' | 'company_admin';
   shift?: string;
   assignedAreas?: string[];
   status: 'active' | 'inactive';
@@ -35,8 +35,8 @@ export interface ManageAccountsFilterOptions {
 export interface ManageAccountsInvitationModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSendInvitation: (email: string, userType: 'attendant' | 'manager') => void;
+  onSendInvitation: (email: string, userType: 'attendant' | 'manager' | 'company_admin') => void;
   loading?: boolean;
   defaultEmail?: string;
-  defaultUserType?: 'attendant' | 'manager';
+  defaultUserType?: 'attendant' | 'manager' | 'company_admin';
 }

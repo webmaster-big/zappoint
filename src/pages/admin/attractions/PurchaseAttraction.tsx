@@ -12,9 +12,17 @@ import {
   ShoppingCart
 } from 'lucide-react';
 import type { PurchaseAttractionAttraction, PurchaseAttractionCustomerInfo } from '../../../types/PurchaseAttraction.types';
+import { attractionService } from '../../../services/AttractionService';
+import { attractionPurchaseService } from '../../../services/AttractionPurchaseService';
+import { customerService, type Customer } from '../../../services/CustomerService';
+import { generatePurchaseQRCode } from '../../../utils/qrcode';
+import Toast from '../../../components/ui/Toast';
+import { ASSET_URL } from '../../../utils/storage';
+import { loadAcceptJS, processCardPayment, validateCardNumber, formatCardNumber, getCardType } from '../../../services/PaymentService';
+import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
 
 const PurchaseAttraction = () => {
-  const { id } = useParams<{ id: string }>();
+  const { location, id } = useParams<{ location: string; id: string }>();
   const navigate = useNavigate();
   const [attraction, setAttraction] = useState<PurchaseAttractionAttraction | null>(null);
   const [loading, setLoading] = useState(true);
@@ -25,31 +33,175 @@ const PurchaseAttraction = () => {
     email: '',
     phone: ''
   });
-  const [paymentMethod, setPaymentMethod] = useState('credit_card');
   const [currentStep, setCurrentStep] = useState(1);
   const [purchaseComplete, setPurchaseComplete] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  
+  // Payment card details
+  const [cardNumber, setCardNumber] = useState('');
+  const [cardMonth, setCardMonth] = useState('');
+  const [cardYear, setCardYear] = useState('');
+  const [cardCVV, setCardCVV] = useState('');
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [paymentError, setPaymentError] = useState('');
+  const [authorizeApiLoginId, setAuthorizeApiLoginId] = useState('');
+  const [authorizeEnvironment, setAuthorizeEnvironment] = useState<'sandbox' | 'production'>('sandbox');
+  const [showNoAuthAccountModal, setShowNoAuthAccountModal] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const [qrCodeImage, setQrCodeImage] = useState<string | null>(null);
+  const [showQRModal, setShowQRModal] = useState(false);
+  const [purchaseId, setPurchaseId] = useState<number | null>(null);
+  const [foundCustomers, setFoundCustomers] = useState<Customer[]>([]);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null);
+  const [searchingCustomer, setSearchingCustomer] = useState(false);
+  const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
 
-  // Load attraction data
+  // Auto-fill form if customer is logged in
   useEffect(() => {
-    const loadAttraction = () => {
+    const fetchCustomerData = async () => {
       try {
-        const attractions = JSON.parse(localStorage.getItem('zapzone_attractions') || '[]');
-        const foundAttraction = attractions.find((a: PurchaseAttractionAttraction) => a.id === id);
-        
-        if (foundAttraction) {
-          setAttraction(foundAttraction);
-        } else {
-          navigate('/attractions');
+        const customerData = localStorage.getItem('zapzone_customer');
+        if (customerData) {
+          const customer = JSON.parse(customerData);
+          if (customer.id) {
+            // Fetch fresh customer data from API
+            const response = await customerService.getCustomerById(customer.id);
+            if (response.success && response.data) {
+              const data = response.data;
+              setCustomerInfo({
+                firstName: data.first_name || '',
+                lastName: data.last_name || '',
+                email: data.email || '',
+                phone: data.phone || ''
+              });
+              setSelectedCustomerId(customer.id);
+            }
+          }
         }
       } catch (error) {
+        console.error('Error fetching customer data:', error);
+      }
+    };
+    
+    fetchCustomerData();
+  }, []);
+
+  // Load attraction data from backend
+  useEffect(() => {
+    const loadAttraction = async () => {
+      if (!id) {
+        navigate('/');
+        return;
+      }
+
+      try {
+        setLoading(true);
+        
+        // If location parameter exists, use it (future enhancement for location-based filtering)
+        // For now, we fetch by ID directly
+        const response = await attractionService.getAttraction(Number(id));
+        const attr = response.data;
+        
+        // Convert API format to component format
+        const convertedAttraction: PurchaseAttractionAttraction = {
+          id: attr.id.toString(),
+          name: attr.name,
+          description: attr.description,
+          category: attr.category,
+          price: attr.price,
+          pricingType: attr.pricing_type as 'per_person' | 'fixed' | 'per_group' | 'per_hour' | 'per_game',
+          maxCapacity: attr.max_capacity,
+          duration: attr.duration?.toString() || '',
+          durationUnit: attr.duration_unit || 'minutes',
+          location: attr.location?.name || location || '', // Use attraction's location or URL param
+          locationId: attr.location?.id || attr.location_id, // Store location_id from API
+          images: attr.image ? (Array.isArray(attr.image) ? attr.image.map(img => ASSET_URL + img) : [ASSET_URL + attr.image]) : [],
+          status: attr.is_active ? 'active' : 'inactive',
+          createdAt: attr.created_at,
+          availability: typeof attr.availability === 'object' ? attr.availability as Record<string, boolean> : {},
+        };
+        console.log('Loaded attraction:', convertedAttraction);
+        setAttraction(convertedAttraction);
+      } catch (error) {
         console.error('Error loading attraction:', error);
+        setToast({ message: 'Failed to load attraction', type: 'error' });
+        navigate('/');
       } finally {
         setLoading(false);
       }
     };
 
     loadAttraction();
-  }, [id, navigate]);
+  }, [id, location, navigate]);
+
+  // Initialize Authorize.Net
+  useEffect(() => {
+    const initializeAuthorizeNet = async () => {
+      try {
+        const locationId = attraction.locationId || 1;
+        const response = await getAuthorizeNetPublicKey(locationId);
+        if (response.success && response.data) {
+          setAuthorizeApiLoginId(response.data.api_login_id);
+        } else {
+          setShowNoAuthAccountModal(true);
+        }
+        await loadAcceptJS(authorizeEnvironment);
+        console.log('✅ Accept.js loaded successfully');
+      } catch (error: any) {
+        console.error('❌ Failed to initialize Authorize.Net:', error);
+        if (error.response?.data?.message?.includes('No active Authorize.Net account')) {
+          setShowNoAuthAccountModal(true);
+        }
+      }
+    };
+    initializeAuthorizeNet();
+  }, [authorizeEnvironment]);
+
+  // Debounced customer search by email
+  useEffect(() => {
+    const searchCustomer = async () => {
+      const email = customerInfo.email.trim();
+      
+      if (!email || email.length < 3) {
+        setFoundCustomers([]);
+        setShowCustomerDropdown(false);
+        setSelectedCustomerId(null);
+        return;
+      }
+
+      try {
+        setSearchingCustomer(true);
+        const response = await customerService.searchCustomers(email);
+        setFoundCustomers(response.data);
+        setShowCustomerDropdown(response.data.length > 0);
+        
+        // Auto-select if exact email match
+        const exactMatch = response.data.find(c => c.email.toLowerCase() === email.toLowerCase());
+        if (exactMatch) {
+          setSelectedCustomerId(exactMatch.id);
+          setCustomerInfo(prev => ({
+            ...prev,
+            firstName: exactMatch.first_name,
+            lastName: exactMatch.last_name,
+            phone: exactMatch.phone || prev.phone,
+          }));
+        } else {
+          setSelectedCustomerId(null);
+        }
+      } catch (error) {
+        console.error('Error searching customer:', error);
+        setFoundCustomers([]);
+        setShowCustomerDropdown(false);
+        setSelectedCustomerId(null);
+      } finally {
+        setSearchingCustomer(false);
+      }
+    };
+
+    // Debounce search by 500ms
+    const timeoutId = setTimeout(searchCustomer, 500);
+    return () => clearTimeout(timeoutId);
+  }, [customerInfo.email]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -57,6 +209,30 @@ const PurchaseAttraction = () => {
       ...prev,
       [name]: value
     }));
+    
+    // Reset customer selection when email changes
+    if (name === 'email') {
+      setSelectedCustomerId(null);
+    }
+  };
+
+  const handleSelectCustomer = (customer: Customer) => {
+    setSelectedCustomerId(customer.id);
+    setCustomerInfo({
+      firstName: customer.first_name,
+      lastName: customer.last_name,
+      email: customer.email,
+      phone: customer.phone || '',
+    });
+    setShowCustomerDropdown(false);
+  };
+
+  const handleCardNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatCardNumber(e.target.value);
+    if (formatted.replace(/\s/g, '').length <= 16) {
+      setCardNumber(formatted);
+      setPaymentError('');
+    }
   };
 
   const calculateTotal = () => {
@@ -64,46 +240,116 @@ const PurchaseAttraction = () => {
     
     let total = parseFloat(attraction.price.toString());
     
-    // Apply pricing logic based on pricing type
-    if (attraction.pricingType === 'per_person') {
       total = total * quantity;
-    }
-    // For other pricing types, the price is fixed regardless of quantity
     
     return total;
   };
 
-  const handlePurchase = () => {
+  const handlePurchase = async () => {
     if (!attraction) return;
 
-    // Create purchase object
-    const purchase = {
-      id: `purchase_${Date.now()}`,
-      type: 'attraction' as const,
-      attractionName: attraction.name,
-      customerName: `${customerInfo.firstName} ${customerInfo.lastName}`,
-      email: customerInfo.email,
-      phone: customerInfo.phone,
-      quantity: quantity,
-      status: 'confirmed' as const,
-      totalAmount: calculateTotal(),
-      createdAt: new Date().toISOString(),
-      paymentMethod: paymentMethod,
-      duration: `${attraction.duration} ${attraction.durationUnit}`,
-      activity: attraction.name
-    };
-    
-    // Save to localStorage
-    const existingPurchases = JSON.parse(localStorage.getItem('zapzone_purchases') || '[]');
-    localStorage.setItem('zapzone_purchases', JSON.stringify([...existingPurchases, purchase]));
-    
-    setPurchaseComplete(true);
-    setCurrentStep(4); // Move to confirmation step
+    // Validate card information
+    if (!cardNumber || !cardMonth || !cardYear || !cardCVV) {
+      setPaymentError('Please fill in all card details');
+      return;
+    }
+    if (!validateCardNumber(cardNumber)) {
+      setPaymentError('Invalid card number');
+      return;
+    }
+    if (!authorizeApiLoginId) {
+      setPaymentError('Payment system not initialized. Please refresh the page.');
+      return;
+    }
 
-    // Show confirmation message
-    setTimeout(() => {
-      window.alert("Purchase confirmed!\nYour tickets for " + attraction.name + " have been purchased.");
-    }, 300);
+    try {
+      setSubmitting(true);
+      setIsProcessingPayment(true);
+      setPaymentError('');
+
+      const totalAmount = calculateTotal();
+      let transactionId: string | undefined;
+
+      // Process card payment
+      console.log('💳 Processing payment...');
+      
+      const cardData = {
+        cardNumber: cardNumber.replace(/\s/g, ''),
+        month: cardMonth,
+        year: cardYear,
+        cardCode: cardCVV,
+      };
+      
+      const paymentData = {
+        location_id: attraction.locationId || 1, // Use attraction's location_id or default to 1
+        amount: totalAmount,
+        order_id: `ATTR-${attraction.id}-${Date.now()}`,
+        description: `Attraction Purchase: ${attraction.name}`,
+      };
+      
+      const paymentResponse = await processCardPayment(
+        cardData,
+        paymentData,
+        authorizeApiLoginId
+      );
+      
+      if (!paymentResponse.success) {
+        throw new Error(paymentResponse.message || 'Payment failed');
+      }
+      
+      transactionId = paymentResponse.transaction_id;
+      console.log('✅ Payment successful:', transactionId);
+
+      // Create purchase data matching backend Payment model
+      const purchaseData = {
+        attraction_id: Number(attraction.id),
+        customer_id: selectedCustomerId || undefined,
+        guest_name: `${customerInfo.firstName} ${customerInfo.lastName}`,
+        guest_email: customerInfo.email,
+        guest_phone: customerInfo.phone || undefined,
+        quantity: quantity,
+        amount: totalAmount,
+        currency: 'USD',
+        method: 'card',
+        status: 'completed',
+        payment_id: transactionId,
+        location_id: attraction.locationId || 1, // Use attraction's location_id from API
+        purchase_date: new Date().toISOString().split('T')[0],
+        notes: `Attraction Purchase: ${attraction.name} (${quantity} ticket${quantity > 1 ? 's' : ''})`,
+        // transaction_id is auto-generated by backend
+      };
+
+      // Create purchase via API
+      const response = await attractionPurchaseService.createPurchase(purchaseData);
+      const createdPurchase = response.data;
+
+      setPurchaseId(createdPurchase.id);
+
+      // Generate QR code
+      const qrData = await generatePurchaseQRCode(createdPurchase.id);
+      setQrCodeImage(qrData);
+
+      // Send receipt email with QR code
+      try {
+        await attractionPurchaseService.sendReceipt(createdPurchase.id, qrData);
+        setToast({ message: 'Purchase completed! Receipt sent to your email.', type: 'success' });
+      } catch (emailError) {
+        console.error('Error sending email:', emailError);
+        setToast({ message: 'Purchase completed! (Email failed to send)', type: 'info' });
+      }
+
+      setPurchaseComplete(true);
+      setCurrentStep(4);
+      setShowQRModal(true);
+
+    } catch (error: any) {
+      console.error('❌ Payment/Purchase error:', error);
+      setPaymentError(error.message || 'Payment processing failed. Please try again.');
+      setToast({ message: error.message || 'Failed to complete purchase. Please try again.', type: 'error' });
+    } finally {
+      setSubmitting(false);
+      setIsProcessingPayment(false);
+    }
   };
 
   if (loading) {
@@ -120,7 +366,7 @@ const PurchaseAttraction = () => {
         <div className="text-center">
           <h2 className="text-2xl font-bold text-gray-900">Attraction not found</h2>
           <button 
-            onClick={() => navigate('/attractions')}
+            onClick={() => navigate('/')}
             className="mt-4 text-blue-800 hover:text-blue-800"
           >
             Back to Attractions
@@ -132,18 +378,18 @@ const PurchaseAttraction = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
           {/* Left Column - Purchase Form */}
           <div className="lg:col-span-2">
             <div className="bg-white shadow-sm rounded-lg overflow-hidden">
               {/* Progress Steps */}
               <div className="border-b border-gray-200">
-                <div className="px-6 py-4">
+                <div className="px-4 md:px-6 py-3 md:py-4">
                   <div className="flex items-center justify-between mb-2">
                     {[1, 2, 3, 4].map(step => (
                       <div key={step} className="flex items-center">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                        <div className={`w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center text-xs md:text-sm ${
                           currentStep >= step 
                             ? 'bg-blue-800 text-white' 
                             : 'bg-gray-200 text-gray-500'
@@ -151,54 +397,62 @@ const PurchaseAttraction = () => {
                           {step}
                         </div>
                         {step < 4 && (
-                          <div className={`w-16 h-1 mx-2 ${currentStep > step ? 'bg-blue-800' : 'bg-gray-200'}`}></div>
+                          <div className={`w-8 md:w-16 h-1 mx-1 md:mx-2 ${currentStep > step ? 'bg-blue-800' : 'bg-gray-200'}`}></div>
                         )}
                       </div>
                     ))}
                   </div>
                   <div className="flex justify-between text-xs text-gray-500">
-                    <span>Quantity</span>
-                    <span>Your Info</span>
+                    <span className="hidden sm:inline">Quantity</span>
+                    <span className="sm:hidden">Qty</span>
+                    <span className="hidden sm:inline">Your Info</span>
+                    <span className="sm:hidden">Info</span>
                     <span>Payment</span>
-                    <span>Confirmation</span>
+                    <span className="hidden sm:inline">Confirmation</span>
+                    <span className="sm:hidden">Done</span>
                   </div>
                 </div>
               </div>
 
               {/* Step 1: Quantity Selection */}
               {currentStep === 1 && (
-                <div className="p-6">
-                  <h2 className="text-xl font-semibold text-gray-900 mb-6">Select Quantity</h2>
+                <div className="p-4 md:p-6 space-y-4 md:space-y-6">
+                  <div>
+                    <h2 className="text-lg md:text-xl font-semibold text-gray-900 mb-1">Select Quantity</h2>
+                    <p className="text-xs md:text-sm text-gray-600">How many tickets would you like to purchase?</p>
+                  </div>
                   
-                  <div className="mb-6">
-                    <label className="block text-sm font-medium text-gray-800 mb-4">
-                      <ShoppingCart className="inline h-5 w-5 mr-1 text-blue-800" />
-                      How many tickets?
-                    </label>
-                    <div className="flex items-center justify-center space-x-4">
+                  <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 rounded-xl p-6 md:p-8">
+                    <div className="flex items-center justify-center mb-4">
+                      <ShoppingCart className="h-8 w-8 md:h-10 md:w-10 text-blue-600" />
+                    </div>
+                    <div className="flex items-center justify-center space-x-6 md:space-x-8">
                       <button
                         onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                        className="w-12 h-12 rounded-full bg-gray-100 text-gray-800 flex items-center justify-center text-xl hover:bg-gray-200"
+                        className="w-12 h-12 md:w-14 md:h-14 rounded-full bg-white shadow-md text-gray-800 flex items-center justify-center text-xl md:text-2xl font-bold hover:bg-gray-50 hover:shadow-lg transition-all active:scale-95"
+                        disabled={quantity <= 1}
                       >
-                        -
+                        −
                       </button>
-                      <span className="text-2xl font-bold w-12 text-center">{quantity}</span>
+                      <div className="text-center">
+                        <div className="text-4xl md:text-5xl font-bold text-blue-800 mb-1">{quantity}</div>
+                        <div className="text-xs md:text-sm text-gray-600">{quantity === 1 ? 'ticket' : 'tickets'}</div>
+                      </div>
                       <button
                         onClick={() => setQuantity(quantity + 1)}
-                        className="w-12 h-12 rounded-full bg-gray-100 text-gray-800 flex items-center justify-center text-xl hover:bg-gray-200"
+                        className="w-12 h-12 md:w-14 md:h-14 rounded-full bg-white shadow-md text-gray-800 flex items-center justify-center text-xl md:text-2xl font-bold hover:bg-gray-50 hover:shadow-lg transition-all active:scale-95"
                       >
                         +
                       </button>
                     </div>
-                    {/* No max participants limit */}
                   </div>
                   
                   <div className="flex justify-end">
                     <button
                       onClick={() => setCurrentStep(2)}
-                      className="bg-blue-800 text-white px-6 py-2 rounded-lg hover:bg-blue-800"
+                      className="py-2.5 md:py-3 px-6 md:px-8 rounded-lg bg-blue-800 text-white font-medium hover:bg-blue-900 transition shadow-sm hover:shadow-md text-sm md:text-base"
                     >
-                      Continue
+                      Continue →
                     </button>
                   </div>
                 </div>
@@ -206,79 +460,122 @@ const PurchaseAttraction = () => {
 
               {/* Step 2: Customer Information */}
               {currentStep === 2 && (
-                <div className="p-6">
-                  <h2 className="text-xl font-semibold text-gray-900 mb-6">Your Information</h2>
+                <div className="p-4 md:p-6 space-y-4 md:space-y-6">
+                  <div>
+                    <h2 className="text-lg md:text-xl font-semibold text-gray-900 mb-1">Your Information</h2>
+                    <p className="text-xs md:text-sm text-gray-600">Please provide your contact details for ticket delivery</p>
+                  </div>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-800 mb-2">
-                        First Name *
-                      </label>
-                      <input
-                        type="text"
-                        name="firstName"
-                        value={customerInfo.firstName}
-                        onChange={handleInputChange}
-                        className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        required
-                      />
-                    </div>
-                    
-                    <div>
-                      <label className="block text-sm font-medium text-gray-800 mb-2">
-                        Last Name *
-                      </label>
-                      <input
-                        type="text"
-                        name="lastName"
-                        value={customerInfo.lastName}
-                        onChange={handleInputChange}
-                        className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        required
-                      />
-                    </div>
-                    
-                    <div>
-                      <label className="block text-sm font-medium text-gray-800 mb-2">
-                        Email Address *
+                  <div className="space-y-4">
+                    <div className="relative">
+                      <label className="block text-sm font-medium text-gray-900 mb-2">
+                        Email Address <span className="text-red-500">*</span>
+                        {selectedCustomerId && <span className="ml-2 text-green-600 text-xs font-normal">✓ Existing customer found</span>}
                       </label>
                       <input
                         type="email"
                         name="email"
                         value={customerInfo.email}
                         onChange={handleInputChange}
-                        className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        onFocus={() => foundCustomers.length > 0 && setShowCustomerDropdown(true)}
+                        onBlur={() => setTimeout(() => setShowCustomerDropdown(false), 200)}
+                        placeholder="john.doe@example.com"
+                        className={`w-full border rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition ${
+                          selectedCustomerId ? 'border-green-400 bg-green-50' : 'border-gray-300'
+                        }`}
                         required
                       />
+                      {searchingCustomer && (
+                        <div className="absolute right-3 top-11 text-gray-400">
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-400"></div>
+                        </div>
+                      )}
+                      
+                      {/* Customer Dropdown */}
+                      {showCustomerDropdown && foundCustomers.length > 0 && (
+                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                          {foundCustomers.map((customer) => (
+                            <div
+                              key={customer.id}
+                              onClick={() => handleSelectCustomer(customer)}
+                              className={`p-3 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition ${
+                                selectedCustomerId === customer.id ? 'bg-green-50' : ''
+                              }`}
+                            >
+                              <div className="font-medium text-gray-900">
+                                {customer.first_name} {customer.last_name}
+                              </div>
+                              <div className="text-sm text-gray-600">{customer.email}</div>
+                              {customer.phone && (
+                                <div className="text-xs text-gray-500">{customer.phone}</div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-900 mb-2">
+                          First Name <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          name="firstName"
+                          value={customerInfo.firstName}
+                          onChange={handleInputChange}
+                          placeholder="John"
+                          className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition"
+                          required
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-900 mb-2">
+                          Last Name <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          name="lastName"
+                          value={customerInfo.lastName}
+                          onChange={handleInputChange}
+                          placeholder="Doe"
+                          className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition"
+                          required
+                        />
+                      </div>
                     </div>
                     
                     <div>
-                      <label className="block text-sm font-medium text-gray-800 mb-2">
-                        Phone Number
+                      <label className="block text-sm font-medium text-gray-900 mb-2">
+                        Phone Number <span className="text-gray-500 text-xs">(Optional)</span>
                       </label>
                       <input
                         type="tel"
                         name="phone"
                         value={customerInfo.phone}
                         onChange={handleInputChange}
-                        className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="+1 (555) 123-4567"
+                        className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition"
                       />
                     </div>
                   </div>
                   
-                  <div className="flex justify-between">
+                  <div className="flex justify-between gap-2 pt-4">
                     <button
                       onClick={() => setCurrentStep(1)}
-                      className="bg-gray-200 text-gray-800 px-6 py-2 rounded-lg hover:bg-gray-300"
+                      className="py-2.5 md:py-3 px-4 md:px-6 rounded-lg bg-gray-100 text-gray-700 font-medium hover:bg-gray-200 transition text-sm md:text-base"
                     >
-                      Back
+                      <span className="sm:hidden">←</span>
+                      <span className="hidden sm:inline">← Back</span>
                     </button>
                     <button
                       onClick={() => setCurrentStep(3)}
                       disabled={!customerInfo.firstName || !customerInfo.lastName || !customerInfo.email}
-                      className="bg-blue-800 text-white px-6 py-2 rounded-lg hover:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="py-2.5 md:py-3 px-6 md:px-8 rounded-lg bg-blue-800 text-white font-medium hover:bg-blue-900 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md text-sm md:text-base"
                     >
-                      Continue to Payment
+                      Continue to Payment →
                     </button>
                   </div>
                 </div>
@@ -286,61 +583,174 @@ const PurchaseAttraction = () => {
 
               {/* Step 3: Payment Method */}
               {currentStep === 3 && (
-                <div className="p-6">
-                  <h2 className="text-xl font-semibold text-gray-900 mb-6">Payment Method</h2>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                    <div 
-                      className={`border-2 rounded-lg p-4 cursor-pointer ${
-                        paymentMethod === 'credit_card' 
-                          ? 'border-blue-800 bg-blue-50' 
-                          : 'border-gray-300 hover:border-gray-400'
-                      }`}
-                      onClick={() => setPaymentMethod('credit_card')}
-                    >
-                      <div className="flex items-center">
-                        <CreditCard className="h-6 w-6 mr-2 text-gray-800" />
-                        <span className="font-medium">Credit/Debit Card</span>
+                <div className="p-4 md:p-6 space-y-4 md:space-y-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <h2 className="text-base md:text-lg font-semibold text-gray-900">Payment Information</h2>
+                      <p className="text-xs md:text-sm text-gray-600 mt-0.5 md:mt-1">Secure payment powered by Authorize.Net</p>
+                    </div>
+                    <div className="flex gap-1.5 md:gap-2">
+                      <img src="https://upload.wikimedia.org/wikipedia/commons/5/5e/Visa_Inc._logo.svg" alt="Visa" className="h-4 md:h-5 lg:h-6 opacity-80" />
+                      <img src="https://upload.wikimedia.org/wikipedia/commons/2/2a/Mastercard-logo.svg" alt="Mastercard" className="h-4 md:h-5 lg:h-6 opacity-80" />
+                      <img src="https://upload.wikimedia.org/wikipedia/commons/f/fa/American_Express_logo_%282018%29.svg" alt="Amex" className="h-4 md:h-5 lg:h-6 opacity-80" />
+                      <img src="https://upload.wikimedia.org/wikipedia/commons/5/57/Discover_Card_logo.svg" alt="Discover" className="h-4 md:h-5 lg:h-6 opacity-80" />
+                    </div>
+                  </div>
+
+                  {/* Card Form */}
+                  <div className="space-y-4">
+                    {/* Card Number */}
+                    <div>
+                      <label className="block font-medium mb-2 text-gray-800 text-xs md:text-sm">Card Number</label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={cardNumber}
+                          onChange={handleCardNumberChange}
+                          placeholder="1234 5678 9012 3456"
+                          className={`w-full rounded-lg border px-3 md:px-4 py-2.5 md:py-3 text-xs md:text-sm font-mono focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition ${
+                            cardNumber && validateCardNumber(cardNumber)
+                              ? 'border-green-400 bg-green-50'
+                              : cardNumber
+                              ? 'border-red-400'
+                              : 'border-gray-300'
+                          }`}
+                          maxLength={19}
+                          disabled={isProcessingPayment}
+                        />
+                        {cardNumber && validateCardNumber(cardNumber) && (
+                          <div className="absolute right-2 md:right-3 top-1/2 -translate-y-1/2">
+                            <svg className="w-4 h-4 md:w-5 md:h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path>
+                            </svg>
+                          </div>
+                        )}
                       </div>
-                      <p className="text-sm text-gray-500 mt-1">Pay securely with your card</p>
+                      {cardNumber && (
+                        <p className="text-xs mt-2 text-gray-600">{getCardType(cardNumber)}</p>
+                      )}
                     </div>
                     
-                    <div 
-                      className={`border-2 rounded-lg p-4 cursor-pointer ${
-                        paymentMethod === 'paypal' 
-                          ? 'border-blue-800 bg-blue-50' 
-                          : 'border-gray-300 hover:border-gray-400'
-                      }`}
-                      onClick={() => setPaymentMethod('paypal')}
-                    >
-                      <div className="flex items-center">
-                        <Wallet className="h-6 w-6 mr-2 text-blue-800" />
-                        <span className="font-medium">PayPal</span>
+                    {/* Expiration and CVV */}
+                    <div className="grid grid-cols-3 gap-2 md:gap-4">
+                      <div>
+                        <label className="block font-medium mb-2 text-gray-800 text-xs md:text-sm">Exp Month</label>
+                        <select
+                          value={cardMonth}
+                          onChange={(e) => setCardMonth(e.target.value)}
+                          className="w-full rounded-lg border border-gray-300 px-2 md:px-4 py-2.5 md:py-3 text-xs md:text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                          disabled={isProcessingPayment}
+                        >
+                          <option value="">MM</option>
+                          {Array.from({ length: 12 }, (_, i) => {
+                            const month = (i + 1).toString().padStart(2, '0');
+                            return <option key={month} value={month}>{month}</option>;
+                          })}
+                        </select>
                       </div>
-                      <p className="text-sm text-gray-500 mt-1">Pay with your PayPal account</p>
+                      <div>
+                        <label className="block font-medium mb-2 text-gray-800 text-xs md:text-sm">Exp Year</label>
+                        <select
+                          value={cardYear}
+                          onChange={(e) => setCardYear(e.target.value)}
+                          className="w-full rounded-lg border border-gray-300 px-2 md:px-4 py-2.5 md:py-3 text-xs md:text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                          disabled={isProcessingPayment}
+                        >
+                          <option value="">YYYY</option>
+                          {Array.from({ length: 10 }, (_, i) => {
+                            const year = (new Date().getFullYear() + i).toString();
+                            return <option key={year} value={year}>{year}</option>;
+                          })}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block font-medium mb-2 text-gray-800 text-xs md:text-sm">CVV</label>
+                        <input
+                          type="text"
+                          value={cardCVV}
+                          onChange={(e) => {
+                            const value = e.target.value.replace(/\D/g, '');
+                            if (value.length <= 4) {
+                              setCardCVV(value);
+                            }
+                          }}
+                          placeholder="123"
+                          className="w-full rounded-lg border border-gray-300 px-2 md:px-4 py-2.5 md:py-3 text-xs md:text-sm font-mono focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                          maxLength={4}
+                          disabled={isProcessingPayment}
+                        />
+                      </div>
+                    </div>
+                    
+                    {/* Error Message */}
+                    {paymentError && (
+                      <div className="bg-red-50 border border-red-200 rounded-lg p-2.5 md:p-3 text-xs md:text-sm text-red-800 flex items-start gap-2">
+                        <svg className="w-4 h-4 md:w-5 md:h-5 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd"></path>
+                        </svg>
+                        <span>{paymentError}</span>
+                      </div>
+                    )}
+                    
+                    {/* Security Notice */}
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-2.5 md:p-3 flex items-start gap-2">
+                      <svg className="w-4 h-4 md:w-5 md:h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd"></path>
+                      </svg>
+                      <div className="text-xs md:text-sm text-blue-900">
+                        <p className="font-semibold">Secure Payment</p>
+                        <p className="text-[10px] md:text-xs text-blue-800 mt-0.5">256-bit SSL encrypted • PCI compliant • Powered by Authorize.Net</p>
+                      </div>
                     </div>
                   </div>
                   
-                  <div className="flex justify-between">
+                  <div className="flex justify-between gap-2 pt-2">
                     <button
                       onClick={() => setCurrentStep(2)}
-                      className="bg-gray-200 text-gray-800 px-6 py-2 rounded-lg hover:bg-gray-300"
+                      disabled={submitting}
+                      className="py-2.5 md:py-3 px-3 md:px-6 rounded-lg bg-gray-200 text-gray-800 font-medium hover:bg-gray-300 transition disabled:opacity-50 disabled:cursor-not-allowed text-xs md:text-base"
                     >
-                      Back
+                      <span className="sm:hidden">←</span>
+                      <span className="hidden sm:inline">← Back</span>
                     </button>
                     <button
                       onClick={handlePurchase}
-                      className="bg-blue-800 text-white px-6 py-2 rounded-lg hover:bg-blue-800"
+                      disabled={submitting || !cardNumber || !cardMonth || !cardYear || !cardCVV || !validateCardNumber(cardNumber)}
+                      className="py-2.5 md:py-3 px-3 md:px-6 rounded-lg bg-blue-800 text-white font-medium hover:bg-blue-900 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center text-xs md:text-base shadow-sm hover:shadow-md"
                     >
-                      Complete Purchase
+                      {isProcessingPayment ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 md:h-5 md:w-5 border-b-2 border-white mr-1.5 md:mr-2"></div>
+                          <span className="hidden sm:inline">Processing Payment...</span>
+                          <span className="sm:hidden">Processing...</span>
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-4 h-4 md:w-5 md:h-5 mr-1.5 md:mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                          </svg>
+                          {submitting ? (
+                            <>
+                              <span className="hidden sm:inline">Processing...</span>
+                              <span className="sm:hidden">Wait...</span>
+                            </>
+                          ) : (
+                            <>
+                              <span className="hidden sm:inline">Pay ${calculateTotal().toFixed(2)}</span>
+                              <span className="sm:hidden">${calculateTotal().toFixed(2)}</span>
+                            </>
+                          )}
+                        </>
+                      )}
                     </button>
                   </div>
                 </div>
+
               )}
 
               {/* Step 4: Confirmation */}
               {currentStep === 4 && purchaseComplete && (
-                <div className="p-6 text-center">
+                <div className="p-4 md:p-6 text-center">
                   <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
                   <h2 className="text-2xl font-bold text-gray-900 mb-2">Purchase Confirmed!</h2>
                   <p className="text-gray-800 mb-6">
@@ -351,7 +761,7 @@ const PurchaseAttraction = () => {
                     <h3 className="font-semibold text-gray-900 mb-2">Purchase Details</h3>
                     <p><strong>Attraction:</strong> {attraction.name}</p>
                     <p><strong>Quantity:</strong> {quantity}</p>
-                    <p><strong>Payment Method:</strong> {paymentMethod.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}</p>
+                    <p><strong>Payment Method:</strong> Credit/Debit Card</p>
                     <p><strong>Total:</strong> ${calculateTotal().toFixed(2)}</p>
                   </div>
                   
@@ -376,7 +786,7 @@ const PurchaseAttraction = () => {
 
           {/* Right Column - Attraction Summary */}
           <div className="lg:col-span-1">
-            <div className="bg-white shadow-sm rounded-lg overflow-hidden sticky top-8">
+            <div className="bg-white shadow-sm rounded-lg overflow-hidden lg:sticky lg:top-8">
               {attraction.images && attraction.images.length > 0 && (
                 <img 
                   src={attraction.images[0]} 
@@ -385,9 +795,9 @@ const PurchaseAttraction = () => {
                 />
               )}
               
-              <div className="p-6">
-                <h2 className="text-xl font-bold text-gray-900 mb-2">{attraction.name}</h2>
-                <p className="text-gray-800 mb-4">{attraction.description}</p>
+              <div className="p-4 md:p-6">
+                <h2 className="text-lg md:text-xl font-bold text-gray-900 mb-2">{attraction.name}</h2>
+                <p className="text-sm md:text-base text-gray-600 mb-4">{attraction.description}</p>
                 
                 <div className="space-y-3 mb-6">
                   <div className="flex items-center">
@@ -404,36 +814,38 @@ const PurchaseAttraction = () => {
                 </div>
                 
                 <div className="border-t border-gray-200 pt-4">
-                  <h3 className="font-semibold text-gray-900 mb-2">Pricing</h3>
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="text-sm text-gray-800">
+                  <h3 className="font-semibold text-gray-900 mb-3 text-sm md:text-base">Order Summary</h3>
+                  <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs md:text-sm text-gray-600">
                       {attraction.pricingType === 'per_person' ? 'Per person' : 
                        attraction.pricingType === 'per_group' ? 'Per group' :
                        attraction.pricingType === 'per_hour' ? 'Per hour' :
                        attraction.pricingType === 'per_game' ? 'Per game' : 'Fixed price'}
                     </span>
-                <span className="font-semibold">${Number(attraction.price).toFixed(2)}</span>
+                    <span className="font-medium text-sm md:text-base">${Number(attraction.price).toFixed(2)}</span>
                   </div>
                   
                   {currentStep >= 1 && (
                     <>
-                      <div className="flex justify-between items-center mb-1">
-                        <span className="text-sm text-gray-800">Quantity</span>
-                        <span className="font-semibold">{quantity}</span>
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs md:text-sm text-gray-600">Quantity</span>
+                        <span className="font-medium text-sm md:text-base">{quantity}</span>
                       </div>
                       
                       {attraction.pricingType === 'per_person' && (
-                        <div className="flex justify-between items-center mb-1">
-                          <span className="text-sm text-gray-800">Subtotal</span>
-                          <span className="font-semibold">${(attraction.price * quantity).toFixed(2)}</span>
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs md:text-sm text-gray-600">Subtotal</span>
+                          <span className="font-medium text-sm md:text-base">${(attraction.price * quantity).toFixed(2)}</span>
                         </div>
                       )}
                     </>
                   )}
+                  </div>
                   
-                  <div className="flex justify-between items-center mt-3 pt-3 border-t border-gray-200">
-                    <span className="font-bold text-gray-900">Total</span>
-                    <span className="text-xl font-bold text-blue-800">${calculateTotal().toFixed(2)}</span>
+                  <div className="flex justify-between items-center mt-4 pt-4 border-t-2 border-gray-300">
+                    <span className="font-bold text-gray-900 text-base md:text-lg">Total</span>
+                    <span className="text-xl md:text-2xl font-bold text-blue-800">${calculateTotal().toFixed(2)}</span>
                   </div>
                 </div>
                 
@@ -459,6 +871,88 @@ const PurchaseAttraction = () => {
           </div>
         </div>
       </div>
+
+      {/* No Authorize.Net Account Modal */}
+      {showNoAuthAccountModal && (
+        <div className="fixed inset-0 bg-black/75 flex items-center justify-center p-4 z-[9999] animate-backdrop-fade">
+          <div className="bg-white rounded-xl max-w-md w-full p-6 border-4 border-red-500 shadow-2xl">
+            <div className="flex flex-col items-center text-center">
+              <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mb-4">
+                <svg className="w-12 h-12 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              
+              <h3 className="text-2xl font-bold text-gray-900 mb-3">Payment System Unavailable</h3>
+              
+              <p className="text-gray-700 mb-6">
+                This location does not have an active Authorize.Net account configured. Card payments cannot be processed at this time.
+              </p>
+              
+              <div className="bg-red-50 border-2 border-red-200 rounded-lg p-4 mb-6 w-full">
+                <p className="text-sm text-red-900 font-medium">
+                  ⚠️ Unable to proceed with payment
+                </p>
+                <p className="text-xs text-red-800 mt-2">
+                  Contact your location manager or system administrator to set up an Authorize.Net merchant account for this location.
+                </p>
+              </div>
+              
+              <button
+                onClick={() => window.history.back()}
+                className="w-full px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold shadow-lg"
+              >
+                Go Back
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* QR Code Modal */}
+      {showQRModal && qrCodeImage && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-backdrop-fade">
+          <div className="bg-white rounded-xl max-w-sm w-full p-6">
+            <div className="text-center">
+              <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-3" />
+              <h3 className="text-lg font-bold text-gray-900 mb-2">Purchase Complete!</h3>
+              <p className="text-sm text-gray-600 mb-4">Scan this QR code at the entrance</p>
+              
+              {/* QR Code Image */}
+              <div className="flex justify-center mb-4">
+                <img 
+                  src={qrCodeImage} 
+                  alt="Purchase QR Code"
+                  className="w-48 h-48 border border-gray-200 rounded-lg"
+                />
+              </div>
+
+              <p className="text-xs text-gray-500 mb-4">Receipt sent to {customerInfo.email}</p>
+
+              <button
+                onClick={() => {
+                  setShowQRModal(false);
+                  navigate('/');
+                }}
+                className="w-full px-4 py-2 bg-blue-800 text-white rounded-lg hover:bg-blue-900"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast Notification */}
+      {toast && (
+        <div className="fixed top-4 right-4 z-50 animate-fade-in-up">
+          <Toast
+            message={toast.message}
+            type={toast.type}
+            onClose={() => setToast(null)}
+          />
+        </div>
+      )}
     </div>
   );
 };

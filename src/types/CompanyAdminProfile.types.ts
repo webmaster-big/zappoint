@@ -7,14 +7,8 @@ export interface CompanyAdminProfilePersonal {
   phone: string;
   position: string;
   avatar: string;
-}
-
-export interface CompanyAdminProfileAddress {
-  street: string;
-  city: string;
-  state: string;
-  zipCode: string;
-  country: string;
+  employeeId: string;
+  department: string;
 }
 
 export interface CompanyAdminProfileCompany {
@@ -23,23 +17,22 @@ export interface CompanyAdminProfileCompany {
   email: string;
   phone: string;
   website: string;
-  founded: string;
+  foundedDate: string;
   description: string;
-  address: CompanyAdminProfileAddress;
-}
-
-export interface CompanyAdminProfileOperatingHours {
-  weekdays: string;
-  weekends: string;
-  holidays: string;
+  logoPath: string;
+  taxId: string;
+  registrationNumber: string;
+  companySize: string;
+  address: string;
+  city: string;
+  state: string;
+  zipCode: string;
+  country: string;
 }
 
 export interface CompanyAdminProfileBusiness {
   totalLocations: number;
-  activeLocations: number;
   totalEmployees: number;
-  monthlyCapacity: number;
-  operatingHours: CompanyAdminProfileOperatingHours;
 }
 
 export interface CompanyAdminProfileData {

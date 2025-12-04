@@ -1,71 +1,28 @@
 import React, { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
-import type { BookPackageAttraction, BookPackageRoom, BookPackagePromoOrGiftCard, BookPackagePackage, BookPackageBooking } from '../../../types/BookPackage.types';
-
-// Generate time slots from 8am to 12am (midnight) in 1-hour increments
-const generateTimeSlots = () => {
-  const slots = [];
-  for (let hour = 8; hour <= 23; hour++) {
-    for (let min = 0; min < 60; min += 30) {
-      // End at 11:40 PM
-      if (hour === 23 && min > 40) break;
-      const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
-      const period = hour < 12 ? "AM" : "PM";
-      const displayMin = min.toString().padStart(2, '0');
-      slots.push(`${displayHour}:${displayMin} ${period}`);
-    }
-  }
-  return slots;
-};
-
-const TIME_SLOTS = generateTimeSlots();
+import { Link, useParams } from "react-router-dom";
+import QRCode from 'qrcode';
+import type { BookPackagePackage } from '../../../types/BookPackage.types';
+import bookingService from '../../../services/bookingService';
+import timeSlotService, { type TimeSlot } from '../../../services/timeSlotService';
+import { ASSET_URL } from "../../../utils/storage";
+import { loadAcceptJS, processCardPayment, validateCardNumber, formatCardNumber, getCardType } from '../../../services/PaymentService';
+import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
+import customerService from '../../../services/CustomerService';
 
 const BookPackage: React.FC = () => {
-  // Save booking to localStorage
-  const handlePayNow = () => {
-    if (!pkg) return;
-    const booking = {
-      packageId: pkg.id,
-      packageName: pkg.name,
-      participants,
-      date: selectedDate,
-      time: selectedTime,
-      duration: formatDuration(),
-      attractions: Object.entries(selectedAttractions).filter(([, qty]) => qty > 0).map(([name, qty]) => ({ name, qty })),
-      room: selectedRoom,
-      addOns: Object.entries(selectedAddOns).filter(([, qty]) => qty > 0).map(([name, qty]) => ({ name, qty })),
-      promo: appliedPromo ? appliedPromo.code : null,
-      giftCard: appliedGiftCard ? appliedGiftCard.code : null,
-      paymentMethod,
-      paymentType,
-      total,
-      customer: { ...form },
-      createdAt: new Date().toISOString(),
-      status: "booked" // Add status to booking
-    };
-    const bookings = JSON.parse(localStorage.getItem("zapzone_bookings") || "[]");
-    bookings.push(booking);
-    localStorage.setItem("zapzone_bookings", JSON.stringify(bookings));
-    // Optionally, show a confirmation or redirect
-    alert("Booking saved!");
-  };
-  const { id } = useParams<{ id: string }>();
+  const { id } = useParams<{ location: string; id: string }>();
   const [pkg, setPkg] = useState<BookPackagePackage | null>(null);
-  const [attractions, setAttractions] = useState<BookPackageAttraction[]>([]);
-  // Removed unused rooms state
-  const [selectedAddOns, setSelectedAddOns] = useState<{ [name: string]: number }>({});
-  const [selectedAttractions, setSelectedAttractions] = useState<{ [name: string]: number }>({});
-  const [selectedRoom, setSelectedRoom] = useState<string>("");
+  const [loadingPackage, setLoadingPackage] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
+  const [selectedAddOns, setSelectedAddOns] = useState<{ [id: number]: number }>({});
+  const [selectedAttractions, setSelectedAttractions] = useState<{ [id: number]: number }>({});
+  const [selectedRoomId, setSelectedRoomId] = useState<number | null>(null);
   const [promoCode, setPromoCode] = useState("");
   const [giftCardCode, setGiftCardCode] = useState("");
-  const [appliedPromo, setAppliedPromo] = useState<BookPackagePromoOrGiftCard | null>(null);
-  const [appliedGiftCard, setAppliedGiftCard] = useState<BookPackagePromoOrGiftCard | null>(null);
-  const [participants, setParticipants] = useState<number>(() => {
-    // Default to maxParticipants if available, else 1
-    const packages = JSON.parse(localStorage.getItem("zapzone_packages") || "[]");
-    const found = packages.find((p: BookPackagePackage) => p.id === id);
-    return found && found.maxParticipants ? Number(found.maxParticipants) : 1;
-  });
+  const [appliedPromo, setAppliedPromo] = useState<BookPackagePackage['promos'][0] | null>(null);
+  const [appliedGiftCard, setAppliedGiftCard] = useState<BookPackagePackage['gift_cards'][0] | null>(null);
+  const [participants, setParticipants] = useState<number>(1);
   const [form, setForm] = useState({
     firstName: "",
     lastName: "",
@@ -73,23 +30,133 @@ const BookPackage: React.FC = () => {
     phone: "",
     notes: ""
   });
-  const [paymentMethod, setPaymentMethod] = useState("stripe");
   const [paymentType, setPaymentType] = useState<'full' | 'partial'>('full');
   const [currentStep, setCurrentStep] = useState(1);
+  
+  // Payment card details
+  const [cardNumber, setCardNumber] = useState("");
+  const [cardMonth, setCardMonth] = useState("");
+  const [cardYear, setCardYear] = useState("");
+  const [cardCVV, setCardCVV] = useState("");
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [paymentError, setPaymentError] = useState("");
+  const [authorizeApiLoginId, setAuthorizeApiLoginId] = useState("");
+  const [authorizeEnvironment, setAuthorizeEnvironment] = useState<'sandbox' | 'production'>('sandbox');
+  const [showNoAuthAccountModal, setShowNoAuthAccountModal] = useState(false);
   
   // Date and time selection
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [selectedTime, setSelectedTime] = useState<string>("");
   const [availableDates, setAvailableDates] = useState<Date[]>([]);
-  const [availableTimes, setAvailableTimes] = useState<string[]>([]);
+  const [availableTimeSlots, setAvailableTimeSlots] = useState<TimeSlot[]>([]);
+  const [loadingTimeSlots, setLoadingTimeSlots] = useState(false);
+  
+  // Confirmation modal state
+  const [showConfirmation, setShowConfirmation] = useState(false);
+  const [confirmationData, setConfirmationData] = useState<{
+    referenceNumber: string;
+    qrCode: string;
+    bookingId: number;
+  } | null>(null);
 
-  // Load package and options from localStorage
+  // Load package from backend
   useEffect(() => {
-    const packages = JSON.parse(localStorage.getItem("zapzone_packages") || "[]");
-    const found = packages.find((p: BookPackagePackage) => p.id === id);
-    setPkg(found || null);
-    setAttractions(JSON.parse(localStorage.getItem("zapzone_attractions") || "[]"));
+    const fetchPackage = async () => {
+      if (!id) return;
+      
+      try {
+        setLoadingPackage(true);
+        const response = await bookingService.getPackageById(Number(id));
+        setPkg(response.data);
+        
+        // Set default participants to max_participants
+        if (response.data.max_participants) {
+          setParticipants(response.data.max_participants);
+        }
+      } catch (err) {
+        console.error('Error fetching package:', err);
+        setError('Failed to load package details');
+      } finally {
+        setLoadingPackage(false);
+      }
+    };
+    
+    fetchPackage();
   }, [id]);
+  
+  // Auto-fill form if customer is logged in
+  useEffect(() => {
+    const fetchCustomerData = async () => {
+      try {
+        const customerData = localStorage.getItem('zapzone_customer');
+        if (customerData) {
+          const customer = JSON.parse(customerData);
+          if (customer.id) {
+            // Fetch fresh customer data from API
+            const response = await customerService.getCustomerById(customer.id);
+            if (response.success && response.data) {
+              const data = response.data;
+              setForm({
+                firstName: data.first_name || '',
+                lastName: data.last_name || '',
+                email: data.email || '',
+                phone: data.phone || '',
+                notes: ''
+              });
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching customer data:', error);
+      }
+    };
+    
+    fetchCustomerData();
+  }, []);
+  
+  // Initialize Authorize.Net
+  useEffect(() => {
+    const initializeAuthorizeNet = async () => {
+      try {
+        // Fetch public key from backend
+        const locationId = pkg?.location_id || 1;
+        const response = await getAuthorizeNetPublicKey(locationId);
+        if (response.success && response.data) {
+          setAuthorizeApiLoginId(response.data.api_login_id);
+        } else {
+          setShowNoAuthAccountModal(true);
+        }
+        
+        // Load Accept.js library
+        await loadAcceptJS(authorizeEnvironment);
+        console.log('✅ Accept.js loaded successfully');
+      } catch (error: any) {
+        console.error('❌ Failed to initialize Authorize.Net:', error);
+        if (error.response?.data?.message?.includes('No active Authorize.Net account')) {
+          setShowNoAuthAccountModal(true);
+        }
+      }
+    };
+    
+    initializeAuthorizeNet();
+  }, [authorizeEnvironment]);
+
+  // Helper function to get week of month (1-5, where 5 is last week)
+  const getWeekOfMonth = (date: Date): number => {
+    const firstDayOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
+    const dayOfMonth = date.getDate();
+    const firstDayWeekday = firstDayOfMonth.getDay();
+    
+    // Calculate which week this day falls into
+    return Math.ceil((dayOfMonth + firstDayWeekday) / 7);
+  };
+
+  // Helper function to check if date is in last week of month
+  const isLastWeekOfMonth = (date: Date): boolean => {
+    const lastDayOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+    const daysUntilEndOfMonth = lastDayOfMonth.getDate() - date.getDate();
+    return daysUntilEndOfMonth < 7;
+  };
 
   // Calculate available dates based on package availability
   useEffect(() => {
@@ -98,28 +165,71 @@ const BookPackage: React.FC = () => {
     const today = new Date();
     const dates: Date[] = [];
     
-    // Generate available dates for the next 60 days
-    for (let i = 0; i < 60; i++) {
+    // Generate available dates for the next 90 days
+    for (let i = 0; i < 90; i++) {
       const date = new Date();
       date.setDate(today.getDate() + i);
       
       // Check if date matches package availability
       let isAvailable = false;
       
-      if (pkg.availabilityType === "daily") {
+      if (pkg.availability_type === "daily") {
+        // Daily: Check if the day of week is in available_days
         const dayName = date.toLocaleDateString('en-US', { weekday: 'long' });
-        isAvailable = pkg.availableDays.includes(dayName);
+        isAvailable = pkg.available_days.includes(dayName);
       } 
-      else if (pkg.availabilityType === "weekly") {
+      else if (pkg.availability_type === "weekly") {
+        // Weekly: Check if the day of week is in available_week_days (every week)
         const dayName = date.toLocaleDateString('en-US', { weekday: 'long' });
-        isAvailable = pkg.availableWeekDays.includes(dayName);
+        isAvailable = pkg.available_week_days.includes(dayName);
       } 
-      else if (pkg.availabilityType === "monthly") {
+      else if (pkg.availability_type === "monthly") {
+        // Monthly: Check patterns like "Sunday-last", "Monday-1st", "15", etc.
+        const dayName = date.toLocaleDateString('en-US', { weekday: 'long' });
+        const weekOfMonth = getWeekOfMonth(date);
+        const isInLastWeek = isLastWeekOfMonth(date);
         const dayOfMonth = date.getDate();
-        const isLastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate() === dayOfMonth;
         
-        isAvailable = pkg.availableMonthDays.includes(dayOfMonth.toString()) || 
-                     (isLastDay && pkg.availableMonthDays.includes("last"));
+        for (const pattern of pkg.available_month_days) {
+          // Check for specific day number (e.g., "15", "1", "30")
+          if (!isNaN(Number(pattern)) && dayOfMonth === Number(pattern)) {
+            isAvailable = true;
+            break;
+          }
+          
+          // Check for day-week patterns (e.g., "Sunday-last", "Monday-1st")
+          if (pattern.includes('-')) {
+            const [patternDay, patternWeek] = pattern.split('-');
+            
+            if (patternDay === dayName) {
+              if (patternWeek === 'last' && isInLastWeek) {
+                isAvailable = true;
+                break;
+              } else if (patternWeek === '1st' && weekOfMonth === 1) {
+                isAvailable = true;
+                break;
+              } else if (patternWeek === '2nd' && weekOfMonth === 2) {
+                isAvailable = true;
+                break;
+              } else if (patternWeek === '3rd' && weekOfMonth === 3) {
+                isAvailable = true;
+                break;
+              } else if (patternWeek === '4th' && weekOfMonth === 4) {
+                isAvailable = true;
+                break;
+              }
+            }
+          }
+          
+          // Check for "last" (last day of month)
+          if (pattern === 'last') {
+            const lastDayOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+            if (dayOfMonth === lastDayOfMonth.getDate()) {
+              isAvailable = true;
+              break;
+            }
+          }
+        }
       }
       
       if (isAvailable) {
@@ -136,100 +246,128 @@ const BookPackage: React.FC = () => {
     }
   }, [pkg, selectedDate]);
 
-  // Calculate available times when date or room is selected
+  // Fetch available time slots via SSE when date or room changes
   useEffect(() => {
-    if (!pkg || !selectedDate || !selectedRoom) return;
+    if (!pkg || !selectedDate || !selectedRoomId) {
+      setAvailableTimeSlots([]);
+      return;
+    }
     
-    // Get all existing bookings
-    const existingBookings: BookPackageBooking[] = JSON.parse(localStorage.getItem("zapzone_bookings") || "[]");
+    setLoadingTimeSlots(true);
     
-    // Filter bookings for the same date and room with status not "checked-in"
-    const conflictingBookings = existingBookings.filter(booking => 
-      booking.date === selectedDate && 
-      booking.room === selectedRoom && 
-      booking.status !== "checked-in"
-    );
-    
-    // Calculate package duration in minutes
-    const durationMinutes = pkg.durationUnit === "hours" 
-      ? parseInt(pkg.duration) * 60 
-      : parseInt(pkg.duration);
-    
-    // Check each time slot for availability
-    const availableSlots = TIME_SLOTS.filter(timeSlot => {
-      // Convert time slot to minutes since start of day
-      const [time, period] = timeSlot.split(" ");
-      const [hoursStr] = time.split(":");
-      let hours = parseInt(hoursStr);
-      
-      if (period === "PM" && hours !== 12) hours += 12;
-      if (period === "AM" && hours === 12) hours = 0;
-      
-      const slotStartMinutes = hours * 60;
-      const slotEndMinutes = slotStartMinutes + durationMinutes;
-      
-      // Check if this slot conflicts with any existing booking
-      const hasConflict = conflictingBookings.some(booking => {
-        // Parse booking time
-        const [bookingTime, bookingPeriod] = booking.time.split(" ");
-        const [bookingHoursStr] = bookingTime.split(":");
-        let bookingHours = parseInt(bookingHoursStr);
-        
-        if (bookingPeriod === "PM" && bookingHours !== 12) bookingHours += 12;
-        if (bookingPeriod === "AM" && bookingHours === 12) bookingHours = 0;
-        
-        const bookingStartMinutes = bookingHours * 60;
-        
-        // Parse booking duration
-        const bookingDurationMatch = booking.duration.match(/(\d+)\s*(hours|minutes|hrs|hr)/i);
-        let bookingDurationMinutes = 60; // Default to 1 hour if parsing fails
-        
-        if (bookingDurationMatch) {
-          const value = parseInt(bookingDurationMatch[1]);
-          const unit = bookingDurationMatch[2].toLowerCase();
-          bookingDurationMinutes = unit.includes("hour") ? value * 60 : value;
-        }
-        
-        const bookingEndMinutes = bookingStartMinutes + bookingDurationMinutes;
-        
-        // Check for time overlap
-        return (
-          (slotStartMinutes >= bookingStartMinutes && slotStartMinutes < bookingEndMinutes) ||
-          (slotEndMinutes > bookingStartMinutes && slotEndMinutes <= bookingEndMinutes) ||
-          (slotStartMinutes <= bookingStartMinutes && slotEndMinutes >= bookingEndMinutes)
-        );
-      });
-      
-      return !hasConflict;
+    // Create SSE connection
+    const eventSource = timeSlotService.getAvailableSlotsSSE({
+      package_id: pkg.id,
+      room_id: selectedRoomId,
+      date: selectedDate,
     });
     
-    setAvailableTimes(availableSlots);
+    // Track if first update has been received
+    let isFirstUpdate = true;
     
-    // If current selected time is not available, reset it
-    if (selectedTime && !availableSlots.includes(selectedTime)) {
-      setSelectedTime(availableSlots[0] || "");
-    } else if (!selectedTime && availableSlots.length > 0) {
-      setSelectedTime(availableSlots[0]);
-    }
-  }, [selectedDate, selectedRoom, pkg, selectedTime]);
+    // Handle incoming messages
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        setAvailableTimeSlots(data.available_slots);
+        setLoadingTimeSlots(false);
+        // console.log('Received SSE data:', data);
+        
+        // Auto-select first available time slot only on initial load
+        if (isFirstUpdate && data.available_slots.length > 0) {
+          setSelectedTime((prevTime) => {
+            // Only set if no time is currently selected
+            if (!prevTime) {
+              return data.available_slots[0].start_time;
+            }
+            
+            // Check if previously selected time is still available
+            const timeIsAvailable = data.available_slots.some(
+              (slot: TimeSlot) => slot.start_time === prevTime
+            );
+            
+            // If not available, select first available slot
+            if (!timeIsAvailable) {
+              return data.available_slots[0]?.start_time || "";
+            }
+            
+            return prevTime;
+          });
+          isFirstUpdate = false;
+        }
+      } catch (err) {
+        console.error('Error parsing SSE data:', err);
+      }
+    };
+    
+    // Handle errors
+    eventSource.onerror = (err) => {
+      console.error('SSE connection error:', err);
+      setLoadingTimeSlots(false);
+      eventSource.close();
+    };
+    
+    // Cleanup: close SSE connection when component unmounts or dependencies change
+    return () => {
+      eventSource.close();
+    };
+  }, [selectedDate, selectedRoomId, pkg]);
 
   // Handle add-on/attraction quantity change
-  const handleAddOnQty = (name: string, qty: number) => {
-    setSelectedAddOns((prev) => ({ ...prev, [name]: Math.max(0, qty) }));
+  const handleAddOnQty = (id: number, qty: number) => {
+    setSelectedAddOns((prev) => ({ ...prev, [id]: Math.max(0, qty) }));
   };
-  const handleAttractionQty = (name: string, qty: number) => {
-    setSelectedAttractions((prev) => ({ ...prev, [name]: Math.max(0, qty) }));
+  const handleAttractionQty = (id: number, qty: number) => {
+    setSelectedAttractions((prev) => ({ ...prev, [id]: Math.max(0, qty) }));
   };
 
   // Handle promo/gift card code apply
   const handleApplyCode = (type: "promo" | "giftcard") => {
     if (!pkg) return;
     if (type === "promo") {
-      const found = (pkg.promos as BookPackagePromoOrGiftCard[]).find((p) => p.code === promoCode);
+      const found = pkg.promos.find((p) => p.code === promoCode);
       setAppliedPromo(found || null);
     } else {
-      const found = (pkg.giftCards as BookPackagePromoOrGiftCard[]).find((g) => g.code === giftCardCode);
+      const found = pkg.gift_cards.find((g) => g.code === giftCardCode);
       setAppliedGiftCard(found || null);
+    }
+  };
+  
+  // Reset form for new booking
+  const resetForm = () => {
+    setSelectedAddOns({});
+    setSelectedAttractions({});
+    setSelectedRoomId(null);
+    setPromoCode("");
+    setGiftCardCode("");
+    setAppliedPromo(null);
+    setAppliedGiftCard(null);
+    setParticipants(pkg?.max_participants || 1);
+    setForm({
+      firstName: "",
+      lastName: "",
+      email: "",
+      phone: "",
+      notes: ""
+    });
+    setPaymentType('full');
+    setCurrentStep(1);
+    setSelectedTime("");
+    setShowConfirmation(false);
+    setConfirmationData(null);
+    setCardNumber("");
+    setCardMonth("");
+    setCardYear("");
+    setCardCVV("");
+    setPaymentError("");
+  };
+  
+  // Handle card number input with formatting
+  const handleCardNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatCardNumber(e.target.value);
+    if (formatted.replace(/\s/g, '').length <= 16) {
+      setCardNumber(formatted);
+      setPaymentError("");
     }
   };
 
@@ -237,8 +375,8 @@ const BookPackage: React.FC = () => {
   const calculateBasePrice = () => {
     if (!pkg) return 0;
     const basePrice = Number(pkg.price);
-    const maxParticipants = Number(pkg.maxParticipants);
-    const pricePerAdditional = Number(pkg.pricePerAdditional);
+    const maxParticipants = Number(pkg.max_participants);
+    const pricePerAdditional = Number(pkg.price_per_additional);
     
     if (participants <= maxParticipants) {
       return basePrice;
@@ -248,131 +386,488 @@ const BookPackage: React.FC = () => {
     }
   };
 
+  // Calculate totals first (moved before calculatePartialAmount)
+  const basePrice = calculateBasePrice();
+  const addOnsTotal = Object.entries(selectedAddOns).reduce((sum, [idStr, qty]) => {
+    const id = Number(idStr);
+    const found = pkg && pkg.add_ons.find((a) => a.id === id);
+    const price = found ? Number(found.price) : 0;
+    return sum + price * qty;
+  }, 0);
+  const attractionsTotal = Object.entries(selectedAttractions).reduce((sum, [idStr, qty]) => {
+    const id = Number(idStr);
+    const found = pkg && pkg.attractions.find((a) => a.id === id);
+    const price = found ? Number(found.price) : 0;
+    return sum + price * qty;
+  }, 0);
+  
+  // Promo and gift card discounts
+  const promoDiscount = appliedPromo ? Number(appliedPromo.discount_value || 0) : 0;
+  const giftCardDiscount = appliedGiftCard ? Number(appliedGiftCard.discount_value || 0) : 0;
+  
+  // Calculate subtotal and total
+  const subtotal = basePrice + addOnsTotal + attractionsTotal;
+  const total = Math.max(0, subtotal - promoDiscount - giftCardDiscount);
+
+  // Calculate partial payment amount based on package settings
+  const calculatePartialAmount = () => {
+    if (!pkg) return 0;
+    
+    // Check if package has partial payment percentage (priority)
+    if (pkg.partial_payment_percentage != null && pkg.partial_payment_percentage > 0) {
+      return Math.round(total * (pkg.partial_payment_percentage / 100) * 100) / 100;
+    }
+    
+    // Check if package has partial payment fixed amount
+    if (pkg.partial_payment_fixed != null && pkg.partial_payment_fixed > 0) {
+      return Math.min(pkg.partial_payment_fixed, total);
+    }
+    
+    // If both are null or 0, return 0 (no partial payment available)
+    return 0;
+  };
+
   // Format duration for display
   const formatDuration = () => {
     if (!pkg || !pkg.duration) return "Not specified";
-    return `${pkg.duration} ${pkg.durationUnit}`;
+    return `${pkg.duration} ${pkg.duration_unit}`;
   };
 
-  // Calculate totals
-  const basePrice = calculateBasePrice();
-  const addOnsTotal = Object.entries(selectedAddOns).reduce((sum, [name, qty]) => {
-    const found = pkg && pkg.addOns.find((a) => (typeof a === "string" ? a : a.name) === name);
-    const price = found ? (typeof found === "string" ? 0 : found.price || 0) : 0;
-    return sum + price * qty;
-  }, 0);
-  const attractionsTotal = Object.entries(selectedAttractions).reduce((sum, [name, qty]) => {
-    // Find the attraction in package attractions
-    let price = 0;
-    if (pkg) {
-      for (const a of pkg.attractions) {
-        if (typeof a === "string" && a === name) {
-          // Look up in master attractions list
-          const masterAttraction = attractions.find(attr => attr.name === name);
-          price = masterAttraction ? masterAttraction.price : 0;
-          break;
-        } else if (typeof a === "object" && a.name === name) {
-          price = a.price || 0;
-          break;
-        }
-      }
-    }
-    return sum + price * qty;
-  }, 0);
-  // Rooms have no price/capacity, so no total
-  const roomsTotal = 0;
-  
-  // Promo and gift card discounts (simplified for demo)
-  const promoDiscount = appliedPromo ? 10 : 0;
-  const giftCardDiscount = appliedGiftCard ? 10 : 0;
-  
-  // Calculate subtotal and total (no tax)
-  const subtotal = basePrice + addOnsTotal + attractionsTotal + roomsTotal;
-  const total = Math.max(0, subtotal - promoDiscount - giftCardDiscount);
-  const partialAmount = Math.round(total * 0.2 * 100) / 100;
+  const partialAmount = calculatePartialAmount();
 
-  if (!pkg) return <div className="p-8 text-center text-gray-500">Package not found.</div>;
+  // Handle booking submission with payment processing
+  const handlePayNow = async () => {
+    if (!pkg || !selectedRoomId) return;
+    
+    // Validate card information
+    if (!cardNumber || !cardMonth || !cardYear || !cardCVV) {
+      setPaymentError('Please fill in all card details');
+      return;
+    }
+    
+    if (!validateCardNumber(cardNumber)) {
+      setPaymentError('Invalid card number');
+      return;
+    }
+    
+    if (!authorizeApiLoginId) {
+      setPaymentError('Payment system not initialized. Please refresh the page.');
+      return;
+    }
+    
+    setIsProcessingPayment(true);
+    setPaymentError('');
+    
+    try {
+      // Calculate payment amount
+      const amountToPay = paymentType === 'full' ? total : partialAmount;
+      
+      // Step 1: Process payment first
+      console.log('💳 Processing payment...');
+      
+      const cardData = {
+        cardNumber: cardNumber.replace(/\s/g, ''),
+        month: cardMonth,
+        year: cardYear,
+        cardCode: cardCVV,
+      };
+      
+      const paymentData = {
+        location_id: pkg.location_id || 1,
+        amount: amountToPay,
+        order_id: `PKG-${pkg.id}-${Date.now()}`,
+        description: `Package Booking: ${pkg.name}`,
+      };
+      
+      const paymentResponse = await processCardPayment(
+        cardData,
+        paymentData,
+        authorizeApiLoginId
+      );
+      
+      if (!paymentResponse.success) {
+        throw new Error(paymentResponse.message || 'Payment failed');
+      }
+      
+      console.log('✅ Payment successful:', paymentResponse.transaction_id);
+      
+      // Step 2: Create booking with payment info
+      const additionalAttractions = Object.entries(selectedAttractions)
+        .filter(([, qty]) => qty > 0)
+        .map(([id, qty]) => {
+          const attraction = pkg.attractions.find(a => a.id === Number(id));
+          return {
+            attraction_id: Number(id),
+            quantity: qty,
+            price_at_booking: attraction ? Number(attraction.price) : 0
+          };
+        });
+      
+      const additionalAddons = Object.entries(selectedAddOns)
+        .filter(([, qty]) => qty > 0)
+        .map(([id, qty]) => {
+          const addon = pkg.add_ons.find(a => a.id === Number(id));
+          return {
+            addon_id: Number(id),
+            quantity: qty,
+            price_at_booking: addon ? Number(addon.price) : 0
+          };
+        });
+      
+      const bookingData = {
+        guest_name: `${form.firstName} ${form.lastName}`,
+        guest_email: form.email,
+        guest_phone: form.phone,
+        location_id: pkg.location_id || 1,
+        package_id: pkg.id,
+        room_id: selectedRoomId,
+        type: 'package' as const,
+        booking_date: selectedDate,
+        booking_time: selectedTime,
+        participants,
+        duration: pkg.duration,
+        duration_unit: pkg.duration_unit,
+        total_amount: total,
+        amount_paid: amountToPay,
+        payment_method: 'credit' as const,
+        payment_status: (paymentType === 'full' ? 'paid' : 'partial') as 'paid' | 'partial',
+        status: 'confirmed' as const,
+        additional_attractions: additionalAttractions.length > 0 ? additionalAttractions : undefined,
+        additional_addons: additionalAddons.length > 0 ? additionalAddons : undefined,
+        promo_code: appliedPromo ? appliedPromo.code : undefined,
+        gift_card_code: appliedGiftCard ? appliedGiftCard.code : undefined,
+        notes: form.notes || undefined,
+        transaction_id: paymentResponse.transaction_id,
+      };
+      
+      const response = await bookingService.createBooking(bookingData);
+      
+      if (response.success && response.data) {
+        const bookingId = response.data.id;
+        const referenceNumber = response.data.reference_number;
+        
+        console.log('✅ Booking created:', { bookingId, referenceNumber });
+        
+        // Generate and store QR code
+        const qrCodeBase64 = await QRCode.toDataURL(referenceNumber, {
+          width: 300,
+          margin: 2,
+          color: {
+            dark: '#000000',
+            light: '#FFFFFF'
+          }
+        });
+        
+        try {
+          await bookingService.storeQrCode(bookingId, qrCodeBase64);
+          console.log('✅ QR code stored');
+        } catch (qrError) {
+          console.error('⚠️ Failed to store QR code:', qrError);
+        }
+        
+        // Show confirmation modal
+        setConfirmationData({
+          referenceNumber,
+          qrCode: qrCodeBase64,
+          bookingId
+        });
+        setShowConfirmation(true);
+      }
+    } catch (err: any) {
+      console.error('❌ Payment/Booking error:', err);
+      setPaymentError(err.message || 'Payment processing failed. Please try again.');
+    } finally {
+      setIsProcessingPayment(false);
+    }
+  };
+
+  // No Authorize.Net Account Modal Component
+  const NoAuthAccountModal = () => {
+    if (!showNoAuthAccountModal) return null;
+    
+    return (
+      <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-[9999] p-4 animate-backdrop-fade">
+        <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 border-4 border-red-500 animate-scale-in">
+          <div className="flex flex-col items-center text-center">
+            <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mb-4">
+              <svg className="w-12 h-12 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            
+            <h3 className="text-2xl font-bold text-gray-900 mb-3">Payment System Unavailable</h3>
+            
+            <p className="text-gray-700 mb-6 text-base">
+              This location does not have an active Authorize.Net account configured. Card payments cannot be processed at this time.
+            </p>
+            
+            <div className="bg-red-50 border-2 border-red-200 rounded-lg p-4 mb-6 w-full">
+              <p className="text-sm text-red-900 font-medium">
+                ⚠️ Unable to proceed with payment
+              </p>
+              <p className="text-xs text-red-800 mt-2">
+                Please contact your location manager or system administrator to set up an Authorize.Net merchant account for this location before accepting online payments.
+              </p>
+            </div>
+            
+            {/* redirect to home */}
+            <Link
+              to="/"
+              className="w-full px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold text-lg shadow-lg"
+            >
+              Go Back to Home
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  };
+  
+  // Confirmation Modal Component
+  const ConfirmationModal = () => {
+    if (!showConfirmation || !confirmationData) return null;
+    
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 animate-backdrop-fade">
+        <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="p-8">
+            {/* Success Header */}
+            <div className="text-center mb-6">
+              <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
+                <svg className="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+                </svg>
+              </div>
+              <h2 className="text-3xl font-bold text-gray-900 mb-2">Booking Confirmed!</h2>
+              <p className="text-gray-600">Your booking has been successfully created</p>
+            </div>
+            
+            {/* QR Code Display */}
+            <div className="bg-gray-50 rounded-xl p-6 mb-6">
+              <div className="flex flex-col items-center">
+                <img src={confirmationData.qrCode} alt="Booking QR Code" className="w-64 h-64 mb-4" />
+                <div className="text-center">
+                  <p className="text-sm text-gray-600 mb-1">Reference Number</p>
+                  <p className="text-2xl font-bold text-blue-800">{confirmationData.referenceNumber}</p>
+                </div>
+              </div>
+            </div>
+            
+            {/* Booking Details */}
+            <div className="bg-blue-50 rounded-xl p-6 mb-6">
+              <h3 className="font-semibold text-lg mb-4 text-gray-800">Booking Details</h3>
+              <div className="space-y-3">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Package:</span>
+                  <span className="font-medium text-gray-900">{pkg?.name}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Guest Name:</span>
+                  <span className="font-medium text-gray-900">{form.firstName} {form.lastName}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Email:</span>
+                  <span className="font-medium text-gray-900">{form.email}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Phone:</span>
+                  <span className="font-medium text-gray-900">{form.phone}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Date:</span>
+                  <span className="font-medium text-gray-900">
+                    {new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Time:</span>
+                  <span className="font-medium text-gray-900">{selectedTime}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Participants:</span>
+                  <span className="font-medium text-gray-900">{participants}</span>
+                </div>
+                <div className="flex justify-between border-t pt-3 mt-3">
+                  <span className="text-gray-600 font-semibold">Total Amount:</span>
+                  <span className="font-bold text-blue-800 text-xl">${total.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Amount Paid:</span>
+                  <span className="font-medium text-green-600">${(paymentType === 'full' ? total : partialAmount).toFixed(2)}</span>
+                </div>
+                {paymentType === 'partial' && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Remaining Balance:</span>
+                    <span className="font-medium text-orange-600">${(total - partialAmount).toFixed(2)}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            {/* Information Notice */}
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+              <div className="flex">
+                <svg className="w-5 h-5 text-yellow-600 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd"></path>
+                </svg>
+                <div className="text-sm text-yellow-800">
+                  <p className="font-semibold mb-1">Important Information</p>
+                  <ul className="list-disc list-inside space-y-1">
+                    <li>A confirmation email has been sent to {form.email}</li>
+                    <li>Please present this QR code at check-in</li>
+                    <li>Save or screenshot this confirmation for your records</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+            
+            {/* Action Buttons */}
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                onClick={() => window.print()}
+                className="flex-1 py-3 px-6 rounded-lg border border-blue-800 text-blue-800 font-medium hover:bg-blue-50 transition flex items-center justify-center"
+              >
+                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path>
+                </svg>
+                Print Confirmation
+              </button>
+              <button
+                onClick={resetForm}
+                className="flex-1 py-3 px-6 rounded-lg bg-blue-800 text-white font-medium hover:bg-blue-900 transition flex items-center justify-center"
+              >
+                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                </svg>
+                New Booking
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+  
+  if (loadingPackage) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-800 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading package details...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !pkg) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-500 text-lg">{error || 'Package not found'}</p>
+          <button 
+            onClick={() => window.history.back()} 
+            className="mt-4 px-6 py-2 bg-blue-800 text-white rounded-lg"
+          >
+            Go Back
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center py-8 px-4">
+    <>
+      <NoAuthAccountModal />
+      <ConfirmationModal />
+      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center py-8 px-4">
         <div className="w-full max-w-6xl flex flex-col md:flex-row gap-8">
         {/* Left: Booking Form */}
         <div className="flex-1 min-w-0">
-          <div className="mb-8 bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-            <h2 className="text-xl font-semibold mb-2 text-gray-800">{pkg.name}</h2>
-            <p className="text-gray-600 mb-4 text-sm">{pkg.description}</p>
-            <div className="flex flex-wrap gap-2">
-              {pkg.features && Array.isArray(pkg.features)
-                ? <>{pkg.features.map((f: string) => (
-                    <span key={f} className="inline-flex items-center rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-800">{f}</span>
-                  ))}</>
-                : typeof pkg.features === 'string' && pkg.features.trim() !== ''
-                  ? <>{pkg.features.split(',').map((f: string) => (
-                      <span key={f.trim()} className="inline-flex items-center rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-800">{f.trim()}</span>
-                    ))}</>
-                  : null}
-            </div>
+          <div className="mb-6 md:mb-8 bg-white rounded-xl p-4 md:p-6 shadow-sm border border-gray-100">
+            <h2 className="text-lg md:text-xl font-semibold mb-2 text-gray-800">{pkg.name}</h2>
+            <p className="text-gray-600 mb-3 md:mb-4 text-xs md:text-sm">{pkg.description}</p>
+            {((pkg.features && Array.isArray(pkg.features) && pkg.features.length > 0) || 
+              (typeof pkg.features === 'string' && pkg.features.trim() !== '')) && (
+              <div className="mt-4">
+                <h3 className="text-sm font-medium text-gray-700 mb-2">Features:</h3>
+                <ul className="space-y-1.5">
+                  {pkg.features && Array.isArray(pkg.features)
+                    ? pkg.features.map((f: string, index: number) => (
+                        <li key={index} className="flex items-start text-xs md:text-sm text-gray-600">
+                          <svg className="w-4 h-4 text-blue-800 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path>
+                          </svg>
+                          <span>{f}</span>
+                        </li>
+                      ))
+                    : typeof pkg.features === 'string' && pkg.features.trim() !== ''
+                      ? pkg.features.split(',').map((f: string, index: number) => (
+                          <li key={index} className="flex items-start text-xs md:text-sm text-gray-600">
+                            <svg className="w-4 h-4 text-blue-800 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path>
+                            </svg>
+                            <span>{f.trim()}</span>
+                          </li>
+                        ))
+                      : null}
+                </ul>
+              </div>
+            )}
           </div>
           
           {/* Step Navigation */}
-          <div className="flex mb-6 bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+          <div className="flex mb-4 md:mb-6 bg-white rounded-xl p-3 md:p-4 shadow-sm border border-gray-100">
             <div className="flex-1 flex items-center">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center mr-3 ${currentStep >= 1 ? 'bg-blue-800 text-white' : 'bg-gray-200 text-gray-500'}`}>
+              <div className={`w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center mr-2 md:mr-3 text-xs md:text-sm ${currentStep >= 1 ? 'bg-blue-800 text-white' : 'bg-gray-200 text-gray-500'}`}>
                 1
               </div>
-              <span className={`text-sm font-medium ${currentStep >= 1 ? 'text-blue-800' : 'text-gray-500'}`}>Booking Details</span>
+              <span className={`text-xs md:text-sm font-medium hidden sm:inline ${currentStep >= 1 ? 'text-blue-800' : 'text-gray-500'}`}>Booking Details</span>
+              <span className={`text-xs font-medium sm:hidden ${currentStep >= 1 ? 'text-blue-800' : 'text-gray-500'}`}>Details</span>
             </div>
             <div className="flex-1 flex items-center">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center mr-3 ${currentStep >= 2 ? 'bg-blue-800 text-white' : 'bg-gray-200 text-gray-500'}`}>
+              <div className={`w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center mr-2 md:mr-3 text-xs md:text-sm ${currentStep >= 2 ? 'bg-blue-800 text-white' : 'bg-gray-200 text-gray-500'}`}>
                 2
               </div>
-              <span className={`text-sm font-medium ${currentStep >= 2 ? 'text-blue-800' : 'text-gray-500'}`}>Personal Info</span>
+              <span className={`text-xs md:text-sm font-medium hidden sm:inline ${currentStep >= 2 ? 'text-blue-800' : 'text-gray-500'}`}>Personal Info</span>
+              <span className={`text-xs font-medium sm:hidden ${currentStep >= 2 ? 'text-blue-800' : 'text-gray-500'}`}>Info</span>
             </div>
             <div className="flex-1 flex items-center">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center mr-3 ${currentStep >= 3 ? 'bg-blue-800 text-white' : 'bg-gray-200 text-gray-500'}`}>
+              <div className={`w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center mr-2 md:mr-3 text-xs md:text-sm ${currentStep >= 3 ? 'bg-blue-800 text-white' : 'bg-gray-200 text-gray-500'}`}>
                 3
               </div>
-              <span className={`text-sm font-medium ${currentStep >= 3 ? 'text-blue-800' : 'text-gray-500'}`}>Payment</span>
+              <span className={`text-xs md:text-sm font-medium ${currentStep >= 3 ? 'text-blue-800' : 'text-gray-500'}`}>Payment</span>
             </div>
           </div>
           
-          <div className="space-y-6 bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+          <div className="space-y-4 md:space-y-6 bg-white rounded-xl shadow-sm p-4 md:p-6 border border-gray-100">
             {currentStep === 1 ? (
               <>
                 {/* Room Selection - Moved to top */}
                 {pkg.rooms && pkg.rooms.length > 0 && (
-                  <div className="border border-gray-200 rounded-xl p-5">
-                    <label className="block font-medium mb-3 text-gray-800 text-sm uppercase tracking-wide">Room Selection</label>
+                  <div className="border border-gray-200 rounded-xl p-4 md:p-5">
+                    <label className="block font-medium mb-3 text-gray-800 text-xs md:text-sm uppercase tracking-wide">Room Selection</label>
                     <div className="space-y-2">
-                      {pkg.rooms.map((r) => {
-                        let room: { name: string };
-                        if (typeof r === "string") {
-                          room = { name: r };
-                        } else {
-                          const { name } = r as BookPackageRoom;
-                          room = { name };
-                        }
-                        return (
-                          <label key={room.name} className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg cursor-pointer">
-                            <input
-                              type="radio"
-                              name="roomSelection"
-                              value={room.name}
-                              checked={selectedRoom === room.name}
-                              onChange={() => setSelectedRoom(room.name)}
-                              className="accent-blue-800"
-                            />
-                            <span className="font-medium text-gray-800 text-sm">{room.name}</span>
-                          </label>
-                        );
-                      })}
+                      {pkg.rooms.map((room) => (
+                        <label key={room.id} className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg cursor-pointer">
+                          <input
+                            type="radio"
+                            name="roomSelection"
+                            value={room.id}
+                            checked={selectedRoomId === room.id}
+                            onChange={() => setSelectedRoomId(room.id)}
+                            className="accent-blue-800"
+                          />
+                          <span className="font-medium text-gray-800 text-sm">{room.name}</span>
+                          {room.capacity && <span className="text-gray-500 text-xs ml-auto">Capacity: {room.capacity}</span>}
+                        </label>
+                      ))}
                     </div>
                   </div>
                 )}
                 
                 {/* Date and Time Selection */}
-                <div className="bg-blue-50 p-5 rounded-xl">
-                  <h3 className="font-medium mb-4 text-gray-800 text-sm uppercase tracking-wide">Select Date & Time</h3>
+                <div className="bg-blue-50 p-4 md:p-5 rounded-xl">
+                  <h3 className="font-medium mb-3 md:mb-4 text-gray-800 text-xs md:text-sm uppercase tracking-wide">Select Date & Time</h3>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div>
@@ -392,172 +887,159 @@ const BookPackage: React.FC = () => {
                     
                     <div>
                       <label className="block font-medium mb-2 text-gray-800 text-sm">Time</label>
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                        {availableTimes.length > 0 ? (
-                          availableTimes.map((time) => (
-                            <label key={time} className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition ${selectedTime === time ? 'border-blue-800 bg-blue-50' : 'border-gray-300 bg-white hover:border-blue-400'}`}> 
-                              <input
-                                type="radio"
-                                name="timeSelection"
-                                value={time}
-                                checked={selectedTime === time}
-                                onChange={() => setSelectedTime(time)}
-                                className="accent-blue-800"
-                                disabled={!selectedRoom}
-                              />
-                              <span className="text-sm text-gray-800">{time}</span>
-                            </label>
-                          ))
-                        ) : (
-                          <span className="text-xs text-gray-400 col-span-2">{!selectedRoom ? 'Select a room first' : 'No available times for this room on the selected date'}</span>
-                        )}
-                      </div>
+                      {loadingTimeSlots ? (
+                        <div className="flex items-center justify-center p-4">
+                          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-800"></div>
+                          <span className="ml-2 text-sm text-gray-600">Loading available times...</span>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                          {availableTimeSlots.length > 0 ? (
+                            availableTimeSlots.map((slot) => (
+                              <label key={slot.start_time} className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition ${selectedTime === slot.start_time ? 'border-blue-800 bg-blue-50' : 'border-gray-300 bg-white hover:border-blue-400'}`}> 
+                                <input
+                                  type="radio"
+                                  name="timeSelection"
+                                  value={slot.start_time}
+                                  checked={selectedTime === slot.start_time}
+                                  onChange={() => setSelectedTime(slot.start_time)}
+                                  className="accent-blue-800"
+                                  disabled={!selectedRoomId}
+                                />
+                                <div className="flex flex-col">
+                                  <span className="text-sm text-gray-800">{slot.start_time}</span>
+                                  <span className="text-xs text-gray-500">{slot.end_time}</span>
+                                </div>
+                              </label>
+                            ))
+                          ) : (
+                            <span className="text-xs text-gray-400 col-span-2">{!selectedRoomId ? 'Select a room first' : 'No available times for this room on the selected date'}</span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                   
                   <div className="text-xs text-gray-500">
-                    <p>This package is available {pkg.availabilityType === 'daily' ? 'on selected days' : 
-                      pkg.availabilityType === 'weekly' ? 'weekly on selected weekdays' : 
+                    <p>This package is available {pkg.availability_type === 'daily' ? 'on selected days' : 
+                      pkg.availability_type === 'weekly' ? 'weekly on selected weekdays' : 
                       'monthly on selected days'}.</p>
                   </div>
                 </div>
                 
           
                 
-                <div className="bg-blue-50 p-5 rounded-xl">
-                  <label className="block font-medium mb-3 text-gray-800 text-sm uppercase tracking-wide">Participants</label>
-                  <div className="flex items-center">
+                <div className="bg-blue-50 p-4 md:p-5 rounded-xl">
+                  <label className="block font-medium mb-3 text-gray-800 text-xs md:text-sm uppercase tracking-wide">Participants</label>
+                  <div className="flex items-center flex-wrap gap-2">
                     <button 
-                      className="w-10 h-10 rounded-lg bg-white border border-gray-300 text-gray-800 flex items-center justify-center shadow-sm"
-                      onClick={() => setParticipants(Math.max(Number(pkg.maxParticipants), participants - 1))}
+                      className="w-9 h-9 md:w-10 md:h-10 rounded-lg bg-white border border-gray-300 text-gray-800 flex items-center justify-center shadow-sm text-sm md:text-base"
+                      onClick={() => setParticipants(Math.max(Number(pkg.max_participants), participants - 1))}
                     >
                       -
                     </button>
                     <input 
                       type="number" 
-                      min={Number(pkg.maxParticipants)} 
-                      max={Number(pkg.maxParticipants) + 10} 
+                      min={Number(pkg.max_participants)} 
+                      max={Number(pkg.max_participants) + 10} 
                       value={participants} 
-                      onChange={e => setParticipants(Math.max(Number(pkg.maxParticipants), Math.min(Number(pkg.maxParticipants) + 10, Number(e.target.value))))} 
-                      className="w-16 text-center mx-3 rounded-lg border border-gray-300 px-2 py-2 text-base font-medium text-gray-800" 
+                      onChange={e => setParticipants(Math.max(Number(pkg.max_participants), Math.min(Number(pkg.max_participants) + 10, Number(e.target.value))))} 
+                      className="w-14 md:w-16 text-center rounded-lg border border-gray-300 px-2 py-2 text-sm md:text-base font-medium text-gray-800" 
                     />
                     <button 
-                      className="w-10 h-10 rounded-lg bg-white border border-gray-300 text-gray-800 flex items-center justify-center shadow-sm"
-                      onClick={() => setParticipants(Math.min(Number(pkg.maxParticipants) + 10, participants + 1))}
+                      className="w-9 h-9 md:w-10 md:h-10 rounded-lg bg-white border border-gray-300 text-gray-800 flex items-center justify-center shadow-sm text-sm md:text-base"
+                      onClick={() => setParticipants(Math.min(Number(pkg.max_participants) + 10, participants + 1))}
                     >
                       +
                     </button>
-                    <span className="ml-4 text-sm text-gray-500">
-                      Min: {pkg.maxParticipants} included, then ${pkg.pricePerAdditional} per additional
+                    <span className="text-xs md:text-sm text-gray-500 w-full sm:w-auto mt-2 sm:mt-0">
+                      Min: {pkg.max_participants} included, then ${pkg.price_per_additional} per additional
                     </span>
                   </div>
                 </div>
                 
                 {pkg.attractions && pkg.attractions.length > 0 && (
-                  <div className="border border-gray-200 rounded-xl p-5">
-                    <label className="block font-medium mb-3 text-gray-800 text-sm uppercase tracking-wide">Additional Attractions</label>
+                  <div className="border border-gray-200 rounded-xl p-4 md:p-5">
+                    <label className="block font-medium mb-3 text-gray-800 text-xs md:text-sm uppercase tracking-wide">Additional Attractions</label>
                     <div className="space-y-4">
-                      {pkg.attractions.map((a) => {
-                        // If a is an object, use its properties; if string, use all available from attractions array
-                        let attraction: { name: string; price?: number; unit?: string };
-                        if (typeof a === "string") {
-                          // Try to find the full object in attractions array if available
-                          const found = attractions.find(attr => attr.name === a);
-                          if (found) {
-                            attraction = found;
-                          } else {
-                            attraction = { name: a };
-                          }
-                        } else {
-                          const { name, price, unit } = a as { name: string; price?: number; unit?: string };
-                          attraction = { name, price, unit };
-                        }
-                        return (
-                          <div key={attraction.name} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                            <div>
-                              <span className="font-medium text-gray-800 text-sm">{attraction.name}</span>
-                              <span className="block text-xs text-gray-500 mt-1">
-                                {typeof attraction.price === "number"
-                                  ? `$${attraction.price}${attraction.unit ? ` ${attraction.unit}` : ''}`
-                                  : <span className="text-red-500">No price set</span>}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <button 
-                                className="w-8 h-8 rounded-md bg-white border border-gray-300 text-gray-800 flex items-center justify-center text-sm shadow-sm"
-                                onClick={() => handleAttractionQty(attraction.name, (selectedAttractions[attraction.name] || 0) - 1)}
-                              >
-                                -
-                              </button>
-                              <input 
-                                type="number" 
-                                min={0} 
-                                value={selectedAttractions[attraction.name] || 0} 
-                                onChange={e => handleAttractionQty(attraction.name, Number(e.target.value))} 
-                                className="w-12 text-center rounded-md border border-gray-300 px-1 py-1 text-sm" 
-                              />
-                              <button 
-                                className="w-8 h-8 rounded-md bg-white border border-gray-300 text-gray-800 flex items-center justify-center text-sm shadow-sm"
-                                onClick={() => handleAttractionQty(attraction.name, (selectedAttractions[attraction.name] || 0) + 1)}
-                              >
-                                +
-                              </button>
-                            </div>
+                      {pkg.attractions.map((attraction) => (
+                        <div key={attraction.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                          <div>
+                            <span className="font-medium text-gray-800 text-sm">{attraction.name}</span>
+                            <span className="block text-xs text-gray-500 mt-1">
+                              ${Number(attraction.price).toFixed(2)}
+                            </span>
                           </div>
-                        );
-                      })}
+                          <div className="flex items-center gap-2">
+                            <button 
+                              className="w-8 h-8 rounded-md bg-white border border-gray-300 text-gray-800 flex items-center justify-center text-sm shadow-sm"
+                              onClick={() => handleAttractionQty(attraction.id, (selectedAttractions[attraction.id] || 0) - 1)}
+                            >
+                              -
+                            </button>
+                            <input 
+                              type="number" 
+                              min={0} 
+                              value={selectedAttractions[attraction.id] || 0} 
+                              onChange={e => handleAttractionQty(attraction.id, Number(e.target.value))} 
+                              className="w-12 text-center rounded-md border border-gray-300 px-1 py-1 text-sm" 
+                            />
+                            <button 
+                              className="w-8 h-8 rounded-md bg-white border border-gray-300 text-gray-800 flex items-center justify-center text-sm shadow-sm"
+                              onClick={() => handleAttractionQty(attraction.id, (selectedAttractions[attraction.id] || 0) + 1)}
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}
                 
-                {pkg.addOns && pkg.addOns.length > 0 && (
-                  <div className="border border-gray-200 rounded-xl p-5">
-                    <label className="block font-medium mb-3 text-gray-800 text-sm uppercase tracking-wide">Add-ons</label>
+                {pkg.add_ons && pkg.add_ons.length > 0 && (
+                  <div className="border border-gray-200 rounded-xl p-4 md:p-5">
+                    <label className="block font-medium mb-3 text-gray-800 text-xs md:text-sm uppercase tracking-wide">Add-ons</label>
                     <div className="space-y-4">
-                      {pkg.addOns.map((a) => {
-                        const addOn = typeof a === "string" ? { name: a, price: undefined, image: undefined } : a;
-                        return (
-                          <div key={addOn.name} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg gap-4">
-                            {/* Add-on Image */}
-                            <div className="w-16 h-16 flex-shrink-0 flex items-center justify-center bg-gray-100 rounded-md border border-gray-200 overflow-hidden">
-                              {addOn.image ? (
-                                <img src={addOn.image} alt={addOn.name} className="object-cover w-full h-full" />
-                              ) : (
-                                <span className="text-gray-400 text-xs">No Image</span>
-                              )}
-                            </div>
-                            <div className="flex-1 flex flex-col justify-between">
-                              <span className="font-medium text-gray-800 text-sm">{addOn.name}</span>
-                              <span className="block text-xs text-gray-500 mt-1">
-                                {typeof addOn.price === "number" && addOn.price > 0 
-                                  ? `$${addOn.price}${addOn.unit ? ` ${addOn.unit}` : ' each'}` 
-                                  : <span className="text-red-500">No price set</span>}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <button 
-                                className="w-8 h-8 rounded-md bg-white border border-gray-300 text-gray-800 flex items-center justify-center text-sm shadow-sm"
-                                onClick={() => handleAddOnQty(addOn.name, (selectedAddOns[addOn.name] || 0) - 1)}
-                              >
-                                -
-                              </button>
-                              <input 
-                                type="number" 
-                                min={0} 
-                                value={selectedAddOns[addOn.name] || 0} 
-                                onChange={e => handleAddOnQty(addOn.name, Number(e.target.value))} 
-                                className="w-12 text-center rounded-md border border-gray-300 px-1 py-1 text-sm" 
-                              />
-                              <button 
-                                className="w-8 h-8 rounded-md bg-white border border-gray-300 text-gray-800 flex items-center justify-center text-sm shadow-sm"
-                                onClick={() => handleAddOnQty(addOn.name, (selectedAddOns[addOn.name] || 0) + 1)}
-                              >
-                                +
-                              </button>
-                            </div>
+                      {pkg.add_ons.map((addOn) => (
+                        <div key={addOn.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg gap-4">
+                          {/* Add-on Image */}
+                          <div className="w-16 h-16 flex-shrink-0 flex items-center justify-center bg-gray-100 rounded-md border border-gray-200 overflow-hidden">
+                            {addOn.image ? (
+                              <img src={ASSET_URL + addOn.image} alt={addOn.name} className="object-cover w-full h-full" />
+                            ) : (
+                              <span className="text-gray-400 text-xs">No Image</span>
+                            )}
                           </div>
-                        );
-                      })}
+                          <div className="flex-1 flex flex-col justify-between">
+                            <span className="font-medium text-gray-800 text-sm">{addOn.name}</span>
+                            <span className="block text-xs text-gray-500 mt-1">
+                              ${Number(addOn.price).toFixed(2)} each
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button 
+                              className="w-8 h-8 rounded-md bg-white border border-gray-300 text-gray-800 flex items-center justify-center text-sm shadow-sm"
+                              onClick={() => handleAddOnQty(addOn.id, (selectedAddOns[addOn.id] || 0) - 1)}
+                            >
+                              -
+                            </button>
+                            <input 
+                              type="number" 
+                              min={0} 
+                              value={selectedAddOns[addOn.id] || 0} 
+                              onChange={e => handleAddOnQty(addOn.id, Number(e.target.value))} 
+                              className="w-12 text-center rounded-md border border-gray-300 px-1 py-1 text-sm" 
+                            />
+                            <button 
+                              className="w-8 h-8 rounded-md bg-white border border-gray-300 text-gray-800 flex items-center justify-center text-sm shadow-sm"
+                              onClick={() => handleAddOnQty(addOn.id, (selectedAddOns[addOn.id] || 0) + 1)}
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}
@@ -565,8 +1047,8 @@ const BookPackage: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   {/* Promo Code Section: Only show if promos exist */}
                   {pkg.promos && pkg.promos.length > 0 && (
-                    <div className="border border-gray-200 rounded-xl p-5">
-                      <label className="block font-medium mb-3 text-gray-800 text-sm uppercase tracking-wide">Promo Code</label>
+                    <div className="border border-gray-200 rounded-xl p-4 md:p-5">
+                      <label className="block font-medium mb-3 text-gray-800 text-xs md:text-sm uppercase tracking-wide">Promo Code</label>
                       <div className="flex gap-2 items-center">
                         <input 
                           type="text" 
@@ -591,9 +1073,9 @@ const BookPackage: React.FC = () => {
                     </div>
                   )}
                   {/* Gift Card Section: Only show if gift cards exist */}
-                  {pkg.giftCards && pkg.giftCards.length > 0 && (
-                    <div className="border border-gray-200 rounded-xl p-5">
-                      <label className="block font-medium mb-3 text-gray-800 text-sm uppercase tracking-wide">Gift Card</label>
+                  {pkg.gift_cards && pkg.gift_cards.length > 0 && (
+                    <div className="border border-gray-200 rounded-xl p-4 md:p-5">
+                      <label className="block font-medium mb-3 text-gray-800 text-xs md:text-sm uppercase tracking-wide">Gift Card</label>
                       <div className="flex gap-2 items-center">
                         <input 
                           type="text" 
@@ -621,9 +1103,9 @@ const BookPackage: React.FC = () => {
                 
                 <div className="flex justify-end pt-4">
                   <button 
-                    className={`py-3 px-6 rounded-lg font-medium transition shadow-sm flex items-center ${(!selectedRoom || !selectedTime) ? 'bg-gray-300 text-gray-400 cursor-not-allowed' : 'bg-blue-800 text-white hover:bg-blue-800'}`}
+                    className={`py-2.5 md:py-3 px-4 md:px-6 rounded-lg font-medium transition shadow-sm flex items-center text-sm md:text-base ${(!selectedRoomId || !selectedTime) ? 'bg-gray-300 text-gray-400 cursor-not-allowed' : 'bg-blue-800 text-white hover:bg-blue-800'}`}
                     onClick={() => setCurrentStep(2)}
-                    disabled={!selectedRoom || !selectedTime}
+                    disabled={!selectedRoomId || !selectedTime}
                   >
                     Continue to Personal Info
                     <svg className="ml-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -634,8 +1116,18 @@ const BookPackage: React.FC = () => {
               </>
             ) : currentStep === 2 ? (
               <>
-                <h3 className="text-lg font-medium text-gray-800 mb-6 border-b pb-3">Personal Information</h3>
+                <h3 className="text-base md:text-lg font-medium text-gray-800 mb-4 md:mb-6 border-b pb-3">Personal Information</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div className="md:col-span-2">
+                    <label className="block font-medium mb-2 text-gray-800 text-sm">Email</label>
+                    <input 
+                      type="email" 
+                      placeholder="Email" 
+                      className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600" 
+                      value={form.email} 
+                      onChange={e => setForm(f => ({ ...f, email: e.target.value }))} 
+                    />
+                  </div>
                   <div>
                     <label className="block font-medium mb-2 text-gray-800 text-sm">First Name</label>
                     <input 
@@ -654,16 +1146,6 @@ const BookPackage: React.FC = () => {
                       className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600" 
                       value={form.lastName} 
                       onChange={e => setForm(f => ({ ...f, lastName: e.target.value }))} 
-                    />
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="block font-medium mb-2 text-gray-800 text-sm">Email</label>
-                    <input 
-                      type="email" 
-                      placeholder="Email" 
-                      className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600" 
-                      value={form.email} 
-                      onChange={e => setForm(f => ({ ...f, email: e.target.value }))} 
                     />
                   </div>
                   <div className="md:col-span-2">
@@ -689,18 +1171,18 @@ const BookPackage: React.FC = () => {
                   </div>
                 </div>
                 
-                <div className="flex justify-between pt-6">
+                <div className="flex justify-between pt-6 gap-2">
                   <button 
-                    className="py-3 px-6 rounded-lg bg-gray-200 text-gray-800 font-medium hover:bg-gray-300 transition flex items-center"
+                    className="py-2.5 md:py-3 px-4 md:px-6 rounded-lg bg-gray-200 text-gray-800 font-medium hover:bg-gray-300 transition flex items-center text-sm md:text-base"
                     onClick={() => setCurrentStep(1)}
                   >
-                    <svg className="mr-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <svg className="mr-1 md:mr-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"></path>
                     </svg>
-                    Back
+                    <span className="hidden sm:inline">Back</span>
                   </button>
                   <button 
-                    className={`py-3 px-6 rounded-lg font-medium transition shadow-sm flex items-center ${(!form.firstName || !form.lastName || !form.email || !form.phone) ? 'bg-gray-300 text-gray-400 cursor-not-allowed' : 'bg-blue-800 text-white hover:bg-blue-800'}`}
+                    className={`py-2.5 md:py-3 px-4 md:px-6 rounded-lg font-medium transition shadow-sm flex items-center text-sm md:text-base ${(!form.firstName || !form.lastName || !form.email || !form.phone) ? 'bg-gray-300 text-gray-400 cursor-not-allowed' : 'bg-blue-800 text-white hover:bg-blue-800'}`}
                     onClick={() => setCurrentStep(3)}
                     disabled={!form.firstName || !form.lastName || !form.email || !form.phone}
                   >
@@ -713,100 +1195,201 @@ const BookPackage: React.FC = () => {
               </>
             ) : (
               <>
-                <h3 className="text-lg font-medium text-gray-800 mb-6 border-b pb-3">Payment Method</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-6">
-                  <div 
-                    className={`border rounded-xl p-5 cursor-pointer transition ${paymentMethod === "stripe" ? "border-blue-600 bg-blue-50" : "border-gray-300 hover:border-gray-400 bg-white"}`}
-                    onClick={() => setPaymentMethod("stripe")}
-                  >
-                    <div className="flex items-center">
-                      <div className={`w-5 h-5 rounded-full border flex items-center justify-center mr-3 ${paymentMethod === "stripe" ? "border-blue-600 bg-blue-600" : "border-gray-400 bg-white"}`}>
-                        {paymentMethod === "stripe" && <div className="w-2 h-2 rounded-full bg-white"></div>}
-                      </div>
-                      <span className="font-medium text-sm">Credit/Debit Card</span>
-                      <div className="ml-auto flex">
-                        <div className="bg-gray-100 rounded-sm p-1">
-                          <svg className="w-6 h-4" viewBox="0 0 24 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M21.5 0H2.5C1.125 0 0 1.125 0 2.5V13.5C0 14.875 1.125 16 2.5 16H21.5C22.875 16 24 14.875 24 13.5V2.5C24 1.125 22.875 0 21.5 0Z" fill="#172B85"/>
-                            <path d="M24 5.5H0V10.5H24V5.5Z" fill="#FF5F00"/>
-                            <path d="M9 8C9 6.625 9.75 5.5 11 5.5C10.125 4.5 8.875 4 7.5 4C4.75 4 2.5 6.25 2.5 9C2.5 11.75 4.75 14 7.5 14C8.875 14 10.125 13.5 11 12.5C9.75 12.5 9 11.375 9 10" fill="#EB001B"/>
-                            <path d="M21.5 8C21.5 6.25 19.75 4 17 4C15.625 4 14.375 4.5 13.5 5.5C14.75 5.5 15.5 6.625 15.5 8C15.5 9.375 14.75 10.5 13.5 10.5C14.375 11.5 15.625 12 17 12C19.75 12 21.5 9.75 21.5 8Z" fill="#F79E1B"/>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 md:mb-6 gap-3">
+                  <div>
+                    <h3 className="text-base md:text-lg font-semibold text-gray-900">Payment Information</h3>
+                    <p className="text-xs md:text-sm text-gray-600 mt-1">Secure payment powered by Authorize.Net</p>
+                  </div>
+                  <div className="flex gap-1.5 md:gap-2">
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/5/5e/Visa_Inc._logo.svg" alt="Visa" className="h-5 md:h-6 opacity-80" />
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/2/2a/Mastercard-logo.svg" alt="Mastercard" className="h-5 md:h-6 opacity-80" />
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/f/fa/American_Express_logo_%282018%29.svg" alt="Amex" className="h-5 md:h-6 opacity-80" />
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/5/57/Discover_Card_logo.svg" alt="Discover" className="h-5 md:h-6 opacity-80" />
+                  </div>
+                </div>
+                
+                {/* Card Information Form */}
+                <div className="space-y-4 mb-6">
+                  
+                  {/* Card Number */}
+                  <div>
+                    <label className="block font-medium mb-2 text-gray-800 text-sm">Card Number</label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={cardNumber}
+                        onChange={handleCardNumberChange}
+                        placeholder="1234 5678 9012 3456"
+                        className={`w-full rounded-lg border px-4 py-3 text-sm font-mono focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition ${
+                          cardNumber && validateCardNumber(cardNumber)
+                            ? 'border-green-400 bg-green-50'
+                            : cardNumber
+                            ? 'border-red-400'
+                            : 'border-gray-300'
+                        }`}
+                        maxLength={19}
+                        disabled={isProcessingPayment}
+                      />
+                      {cardNumber && validateCardNumber(cardNumber) && (
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                          <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path>
                           </svg>
                         </div>
-                      </div>
+                      )}
+                    </div>
+                    {cardNumber && (
+                      <p className="text-xs mt-2 text-gray-600">{getCardType(cardNumber)}</p>
+                    )}
+                  </div>
+                  
+                  {/* Expiration Date and CVV */}
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <label className="block font-medium mb-2 text-gray-800 text-sm">Exp Month</label>
+                      <select
+                        value={cardMonth}
+                        onChange={(e) => setCardMonth(e.target.value)}
+                        className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                        disabled={isProcessingPayment}
+                      >
+                        <option value="">MM</option>
+                        {Array.from({ length: 12 }, (_, i) => {
+                          const month = (i + 1).toString().padStart(2, '0');
+                          return <option key={month} value={month}>{month}</option>;
+                        })}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block font-medium mb-2 text-gray-800 text-sm">Exp Year</label>
+                      <select
+                        value={cardYear}
+                        onChange={(e) => setCardYear(e.target.value)}
+                        className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                        disabled={isProcessingPayment}
+                      >
+                        <option value="">YYYY</option>
+                        {Array.from({ length: 10 }, (_, i) => {
+                          const year = (new Date().getFullYear() + i).toString();
+                          return <option key={year} value={year}>{year}</option>;
+                        })}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block font-medium mb-2 text-gray-800 text-sm">CVV</label>
+                      <input
+                        type="text"
+                        value={cardCVV}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/\D/g, '');
+                          if (value.length <= 4) {
+                            setCardCVV(value);
+                          }
+                        }}
+                        placeholder="123"
+                        className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm font-mono focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                        maxLength={4}
+                        disabled={isProcessingPayment}
+                      />
                     </div>
                   </div>
-                  <div 
-                    className={`border rounded-xl p-5 cursor-pointer transition ${paymentMethod === "paypal" ? "border-blue-600 bg-blue-50" : "border-gray-300 hover:border-gray-400 bg-white"}`}
-                    onClick={() => setPaymentMethod("paypal")}
-                  >
-                    <div className="flex items-center">
-                      <div className={`w-5 h-5 rounded-full border flex items-center justify-center mr-3 ${paymentMethod === "paypal" ? "border-blue-600 bg-blue-600" : "border-gray-400 bg-white"}`}>
-                        {paymentMethod === "paypal" && <div className="w-2 h-2 rounded-full bg-white"></div>}
-                      </div>
-                      <span className="font-medium text-sm">PayPal</span>
-                      <div className="ml-auto flex">
-                        <div className="bg-gray-100 rounded-sm p-1">
-                          <svg className="w-6 h-4" viewBox="0 0 24 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M20 0H4C1.75 0 0 1.75 0 4V12C0 14.25 1.75 16 4 16H20C22.25 16 24 14.25 24 12V4C24 1.75 22.25 0 20 0Z" fill="#27346A"/>
-                            <path d="M19.25 4.75C19.25 6.5 17.75 8 16 8H12.5L11.5 12H9.75L11 7.25H15.5C16 7.25 16.5 6.75 16.5 6.25C16.5 5.75 16 5.25 15.5 5.25H11.25L11 4H16C17.75 4 19.25 5.5 19.25 7.25V4.75Z" fill="#2790C3"/>
-                            <path d="M17.75 7.25C17.75 5.5 16.25 4 14.5 4H10.25L9.25 8H7.5L8.75 3.25H13.25C13.75 3.25 14.25 3.75 14.25 4.25C14.25 4.75 13.75 5.25 13.25 5.25H9L8.75 4H13.25C14.75 4 16 5.25 16 6.75C16 8.25 14.75 9.5 13.25 9.5H11.75L11 12.75H9.25L10.25 8.75H11.75C13.5 8.75 15 7.25 15 5.5C15 5.5 17.75 5.5 17.75 7.25Z" fill="#2790C3"/>
-                          </svg>
-                        </div>
-                      </div>
+                  
+                  {/* Error Message */}
+                  {paymentError && (
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-800 flex items-start gap-2">
+                      <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd"></path>
+                      </svg>
+                      <span>{paymentError}</span>
+                    </div>
+                  )}
+                  
+                  {/* Security Notice */}
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-start gap-2">
+                    <svg className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd"></path>
+                    </svg>
+                    <div className="text-sm text-blue-900">
+                      <p className="font-semibold">Secure Payment</p>
+                      <p className="text-xs text-blue-800 mt-0.5">256-bit SSL encrypted • PCI compliant • Powered by Authorize.Net</p>
                     </div>
                   </div>
                 </div>
+                
                 {/* Payment Type Selection */}
-                <div className="mt-6 mb-4">
-                  <label className="block font-medium mb-2 text-gray-800 text-sm">Select Payment Type</label>
-                  <div className="flex gap-4">
-                    <label className="flex items-center gap-2 cursor-pointer">
+                <div className="mt-4 md:mt-6 mb-4 border border-gray-200 rounded-xl p-4 md:p-5">
+                  <label className="block font-medium mb-3 text-gray-800 text-xs md:text-sm">Select Payment Type</label>
+                  <div className="space-y-3">
+                    <label className="flex items-start gap-3 cursor-pointer p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition">
                       <input
                         type="radio"
                         name="paymentType"
                         value="full"
                         checked={paymentType === 'full'}
                         onChange={() => setPaymentType('full')}
-                        className="accent-blue-800"
+                        className="mt-1 accent-blue-800"
                       />
-                      <span className="text-sm">Full Payment</span>
+                      <div className="flex-1">
+                        <div className="font-medium text-sm text-gray-900">Full Payment</div>
+                        <div className="text-xs text-gray-600 mt-1">Pay the complete amount now (${total.toFixed(2)})</div>
+                      </div>
                     </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="paymentType"
-                        value="partial"
-                        checked={paymentType === 'partial'}
-                        onChange={() => setPaymentType('partial')}
-                        className="accent-blue-800"
-                      />
-                      <span className="text-sm">Partial Payment (20%)</span>
-                    </label>
+                    {partialAmount > 0 && (
+                      <label className="flex items-start gap-3 cursor-pointer p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition">
+                        <input
+                          type="radio"
+                          name="paymentType"
+                          value="partial"
+                          checked={paymentType === 'partial'}
+                          onChange={() => setPaymentType('partial')}
+                          className="mt-1 accent-blue-800"
+                        />
+                        <div className="flex-1">
+                          <div className="font-medium text-sm text-gray-900">
+                            Partial Payment {pkg.partial_payment_percentage ? `(${pkg.partial_payment_percentage}%)` : ''}
+                          </div>
+                          <div className="text-xs text-gray-600 mt-1">
+                            Pay <span className="font-semibold text-blue-800">${partialAmount.toFixed(2)}</span> now. 
+                            Remaining <span className="font-semibold">${(total - partialAmount).toFixed(2)}</span> will be paid on-site.
+                          </div>
+                        </div>
+                      </label>
+                    )}
                   </div>
-                  {paymentType === 'partial' && (
-                    <div className="mt-2 text-xs text-gray-600">
-                      You will pay <span className="font-semibold text-blue-800">${partialAmount.toFixed(2)}</span> now. Remaining balance will be paid on site.
-                    </div>
-                  )}
                 </div>
                 
-                <div className="flex justify-between pt-6">
+                <div className="flex justify-between pt-6 gap-2">
                   <button 
-                    className="py-3 px-6 rounded-lg bg-gray-200 text-gray-800 font-medium hover:bg-gray-300 transition flex items-center"
+                    className="py-2.5 md:py-3 px-4 md:px-6 rounded-lg bg-gray-200 text-gray-800 font-medium hover:bg-gray-300 transition flex items-center text-sm md:text-base"
                     onClick={() => setCurrentStep(2)}
                   >
-                    <svg className="mr-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <svg className="mr-1 md:mr-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"></path>
                     </svg>
-                    Back
+                    <span className="hidden sm:inline">Back</span>
                   </button>
                   <button 
-                    className={`py-3 px-8 rounded-lg font-medium transition shadow-sm ${(!paymentMethod || !paymentType) ? 'bg-gray-300 text-gray-400 cursor-not-allowed' : 'bg-blue-800 text-white hover:bg-blue-800'}`}
+                    className={`py-2.5 md:py-3 px-4 md:px-8 rounded-lg font-medium transition shadow-sm flex items-center justify-center text-sm md:text-base ${
+                      isProcessingPayment || !cardNumber || !cardMonth || !cardYear || !cardCVV || !validateCardNumber(cardNumber)
+                        ? 'bg-gray-300 text-gray-400 cursor-not-allowed' 
+                        : 'bg-blue-800 text-white hover:bg-blue-900'
+                    }`}
                     onClick={handlePayNow}
-                    disabled={!paymentMethod || !paymentType}
+                    disabled={isProcessingPayment || !cardNumber || !cardMonth || !cardYear || !cardCVV || !validateCardNumber(cardNumber)}
                   >
-                    Pay Now
+                    {isProcessingPayment ? (
+                      <>
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                        Processing Payment...
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                        </svg>
+                        Pay ${paymentType === 'full' ? total.toFixed(2) : partialAmount.toFixed(2)}
+                      </>
+                    )}
                   </button>
                 </div>
               </>
@@ -816,12 +1399,12 @@ const BookPackage: React.FC = () => {
         
         {/* Right: Order Summary */}
         <div className="w-full md:w-80 flex-shrink-0">
-            <div className="bg-white rounded-xl shadow-sm p-6 sticky top-6 border border-gray-100">
-              <h3 className="font-semibold text-lg mb-5 text-gray-800 border-b pb-4">Order Summary</h3>
+            <div className="bg-white rounded-xl shadow-sm p-4 md:p-6 sticky top-6 border border-gray-100">
+              <h3 className="font-semibold text-base md:text-lg mb-4 md:mb-5 text-gray-800 border-b pb-3 md:pb-4">Order Summary</h3>
               {/* Package Image in Order Summary */}
               {pkg.image && (
                 <div className="mb-4 w-full flex justify-center">
-                  <img src={pkg.image} alt={pkg.name} className="max-h-32 rounded-lg object-contain border border-gray-200" />
+                  <img src={ASSET_URL + pkg.image} alt={pkg.name} className="max-h-32 rounded-lg object-contain border border-gray-200" />
                 </div>
               )}
               <div className="mb-5">
@@ -860,41 +1443,27 @@ const BookPackage: React.FC = () => {
               {Object.entries(selectedAttractions).some(([, qty]) => qty > 0) && (
                 <div>
                   <div className="font-medium text-gray-800 mb-2 text-sm">Attractions</div>
-                  {Object.entries(selectedAttractions).filter(([, qty]) => qty > 0).map(([name, qty]) => {
-                    let price = 0;
-                    let unit = '';
-                    if (pkg) {
-                      for (const a of pkg.attractions) {
-                        if (typeof a === "string" && a === name) {
-                          // Look up in master attractions list
-                          const masterAttraction = attractions.find(attr => attr.name === name);
-                          if (masterAttraction) {
-                            price = masterAttraction.price || 0;
-                            unit = masterAttraction.unit || '';
-                          }
-                          break;
-                        } else if (typeof a === "object" && a.name === name) {
-                          price = a.price || 0;
-                          unit = a.unit || '';
-                          break;
-                        }
-                      }
-                    }
+                  {Object.entries(selectedAttractions).filter(([, qty]) => qty > 0).map(([idStr, qty]) => {
+                    const id = Number(idStr);
+                    const attraction = pkg.attractions.find((a) => a.id === id);
+                    if (!attraction) return null;
+                    const price = Number(attraction.price);
+                    
                     return (
-                      <div key={name} className="flex justify-between text-gray-600 pl-2 text-xs mb-1">
-                        <span>{name} x{qty}</span>
-                        <span>${(price * qty).toFixed(2)}{unit && ` (${unit})`}</span>
+                      <div key={id} className="flex justify-between text-gray-600 pl-2 text-xs mb-1">
+                        <span>{attraction.name} x{qty}</span>
+                        <span>${(price * qty).toFixed(2)}</span>
                       </div>
                     );
                   })}
                 </div>
               )}
               
-              {selectedRoom && (
+              {selectedRoomId && (
                 <div>
                   <div className="font-medium text-gray-800 mb-2 text-sm">Room</div>
                   <div className="flex justify-between text-gray-600 pl-2 text-xs mb-1">
-                    <span>{selectedRoom}</span>
+                    <span>{pkg.rooms.find(r => r.id === selectedRoomId)?.name}</span>
                   </div>
                 </div>
               )}
@@ -902,22 +1471,16 @@ const BookPackage: React.FC = () => {
               {Object.entries(selectedAddOns).some(([, qty]) => qty > 0) && (
                 <div>
                   <div className="font-medium text-gray-800 mb-2 text-sm">Add-ons</div>
-                  {Object.entries(selectedAddOns).filter(([, qty]) => qty > 0).map(([name, qty]) => {
-                    let price = 0;
-                    let unit = '';
-                    if (pkg) {
-                      for (const a of pkg.addOns) {
-                        if ((typeof a === "string" && a === name) || (typeof a === "object" && a.name === name)) {
-                          price = typeof a === "object" && typeof a.price === "number" ? a.price : 0;
-                          unit = typeof a === "object" && a.unit ? a.unit : '';
-                          break;
-                        }
-                      }
-                    }
+                  {Object.entries(selectedAddOns).filter(([, qty]) => qty > 0).map(([idStr, qty]) => {
+                    const id = Number(idStr);
+                    const addOn = pkg.add_ons.find((a) => a.id === id);
+                    if (!addOn) return null;
+                    const price = Number(addOn.price);
+                    
                     return (
-                      <div key={name} className="flex justify-between text-gray-600 pl-2 text-xs mb-1">
-                        <span>{name} x{qty}</span>
-                        <span>${(price * qty).toFixed(2)}{unit && ` (${unit})`}</span>
+                      <div key={id} className="flex justify-between text-gray-600 pl-2 text-xs mb-1">
+                        <span>{addOn.name} x{qty}</span>
+                        <span>${(price * qty).toFixed(2)}</span>
                       </div>
                     );
                   })}
@@ -951,6 +1514,7 @@ const BookPackage: React.FC = () => {
         </div>
       </div>
     </div>
+    </>
   );
 };
 

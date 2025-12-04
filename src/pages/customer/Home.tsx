@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   MapPin, 
   Calendar, 
@@ -15,6 +15,8 @@ import {
   DollarSign
 } from 'lucide-react';
 import type { Attraction, Package as PackageType, BookingType } from '../../types/customer';
+import { customerService, type GroupedAttraction, type GroupedPackage } from '../../services/CustomerService';
+import { ASSET_URL } from '../../utils/storage';
 
 const EntertainmentLandingPage = () => {
   const [selectedLocation, setSelectedLocation] = useState('All Locations');
@@ -24,179 +26,105 @@ const EntertainmentLandingPage = () => {
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [showAttractionModal, setShowAttractionModal] = useState(false);
   const [showPackageModal, setShowPackageModal] = useState(false);
-
   const [activeBookingType, setActiveBookingType] = useState<BookingType | null>(null);
+  
+  // Backend data
+  const [attractions, setAttractions] = useState<Attraction[]>([]);
+  const [packages, setPackages] = useState<PackageType[]>([]);
+  const [locations, setLocations] = useState<string[]>(['All Locations']);
+  const [loading, setLoading] = useState(true);
 
-  const locations = [
-    'Brighton', 'Canton', 'Farmington', 'Lansing', 'Taylor', 
-    'Waterford', 'Sterling Heights', 'Battle Creek', 'Ypsilanti', 'Escape Room Zone'
-  ];
+  // Get customer from localStorage
+  const getCustomer = () => {
+    const customerData = localStorage.getItem('zapzone_customer');
+    return customerData ? JSON.parse(customerData) : null;
+  };
 
-  // Sample attractions data with enhanced details
-  const attractions: Attraction[] = [
-    {
-      id: 1,
-      name: 'Laser Tag Arena',
-      description: 'Experience thrilling team battles in our state-of-the-art laser tag arena with special effects and multi-level battlegrounds. Perfect for groups, parties, and competitive play.',
-      price: 25,
-      minAge: 8,
-      capacity: 20,
-      rating: 4.8,
-      image: '/api/placeholder/400/250',
-      category: 'adventure',
-      availableLocations: ['Brighton', 'Canton', 'Sterling Heights', 'Battle Creek'],
-      duration: '30 minutes'
-    },
-    {
-      id: 2,
-      name: 'VR Experience Zone',
-      description: 'Immerse yourself in virtual reality with cutting-edge technology and exciting games. Choose from action, adventure, or simulation experiences.',
-      price: 35,
-      minAge: 10,
-      capacity: 8,
-      rating: 4.9,
-      image: '/api/placeholder/400/250',
-      category: 'technology',
-      availableLocations: ['Brighton', 'Farmington', 'Ypsilanti', 'Escape Room Zone'],
-      duration: '45 minutes'
-    },
-    {
-      id: 3,
-      name: 'Bowling Alley',
-      description: 'Modern bowling lanes with automatic scoring, cosmic bowling, and premium service. Features state-of-the-art equipment and comfortable seating.',
-      price: 20,
-      minAge: 4,
-      capacity: 6,
-      rating: 4.6,
-      image: '/api/placeholder/400/250',
-      category: 'sports',
-      availableLocations: ['Brighton', 'Lansing', 'Taylor', 'Waterford', 'Sterling Heights'],
-      duration: '60 minutes'
-    },
-    {
-      id: 4,
-      name: 'Escape Room Challenge',
-      description: 'Solve puzzles and uncover mysteries in our themed escape rooms. Perfect for groups.',
-      price: 30,
-      duration: '60 minutes',
-      minAge: 12,
-      capacity: 6,
-      rating: 4.7,
-      image: '/api/placeholder/400/250',
-      category: 'adventure',
-      availableLocations: ['Escape Room Zone', 'Brighton', 'Canton', 'Ypsilanti']
-    },
-    {
-      id: 5,
-      name: 'Arcade Zone',
-      description: 'Classic and modern arcade games with prize redemption center. Fun for all ages! Over 100 games to choose from.',
-      price: 15,
-      minAge: 4,
-      capacity: 50,
-      rating: 4.5,
-      image: '/api/placeholder/400/250',
-      category: 'games',
-      availableLocations: ['Brighton', 'Canton', 'Farmington', 'Lansing', 'Taylor', 'Waterford', 'Sterling Heights', 'Battle Creek', 'Ypsilanti'],
-      duration: 'Flexible'
-    },
-    {
-      id: 6,
-      name: 'Mini Golf Course',
-      description: '18-hole indoor mini golf course with challenging obstacles and tropical theme. Perfect for families and groups.',
-      price: 18,
-      minAge: 5,
-      capacity: 4,
-      rating: 4.4,
-      image: '/api/placeholder/400/250',
-      category: 'sports',
-      availableLocations: ['Brighton', 'Waterford', 'Battle Creek'],
-      duration: '45 minutes'
+  const customer = getCustomer();
+  const isLoggedIn = customer && customer.token;
+
+  // Load data from backend on mount
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  // Reload data when search changes (with debounce)
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      loadData();
+    }, 500);
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery]);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      
+      // Fetch grouped attractions and packages from backend
+      const [attractionsResponse, packagesResponse] = await Promise.all([
+        customerService.getGroupedAttractions(searchQuery || undefined),
+        customerService.getGroupedPackages(searchQuery || undefined),
+      ]);
+
+      if (attractionsResponse.success && attractionsResponse.data) {
+        // Transform grouped attractions to match component format
+        const transformedAttractions: Attraction[] = attractionsResponse.data.map((attr: GroupedAttraction) => ({
+          id: attr.purchase_links[0]?.attraction_id || 0,
+          name: attr.name,
+          description: attr.description,
+          price: attr.price,
+          minAge: attr.min_age,
+          capacity: attr.max_capacity,
+          rating: attr.rating || 4.5,
+          image: Array.isArray(attr.image) ? attr.image[0] : attr.image,
+          category: attr.category,
+          availableLocations: attr.locations.map(loc => loc.location_name),
+          duration: `${attr.duration} ${attr.duration_unit}`,
+          pricingType: attr.pricing_type,
+          purchaseLinks: attr.purchase_links,
+        }));
+        setAttractions(transformedAttractions);
+
+        // Extract unique locations from attractions
+        const attractionLocations = new Set<string>();
+        attractionsResponse.data.forEach((attr: GroupedAttraction) => {
+          attr.locations.forEach(loc => attractionLocations.add(loc.location_name));
+        });
+        
+        // Add locations from packages too
+        if (packagesResponse.success && packagesResponse.data) {
+          packagesResponse.data.forEach((pkg: GroupedPackage) => {
+            pkg.locations.forEach(loc => attractionLocations.add(loc.location_name));
+          });
+        }
+
+        setLocations(['All Locations', ...Array.from(attractionLocations).sort()]);
+      }
+
+      if (packagesResponse.success && packagesResponse.data) {
+        // Transform grouped packages to match component format
+        const transformedPackages: PackageType[] = packagesResponse.data.map((pkg: GroupedPackage) => ({
+          id: pkg.booking_links[0]?.package_id || 0,
+          name: pkg.name,
+          description: pkg.description,
+          price: pkg.price,
+          duration: `${pkg.duration} hours`,
+          participants: `Up to ${pkg.max_guests} guests`,
+          includes: [], // This would need to be added to backend if needed
+          rating: 4.8, // Default rating, backend doesn't return this yet
+          image: Array.isArray(pkg.image) ? pkg.image[0] : pkg.image,
+          category: pkg.category,
+          availableLocations: pkg.locations.map(loc => loc.location_name),
+          bookingLinks: pkg.booking_links,
+        }));
+        setPackages(transformedPackages);
+      }
+    } catch (error) {
+      console.error('Error loading data:', error);
+    } finally {
+      setLoading(false);
     }
-  ];
-
-  // Sample packages data with enhanced details
-  const packages: PackageType[] = [
-    {
-      id: 1,
-      name: 'Birthday Bash Package',
-      description: 'The perfect birthday celebration! Includes 2 hours of unlimited attractions, private party room, and dedicated host. Make your special day unforgettable with our all-inclusive birthday package.',
-      price: 299,
-      duration: '2 hours',
-      participants: 'Up to 10 guests',
-      includes: ['Unlimited Attractions', 'Private Party Room', 'Dedicated Party Host', 'Birthday Cake Service', 'Custom Decorations', 'Party Favors', 'Reserved Seating Area', 'Priority Access to All Attractions'],
-      rating: 4.9,
-      image: '/api/placeholder/400/250',
-      category: 'celebration',
-      availableLocations: ['Brighton', 'Canton', 'Farmington', 'Lansing', 'Taylor', 'Waterford']
-    },
-    {
-      id: 2,
-      name: 'Corporate Team Building',
-      description: 'Boost team morale with our corporate package. Includes team-building activities and meeting space. Perfect for strengthening workplace relationships and improving team collaboration.',
-      price: 499,
-      duration: '3 hours',
-      participants: 'Up to 20 employees',
-      includes: ['Team Building Activities', 'Private Meeting Space', 'Catering Options Available', 'Dedicated Event Coordinator', 'AV Equipment Included', 'Customized Activity Schedule', 'Professional Facilitation', 'Post-Event Report'],
-      rating: 4.8,
-      image: '/api/placeholder/400/250',
-      category: 'corporate',
-      availableLocations: ['Brighton', 'Sterling Heights', 'Battle Creek', 'Ypsilanti']
-    },
-    {
-      id: 3,
-      name: 'Family Fun Package',
-      description: 'Create lasting memories with our family package. Perfect for family outings with mixed attractions suitable for all ages. Bring the whole family for a day of fun and bonding.',
-      price: 149,
-      duration: '2 hours',
-      participants: 'Up to 6 family members',
-      includes: ['Access to Multiple Attractions', '$50 Food & Beverage Vouchers', 'Complimentary Photo Package', 'Priority Access to All Activities', 'Family Locker Access', 'Souvenir Gift', 'Flexible Scheduling'],
-      rating: 4.7,
-      image: '/api/placeholder/400/250',
-      category: 'family',
-      availableLocations: ['Brighton', 'Canton', 'Farmington', 'Lansing', 'Taylor', 'Waterford', 'Sterling Heights', 'Battle Creek', 'Ypsilanti']
-    },
-    {
-      id: 4,
-      name: 'Adventure Seeker Package',
-      description: 'For thrill-seekers! Includes access to all high-adrenaline attractions with extended play time. Perfect for those who want maximum excitement and variety.',
-      price: 79,
-      duration: '2.5 hours',
-      participants: 'Individual or Group',
-      includes: ['2 Laser Tag Sessions', '1 VR Experience', 'Escape Room Entry', 'Priority Booking', 'Fast-Track Access', 'Complimentary Drink', 'Achievement Badge'],
-      rating: 4.6,
-      image: '/api/placeholder/400/250',
-      category: 'adventure',
-      availableLocations: ['Brighton', 'Escape Room Zone', 'Battle Creek', 'Ypsilanti']
-    },
-    {
-      id: 5,
-      name: 'Date Night Special',
-      description: 'Romantic evening package perfect for couples. Includes private bowling and arcade credits. Create special memories with your partner in a fun and relaxed atmosphere.',
-      price: 89,
-      duration: '2 hours',
-      participants: '2 people',
-      includes: ['Private Bowling Lane (1 hour)', '$30 Arcade Game Credits', '$25 Dining Credit', 'Complimentary Photo Memory Print', 'Reserved Table Seating', 'Romantic Ambiance Setup', 'Couples Discount on Future Visits'],
-      rating: 4.8,
-      image: '/api/placeholder/400/250',
-      category: 'romance',
-      availableLocations: ['Brighton', 'Canton', 'Farmington', 'Lansing', 'Sterling Heights']
-    },
-    {
-      id: 6,
-      name: 'Ultimate All-Access Pass',
-      description: 'Experience everything we have to offer! Unlimited access to all attractions for the entire day. The best value for maximum entertainment.',
-      price: 129,
-      duration: 'Full Day (Open to Close)',
-      participants: 'Individual',
-      includes: ['Unlimited Access to All Attractions', 'Unlimited Play Sessions', '20% Food & Beverage Discount', 'Express Lane Priority', 'VIP Lounge Access', 'Free Locker Rental', 'Complimentary Drink Refills', 'Souvenir Wristband', 'Early Entry (30 minutes)'],
-      rating: 4.9,
-      image: '/api/placeholder/400/250',
-      category: 'premium',
-      availableLocations: ['Brighton', 'Canton', 'Farmington', 'Lansing', 'Taylor', 'Waterford', 'Sterling Heights', 'Battle Creek', 'Ypsilanti', 'Escape Room Zone']
-    }
-  ];
-
-
+  };
   const filteredAttractions = attractions.filter(attraction => {
     const matchesLocation = selectedLocation === 'All Locations' || 
       attraction.availableLocations.includes(selectedLocation);
@@ -240,26 +168,28 @@ const EntertainmentLandingPage = () => {
   };
 
   const handleLocationSelect = (location: string) => {
-    // Redirect to booking page with selected location and item
+    // Get the selected item (attraction or package)
     const bookingItem = activeBookingType === 'attraction' ? selectedAttraction : selectedPackage;
-    const type = activeBookingType === 'attraction' ? 'attraction' : 'package';
-    
-    // Store in localStorage for the booking page to access
-    localStorage.setItem('bookingData', JSON.stringify({
-      type,
-      item: bookingItem,
-      location,
-      timestamp: new Date().toISOString()
-    }));
+    if (!bookingItem) return;
 
-    // Redirect to booking page
-    window.location.href = '/booking';
+    // Find the appropriate link for the selected location
+    if (activeBookingType === 'attraction' && selectedAttraction?.purchaseLinks) {
+      const link = selectedAttraction.purchaseLinks.find(l => l.location === location);
+      if (link) {
+        window.open(link.url, '_blank');
+      }
+    } else if (activeBookingType === 'package' && selectedPackage?.bookingLinks) {
+      const link = selectedPackage.bookingLinks.find(l => l.location === location);
+      if (link) {
+        window.open(link.url, '_blank');
+      }
+    }
   };
 
   return (
     <>
       {/* Hero Section */}
-      <section className="relative text-white py-38 overflow-hidden" style={{marginTop: '-4rem'}}>
+      <section className="relative text-white py-12 md:py-24 lg:py-38 overflow-hidden" style={{marginTop: '-4rem'}}>
         {/* Video Background (hidden on mobile) */}
         <div className="hidden md:block absolute inset-0 z-0">
           <div style={{ position: 'relative', paddingTop: '56.25%' }}>
@@ -277,36 +207,36 @@ const EntertainmentLandingPage = () => {
         <div className="block md:hidden absolute inset-0 z-0 bg-gradient-to-br from-blue-800 via-blue-700 to-violet-600"></div>
         
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <div className="mb-8">
-            <div className="inline-flex items-center space-x-2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-full mb-6">
-              <Zap className="w-5 h-5 text-yellow-300" />
-              <span className="text-sm font-medium">Premium Entertainment Experience</span>
+          <div className="mb-6 md:mb-8">
+            <div className="inline-flex items-center space-x-2 bg-white/10 backdrop-blur-sm px-3 py-1.5 md:px-4 md:py-2 rounded-full mb-4 md:mb-6">
+              <Zap className="w-4 h-4 md:w-5 md:h-5 text-yellow-300" />
+              <span className="text-xs md:text-sm font-medium">Premium Entertainment Experience</span>
             </div>
             
-            <h1 className="text-5xl md:text-7xl font-bold mb-6 bg-gradient-to-r from-white to-blue-100 bg-clip-text text-transparent">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-7xl font-bold mb-4 md:mb-6 bg-gradient-to-r from-white to-blue-100 bg-clip-text text-transparent">
               Unleash the Fun at ZapZone!
             </h1>
-            <p className="text-lg md:text-xl mb-10 text-blue-50 max-w-4xl mx-auto leading-relaxed">
+            <p className="text-sm sm:text-base md:text-lg lg:text-xl mb-6 md:mb-10 text-blue-50 max-w-4xl mx-auto leading-relaxed px-2">
               Discover thrilling attractions and amazing packages across all our locations. 
               From laser tag adventures to unforgettable celebrations - your next adventure awaits!
             </p>
           </div>
           
           {/* Enhanced Search Bar */}
-          <div className="max-w-3xl mx-auto">
+          <div className="max-w-3xl mx-auto px-2">
             <div className="relative group">
-              <div className="absolute -inset-1 bg-gradient-to-r from-white/20 to-violet-300/20  blur opacity-75 group-hover:opacity-100 transition duration-1000"></div>
+              <div className="absolute -inset-1 bg-gradient-to-r from-white/20 to-violet-300/20 rounded-lg blur opacity-75 group-hover:opacity-100 transition duration-1000"></div>
               <div className="relative">
-                <Search className="absolute left-6 top-1/2 transform -translate-y-1/2 text-blue-800" size={22} />
+                <Search className="absolute left-3 md:left-6 top-1/2 transform -translate-y-1/2 text-blue-800" size={18} />
                 <input
                   type="text"
-                  placeholder="Search attractions, or packages..."
+                  placeholder="Search attractions or packages..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-16 pr-6 py-5 text-lg text-gray-900 bg-white/95 backdrop-blur-sm  border-0 focus:outline-none focus:ring-4 focus:ring-white/30 shadow-2xl placeholder-gray-500"
+                  className="w-full pl-10 md:pl-16 pr-20 md:pr-24 py-3 md:py-5 text-sm md:text-lg text-gray-900 bg-white/95 backdrop-blur-sm rounded-lg border-0 focus:outline-none focus:ring-4 focus:ring-white/30 shadow-2xl placeholder-gray-500"
                 />
-                <div className="absolute right-4 top-1/2 transform -translate-y-1/2">
-                  <div className="bg-blue-800 text-white px-4 py-2  text-sm font-medium">
+                <div className="absolute right-2 md:right-4 top-1/2 transform -translate-y-1/2">
+                  <div className="bg-blue-800 text-white px-3 py-1.5 md:px-4 md:py-2 rounded text-xs md:text-sm font-medium">
                     Search
                   </div>
                 </div>
@@ -322,31 +252,21 @@ const EntertainmentLandingPage = () => {
       </section>
 
       {/* Location Selector Only */}
-      <section className="bg-white py-8 border-b border-gray-100">
+      <section className="bg-white py-4 md:py-8 border-b border-gray-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="space-y-6">
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <h3 className="text-sm font-semibold text-gray-900 tracking-wide">Select Locations</h3>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  onClick={() => setSelectedLocation('All Locations')}
-                  className={`px-3 py-2 text-xs font-medium transition-all duration-200 ${
-                    selectedLocation === 'All Locations'
-                        ? 'bg-blue-800 text-white shadow-sm'
-                      : 'bg-gray-50 text-gray-700 hover:bg-gray-100 hover:text-gray-900 hover:shadow-md'
-                  }`}
-                >
-                  All Locations
-                </button>
+          <div className="space-y-3 md:space-y-6">
+            <div className="space-y-2 md:space-y-3">
+              <div className="flex flex-col gap-2">
+                <h3 className="text-xs md:text-sm font-semibold text-gray-900 tracking-wide">Select Locations</h3>
+              <div className="flex flex-wrap gap-1.5 md:gap-2">
                 {locations.map(location => (
                   <button
                     key={location}
                     onClick={() => setSelectedLocation(location)}
-                    className={`px-3 py-2 text-xs font-medium transition-all duration-200 ${
+                    className={`px-2.5 py-1.5 md:px-3 md:py-2 text-xs font-medium rounded transition-all duration-200 ${
                       selectedLocation === location
                         ? 'bg-blue-800 text-white shadow-sm'
-                        : 'bg-gray-50 text-gray-700 hover:bg-gray-100 hover:text-gray-900 hover:shadow-md'
+                      : 'bg-gray-50 text-gray-700 hover:bg-gray-100 hover:text-gray-900 hover:shadow-md'
                     }`}
                   >
                     {location}
@@ -360,73 +280,85 @@ const EntertainmentLandingPage = () => {
         </div>
       </section>
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        {/* Location Info */}
-        <div className="mb-8 p-4 bg-yellow-50 border border-yellow-200">
-          <div className="flex items-center space-x-2 text-yellow-800">
-            <MapPin size={20} />
-            <span className="font-semibold">
-              {selectedLocation === 'All Locations' 
-                ? 'Showing attractions and packages from all locations' 
-                : `Showing attractions and packages available at ${selectedLocation}`}
-            </span>
+        {/* Main Content */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-12">
+        {/* Loading State */}
+        {loading ? (
+          <div className="flex justify-center items-center py-20">
+            <div className="animate-spin rounded-full h-12 w-12 md:h-16 md:w-16 border-b-4 border-blue-800"></div>
           </div>
-        </div>
-
-        {/* Attractions Section */}
-        <section className="mb-16" >
-          <div className="flex items-center justify-between mb-8">
-            <h2 className="text-3xl font-bold text-gray-900 flex items-center gap-3" id="attractions">
-              <Ticket className="w-8 h-8 text-violet-500" />
+        ) : (
+          <>
+            {/* Location Info */}
+            <div className="mb-6 md:mb-8 p-3 md:p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <div className="flex items-start md:items-center space-x-2 text-yellow-800">
+                <MapPin size={18} className="flex-shrink-0 mt-0.5 md:mt-0" />
+                <span className="font-semibold text-xs md:text-sm">
+                  {selectedLocation === 'All Locations' 
+                    ? 'Showing attractions and packages from all locations' 
+                    : `Showing attractions and packages available at ${selectedLocation}`}
+                </span>
+              </div>
+            </div>        {/* Attractions Section */}
+        <section className="mb-10 md:mb-16" >
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 md:mb-8 gap-2">
+            <h2 className="text-xl md:text-3xl font-bold text-gray-900 flex items-center gap-2 md:gap-3" id="attractions">
+              <Ticket className="w-6 h-6 md:w-8 md:h-8 text-violet-500" />
               Individual Attractions
             </h2>
-            <p className="text-gray-600">
+            <p className="text-gray-600 text-xs md:text-base">
               {filteredAttractions.length} attractions available
             </p>
           </div>
 
           {filteredAttractions.length === 0 ? (
             <div className="text-center py-12">
-              <p className="text-gray-500 text-lg">No attractions found matching your criteria.</p>
+              <p className="text-gray-500 text-sm md:text-lg">No attractions found matching your criteria.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
               {filteredAttractions.map(attraction => (
                 <div 
                   key={attraction.id} 
                   onClick={() => handleAttractionClick(attraction)}
-                  className="bg-white border border-gray-200 hover:shadow-lg transition-all cursor-pointer overflow-hidden transform hover:scale-105"
+                  className="bg-white border border-gray-200 hover:shadow-lg transition-all duration-300 cursor-pointer overflow-hidden transform hover:scale-105"
                 >
                   <div className="h-48 bg-gray-200 relative">
-                    <div className="w-full h-full bg-gradient-to-br from-violet-500 to-blue-800 flex items-center justify-center text-white text-lg font-semibold">
-                      {attraction.name}
-                    </div>
-                    <div className="absolute top-3 right-3 bg-yellow-300 text-gray-900 px-3 py-1 font-semibold flex items-center gap-1">
-                      <Star size={14} className="fill-current" />
-                      {attraction.rating}
-                    </div>
+                    {attraction.image ? (
+                      <img 
+                        src={ASSET_URL + attraction.image} 
+                        alt={attraction.name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-br from-violet-500 to-blue-800 flex items-center justify-center text-white text-lg font-semibold">
+                        {attraction.name}
+                      </div>
+                    )}
                   </div>
                   
-                  <div className="p-6">
-                    <h3 className="text-xl font-bold text-gray-900 mb-2">
+                  <div className="p-4 md:p-6">
+                    <h3 className="text-lg md:text-xl font-bold text-gray-900 mb-2">
                       {attraction.name}
                     </h3>
-                    <p className="text-gray-600 mb-4 line-clamp-2">
+                    <p className="text-sm md:text-base text-gray-600 mb-4 line-clamp-2">
                       {attraction.description}
                     </p>
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                       <div>
-                        <span className="text-2xl font-bold text-gray-900">
+                        <span className="text-xl md:text-2xl font-bold text-gray-900">
                           ${attraction.price}
                         </span>
-                        <span className="text-gray-500 text-sm ml-1">per person</span>
+                        <span className="text-gray-500 text-xs md:text-sm ml-1">per person</span>
                       </div>
                       <button
-                        onClick={() => handleBuyTickets(attraction)}
-                        className="bg-violet-500 hover:bg-violet-600 text-white px-6 py-2 font-semibold transition flex items-center gap-2"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleBuyTickets(attraction);
+                        }}
+                        className="bg-violet-500 hover:bg-violet-600 text-white px-4 py-2 md:px-6 md:py-2 rounded font-semibold transition flex items-center justify-center gap-2 text-sm md:text-base"
                       >
-                        <Ticket size={18} />
+                        <Ticket size={16} />
                         Buy Tickets
                       </button>
                     </div>
@@ -439,78 +371,85 @@ const EntertainmentLandingPage = () => {
 
         {/* Packages Section */}
         <section>
-          <div className="flex items-center justify-between mb-8" id="packages">
-            <h2 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-              <Package className="w-8 h-8 text-blue-800" />
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 md:mb-8 gap-2" id="packages">
+            <h2 className="text-xl md:text-3xl font-bold text-gray-900 flex items-center gap-2 md:gap-3">
+              <Package className="w-6 h-6 md:w-8 md:h-8 text-blue-800" />
               Experience Packages
             </h2>
-            <p className="text-gray-600">
+            <p className="text-gray-600 text-xs md:text-base">
               {filteredPackages.length} packages available
             </p>
           </div>
 
           {filteredPackages.length === 0 ? (
             <div className="text-center py-12">
-              <p className="text-gray-500 text-lg">No packages found matching your criteria.</p>
+              <p className="text-gray-500 text-sm md:text-lg">No packages found matching your criteria.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
               {filteredPackages.map(pkg => (
                 <div 
                   key={pkg.id} 
                   onClick={() => handlePackageClick(pkg)}
-                  className="bg-white border border-gray-200 hover:shadow-lg transition-all cursor-pointer overflow-hidden transform hover:scale-105"
+                  className="bg-white border border-gray-200 hover:shadow-lg transition-all duration-300 cursor-pointer overflow-hidden transform hover:scale-105"
                 >
                   <div className="h-48 bg-gray-200 relative">
-                    <div className="w-full h-full bg-gradient-to-br from-blue-800 to-violet-500 flex items-center justify-center text-white text-lg font-semibold">
-                      {pkg.name}
-                    </div>
-                    <div className="absolute top-3 right-3 bg-yellow-300 text-gray-900 px-3 py-1 font-semibold flex items-center gap-1">
-                      <Star size={14} className="fill-current" />
-                      {pkg.rating}
-                    </div>
+                    {pkg.image ? (
+                      <img 
+                        src={ASSET_URL + pkg.image} 
+                        alt={pkg.name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-br from-blue-800 to-violet-500 flex items-center justify-center text-white text-lg font-semibold">
+                        {pkg.name}
+                      </div>
+                    )}
                   </div>
                   
-                  <div className="p-6">
-                    <h3 className="text-xl font-bold text-gray-900 mb-2">
+                  <div className="p-4 md:p-6">
+                    <h3 className="text-lg md:text-xl font-bold text-gray-900 mb-2">
                       {pkg.name}
                     </h3>
-                    <p className="text-gray-600 mb-4 line-clamp-2">
+                    <p className="text-sm md:text-base text-gray-600 mb-4 line-clamp-2">
                       {pkg.description}
                     </p>
                     
                     <div className="space-y-2 mb-4">
                       {pkg.includes.slice(0, 3).map((item: string, index: number) => (
-                        <div key={index} className="flex items-center text-sm text-gray-600">
-                          <div className="w-2 h-2 bg-green-500 mr-3"></div>
-                          {item}
+                        <div key={index} className="flex items-center text-xs md:text-sm text-gray-600">
+                          <div className="w-1.5 h-1.5 md:w-2 md:h-2 bg-green-500 rounded-full mr-2 md:mr-3 flex-shrink-0"></div>
+                          <span className="line-clamp-1">{item}</span>
                         </div>
                       ))}
                     </div>
                     
-                    <div className="flex items-center justify-between text-sm text-gray-500 mb-4">
+                    <div className="flex items-center justify-between text-xs md:text-sm text-gray-500 mb-4">
                       <div className="flex items-center gap-1">
-                        <Clock size={16} />
-                        {pkg.duration}
+                        <Clock size={14} />
+                        <span className="truncate">{pkg.duration}</span>
                       </div>
                       <div className="flex items-center gap-1">
-                        <Users size={16} />
-                        {pkg.participants}
+                        <Users size={14} />
+                        <span className="truncate">{pkg.participants}</span>
                       </div>
                     </div>
                     
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                       <div>
-                        <span className="text-2xl font-bold text-gray-900">
+                        <span className="text-xl md:text-2xl font-bold text-gray-900">
                           ${pkg.price}
                         </span>
-                        <span className="text-gray-500 text-sm ml-1">package</span>
+                        <span className="text-gray-500 text-xs md:text-sm ml-1">package</span>
                       </div>
                       <button
-                        onClick={() => handleBookPackage(pkg)}
-                        className="bg-blue-800 hover:bg-blue-900 text-white px-6 py-2 font-semibold transition flex items-center gap-2"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleBookPackage(pkg);
+                        }}
+                        className="bg-blue-800 hover:bg-blue-900 text-white px-4 py-2 md:px-6 md:py-2 rounded font-semibold transition flex items-center justify-center gap-2 text-sm md:text-base"
                       >
-                        <Calendar size={18} />
+                        <Calendar size={16} />
                         Book Now
                       </button>
                     </div>
@@ -520,12 +459,14 @@ const EntertainmentLandingPage = () => {
             </div>
           )}
         </section>
+          </>
+        )}
       </main>
 
       {/* Attraction Details Modal */}
       {showAttractionModal && selectedAttraction && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onClick={() => setShowAttractionModal(false)}>
-          <div className="bg-white max-w-3xl w-full max-h-[90vh] overflow-y-auto rounded-xl shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-backdrop-fade" onClick={() => setShowAttractionModal(false)}>
+          <div className="bg-white max-w-3xl w-full max-h-[90vh] overflow-y-auto rounded-xl shadow-2xl animate-scale-in" onClick={(e) => e.stopPropagation()}>
             {/* Modal Header */}
             <div className="relative h-64 bg-gradient-to-br from-violet-500 to-blue-800">
               <button
@@ -540,10 +481,6 @@ const EntertainmentLandingPage = () => {
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="text-center">
                   <h2 className="text-4xl font-bold text-white mb-2">{selectedAttraction.name}</h2>
-                  <div className="flex items-center justify-center gap-2 text-yellow-300">
-                    <Star size={20} className="fill-current" />
-                    <span className="text-lg font-semibold">{selectedAttraction.rating} / 5.0</span>
-                  </div>
                 </div>
               </div>
             </div>
@@ -660,8 +597,8 @@ const EntertainmentLandingPage = () => {
 
       {/* Package Details Modal */}
       {showPackageModal && selectedPackage && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onClick={() => setShowPackageModal(false)}>
-          <div className="bg-white max-w-3xl w-full max-h-[90vh] overflow-y-auto rounded-xl shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-backdrop-fade" onClick={() => setShowPackageModal(false)}>
+          <div className="bg-white max-w-3xl w-full max-h-[90vh] overflow-y-auto rounded-xl shadow-2xl animate-scale-in" onClick={(e) => e.stopPropagation()}>
             {/* Modal Header */}
             <div className="relative h-64 bg-gradient-to-br from-blue-800 to-violet-500">
               <button
@@ -676,10 +613,6 @@ const EntertainmentLandingPage = () => {
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="text-center">
                   <h2 className="text-4xl font-bold text-white mb-2">{selectedPackage.name}</h2>
-                  <div className="flex items-center justify-center gap-2 text-yellow-300">
-                    <Star size={20} className="fill-current" />
-                    <span className="text-lg font-semibold">{selectedPackage.rating} / 5.0</span>
-                  </div>
                 </div>
               </div>
             </div>
@@ -852,20 +785,20 @@ const EntertainmentLandingPage = () => {
       )}
 
       {/* Footer */}
-      <footer className="bg-gray-900 text-white py-12">
+      <footer className="bg-gray-900 text-white py-8 md:py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 md:gap-8">
             <div>
-            <img src="\Zap-Zone.png" alt="Logo" className="w-3/5 mr-2 mb-5"/>
+            <img src="\Zap-Zone.png" alt="Logo" className="w-2/5 md:w-3/5 mr-2 mb-4 md:mb-5"/>
 
-              <p className="text-gray-400">
+              <p className="text-sm md:text-base text-gray-400">
                 Creating unforgettable experiences through thrilling attractions and amazing entertainment packages.
               </p>
             </div>
             
             <div>
-              <h4 className="font-semibold mb-4 text-white">Locations</h4>
-              <div className="grid grid-cols-2 gap-2 text-sm text-gray-400">
+              <h4 className="font-semibold mb-3 md:mb-4 text-white text-sm md:text-base">Locations</h4>
+              <div className="grid grid-cols-2 gap-2 text-xs md:text-sm text-gray-400">
                 {locations.slice(0, 6).map(location => (
                   <div key={location}>{location}</div>
                 ))}
@@ -873,8 +806,8 @@ const EntertainmentLandingPage = () => {
             </div>
             
             <div>
-              <h4 className="font-semibold mb-4 text-white">Contact</h4>
-              <div className="space-y-2 text-sm text-gray-400">
+              <h4 className="font-semibold mb-3 md:mb-4 text-white text-sm md:text-base">Contact</h4>
+              <div className="space-y-2 text-xs md:text-sm text-gray-400">
                 <div>info@zapzone.com</div>
                 <div>(555) 123-4567</div>
                 <div>Mon-Sun: 9AM-11PM</div>
@@ -882,22 +815,22 @@ const EntertainmentLandingPage = () => {
             </div>
             
             <div>
-              <h4 className="font-semibold mb-4 text-white">Follow Us</h4>
-              <div className="flex space-x-4">
-                <div className="w-10 h-10 bg-gray-800 flex items-center justify-center hover:bg-gray-700 transition cursor-pointer">
-                  <span className="text-white">FB</span>
+              <h4 className="font-semibold mb-3 md:mb-4 text-white text-sm md:text-base">Follow Us</h4>
+              <div className="flex space-x-3 md:space-x-4">
+                <div className="w-8 h-8 md:w-10 md:h-10 bg-gray-800 rounded flex items-center justify-center hover:bg-gray-700 transition cursor-pointer">
+                  <span className="text-white text-xs md:text-sm">FB</span>
                 </div>
-                <div className="w-10 h-10 bg-gray-800 flex items-center justify-center hover:bg-gray-700 transition cursor-pointer">
-                  <span className="text-white">IG</span>
+                <div className="w-8 h-8 md:w-10 md:h-10 bg-gray-800 rounded flex items-center justify-center hover:bg-gray-700 transition cursor-pointer">
+                  <span className="text-white text-xs md:text-sm">IG</span>
                 </div>
-                <div className="w-10 h-10 bg-gray-800 flex items-center justify-center hover:bg-gray-700 transition cursor-pointer">
-                  <span className="text-white">TW</span>
+                <div className="w-8 h-8 md:w-10 md:h-10 bg-gray-800 rounded flex items-center justify-center hover:bg-gray-700 transition cursor-pointer">
+                  <span className="text-white text-xs md:text-sm">TW</span>
                 </div>
               </div>
             </div>
           </div>
           
-          <div className="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400 text-sm">
+          <div className="border-t border-gray-800 mt-6 md:mt-8 pt-6 md:pt-8 text-center text-gray-400 text-xs md:text-sm">
             &copy; {new Date().getFullYear()} ZapZone. All rights reserved.
           </div>
         </div>

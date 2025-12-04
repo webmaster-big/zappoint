@@ -15,9 +15,12 @@ import {
   MapPin,
   Send,
   X,
-  Copy
+  Copy,
+  CheckCircle
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
+import CounterAnimation from '../../../components/ui/CounterAnimation';
+import { API_BASE_URL } from '../../../utils/storage';
 import type {
   ManageAttendantsAttendant,
   ManageAttendantsFilterOptions,
@@ -25,59 +28,115 @@ import type {
 
 interface InvitationModalProps {
   isOpen: boolean;
-  attendantName?: string;
-  generatedLink?: string;
-  loading?: boolean;
   onClose: () => void;
-  onSendInvitation: (email: string) => void;
+  onSendInvitation: (email: string, userType: 'attendant' | 'manager') => void;
 }
 
 const InvitationModal: React.FC<InvitationModalProps> = ({ 
   isOpen, 
   onClose, 
-  onSendInvitation, 
-  loading = false 
+  onSendInvitation
 }) => {
-  const { themeColor } = useThemeColor();
+  const { themeColor, fullColor } = useThemeColor();
   const [email, setEmail] = useState('');
+  const [userType, setUserType] = useState<'attendant' | 'manager'>('attendant');
   const [generatedLink, setGeneratedLink] = useState('');
+  const [isSending, setIsSending] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
-      // Generate a unique invitation link
-      const token = Math.random().toString(36).substring(2) + Date.now().toString(36);
-      const link = `${window.location.origin}/register?token=${token}&type=attendant`;
-      setGeneratedLink(link);
-    } else {
-      // Reset form when modal closes
       setEmail('');
+      setUserType('attendant');
       setGeneratedLink('');
+      setError('');
+      setSuccess(false);
     }
   }, [isOpen]);
 
-  const handleSend = () => {
-    if (email && generatedLink) {
-      onSendInvitation(email);
+  const handleSend = async () => {
+    if (!email) {
+      setError('Please enter an email address');
+      return;
+    }
+
+    setIsSending(true);
+    setError('');
+    setSuccess(false);
+
+    try {
+      // Get auth token from localStorage
+      const userData = localStorage.getItem('zapzone_user');
+      const authToken = userData ? JSON.parse(userData).token : null;
+
+      if (!authToken) {
+        throw new Error('Authentication required. Please log in again.');
+      }
+
+      // Map userType to backend role
+      const role = userType === 'manager' ? 'location_manager' : 'attendant';
+
+      const response = await fetch(`${API_BASE_URL}/shareable-tokens`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`,
+        },
+        body: JSON.stringify({
+          email: email,
+          role: role,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || 'Failed to create invitation');
+      }
+
+      // Set the generated link from backend
+      setGeneratedLink(data.data.link);
+      setSuccess(true);
+
+      // Call the parent callback
+      if (onSendInvitation) {
+        onSendInvitation(email, userType);
+      }
+
+      // Show success message
+      setTimeout(() => {
+        setSuccess(false);
+      }, 3000);
+
+    } catch (err) {
+      console.error('Error sending invitation:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to send invitation. Please try again.';
+      setError(errorMessage);
+    } finally {
+      setIsSending(false);
     }
   };
 
   const copyToClipboard = () => {
-    navigator.clipboard.writeText(generatedLink);
-    // You could add a toast notification here
-    alert('Link copied to clipboard!');
+    if (generatedLink) {
+      navigator.clipboard.writeText(generatedLink);
+      alert('Link copied to clipboard!');
+    }
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-backdrop-fade">
       <div className="bg-white rounded-xl shadow-lg max-w-md w-full">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900">Send Invitation</h3>
+          <h3 className="text-lg font-semibold text-gray-900">Send Account Invitation</h3>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 transition-colors"
+            disabled={isSending}
           >
             <X className="h-5 w-5" />
           </button>
@@ -85,6 +144,39 @@ const InvitationModal: React.FC<InvitationModalProps> = ({
 
         {/* Content */}
         <div className="p-6 space-y-4">
+          {/* Success Message */}
+          {success && (
+            <div className="p-3 bg-${themeColor}-50 border border-${themeColor}-200 rounded-lg flex items-start gap-2">
+              <CheckCircle className="w-5 h-5 text-${themeColor}-500 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-${themeColor}-800">Invitation sent successfully!</p>
+                <p className="text-xs text-${themeColor}-600 mt-1">The invitation email has been sent to {email}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Error Message */}
+          {error && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-sm text-red-700">{error}</p>
+            </div>
+          )}
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              User Type
+            </label>
+            <select
+              value={userType}
+              onChange={(e) => setUserType(e.target.value as 'attendant' | 'manager')}
+              disabled={isSending || success}
+              className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 disabled:bg-gray-100 disabled:cursor-not-allowed`}
+            >
+              <option value="attendant">Attendant</option>
+              <option value="manager">Location Manager</option>
+            </select>
+          </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Email Address
@@ -93,62 +185,68 @@ const InvitationModal: React.FC<InvitationModalProps> = ({
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="Enter attendant's email address"
-              className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
+              placeholder="Enter email address"
+              disabled={isSending || success}
+              className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 disabled:bg-gray-100 disabled:cursor-not-allowed`}
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Invitation Link
-            </label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={generatedLink}
-                readOnly
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm text-gray-600"
-              />
-              <button
-                onClick={copyToClipboard}
-                className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                title="Copy to clipboard"
-              >
-                <Copy className="h-4 w-4" />
-              </button>
+          {/* Show generated link after successful creation */}
+          {generatedLink && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Invitation Link
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={generatedLink}
+                  readOnly
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm text-gray-600"
+                />
+                <button
+                  onClick={copyToClipboard}
+                  className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                  title="Copy to clipboard"
+                >
+                  <Copy className="h-4 w-4" />
+                </button>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                This link will expire once the account is created
+              </p>
             </div>
-            <p className="text-xs text-gray-500 mt-1">
-              This link will expire once the account is created or after 7 days
-            </p>
-          </div>
+          )}
         </div>
 
         {/* Footer */}
         <div className="flex gap-3 p-6 border-t border-gray-200">
           <button
             onClick={onClose}
-            disabled={loading}
+            disabled={isSending}
             className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
           >
-            Cancel
+            {success ? 'Close' : 'Cancel'}
           </button>
-          <button
-            onClick={handleSend}
-            disabled={!email || loading}
-            className={`flex-1 px-4 py-2 bg-${themeColor}-600 text-white rounded-lg hover:bg-${themeColor}-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2`}
-          >
-            {loading ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                Sending...
-              </>
-            ) : (
-              <>
-                <Send className="h-4 w-4" />
-                Send Invitation
-              </>
-            )}
-          </button>
+          {!success && (
+            <button
+              onClick={handleSend}
+              disabled={!email || isSending}
+              className={`flex-1 px-4 py-2 bg-${fullColor} text-white rounded-lg hover:bg-${themeColor}-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2`}
+            >
+              {isSending ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  Sending...
+                </>
+              ) : (
+                <>
+                  <Send className="h-4 w-4" />
+                  Send Invitation
+                </>
+              )}
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -170,8 +268,6 @@ const ManageAttendants = () => {
   const [itemsPerPage] = useState(10);
   const [showFilters, setShowFilters] = useState(false);
   const [showInvitationModal, setShowInvitationModal] = useState(false);
-  const [sendingInvitation, setSendingInvitation] = useState(false);
-  const [selectedAttendantForInvite, setSelectedAttendantForInvite] = useState<ManageAttendantsAttendant | null>(null);
 
   // Status colors
   const statusColors = {
@@ -217,7 +313,7 @@ const ManageAttendants = () => {
       title: 'New Attendants',
       value: newAttendantsCount.toString(),
       change: 'Last 30 days',
-      accent: 'bg-green-100 text-green-800',
+      accent: `bg-${themeColor}-100 text-${fullColor}`,
       icon: Plus,
     },
     {
@@ -259,9 +355,10 @@ const ManageAttendants = () => {
     setCurrentPage(1); // Reset to first page when filters change
   }, [attendants, filters]);
 
-  // Load attendants from localStorage
+  // Load attendants from backend API
   useEffect(() => {
     loadAttendants();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Apply filters when attendants or filters change
@@ -269,89 +366,61 @@ const ManageAttendants = () => {
     applyFilters();
   }, [applyFilters]);
 
-  const loadAttendants = () => {
+  const loadAttendants = async () => {
     try {
-      const storedAttendants = localStorage.getItem('zapzone_attendants');
-      if (storedAttendants) {
-        const parsedAttendants = JSON.parse(storedAttendants);
-        setAttendants(parsedAttendants);
-      } else {
-        // Sample data for demonstration (all accounts already created)
-        const sampleAttendants: ManageAttendantsAttendant[] = [
-          {
-            id: 'att_1',
-            firstName: 'Sarah',
-            lastName: 'Johnson',
-            email: 'sarah.johnson@zapzone.com',
-            phone: '(555) 123-4567',
-            hireDate: '2024-01-15',
-            position: 'Senior Attendant',
-            employeeId: 'ZAP-001',
-            department: 'Guest Services',
-            shift: 'Evening Shift (2:00 PM - 10:00 PM)',
-            assignedAreas: ['Laser Tag Arena', 'Bowling Alley'],
-            status: 'active',
-            username: 'sarah.johnson',
-            createdAt: '2024-01-15T08:00:00Z',
-            accountCreated: true
-          },
-          {
-            id: 'att_2',
-            firstName: 'Mike',
-            lastName: 'Chen',
-            email: 'mike.chen@zapzone.com',
-            phone: '(555) 234-5678',
-            hireDate: '2024-02-01',
-            position: 'Attendant',
-            employeeId: 'ZAP-002',
-            department: 'Entertainment',
-            shift: 'Morning Shift (8:00 AM - 4:00 PM)',
-            assignedAreas: ['VR Experience', 'Arcade Zone'],
-            status: 'active',
-            username: 'mike.chen',
-            createdAt: '2024-02-01T09:30:00Z',
-            accountCreated: true
-          },
-          {
-            id: 'att_3',
-            firstName: 'Emily',
-            lastName: 'Rodriguez',
-            email: 'emily.rodriguez@zapzone.com',
-            phone: '(555) 345-6789',
-            hireDate: '2023-11-20',
-            position: 'Team Lead',
-            employeeId: 'ZAP-003',
-            department: 'Food & Beverage',
-            shift: 'Weekend Shift (10:00 AM - 6:00 PM)',
-            assignedAreas: ['Food & Beverage', 'Customer Service'],
-            status: 'inactive',
-            username: 'emily.rodriguez',
-            createdAt: '2023-11-20T14:15:00Z',
-            accountCreated: true
-          },
-          {
-            id: 'att_4',
-            firstName: 'David',
-            lastName: 'Kim',
-            email: 'david.kim@zapzone.com',
-            phone: '(555) 456-7890',
-            hireDate: '2024-03-10',
-            position: 'Attendant',
-            employeeId: 'ZAP-004',
-            department: 'Maintenance',
-            shift: 'Night Shift (6:00 PM - 2:00 AM)',
-            assignedAreas: ['Escape Room', 'VR Experience'],
-            status: 'active',
-            username: 'david.kim',
-            createdAt: '2024-03-10T10:00:00Z',
-            accountCreated: true
-          }
-        ];
-        setAttendants(sampleAttendants);
-        localStorage.setItem('zapzone_attendants', JSON.stringify(sampleAttendants));
+      const userData = localStorage.getItem('zapzone_user');
+      const authToken = userData ? JSON.parse(userData).token : null;
+
+      if (!authToken) {
+        console.error('No auth token found');
+        setLoading(false);
+        return;
       }
+
+      // Build query parameters
+      const params = new URLSearchParams();
+      if (filters.status !== 'all') params.append('status', filters.status);
+      if (filters.department !== 'all') params.append('department', filters.department);
+      if (filters.search) params.append('search', filters.search);
+      params.append('role', 'attendant'); // Only fetch attendants
+
+      const response = await fetch(`${API_BASE_URL}/users?${params.toString()}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || 'Failed to load attendants');
+      }
+
+      // Transform backend users to frontend attendant format
+      const transformedAttendants: ManageAttendantsAttendant[] = data.data.users.map((user: Record<string, unknown>) => ({
+        id: String(user.id),
+        firstName: String(user.first_name || ''),
+        lastName: String(user.last_name || ''),
+        email: String(user.email || ''),
+        phone: String(user.phone || ''),
+        hireDate: String(user.hire_date || (typeof user.created_at === 'string' ? user.created_at.split('T')[0] : '')),
+        position: String(user.position || 'Attendant'),
+        employeeId: String(user.employee_id || `ZAP-${user.id}`),
+        department: String(user.department || 'Guest Services'),
+        shift: String(user.shift || ''),
+        assignedAreas: [],
+        status: (user.status as 'active' | 'inactive') || 'active',
+        username: typeof user.email === 'string' ? user.email.split('@')[0] : '',
+        createdAt: String(user.created_at || ''),
+        accountCreated: true,
+      }));
+
+      setAttendants(transformedAttendants);
     } catch (error) {
       console.error('Error loading attendants:', error);
+      setAttendants([]);
     } finally {
       setLoading(false);
     }
@@ -388,88 +457,160 @@ const ManageAttendants = () => {
     }
   };
 
-  const handleStatusChange = (id: string, newStatus: ManageAttendantsAttendant['status']) => {
-    const updatedAttendants = attendants.map(attendant =>
-      attendant.id === id ? { ...attendant, status: newStatus } : attendant
-    );
-    setAttendants(updatedAttendants);
-    localStorage.setItem('zapzone_attendants', JSON.stringify(updatedAttendants));
-  };
+  const handleStatusChange = async (id: string, newStatus: ManageAttendantsAttendant['status']) => {
+    try {
+      const userData = localStorage.getItem('zapzone_user');
+      const authToken = userData ? JSON.parse(userData).token : null;
 
-  const handleDeleteAttendant = (id: string) => {
-    if (window.confirm('Are you sure you want to delete this attendant? This action cannot be undone.')) {
-      const updatedAttendants = attendants.filter(attendant => attendant.id !== id);
+      if (!authToken) {
+        alert('Authentication required. Please log in again.');
+        return;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/users/${id}/toggle-status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || 'Failed to update status');
+      }
+
+      // Update local state
+      const updatedAttendants = attendants.map(attendant =>
+        attendant.id === id ? { ...attendant, status: newStatus } : attendant
+      );
       setAttendants(updatedAttendants);
-      localStorage.setItem('zapzone_attendants', JSON.stringify(updatedAttendants));
+    } catch (error) {
+      console.error('Error updating status:', error);
+      alert('Failed to update attendant status. Please try again.');
     }
   };
 
-  const handleBulkDelete = () => {
+  const handleDeleteAttendant = async (id: string) => {
+    if (!window.confirm('Are you sure you want to delete this attendant? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const userData = localStorage.getItem('zapzone_user');
+      const authToken = userData ? JSON.parse(userData).token : null;
+
+      if (!authToken) {
+        alert('Authentication required. Please log in again.');
+        return;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/users/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || 'Failed to delete attendant');
+      }
+
+      // Update local state
+      const updatedAttendants = attendants.filter(attendant => attendant.id !== id);
+      setAttendants(updatedAttendants);
+    } catch (error) {
+      console.error('Error deleting attendant:', error);
+      alert('Failed to delete attendant. Please try again.');
+    }
+  };
+
+  const handleBulkDelete = async () => {
     if (selectedAttendants.length === 0) return;
     
-    if (window.confirm(`Are you sure you want to delete ${selectedAttendants.length} attendant(s)? This action cannot be undone.`)) {
+    if (!window.confirm(`Are you sure you want to delete ${selectedAttendants.length} attendant(s)? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const userData = localStorage.getItem('zapzone_user');
+      const authToken = userData ? JSON.parse(userData).token : null;
+
+      if (!authToken) {
+        alert('Authentication required. Please log in again.');
+        return;
+      }
+
+      // Delete all selected attendants
+      await Promise.all(selectedAttendants.map(id => 
+        fetch(`${API_BASE_URL}/users/${id}`, {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`,
+          },
+        })
+      ));
+
+      // Update local state
       const updatedAttendants = attendants.filter(attendant => !selectedAttendants.includes(attendant.id));
       setAttendants(updatedAttendants);
       setSelectedAttendants([]);
-      localStorage.setItem('zapzone_attendants', JSON.stringify(updatedAttendants));
+    } catch (error) {
+      console.error('Error deleting attendants:', error);
+      alert('Failed to delete some attendants. Please try again.');
     }
   };
 
-  const handleBulkStatusChange = (newStatus: ManageAttendantsAttendant['status']) => {
+  const handleBulkStatusChange = async (newStatus: ManageAttendantsAttendant['status']) => {
     if (selectedAttendants.length === 0) return;
     
-    const updatedAttendants = attendants.map(attendant =>
-      selectedAttendants.includes(attendant.id) ? { ...attendant, status: newStatus } : attendant
-    );
-    setAttendants(updatedAttendants);
-    setSelectedAttendants([]);
-    localStorage.setItem('zapzone_attendants', JSON.stringify(updatedAttendants));
+    try {
+      const userData = localStorage.getItem('zapzone_user');
+      const authToken = userData ? JSON.parse(userData).token : null;
+
+      if (!authToken) {
+        alert('Authentication required. Please log in again.');
+        return;
+      }
+
+      // Update status for all selected attendants
+      await Promise.all(selectedAttendants.map(id => 
+        fetch(`${API_BASE_URL}/users/${id}/toggle-status`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`,
+          },
+        })
+      ));
+
+      // Update local state
+      const updatedAttendants = attendants.map(attendant =>
+        selectedAttendants.includes(attendant.id) ? { ...attendant, status: newStatus } : attendant
+      );
+      setAttendants(updatedAttendants);
+      setSelectedAttendants([]);
+    } catch (error) {
+      console.error('Error updating attendant status:', error);
+      alert('Failed to update some attendant statuses. Please try again.');
+    }
   };
 
   // Send invitation to create account
-  const handleSendInvitation = (email: string) => {
-    setSendingInvitation(true);
-    
-    // Simulate API call
-    setTimeout(() => {
-      const token = Math.random().toString(36).substring(2) + Date.now().toString(36);
-      const invitationLink = `${window.location.origin}/register?token=${token}&type=attendant`;
-      const expiryDate = new Date();
-      expiryDate.setDate(expiryDate.getDate() + 7); // 7 days from now
-
-      const updatedAttendants = attendants.map(attendant => {
-        if (attendant.email === email || attendant.id === selectedAttendantForInvite?.id) {
-          return {
-            ...attendant,
-            invitationSent: true,
-            invitationLink: invitationLink,
-            invitationExpiry: expiryDate.toISOString()
-          };
-        }
-        return attendant;
-      });
-
-      setAttendants(updatedAttendants);
-      localStorage.setItem('zapzone_attendants', JSON.stringify(updatedAttendants));
-      
-      setSendingInvitation(false);
-      setShowInvitationModal(false);
-      setSelectedAttendantForInvite(null);
-      
-      // Show success message
-      alert(`Invitation sent successfully to ${email}`);
-    }, 2000);
+  const handleSendInvitation = () => {
+    // The actual API call is handled in the modal
+    // Reload attendants to get updated data from backend
+    loadAttendants();
   };
 
   // Open invitation modal for specific attendant
-  const handleInviteAttendant = (attendant?: ManageAttendantsAttendant) => {
-    if (attendant) {
-      setSelectedAttendantForInvite(attendant);
-      setShowInvitationModal(true);
-    } else {
-      setSelectedAttendantForInvite(null);
-      setShowInvitationModal(true);
-    }
+  const handleInviteAttendant = () => {
+    setShowInvitationModal(true);
   };
 
   // Get unique departments
@@ -519,18 +660,18 @@ const ManageAttendants = () => {
         <div className="flex gap-2 mt-4 sm:mt-0">
           <button
             onClick={() => handleInviteAttendant()}
-            className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+            className={`inline-flex items-center px-4 py-2 bg-${fullColor} text-white rounded-lg hover:bg-${themeColor}-900 transition-colors`}
           >
             <Send className="h-5 w-5 mr-2" />
             Send Invitation
           </button>
-          <Link
+          {/* <Link
             to="/manager/attendants/create"
             className={`inline-flex items-center px-4 py-2 bg-${fullColor} text-white rounded-lg hover:bg-${themeColor}-900 transition-colors`}
           >
             <Plus className="h-5 w-5 mr-2" />
             New Attendant
-          </Link>
+          </Link> */}
         </div>
       </div>
 
@@ -550,7 +691,7 @@ const ManageAttendants = () => {
                 <span className="text-base font-semibold text-gray-800">{metric.title}</span>
               </div>
               <div className="flex items-end gap-2 mt-2">
-                <h3 className="text-2xl font-bold text-gray-900">{metric.value}</h3>
+                <CounterAnimation value={metric.value} className="text-2xl font-bold text-gray-900" />
               </div>
               <p className="text-xs mt-1 text-gray-400">{metric.change}</p>
             </div>
@@ -827,12 +968,8 @@ const ManageAttendants = () => {
       {/* Invitation Modal */}
       <InvitationModal
         isOpen={showInvitationModal}
-        onClose={() => {
-          setShowInvitationModal(false);
-          setSelectedAttendantForInvite(null);
-        }}
+        onClose={() => setShowInvitationModal(false)}
         onSendInvitation={handleSendInvitation}
-        loading={sendingInvitation}
       />
     </div>
   );

@@ -16,13 +16,19 @@ import {
   Upload,
   X,
   CheckSquare,
-  Square
+  Square,
+  Link2
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
+import CounterAnimation from '../../../components/ui/CounterAnimation';
 import type {
   ManageAttractionsAttraction,
   ManageAttractionsFilterOptions,
 } from '../../../types/manageAttractions.types';
+import { attractionService } from '../../../services/AttractionService';
+import type { Attraction } from '../../../services/AttractionService';
+import Toast from '../../../components/ui/Toast';
+import { getStoredUser } from '../../../utils/storage';
 
 const ManageAttractions = () => {
   const { themeColor, fullColor } = useThemeColor();
@@ -43,6 +49,7 @@ const ManageAttractions = () => {
   const [showImportModal, setShowImportModal] = useState(false);
   const [selectedForExport, setSelectedForExport] = useState<string[]>([]);
   const [importData, setImportData] = useState<string>("");
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
   // Export/Import handlers
   const handleOpenExportModal = () => {
@@ -79,27 +86,49 @@ const ManageAttractions = () => {
     setShowExportModal(false);
   };
 
-  const handleImport = () => {
+  const handleImport = async () => {
     try {
       const parsedData = JSON.parse(importData);
       if (!Array.isArray(parsedData)) {
-        alert('Invalid data format. Please provide a valid JSON array of attractions.');
+        setToast({ message: 'Invalid data format. Please provide a valid JSON array of attractions.', type: 'error' });
         return;
       }
 
-      const newAttractions = parsedData.map((attraction: ManageAttractionsAttraction) => ({
-        ...attraction,
-        id: `attr_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      // Convert to API format
+      const attractionsToImport = parsedData.map((attraction: ManageAttractionsAttraction) => ({
+        location_id: 1, // Will be set by backend
+        name: attraction.name,
+        description: attraction.description,
+        price: Number(attraction.price),
+        pricing_type: attraction.pricingType || 'per_person',
+        max_capacity: Number(attraction.maxCapacity),
+        category: attraction.category,
+        duration: attraction.duration ? Number(attraction.duration) : undefined,
+        duration_unit: attraction.durationUnit as 'hours' | 'minutes',
+        availability: attraction.availability,
+        image: attraction.images?.[0],
+        is_active: attraction.status === 'active',
       }));
 
-      const updatedAttractions = [...attractions, ...newAttractions];
-      setAttractions(updatedAttractions);
-      localStorage.setItem('zapzone_attractions', JSON.stringify(updatedAttractions));
+      // Note: The backend bulkImport endpoint would need to be added to the service
+      // For now, we'll import them one by one
+      let successCount = 0;
+      for (const attraction of attractionsToImport) {
+        try {
+          await attractionService.createAttraction(attraction);
+          successCount++;
+        } catch (err) {
+          console.error('Failed to import attraction:', err);
+        }
+      }
+
       setImportData("");
       setShowImportModal(false);
-      alert(`Successfully imported ${newAttractions.length} attraction(s)!`);
+      setToast({ message: `Successfully imported ${successCount} of ${attractionsToImport.length} attraction(s)!`, type: 'success' });
+      loadAttractions(); // Reload the list
     } catch (error) {
-      alert('Invalid JSON format. Please check your data and try again.');
+      console.error('Import error:', error);
+      setToast({ message: 'Invalid JSON format. Please check your data and try again.', type: 'error' });
     }
   };
 
@@ -119,7 +148,6 @@ const ManageAttractions = () => {
   const statusColors = {
     active: `bg-${themeColor}-100 text-${fullColor}`,
     inactive: 'bg-gray-100 text-gray-800',
-    maintenance: 'bg-yellow-100 text-yellow-800'
   };
 
   // Calculate metrics data
@@ -141,7 +169,7 @@ const ManageAttractions = () => {
     {
       title: 'Avg. Price',
       value: attractions.length > 0 
-        ? `$${(attractions.reduce((sum, a) => sum + a.price, 0) / attractions.length).toFixed(2)}` 
+        ? `$${Number((attractions.reduce((sum, a) => sum + Number(a.price), 0) / attractions.length).toFixed(2))}` 
         : '$0.00',
       change: 'Per attraction',
       accent: `bg-${themeColor}-100 text-${fullColor}`,
@@ -166,93 +194,55 @@ const ManageAttractions = () => {
     applyFilters();
   }, [attractions, filters]);
 
-  const loadAttractions = () => {
+  const loadAttractions = async () => {
     try {
-      const storedAttractions = localStorage.getItem('zapzone_attractions');
-      if (storedAttractions) {
-        const parsedAttractions = JSON.parse(storedAttractions);
-        setAttractions(parsedAttractions);
-      } else {
-        // Sample data for demonstration
-        const sampleAttractions: ManageAttractionsAttraction[] = [
-          {
-            id: 'attr_1',
-            name: 'Laser Tag Arena',
-            description: 'Exciting laser tag experience for all ages with futuristic equipment and obstacles',
-            category: 'Adventure',
-            price: 25,
-            pricingType: 'per_person',
-            maxCapacity: 20,
-            duration: '30',
-            durationUnit: 'minutes',
-            location: 'Main Arena, Zone A',
-            images: ['laser-tag.jpg'],
-            status: 'active',
-            createdAt: '2024-01-10T10:30:00Z',
-            availability: {
-              monday: true,
-              tuesday: true,
-              wednesday: true,
-              thursday: true,
-              friday: true,
-              saturday: true,
-              sunday: true
-            },          
-          },
-          {
-            id: 'attr_2',
-            name: 'Bowling Lanes',
-            description: 'Modern bowling lanes with automatic scoring and shoe rental included',
-            category: 'Sports',
-            price: 20,
-            pricingType: 'per_lane',
-            maxCapacity: 6,
-            duration: '60',
-            durationUnit: 'minutes',
-            location: 'West Wing, Lane Area',
-            images: ['bowling.jpg'],
-            status: 'active',
-            createdAt: '2024-01-12T14:45:00Z',
-            availability: {
-              monday: true,
-              tuesday: true,
-              wednesday: true,
-              thursday: true,
-              friday: true,
-              saturday: true,
-              sunday: true
-            },
-          },
-          {
-            id: 'attr_3',
-            name: 'VR Experience',
-            description: 'Immersive virtual reality experiences with the latest technology',
-            category: 'Entertainment',
-            price: 35,
-            pricingType: 'per_person',
-            maxCapacity: 4,
-            duration: '20',
-            durationUnit: 'minutes',
-            location: 'Tech Zone, VR Room',
-            images: ['vr-experience.jpg'],
-            status: 'maintenance',
-            createdAt: '2024-01-05T09:15:00Z',
-            availability: {
-              monday: false,
-              tuesday: false,
-              wednesday: true,
-              thursday: true,
-              friday: true,
-              saturday: true,
-              sunday: true
-            },
-          }
-        ];
-        setAttractions(sampleAttractions);
-        localStorage.setItem('zapzone_attractions', JSON.stringify(sampleAttractions));
+      setLoading(true);
+      const params: Record<string, string | number | boolean | undefined> = {
+        search: filters.search || undefined,
+        category: filters.category !== 'all' ? filters.category : undefined,
+        per_page: 100, 
+        user_id: getStoredUser()?.id
+      };
+      
+      // Only add is_active filter if status is not 'all'
+      if (filters.status !== 'all') {
+        params.is_active = filters.status === 'active';
       }
+      
+      const response = await attractionService.getAttractions(params);
+
+      // Convert API format to component format
+      const convertedAttractions: ManageAttractionsAttraction[] = response.data.attractions.map((attr: Attraction & { location?: { id: number; name: string } }) => ({
+        id: attr.id.toString(),
+        name: attr.name,
+        description: attr.description,
+        category: attr.category,
+        price: attr.price,
+        pricingType: attr.pricing_type,
+        maxCapacity: attr.max_capacity,
+        duration: attr.duration?.toString() || '',
+        durationUnit: attr.duration_unit || 'minutes',
+        location: attr.location?.name || '',
+        locationId: attr.location_id,
+        locationName: attr.location?.name || '',
+        images: attr.image ? [attr.image] : [],
+        status: attr.is_active ? 'active' : 'inactive',
+        createdAt: attr.created_at,
+        availability: typeof attr.availability === 'object' ? attr.availability as Record<string, boolean> : {
+          monday: true,
+          tuesday: true,
+          wednesday: true,
+          thursday: true,
+          friday: true,
+          saturday: true,
+          sunday: true
+        },
+      }));
+
+      setAttractions(convertedAttractions);
     } catch (error) {
       console.error('Error loading attractions:', error);
+      setToast({ message: 'Failed to load attractions', type: 'error' });
     } finally {
       setLoading(false);
     }
@@ -316,48 +306,82 @@ const ManageAttractions = () => {
     }
   };
 
-  const handleStatusChange = (id: string, newStatus: ManageAttractionsAttraction['status']) => {
-    const updatedAttractions = attractions.map(attraction =>
-      attraction.id === id ? { ...attraction, status: newStatus } : attraction
-    );
-    setAttractions(updatedAttractions);
-    localStorage.setItem('zapzone_attractions', JSON.stringify(updatedAttractions));
-  };
-
-  const handleDeleteAttraction = (id: string) => {
-    if (window.confirm('Are you sure you want to delete this attraction? This action cannot be undone.')) {
-      const updatedAttractions = attractions.filter(attraction => attraction.id !== id);
-      setAttractions(updatedAttractions);
-      localStorage.setItem('zapzone_attractions', JSON.stringify(updatedAttractions));
+  const handleStatusChange = async (id: string, newStatus: ManageAttractionsAttraction['status']) => {
+    try {
+      if (newStatus === 'active') {
+        await attractionService.activateAttraction(Number(id));
+      } else {
+        await attractionService.deactivateAttraction(Number(id));
+      }
+      setToast({ message: 'Status updated successfully', type: 'success' });
+      loadAttractions(); // Reload the list
+    } catch (error) {
+      console.error('Error updating status:', error);
+      setToast({ message: 'Failed to update status', type: 'error' });
     }
   };
 
-  const handleBulkDelete = () => {
+  const handleDeleteAttraction = async (id: string) => {
+    if (window.confirm('Are you sure you want to delete this attraction? This action cannot be undone.')) {
+      try {
+        await attractionService.deleteAttraction(Number(id));
+        setToast({ message: 'Attraction deleted successfully', type: 'success' });
+        loadAttractions(); // Reload the list
+      } catch (error) {
+        console.error('Error deleting attraction:', error);
+        setToast({ message: 'Failed to delete attraction', type: 'error' });
+      }
+    }
+  };
+
+  const handleBulkDelete = async () => {
     if (selectedAttractions.length === 0) return;
     
     if (window.confirm(`Are you sure you want to delete ${selectedAttractions.length} attraction(s)? This action cannot be undone.`)) {
-      const updatedAttractions = attractions.filter(attraction => !selectedAttractions.includes(attraction.id));
-      setAttractions(updatedAttractions);
-      setSelectedAttractions([]);
-      localStorage.setItem('zapzone_attractions', JSON.stringify(updatedAttractions));
+      try {
+        // Delete each attraction
+        await Promise.all(
+          selectedAttractions.map(id => attractionService.deleteAttraction(Number(id)))
+        );
+        setToast({ message: `${selectedAttractions.length} attraction(s) deleted successfully`, type: 'success' });
+        setSelectedAttractions([]);
+        loadAttractions(); // Reload the list
+      } catch (error) {
+        console.error('Error deleting attractions:', error);
+        setToast({ message: 'Failed to delete some attractions', type: 'error' });
+      }
     }
   };
 
-  const handleBulkStatusChange = (newStatus: ManageAttractionsAttraction['status']) => {
+  const handleBulkStatusChange = async (newStatus: ManageAttractionsAttraction['status']) => {
     if (selectedAttractions.length === 0) return;
     
-    const updatedAttractions = attractions.map(attraction =>
-      selectedAttractions.includes(attraction.id) ? { ...attraction, status: newStatus } : attraction
-    );
-    setAttractions(updatedAttractions);
-    setSelectedAttractions([]);
-    localStorage.setItem('zapzone_attractions', JSON.stringify(updatedAttractions));
+    try {
+      // Update each attraction's status
+      await Promise.all(
+        selectedAttractions.map(id => 
+          newStatus === 'active' 
+            ? attractionService.activateAttraction(Number(id))
+            : attractionService.deactivateAttraction(Number(id))
+        )
+      );
+      setToast({ message: `${selectedAttractions.length} attraction(s) updated successfully`, type: 'success' });
+      setSelectedAttractions([]);
+      loadAttractions(); // Reload the list
+    } catch (error) {
+      console.error('Error updating attractions:', error);
+      setToast({ message: 'Failed to update some attractions', type: 'error' });
+    }
   };
 
-  const copyPurchaseLink = (id: string) => {
-    const fullPurchaseLink = `${window.location.origin}/purchase/attraction/${id}`;
+  const copyPurchaseLink = (attraction: ManageAttractionsAttraction) => {
+    // Create a URL-friendly location slug from location name or use location_id
+    const locationSlug = attraction.locationName 
+      ? attraction.locationName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
+      : `location-${attraction.locationId || '1'}`;
+    const fullPurchaseLink = `${window.location.origin}/purchase/attraction/${locationSlug}/${attraction.id}`;
     navigator.clipboard.writeText(fullPurchaseLink);
-    setCopiedLink(id);
+    setCopiedLink(attraction.id);
     setTimeout(() => setCopiedLink(null), 2000);
   };
 
@@ -432,7 +456,7 @@ const ManageAttractions = () => {
                 <span className="text-base font-semibold text-gray-800">{metric.title}</span>
               </div>
               <div className="flex items-end gap-2 mt-2">
-                <h3 className="text-2xl font-bold text-gray-900">{metric.value}</h3>
+                <CounterAnimation value={metric.value} className="text-2xl font-bold text-gray-900" />
               </div>
               <p className="text-xs mt-1 text-gray-400">{metric.change}</p>
             </div>
@@ -486,7 +510,6 @@ const ManageAttractions = () => {
                   <option value="all">All Statuses</option>
                   <option value="active">Active</option>
                   <option value="inactive">Inactive</option>
-                  <option value="maintenance">Maintenance</option>
                 </select>
               </div>
               <div>
@@ -529,7 +552,6 @@ const ManageAttractions = () => {
               <option value="">Change Status</option>
               <option value="active">Activate</option>
               <option value="inactive">Deactivate</option>
-              <option value="maintenance">Maintenance</option>
             </select>
             <button
               onClick={handleBulkDelete}
@@ -616,13 +638,12 @@ const ManageAttractions = () => {
                       >
                         <option value="active">Active</option>
                         <option value="inactive">Inactive</option>
-                        <option value="maintenance">Maintenance</option>
                       </select>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-2">
                         <button
-                          onClick={() => copyPurchaseLink(attraction.id)}
+                          onClick={() => copyPurchaseLink(attraction)}
                           className={`flex items-center px-3 py-1 bg-${themeColor}-100 text-${fullColor} rounded-lg hover:bg-${themeColor}-200 transition-colors text-xs`}
                           title="Copy purchase link"
                         >
@@ -634,10 +655,17 @@ const ManageAttractions = () => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-3">
                         <Link
-                          to={`${window.location.origin}/purchase/attraction/${attraction.id}`}
+                          to={`${window.location.origin}/purchase/attraction/${attraction.locationName ? attraction.locationName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') : `location-${attraction.locationId || '1'}`}/${attraction.id}`}
                           className={`text-${themeColor}-600 hover:text-${fullColor}`}
                           title="View Purchase Page"
                           target="_blank"
+                        >
+                          <Link2 className="h-4 w-4" />
+                        </Link>
+                        <Link
+                          to={`/attractions/details/${attraction.id}`}
+                          className={`text-${fullColor} hover:text-${themeColor}-900`}
+                          title="View Details"
                         >
                           <Eye className="h-4 w-4" />
                         </Link>
@@ -713,8 +741,8 @@ const ManageAttractions = () => {
 
       {/* Export Modal */}
       {showExportModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-backdrop-fade">
+          <div className="bg-white rounded-xl max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col animate-scale-in">
             <div className="p-6 border-b border-gray-200">
               <div className="flex justify-between items-center">
                 <div>
@@ -807,8 +835,8 @@ const ManageAttractions = () => {
 
       {/* Import Modal */}
       {showImportModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-backdrop-fade">
+          <div className="bg-white rounded-xl max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col animate-scale-in">
             <div className="p-6 border-b border-gray-200">
               <div className="flex justify-between items-center">
                 <div>
@@ -903,6 +931,17 @@ const ManageAttractions = () => {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Toast Notification */}
+      {toast && (
+        <div className="fixed top-4 right-4 z-50 animate-slide-in-right">
+          <Toast
+            message={toast.message}
+            type={toast.type}
+            onClose={() => setToast(null)}
+          />
         </div>
       )}
     </div>

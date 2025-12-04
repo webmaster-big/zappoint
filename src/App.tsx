@@ -27,6 +27,7 @@ import AttendantDashboard from "./pages/admin/AttendantDashboard";
 import PurchaseAttraction from "./pages/admin/attractions/PurchaseAttraction";
 import ManagePurchases from "./pages/admin/attractions/AttractionPurchases";
 import CreatePurchase from "./pages/admin/attractions/CreatePurchase";
+import AttractionCheckIn from "./pages/admin/attractions/AttractionCheckIn";
 import CustomerAnalytics from "./pages/admin/customer/CustomerAnalytics";
 import CustomerListing from "./pages/admin/customer/Customers";
 import CompanyAdminRegistration from "./pages/auth/Register";
@@ -52,6 +53,11 @@ import CustomerGiftCards from './pages/customer/CustomerGiftCards';
 import CustomerNotifications from "./pages/customer/CustomerNotifications";
 import CustomerLayout from "./layouts/CustomerLayout";
 import Settings from "./pages/admin/Settings";
+import Rooms from "./pages/admin/packages/Rooms";
+import ViewBooking from "./pages/admin/bookings/ViewBooking";
+import AttractionDetails from "./pages/admin/attractions/AttractionDetails";
+import PurchaseDetails from "./pages/admin/attractions/PurchaseDetails";
+import PackageDetails from "./pages/admin/packages/PackageDetails";
 
 
 function App() {
@@ -60,7 +66,7 @@ function App() {
       <PageTitleSetter />
       <Routes>
         <Route path="/admin" element={<Login />} />
-        <Route path="/register" element={<CompanyAdminRegistration />} />
+        <Route path="/admin/register" element={<CompanyAdminRegistration />} />
         <Route path="/home" element={<Home />} />
         <Route path="/customer/login" element={<CustomerLogin />} />
         <Route path="/customer/register" element={<CustomerRegister />} />
@@ -70,25 +76,32 @@ function App() {
           <Route path="/customer/gift-cards" element={<CustomerGiftCards />} />
           <Route path="/customer/notifications" element={<CustomerNotifications />} />
         </Route>
-        <Route path="/book/package/:id" element={<BookPackage />} />
-        <Route path="/purchase/attraction/:id" element={<PurchaseAttraction />} />
+        <Route path="/book/package/:location/:id" element={<BookPackage />} />
+        <Route path="/purchase/attraction/:location/:id" element={<PurchaseAttraction />} />
         <Route element={<MainLayout />}> 
           <Route path="/attendant/dashboard" element={<AttendantDashboard />} />
           <Route path="/manager/dashboard" element={<LocationManagerDashboard />} />
           <Route path="/company/dashboard" element={<CompanyDashboard />} />
           <Route path="/attractions/create" element={<CreateAttraction />} />
           <Route path="/edit-attraction/:id" element={<EditAttraction />} />
+          <Route path="/attractions/edit/:id" element={<EditAttraction />} />
           <Route path="/attractions/" element={<ManageAttractions />} />
+          <Route path="/attractions/details/:id" element={<AttractionDetails />} />
           <Route path="/attractions/purchases" element={<ManagePurchases />} />
+          <Route path="/attractions/purchases/:id" element={<PurchaseDetails />} />
           <Route path="/attractions/purchases/create" element={<CreatePurchase />} />
+          <Route path="/attractions/check-in" element={<AttractionCheckIn />} />
           <Route path="/packages/create" element={<CreatePackage />} />
           <Route path="/packages/edit/:id" element={<EditPackage />} />
           <Route path="/packages" element={<Packages />} />
+          <Route path="/packages/details/:id" element={<PackageDetails />} />
           <Route path="/packages/promos" element={<Promo />} />
+          <Route path="/packages/rooms" element={<Rooms />} />
           <Route path="/packages/add-ons" element={<ManageAddOns />} />
           <Route path="/packages/gift-cards" element={<GiftCard />} />
           <Route path="/bookings" element={<Bookings />} />
           <Route path="/bookings/edit/:id" element={<EditBooking />} />
+          <Route path="/bookings/:id" element={<ViewBooking />} />
           <Route path="/bookings/calendar" element={<CalendarView />} />
           <Route path="/bookings/create" element={<OnsiteBooking />} />
           <Route path="/bookings/check-in" element={<CheckIn />} />

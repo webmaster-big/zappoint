@@ -15,12 +15,15 @@ import {
   Menu,
   Moon,
   Sun,
-  LogOut
+  LogOut,
+  X
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useThemeColor } from '../../hooks/useThemeColor';
 import type { NavItem, UserData, SidebarProps } from '../../types/sidebar.types';
+import { ASSET_URL, API_BASE_URL } from '../../utils/storage';
+import { notificationStreamService, type NotificationObject } from '../../services/NotificationStreamService';
 
 // Helper function to add descriptions to navigation items
 const addDescriptions = (navItems: NavItem[]): NavItem[] => {
@@ -28,7 +31,8 @@ const addDescriptions = (navItems: NavItem[]): NavItem[] => {
     'Dashboard': 'Overview of your account and recent activity',
     'Manage Attractions': 'View and edit all available attractions',
     'Create Attractions': 'Add new attractions to your offerings',
-  'Create Purchase': 'Add a new purchase for attractions',
+    'Create Purchase': 'Add a new purchase for attractions',
+    'Check-in Scanner': 'Scan QR codes to check in attraction tickets',
     'Calendar View': 'See all bookings in a calendar format',
     'Bookings': 'Manage existing bookings and reservations',
     'Create Bookings': 'Create new bookings for customers',
@@ -44,9 +48,7 @@ const addDescriptions = (navItems: NavItem[]): NavItem[] => {
     'Attendants Management': 'Manage attendant accounts and permissions',
     'Create Account': 'Create new user accounts',
     'Account Activity Log': 'View user activity history',
-    'Attendants Performance': 'Monitor attendant performance metrics',
     'Analytics & Reports': 'Business intelligence and reporting',
-    // 'Accounting': 'Financial management and reporting',
     'Activity Logs': 'System-wide activity tracking',
     'Notifications': 'Manage your notification preferences',
     'User Management': 'Administer user accounts and permissions'
@@ -95,26 +97,28 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
         { label: 'Attractions', icon: Ticket, items: [
           { label: 'Manage Attractions', href: '/attractions', icon: Dot },
           { label: 'Create Attractions', href: '/attractions/create', icon: Dot },
-          { label: 'Purchases', href: '/attractions/purchases', icon: Dot },
-          { label: 'Create Purchase', href: '/attractions/purchases/create', icon: Dot }
+          { label: 'Manage Purchases', href: '/attractions/purchases', icon: Dot },
+          { label: 'Create Purchase', href: '/attractions/purchases/create', icon: Dot },
+          { label: 'Check-in Scanner', href: '/attractions/check-in', icon: Dot }
         ]},
         { label: 'Bookings', icon: Calendar, items: [
           { label: 'Calendar View', href: '/bookings/calendar', icon: Dot },
-          { label: 'Bookings', href: '/bookings', icon: Dot },
+          { label: 'Manage Bookings', href: '/bookings', icon: Dot },
           { label: 'Create Bookings', href: '/bookings/create', icon: Dot },
-          { label: 'Check-in with QR Scanner', href: '/bookings/check-in', icon: Dot }
+          { label: 'Check-in Scanner', href: '/bookings/check-in', icon: Dot }
         ]},
         { label: 'Packages', icon: Package, items: [
-          { label: 'Packages', href: '/packages', icon: Dot },
+          { label: 'Manage Packages', href: '/packages', icon: Dot },
           { label: 'Create Package', href: '/packages/create', icon: Dot },
+          { label: 'Rooms', href: '/packages/rooms', icon: Dot },
           { label: 'Add-ons', href: '/packages/add-ons', icon: Dot },
           { label: 'Promos', href: '/packages/promos', icon: Dot },
           { label: 'Gift Cards', href: '/packages/gift-cards', icon: Dot }
         ]},
-        { label: 'Customers', icon: Users, items: [
-          { label: 'Customer Analytics', href: '/customers/analytics', icon: Dot },
-          { label: 'Customers', href: '/customers', icon: Dot }
-        ]},
+        // { label: 'Customers', icon: Users, items: [
+        //   { label: 'Customer Analytics', href: '/customers/analytics', icon: Dot },
+        //   { label: 'Customers', href: '/customers', icon: Dot }
+        // ]},
         { label: 'Profile', icon: User, href: '/attendant/profile' },
         { label: 'Settings', icon: Settings, href: '/attendant/settings' }
       ];
@@ -125,18 +129,20 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
         { label: 'Attractions', icon: Ticket, items: [
           { label: 'Manage Attractions', href: '/attractions', icon: Dot },
           { label: 'Create Attractions', href: '/attractions/create', icon: Dot },
-          { label: 'Purchases', href: '/attractions/purchases', icon: Dot },
-          { label: 'Create Purchase', href: '/attractions/purchases/create', icon: Dot }
+          { label: 'Manage Purchases', href: '/attractions/purchases', icon: Dot },
+          { label: 'Create Purchase', href: '/attractions/purchases/create', icon: Dot },
+          { label: 'Check-in Scanner', href: '/attractions/check-in', icon: Dot }
         ]},
         { label: 'Bookings', icon: Calendar, items: [
           { label: 'Calendar View', href: '/bookings/calendar', icon: Dot },
-          { label: 'Bookings', href: '/bookings', icon: Dot },
+          { label: 'Manage Bookings', href: '/bookings', icon: Dot },
           { label: 'Create Bookings', href: '/bookings/create', icon: Dot },
-          { label: 'Check-in with QR Scanner', href: '/bookings/check-in', icon: Dot }
+          { label: 'Check-in Scanner', href: '/bookings/check-in', icon: Dot }
         ]},
         { label: 'Packages', icon: Package, items: [
-          { label: 'Packages', href: '/packages', icon: Dot },
+          { label: 'Manage Packages', href: '/packages', icon: Dot },
           { label: 'Create Package', href: '/packages/create', icon: Dot },
+          { label: 'Rooms', href: '/packages/rooms', icon: Dot },
           { label: 'Add-ons', href: '/packages/add-ons', icon: Dot },
           { label: 'Promos', href: '/packages/promos', icon: Dot },
           { label: 'Gift Cards', href: '/packages/gift-cards', icon: Dot }
@@ -146,10 +152,9 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
           { label: 'Customers', href: '/customers', icon: Dot }
         ]},
         { label: 'Attendants Management', icon: Users, items: [
-          { label: 'Attendants', href: '/manager/attendants', icon: Dot },
-          { label: 'Create Attendant', href: '/manager/attendant/create', icon: Dot },
-          { label: 'Attendants Activity Log', href: '/manager/attendants/activity', icon: Dot },
-          { label: 'Attendants Performance', href: '/manager/attendants/performance', icon: Dot },
+          { label: 'Manage Attendants', href: '/manager/attendants', icon: Dot },
+          // { label: 'Create Attendant', href: '/manager/attendant/create', icon: Dot },
+          { label: 'Activity Log', href: '/manager/attendants/activity', icon: Dot },
         ]},
         { label: 'Analytics & Reports', icon: BarChart3, href: '/manager/analytics' },
         { label: 'Notifications', icon: Bell, href: '/notifications' },
@@ -163,18 +168,20 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
         { label: 'Attractions', icon: Ticket, items: [
           { label: 'Manage Attractions', href: '/attractions', icon: Dot },
           { label: 'Create Attractions', href: '/attractions/create', icon: Dot },
-          { label: 'Purchases', href: '/attractions/purchases', icon: Dot },
-          { label: 'Create Purchase', href: '/attractions/purchases/create', icon: Dot }
+          { label: 'Manage Purchases', href: '/attractions/purchases', icon: Dot },
+          { label: 'Create Purchase', href: '/attractions/purchases/create', icon: Dot },
+          { label: 'Check-in Scanner', href: '/attractions/check-in', icon: Dot }
         ]},
         { label: 'Bookings', icon: Calendar, items: [
           { label: 'Calendar View', href: '/bookings/calendar', icon: Dot },
-          { label: 'Bookings', href: '/bookings', icon: Dot },
+          { label: 'Manage Bookings', href: '/bookings', icon: Dot },
           { label: 'Create Bookings', href: '/bookings/create', icon: Dot },
-          { label: 'Check-in with QR Scanner', href: '/bookings/check-in', icon: Dot }
+          { label: 'Check-in Scanner', href: '/bookings/check-in', icon: Dot }
         ]},
         { label: 'Packages', icon: Package, items: [
-          { label: 'Packages', href: '/packages', icon: Dot },
+          { label: 'Manage Packages', href: '/packages', icon: Dot },
           { label: 'Create Package', href: '/packages/create', icon: Dot },
+          { label: 'Rooms', href: '/packages/rooms', icon: Dot },
           { label: 'Add-ons', href: '/packages/add-ons', icon: Dot },
           { label: 'Promos', href: '/packages/promos', icon: Dot },
           { label: 'Gift Cards', href: '/packages/gift-cards', icon: Dot }
@@ -184,13 +191,11 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
           { label: 'Customers', href: '/customers', icon: Dot }
         ]},
         { label: 'User Management', icon: Users, items: [
-          { label: 'Accounts', href: '/admin/users', icon: Dot },
-          { label: 'Create Accounts', href: '/admin/users/create', icon: Dot },
+          { label: 'Manage Accounts', href: '/admin/users', icon: Dot },
+          // { label: 'Create Accounts', href: '/admin/users/create', icon: Dot },
           { label: 'Activity Log', href: '/admin/activity', icon: Dot },
-          { label: 'Attendants Performance', href: '/admin/attendants/performance', icon: Dot },
         ]},
         { label: 'Analytics & Reports', icon: BarChart3, href: '/admin/analytics' },
-        // { label: 'Accounting', icon: DollarSign, href: '/accounting' },
         { label: 'Notifications', icon: Bell, href: '/notifications' },
         { label: 'Profile', icon: User, href: '/admin/profile' },
         { label: 'Settings', icon: Settings, href: '/admin/settings' }
@@ -221,6 +226,13 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
 
   // Unread notifications count from localStorage (zapzone_notifications)
   const [unreadNotifications, setUnreadNotifications] = useState<number>(0);
+  const isStreamConnectedRef = useRef<boolean>(false);
+  
+  // Toast notification state
+  const [showToast, setShowToast] = useState(false);
+  const [toastData, setToastData] = useState<{ title: string; message: string; type: string } | null>(null);
+  const toastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const previousNotificationCountRef = useRef<number>(0);
 
   // Get CSS variable value for the current theme color
   const getThemeColorValue = () => {
@@ -238,14 +250,41 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
   };
 
   // Helper to get unread count from localStorage
-  const getUnreadCount = () => {
+  const getUnreadCount = async () => {
     try {
-      const stored = localStorage.getItem('zapzone_notifications');
-      if (!stored) return 0;
-      const notifications = JSON.parse(stored);
-      if (!Array.isArray(notifications)) return 0;
-      return notifications.filter((n: { read?: boolean }) => n && n.read === false).length;
-    } catch {
+      const user = JSON.parse(localStorage.getItem('zapzone_user') || '{}');
+      const token = user.token;
+      const isCompanyAdmin = user.role === 'company_admin';
+      const locationId = user.location_id;
+
+      if (!token) return 0;
+
+      // Build query parameters
+      const params = new URLSearchParams({
+        per_page: '1', // We only need the count
+        unread: 'true',
+      });
+
+      // Only add location_id if not company_admin
+      if (!isCompanyAdmin && locationId) {
+        params.append('location_id', locationId.toString());
+      }
+
+      const response = await fetch(`${API_BASE_URL}/notifications?${params.toString()}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        return data.data.pagination.total || 0;
+      }
+      return 0;
+    } catch (error) {
+      console.error('Error fetching unread count:', error);
       return 0;
     }
   };
@@ -253,19 +292,142 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
 
   // Sync unread count on mount, when localStorage changes, and when custom event is dispatched
   useEffect(() => {
-    const updateUnread = () => setUnreadNotifications(getUnreadCount());
+    const updateUnread = async () => {
+      const count = await getUnreadCount();
+      setUnreadNotifications(count);
+    };
+    
     updateUnread();
-    window.addEventListener('storage', updateUnread);
+    
+    // Initialize previous count on mount
+    updateUnread().then(() => {
+      // Set initial previous count after first fetch
+      getUnreadCount().then(count => {
+        previousNotificationCountRef.current = count;
+      });
+    });
+    
     window.addEventListener('zapzone_notifications_updated', updateUnread);
     return () => {
-      window.removeEventListener('storage', updateUnread);
       window.removeEventListener('zapzone_notifications_updated', updateUnread);
     };
   }, []);
 
+  // Setup SSE connection for real-time notifications
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
+
+    // Try to get location_id from user prop first, then from localStorage
+    let locationId = user.location_id;
+    
+    if (!locationId) {
+      try {
+        const storedUser = localStorage.getItem('zapzone_user');
+        if (storedUser) {
+          const parsedUser = JSON.parse(storedUser);
+          locationId = parsedUser.location_id;
+        }
+      } catch (error) {
+        console.error('[AdminSidebar] Error parsing localStorage zapzone_user:', error);
+      }
+    }
+    
+    if (!locationId) {
+      console.warn('[AdminSidebar] User has no location_id, cannot connect to notification stream');
+      return;
+    }
+
+    if (isStreamConnectedRef.current) {
+      return;
+    }
+
+    // Handle incoming notifications
+    const handleNotification = (notification: NotificationObject) => {
+      // Get existing notifications from localStorage
+      const stored = localStorage.getItem('zapzone_notifications');
+      const notifications = stored ? JSON.parse(stored) : [];
+      const previousCount = previousNotificationCountRef.current;
+      
+      // Add new notification at the beginning
+      notifications.unshift(notification);
+      
+      // Keep only last 100 notifications
+      const trimmed = notifications.slice(0, 100);
+      const newCount = trimmed.length;
+      
+      // Save back to localStorage
+      localStorage.setItem('zapzone_notifications', JSON.stringify(trimmed));
+      
+      // Update unread count
+      const newUnreadCount = getUnreadCount();
+      setUnreadNotifications(newUnreadCount);
+      
+      // Dispatch custom event for other components
+      window.dispatchEvent(new Event('zapzone_notifications_updated'));
+      
+      // Show toast ONLY if the new count exceeds or is not equal to previous count
+      // This prevents toasts from showing on page reload/login
+      if (newCount > previousCount && previousCount > 0) {
+        if (toastTimeoutRef.current) {
+          clearTimeout(toastTimeoutRef.current);
+        }
+        setToastData({
+          title: notification.title,
+          message: notification.message,
+          type: notification.type
+        });
+        setShowToast(true);
+        
+        toastTimeoutRef.current = setTimeout(() => {
+          setShowToast(false);
+        }, 5000);
+        
+        // Optional: Show browser notification if permitted
+        if ('Notification' in window && Notification.permission === 'granted') {
+          new Notification(notification.title, {
+            body: notification.message,
+            icon: '/Zap-Zone.png',
+            tag: notification.id
+          });
+        }
+      }
+      
+      // Update previous count reference for next comparison
+      previousNotificationCountRef.current = newCount;
+    };
+
+    // Handle connection errors
+    const handleError = (error: Event) => {
+      console.error('[AdminSidebar] ❌ Stream connection error:', error);
+    };
+
+    // Connect to the notification stream
+    notificationStreamService.connect(locationId, handleNotification, handleError);
+    isStreamConnectedRef.current = true;
+
+    // Request notification permission on mount (optional)
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+
+    // Cleanup on unmount
+    return () => {
+      notificationStreamService.disconnect();
+      isStreamConnectedRef.current = false;
+      
+      if (toastTimeoutRef.current) {
+        clearTimeout(toastTimeoutRef.current);
+      }
+    };
+  }, [user]);
+
   // Optionally, update unread count when sidebar opens (for SPA navigation)
   useEffect(() => {
-    if (isOpen) setUnreadNotifications(getUnreadCount());
+    if (isOpen) {
+      getUnreadCount().then(count => setUnreadNotifications(count));
+    }
   }, [isOpen]);
 
   useEffect(() => {
@@ -523,17 +685,122 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
     );
   };
 
-// Custom animation for badge (add to global CSS if not present)
-// .animate-bounce-slow {
-//   animation: bounce 1.5s infinite cubic-bezier(0.28, 0.84, 0.42, 1);
-// }
-// @keyframes bounce {
-//   0%, 100% { transform: translateY(0); }
-//   50% { transform: translateY(-4px); }
-// }
-
   return (
     <>
+      {/* Toast Notification - Right Top */}
+      {showToast && toastData && (
+        <div 
+          className="fixed top-6 right-6 z-[9999] animate-slideDown"
+          style={{ maxWidth: '90vw', width: '450px' }}
+        >
+          <div 
+            className="relative rounded-2xl shadow-2xl overflow-hidden backdrop-blur-sm"
+            style={{ 
+              background: 'linear-gradient(135deg, rgba(255,255,255,0.98) 0%, rgba(255,255,255,0.95) 100%)',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.05)'
+            }}
+          >
+            {/* Animated gradient border */}
+            <div 
+              className="absolute inset-0 rounded-2xl"
+              style={{
+                background: `linear-gradient(135deg, ${getThemeColorValue()}, ${getThemeColorValue()}dd)`,
+                opacity: 0.1,
+                zIndex: 0
+              }}
+            />
+            
+            {/* Colored accent bar */}
+            <div 
+              className="absolute top-0 left-0 right-0 h-1.5"
+              style={{ 
+                background: `linear-gradient(90deg, ${getThemeColorValue()}, ${getThemeColorValue()}cc)`,
+                boxShadow: `0 2px 8px ${getThemeColorValue()}40`
+              }}
+            />
+            
+            <div className="relative p-5">
+              <div className="flex items-start gap-4">
+                {/* Animated Icon */}
+                <div 
+                  className="flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center relative"
+                  style={{ 
+                    background: `linear-gradient(135deg, ${getThemeColorValue()}15, ${getThemeColorValue()}08)`,
+                    boxShadow: `0 4px 12px ${getThemeColorValue()}20`
+                  }}
+                >
+                  <div 
+                    className="absolute inset-0 rounded-xl animate-pulse"
+                    style={{ 
+                      background: `radial-gradient(circle, ${getThemeColorValue()}30, transparent)`,
+                      opacity: 0.5
+                    }}
+                  />
+                  <Bell 
+                    size={22} 
+                    style={{ color: getThemeColorValue() }}
+                    className="relative z-10"
+                  />
+                </div>
+                
+                {/* Content */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between mb-2">
+                    <div>
+                      <h4 className="text-base font-bold text-gray-900 mb-0.5">
+                        {toastData.title}
+                      </h4>
+                      <div className="flex items-center gap-2">
+                        <span 
+                          className="inline-flex items-center py-0.5 rounded-lg text-xs font-semibold"
+                          style={{ 
+                            background: `linear-gradient(135deg, ${getThemeColorValue()}20, ${getThemeColorValue()}10)`,
+                            color: getThemeColorValue(),
+                            border: `1px solid ${getThemeColorValue()}30`
+                          }}
+                        >
+                          {toastData.type === 'booking' ? 'Booking' : 'Purchase'}
+                        </span>
+                        <span className="text-xs font-medium text-gray-400">• Just now</span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setShowToast(false)}
+                      className="flex-shrink-0 p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all"
+                      aria-label="Close notification"
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+                  <p className="text-sm text-gray-700 leading-relaxed font-medium">
+                    {toastData.message}
+                  </p>
+                </div>
+              </div>
+              
+              {/* Enhanced Progress bar */}
+              <div className="mt-4 -mx-5 -mb-5 h-1.5 bg-gray-100 overflow-hidden">
+                <div 
+                  className="h-full animate-shrink relative"
+                  style={{ 
+                    background: `linear-gradient(90deg, ${getThemeColorValue()}, ${getThemeColorValue()}cc)`,
+                    boxShadow: `0 0 8px ${getThemeColorValue()}60`
+                  }}
+                >
+                  <div 
+                    className="absolute inset-0 opacity-50"
+                    style={{
+                      background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)',
+                      animation: 'shimmer 2s infinite'
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      
       {/* Mobile overlay */}
       {isOpen && (
         <div
@@ -554,7 +821,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
       {/* Sidebar */}
       <aside
         id="sidebar"
-        className={`fixed top-0 left-0 z-50 h-screen bg-white via-white to-white shadow-md transition-all duration-300 ease-in-out transform
+        className={`fixed top-0 left-0 z-50 h-screen bg-white via-white to-white shadow-md transition-all duration-300 ease-in-out transform animate-slide-in-from-left
           ${isOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 lg:static lg:inset-0 ${isMinimized ? 'w-20' : 'w-64'}`}
         style={{ overflow: 'visible' }}
       >
@@ -634,11 +901,32 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
             {isMinimized ? (
               <div className="flex items-center justify-center relative" ref={profileDropdownRef}>
                 <button
-                  className={`w-10 h-10 bg-${themeColor}-200 rounded-full flex items-center justify-center hover:bg-${themeColor}-300 transition-colors`}
+                  className={`w-10 h-10 rounded-full flex items-center justify-center hover:ring-2 hover:ring-${themeColor}-300 transition-all overflow-hidden`}
                   onClick={() => setShowProfileDropdown((prev: boolean) => !prev)}
                   type="button"
                 >
-                  <User size={20} className={`text-${fullColor} transition-all duration-200`} />
+                  {user.profile_path ? (
+                    <img 
+                      src={`${ASSET_URL}${user.profile_path}`}
+                      alt={user.name}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        // Fallback to icon if image fails to load
+                        e.currentTarget.style.display = 'none';
+                        const parent = e.currentTarget.parentElement;
+                        if (parent) {
+                          parent.classList.add(`bg-${themeColor}-200`);
+                          const icon = parent.querySelector('svg');
+                          if (icon) icon.classList.remove('hidden');
+                        }
+                      }}
+                    />
+                  ) : (
+                    <div className={`w-full h-full bg-${themeColor}-200 rounded-full flex items-center justify-center`}>
+                      <User size={20} className={`text-${fullColor}`} />
+                    </div>
+                  )}
+                  <User size={20} className={`text-${fullColor} transition-all duration-200 ${user.profile_path ? 'hidden' : ''}`} />
                 </button>
                 {showProfileDropdown && (
                   <div className="absolute left-full ml-2 bottom-0 w-48 bg-white border border-gray-200 rounded-xl shadow-lg z-50 overflow-hidden transition-all duration-200 ease-in-out">
@@ -646,8 +934,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
                       <p className="text-sm font-medium text-gray-900">{user.name}</p>
                       <p className="text-xs text-gray-500">{user.position}</p>
                       <p className="text-xs text-gray-500">
-                        {user.company}
-                        {user.subcompany && ` • ${user.subcompany}`}
+                        {user.role === 'company_admin' ? user.company : user.location_name || user.company}
                       </p>
                     </div>
                     <div className="p-2">
@@ -687,15 +974,31 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
             ) : (
               <div className="flex items-center justify-between">
                 <div className="flex items-center">
-                  <div className={`w-10 h-10 bg-${themeColor}-200 rounded-full flex items-center justify-center`}>
-                    <User size={20} className={`text-${fullColor}`} />
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center overflow-hidden ${!user.profile_path ? `bg-${themeColor}-200` : ''}`}>
+                    {user.profile_path ? (
+                      <img 
+                        src={`${ASSET_URL}${user.profile_path}`}
+                        alt={user.name}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          // Fallback to icon if image fails to load
+                          e.currentTarget.style.display = 'none';
+                          const parent = e.currentTarget.parentElement;
+                          if (parent) {
+                            parent.classList.add(`bg-${themeColor}-200`);
+                            const icon = parent.querySelector('svg');
+                            if (icon) icon.classList.remove('hidden');
+                          }
+                        }}
+                      />
+                    ) : null}
+                    <User size={20} className={`text-${fullColor} ${user.profile_path ? 'hidden' : ''}`} />
                   </div>
                   <div className="ml-3 text-left">
                     <p className="text-sm font-medium text-gray-900">{user.name}</p>
                     <p className="text-xs text-gray-500">{user.position}</p>
                     <p className="text-xs text-gray-500">
-                      {user.company}
-                      {user.subcompany && ` • ${user.subcompany}`}
+                      {user.role === 'company_admin' ? user.company : user.location_name || user.company}
                     </p>
                   </div>
                 </div>

@@ -2,12 +2,16 @@ import React, { useState, useEffect } from "react";
 import { Plus, X, Edit2, Trash2, Eye, EyeOff, Copy } from "lucide-react";
 import type { PromoStatus, PromoType, PromoItem } from '../../../types/Promo.types';
 import { useThemeColor } from '../../../hooks/useThemeColor';
+import { promoService } from '../../../services';
+import Toast from '../../../components/ui/Toast';
+import { getStoredUser } from "../../../utils/storage";
 
 const Promo: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
   const [promos, setPromos] = useState<PromoItem[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [loading, setLoading] = useState(false);
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const [editForm, setEditForm] = useState<null | Partial<PromoItem>>(null);
   
@@ -22,28 +26,53 @@ const Promo: React.FC = () => {
     description: "",
   });
 
-  useEffect(() => {
-    const stored = localStorage.getItem("zapzone_promos");
-    if (stored) setPromos(JSON.parse(stored));
-  }, []);
+  // Toast state
+  const [toast, setToast] = useState<{ message: string; type?: "success" | "error" | "info" } | null>(null);
+  const showToast = (message: string, type?: "success" | "error" | "info") => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  };
 
   useEffect(() => {
-    // Update status for expired or exhausted promos
-    const now = new Date();
-    let updated = false;
-    const updatedPromos = promos.map(promo => {
-      // Check if expired
-      if (new Date(promo.end_date) < now && promo.status !== 'expired') {
-        updated = true;
-        return { ...promo, status: 'expired' as PromoStatus };
+    loadPromos();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const loadPromos = async () => {
+    try {
+      setLoading(true);
+      const response = await promoService.getPromos();
+      
+      if (response.data && response.data.promos) {
+        const formattedPromos: PromoItem[] = response.data.promos.map(promo => ({
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          ...(promo as any), // Keep all backend fields including id
+          code: promo.code,
+          type: promo.type as PromoType,
+          value: Number(promo.value), // Ensure it's a number
+          start_date: promo.start_date,
+          end_date: promo.end_date,
+          usage_limit_total: Number(promo.usage_limit_total || 0),
+          usage_limit_per_user: Number(promo.usage_limit_per_user),
+          status: promo.status as PromoStatus,
+          description: promo.description || '',
+          created_by: promo.created_by?.toString() || 'admin',
+          created_at: promo.created_at,
+          updated_at: promo.updated_at,
+          deleted: promo.deleted || false
+        }));
+        setPromos(formattedPromos);
       }
-      return promo;
-    });
-    if (updated) {
-      setPromos(updatedPromos);
-      localStorage.setItem("zapzone_promos", JSON.stringify(updatedPromos));
+    } catch (error) {
+      console.error('Error loading promos:', error);
+      showToast('Error loading promo codes', 'error');
+    } finally {
+      setLoading(false);
     }
-  }, [promos]);
+  };
+
+  // Note: Status updates for expired promos should be handled by the backend
+  // This useEffect is removed to avoid localStorage dependency and infinite loops
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -58,44 +87,58 @@ const Promo: React.FC = () => {
     );
   }
 
-  const handleAdd = (e: React.FormEvent) => {
+  const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.value.trim() || isNaN(Number(form.value))) return;
-    if (!form.usage_limit_total.trim() || isNaN(Number(form.usage_limit_total))) return;
-    if (!form.usage_limit_per_user.trim() || isNaN(Number(form.usage_limit_per_user))) return;
+    if (!form.value.trim() || isNaN(Number(form.value))) {
+      showToast('Please enter a valid value', 'error');
+      return;
+    }
+    if (!form.usage_limit_total.trim() || isNaN(Number(form.usage_limit_total))) {
+      showToast('Please enter a valid usage limit', 'error');
+      return;
+    }
+    if (!form.usage_limit_per_user.trim() || isNaN(Number(form.usage_limit_per_user))) {
+      showToast('Please enter a valid usage limit per user', 'error');
+      return;
+    }
     
-    const now = new Date().toISOString();
-    const code = form.code || generatePromoCode();
-    const value = Number(form.value);
-    
-    const newPromo: PromoItem = {
-      code,
-      type: form.type,
-      value,
-      start_date: form.start_date ? new Date(form.start_date).toISOString() : now,
-      end_date: form.end_date ? new Date(form.end_date).toISOString() : "",
-      usage_limit_total: Number(form.usage_limit_total),
-      usage_limit_per_user: Number(form.usage_limit_per_user),
-      status: "active",
-      description: form.description,
-      created_by: "admin1",
-      created_at: now,
-    };
-    
-    const updated = [...promos, newPromo];
-    setPromos(updated);
-    localStorage.setItem("zapzone_promos", JSON.stringify(updated));
-    setForm({
-      type: "fixed",
-      value: "",
-      code: "",
-      start_date: "",
-      end_date: "",
-      usage_limit_total: "",
-      usage_limit_per_user: "",
-      description: "",
-    });
-    setShowModal(false);
+    try {
+      setLoading(true);
+      const code = form.code || generatePromoCode();
+      const now = new Date().toISOString();
+      
+      await promoService.createPromo({
+        name: code, // Using code as name
+        code,
+        type: form.type,
+        value: Number(form.value),
+        start_date: form.start_date || now.split('T')[0],
+        end_date: form.end_date || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        usage_limit_per_user: Number(form.usage_limit_per_user),
+        description: form.description,
+        status: 'active',
+        created_by: getStoredUser()?.id
+      });
+
+      showToast('Promo code created successfully!', 'success');
+      await loadPromos();
+      setForm({
+        type: "fixed",
+        value: "",
+        code: "",
+        start_date: "",
+        end_date: "",
+        usage_limit_total: "",
+        usage_limit_per_user: "",
+        description: "",
+      });
+      setShowModal(false);
+    } catch (error) {
+      console.error('Error creating promo:', error);
+      showToast('Error creating promo code', 'error');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const openEditModal = (index: number) => {
@@ -170,16 +213,27 @@ const Promo: React.FC = () => {
     localStorage.setItem("zapzone_promos", JSON.stringify(updatedPromos));
   };
 
-  const handleDelete = (index: number) => {
-    const updatedPromos = [...promos];
-    updatedPromos[index] = {
-      ...updatedPromos[index],
-      status: "inactive" as PromoStatus,
-      deleted: true,
-      updated_at: new Date().toISOString(),
-    };
-    setPromos(updatedPromos);
-    localStorage.setItem("zapzone_promos", JSON.stringify(updatedPromos));
+  const handleDelete = async (index: number) => {
+    const promo = promos[index];
+    if (!window.confirm(`Are you sure you want to delete promo "${promo.code}"?`)) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      // Assuming promo has an id field from backend
+      const promoId = (promo as unknown as { id?: number }).id;
+      if (promoId) {
+        await promoService.deletePromo(promoId);
+        showToast('Promo deleted successfully!', 'success');
+        await loadPromos();
+      }
+    } catch (error) {
+      console.error('Error deleting promo:', error);
+      showToast('Error deleting promo', 'error');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const copyToClipboard = (text: string) => {
@@ -490,10 +544,11 @@ const Promo: React.FC = () => {
                   </div>
                 </div>
                 <button 
-                  type="submit" 
-                  className={`w-full bg-${fullColor} text-white py-2.5 rounded-lg font-medium mt-2 hover:bg-${themeColor}-900 transition-colors`}
+                  type="submit"
+                  disabled={loading}
+                  className={`w-full bg-${fullColor} text-white py-2.5 rounded-lg font-medium mt-2 hover:bg-${themeColor}-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed`}
                 >
-                  Create Promo Code
+                  {loading ? 'Creating...' : 'Create Promo Code'}
                 </button>
               </form>
             </div>
@@ -620,6 +675,17 @@ const Promo: React.FC = () => {
                 </div>
               </form>
             </div>
+          </div>
+        )}
+
+        {/* Toast Notification */}
+        {toast && (
+          <div className="fixed top-4 right-4 z-50">
+            <Toast 
+              message={toast.message} 
+              type={toast.type} 
+              onClose={() => setToast(null)} 
+            />
           </div>
         )}
       </div>

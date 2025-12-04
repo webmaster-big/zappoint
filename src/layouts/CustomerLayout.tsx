@@ -5,21 +5,27 @@ import {
   ChevronRight,
   Bell
 } from 'lucide-react';
-import { Link, useLocation, Outlet } from 'react-router-dom';
+import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
+import customerService from '../services/CustomerService';
+import LoadingSpinner from '../components/ui/LoadingSpinner';
 
 interface CustomerUser {
-  id: string;
+  id: number;
   name: string;
   email: string;
-  // Add other user properties as needed
+  phone?: string;
+  token: string;
+  role?: string | null;
 }
 
 const CustomerLayout = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [customerUser, setCustomerUser] = useState<CustomerUser | null>(null);
-  const [isLoading, setIsLoading] = useState(true); // Add loading state
+  const [isLoading, setIsLoading] = useState(true);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
 
 
@@ -36,10 +42,15 @@ const CustomerLayout = () => {
 
   const checkUserLoginStatus = () => {
     try {
-      const userData = localStorage.getItem('customer_user');
+      const userData = localStorage.getItem('zapzone_customer');
       if (userData) {
         const user = JSON.parse(userData);
-        setCustomerUser(user);
+        // Check if user has a valid token
+        if (user.token) {
+          setCustomerUser(user);
+        } else {
+          setCustomerUser(null);
+        }
       } else {
         setCustomerUser(null);
       }
@@ -47,18 +58,35 @@ const CustomerLayout = () => {
       console.error('Error reading user data from localStorage:', error);
       setCustomerUser(null);
     } finally {
-      setIsLoading(false); // Always set loading to false after check
+      setIsLoading(false);
     }
   };
 
   console.log(window.location.pathname);
 
-  const handleLogout = () => {
-    localStorage.removeItem('customer_user');
-    setCustomerUser(null);
-    setUserMenuOpen(false);
-    // Optional: Redirect to home page or login page
-    // window.location.href = '/';
+  const handleLogout = async () => {
+    if (!customerUser?.token) return;
+    
+    setIsLoggingOut(true);
+    
+    try {
+      // Call logout API
+      await customerService.logout(customerUser.token);
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Continue with logout even if API call fails
+    } finally {
+      // Clear localStorage and state
+      localStorage.removeItem('zapzone_customer');
+      setCustomerUser(null);
+      setUserMenuOpen(false);
+      
+      // Redirect to home page
+      setTimeout(() => {
+        setIsLoggingOut(false);
+        navigate('/');
+      }, 500);
+    }
   };
 
   // Don't render anything until we've checked localStorage
@@ -66,7 +94,7 @@ const CustomerLayout = () => {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-800 mx-auto"></div>
+          <LoadingSpinner size="medium" />
           <p className="mt-4 text-gray-600">Loading...</p>
         </div>
       </div>
@@ -152,13 +180,23 @@ const CustomerLayout = () => {
                         <button 
                           className="w-full flex items-center space-x-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
                           onClick={handleLogout}
-                        >
-                          <span>Sign Out</span>
+                          disabled={isLoggingOut}
+                        >  {isLoggingOut ? (
+                            <div className="flex items-center gap-2">
+                              <LoadingSpinner size="small" message="Signing out..." />
+                            </div>
+                          ) : (
+                            <>
+                              <span>Sign Out</span>
+                              <ChevronRight className="h-4 w-4 ml-auto" />
+                            </>
+                          )}
                         </button>
                       </div>
                     )}
                   </div>
                 </div>
+                
               ) : (
                 /* Not Logged In Auth Buttons */
                 <div className="flex items-center space-x-2">
@@ -237,8 +275,15 @@ const CustomerLayout = () => {
                     <button 
                       className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-red-600 text-white font-medium hover:bg-red-700 transition-colors"
                       onClick={handleLogout}
+                      disabled={isLoggingOut}
                     >
-                      <span>Sign Out</span>
+                      {isLoggingOut ? (
+                        <div className="flex items-center gap-2">
+                          <LoadingSpinner size="small" message="Signing out..." />
+                        </div>
+                      ) : (
+                        <span>Sign Out</span>
+                      )}
                     </button>
                   </div>
                 ) : (
@@ -268,6 +313,7 @@ const CustomerLayout = () => {
             </div>
           )}
         </div>
+
       </header>
 
       {/* Page Content */}

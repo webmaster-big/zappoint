@@ -3,13 +3,15 @@ import type { ChangeEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import type { CreateAttractionsFormData } from '../../../types/createAttractions.types';
-import type { ManageAttractionsAttraction } from '../../../types/manageAttractions.types';
+import { attractionService } from '../../../services/AttractionService';
+import type { UpdateAttractionData } from '../../../services/AttractionService';
+import Toast from '../../../components/ui/Toast';
+import { ASSET_URL } from '../../../utils/storage';
 
 const EditAttraction = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const { themeColor, fullColor } = useThemeColor();
-  const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [formData, setFormData] = useState<CreateAttractionsFormData>({
     name: '',
@@ -36,6 +38,8 @@ const EditAttraction = () => {
 
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [customCategory, setCustomCategory] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
   // Load attraction data
   useEffect(() => {
@@ -45,58 +49,64 @@ const EditAttraction = () => {
       return;
     }
 
-    try {
-      const storedAttractions = localStorage.getItem('zapzone_attractions');
-      if (storedAttractions) {
-        const attractions: ManageAttractionsAttraction[] = JSON.parse(storedAttractions);
-        const attraction = attractions.find((a: ManageAttractionsAttraction) => a.id === id);
+    const loadAttraction = async () => {
+      try {
+        const response = await attractionService.getAttraction(Number(id));
+        const attraction = response.data;
         
-        if (attraction) {
-          setFormData({
-            name: attraction.name || '',
-            description: attraction.description || '',
-            category: attraction.category || '',
-            price: attraction.price?.toString() || '',
-            pricingType: attraction.pricingType || 'per_person',
-            maxCapacity: attraction.maxCapacity?.toString() || '',
-            duration: attraction.duration || '',
-            durationUnit: attraction.durationUnit || 'minutes',
-            images: attraction.images || [],
-            bookingLink: '',
-            embedCode: '',
-            availability: {
-              monday: attraction.availability?.monday ?? true,
-              tuesday: attraction.availability?.tuesday ?? true,
-              wednesday: attraction.availability?.wednesday ?? true,
-              thursday: attraction.availability?.thursday ?? true,
-              friday: attraction.availability?.friday ?? true,
-              saturday: attraction.availability?.saturday ?? true,
-              sunday: attraction.availability?.sunday ?? true
-            },
-          });
+        setFormData({
+          name: attraction.name || '',
+          description: attraction.description || '',
+          category: attraction.category || '',
+          price: attraction.price?.toString() || '',
+          pricingType: attraction.pricing_type || 'per_person',
+          maxCapacity: attraction.max_capacity?.toString() || '',
+          duration: attraction.duration?.toString() || '',
+          durationUnit: attraction.duration_unit || 'minutes',
+          images: attraction.image ? (Array.isArray(attraction.image) ? attraction.image : [attraction.image]) : [],
+          bookingLink: '',
+          embedCode: '',
+          availability: typeof attraction.availability === 'object' ? {
+            monday: (attraction.availability as Record<string, boolean>).monday ?? true,
+            tuesday: (attraction.availability as Record<string, boolean>).tuesday ?? true,
+            wednesday: (attraction.availability as Record<string, boolean>).wednesday ?? true,
+            thursday: (attraction.availability as Record<string, boolean>).thursday ?? true,
+            friday: (attraction.availability as Record<string, boolean>).friday ?? true,
+            saturday: (attraction.availability as Record<string, boolean>).saturday ?? true,
+            sunday: (attraction.availability as Record<string, boolean>).sunday ?? true
+          } : {
+            monday: true,
+            tuesday: true,
+            wednesday: true,
+            thursday: true,
+            friday: true,
+            saturday: true,
+            sunday: true
+          },
+        });
 
-          // Check if it's a custom category
-          const standardCategories = ['adventure', 'sports', 'arcade', 'entertainment', 'educational', 'food', 'kids'];
-          if (attraction.category && !standardCategories.includes(attraction.category.toLowerCase())) {
-            setCustomCategory(attraction.category);
-          }
-
-          // Set image previews if images exist (just use placeholder for now)
-          if (attraction.images && attraction.images.length > 0) {
-            setImagePreviews(attraction.images.map(() => '/api/placeholder/400/300'));
-          }
-        } else {
-          setNotFound(true);
+        // Check if it's a custom category
+        const standardCategories = ['adventure', 'sports', 'arcade', 'entertainment', 'educational', 'food', 'kids'];
+        if (attraction.category && !standardCategories.includes(attraction.category.toLowerCase())) {
+          setCustomCategory(attraction.category);
         }
-      } else {
+
+        // Set image previews if images exist (handle both string and array)
+        if (attraction.image) {
+          const images = Array.isArray(attraction.image) ? attraction.image : [attraction.image];
+          console.log("ASSET_URL + attraction.image", images.map(img => ASSET_URL + img));
+          setImagePreviews(images.map(img => ASSET_URL + img));
+        }
+      } catch (error) {
+        console.error('Error loading attraction:', error);
         setNotFound(true);
+        setToast({ message: 'Failed to load attraction', type: 'error' });
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      console.error('Error loading attraction:', error);
-      setNotFound(true);
-    } finally {
-      setLoading(false);
-    }
+    };
+
+    loadAttraction();
   }, [id]);
 
   const handleInputChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -117,7 +127,7 @@ const EditAttraction = () => {
     }));
   };
 
-  const handleImageUpload = (e: ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
 
@@ -127,13 +137,33 @@ const EditAttraction = () => {
       return;
     }
 
+    // Create previews using object URLs
     const newImagePreviews = fileArray.map(file => URL.createObjectURL(file));
     setImagePreviews(prev => [...prev, ...newImagePreviews]);
 
-    setFormData(prev => ({
-      ...prev,
-      images: [...prev.images, ...fileArray.map(file => file.name)]
-    }));
+    // Convert files to base64 for backend
+    const base64Promises = fileArray.map(file => {
+      return new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const base64String = reader.result as string;
+          resolve(base64String);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    });
+
+    try {
+      const base64Images = await Promise.all(base64Promises);
+      setFormData(prev => ({
+        ...prev,
+        images: [...prev.images, ...base64Images]
+      }));
+    } catch (error) {
+      console.error('Error converting images to base64:', error);
+      alert('Failed to process images. Please try again.');
+    }
   };
 
   const removeImage = (index: number) => {
@@ -164,48 +194,54 @@ const EditAttraction = () => {
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (!id) return;
+
     try {
-      const storedAttractions = localStorage.getItem('zapzone_attractions');
-      if (!storedAttractions) {
-        alert('No attractions found');
-        return;
-      }
+      setIsSubmitting(true);
 
-      const attractions: ManageAttractionsAttraction[] = JSON.parse(storedAttractions);
-      const attractionIndex = attractions.findIndex((a: ManageAttractionsAttraction) => a.id === id);
-
-      if (attractionIndex === -1) {
-        alert('Attraction not found');
-        return;
-      }
-
-      // Update the attraction
-      const updatedAttraction: ManageAttractionsAttraction = {
-        ...attractions[attractionIndex],
+      // Convert form data to API format
+      // Note: location_id is automatically handled by backend
+      const attractionData: UpdateAttractionData = {
         name: formData.name,
         description: formData.description,
-        category: formData.category,
         price: Number(formData.price),
-        pricingType: formData.pricingType,
-        maxCapacity: Number(formData.maxCapacity),
-        duration: formData.duration,
-        durationUnit: formData.durationUnit,
-        images: formData.images,
+        pricing_type: formData.pricingType,
+        max_capacity: Number(formData.maxCapacity),
+        category: formData.category,
+        duration: formData.duration ? Number(formData.duration) : undefined,
+        duration_unit: formData.durationUnit as 'hours' | 'minutes',
         availability: formData.availability,
+        image: formData.images.length > 0 ? formData.images : undefined, // Send all images as array
+        is_active: true,
       };
 
-      attractions[attractionIndex] = updatedAttraction;
+      console.log('Updating attraction data:', attractionData);
 
-      localStorage.setItem('zapzone_attractions', JSON.stringify(attractions));
-
-      alert('Attraction updated successfully!');
-      navigate('/manage-attractions');
-    } catch (error) {
+      const response = await attractionService.updateAttraction(Number(id), attractionData);
+      
+      console.log('Attraction updated:', response);
+      
+      setToast({ message: 'Attraction updated successfully!', type: 'success' });
+      
+      // Navigate after a short delay to show success message
+      setTimeout(() => {
+        navigate('/attractions');
+      }, 1500);
+    } catch (error: unknown) {
       console.error('Error updating attraction:', error);
-      alert('Failed to update attraction. Please try again.');
+      
+      let errorMessage = 'Failed to update attraction. Please try again.';
+      if (error && typeof error === 'object' && 'response' in error) {
+        const axiosError = error as { response?: { data?: { message?: string } } };
+        errorMessage = axiosError.response?.data?.message || errorMessage;
+      }
+      
+      setToast({ message: errorMessage, type: 'error' });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -281,14 +317,6 @@ const EditAttraction = () => {
       </div>
     );
   };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className={`animate-spin rounded-full h-12 w-12 border-b-2 border-${fullColor}`}></div>
-      </div>
-    );
-  }
 
   if (notFound) {
     return (
@@ -584,16 +612,18 @@ const EditAttraction = () => {
               <div className="px-6 py-5 bg-gray-50 text-right space-x-3">
                 <button
                   type="button"
-                  onClick={() => navigate('/manage-attractions')}
-                  className={`px-5 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-800 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-${themeColor}-500 transition-colors`}
+                  onClick={() => navigate('/attractions')}
+                  disabled={isSubmitting}
+                  className={`px-5 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-800 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-${themeColor}-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed`}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className={`px-5 py-2.5 bg-${fullColor} border border-transparent rounded-lg shadow-sm text-sm font-medium text-white hover:from-${fullColor} hover:to-${fullColor} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-${themeColor}-500 transition-all`}
+                  disabled={isSubmitting}
+                  className={`px-5 py-2.5 bg-${fullColor} border border-transparent rounded-lg shadow-sm text-sm font-medium text-white hover:from-${fullColor} hover:to-${fullColor} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-${themeColor}-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed`}
                 >
-                  Update Attraction
+                  {isSubmitting ? 'Updating...' : 'Update Attraction'}
                 </button>
               </div>
             </form>
@@ -607,6 +637,17 @@ const EditAttraction = () => {
           </div>
         </div>
       </div>
+
+      {/* Toast Notification */}
+      {toast && (
+        <div className="fixed top-4 right-4 z-50 animate-fade-in-up">
+          <Toast
+            message={toast.message}
+            type={toast.type}
+            onClose={() => setToast(null)}
+          />
+        </div>
+      )}
     </div>
   );
 };

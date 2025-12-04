@@ -12,9 +12,12 @@ export interface NavItem {
 export interface UserData {
   name: string;
   company: string;
-  subcompany?: string;
+  location_name?: string;
   position: string;
   role: 'attendant' | 'location_manager' | 'company_admin';
+  token?: string;
+  profile_path?: string;
+  location_id?: number;
 }
 
 export interface SidebarProps {

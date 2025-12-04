@@ -1,0 +1,63 @@
+// Import all services
+import { packageService } from './PackageService';
+import { addOnService } from './AddOnService';
+import { attractionService } from './AttractionService';
+import { roomService } from './RoomService';
+import { giftCardService } from './GiftCardService';
+import { promoService } from './PromoService';
+import { notificationStreamService } from './NotificationStreamService';
+import { metricsService } from './MetricsService';
+
+// Service exports for easy importing
+export { packageService } from './PackageService';
+export type { Package, PackageFilters, CreatePackageData, UpdatePackageData } from './PackageService';
+
+export { addOnService } from './AddOnService';
+export type { AddOn, AddOnFilters, CreateAddOnData, UpdateAddOnData } from './AddOnService';
+
+export { attractionService } from './AttractionService';
+export type { Attraction, AttractionFilters, CreateAttractionData, UpdateAttractionData } from './AttractionService';
+
+export { roomService } from './RoomService';
+export type { Room, RoomFilters, CreateRoomData, UpdateRoomData } from './RoomService';
+
+export { giftCardService } from './GiftCardService';
+export type { GiftCard, GiftCardFilters, CreateGiftCardData, UpdateGiftCardData } from './GiftCardService';
+
+export { promoService } from './PromoService';
+export type { Promo, PromoFilters, CreatePromoData, UpdatePromoData } from './PromoService';
+
+export { notificationStreamService } from './NotificationStreamService';
+export type { StreamNotificationData, NotificationObject } from './NotificationStreamService';
+
+export { metricsService } from './MetricsService';
+export type { 
+  DashboardMetrics, 
+  RecentPurchase, 
+  LocationStats, 
+  LocationDetails, 
+  DashboardResponse,
+  RecentBooking,
+  AttendantResponse 
+} from './MetricsService';
+
+// Settings service exports
+export * from './SettingsService';
+
+// Payment service exports
+export * from './PaymentService';
+
+// Common API response types
+export type { ApiResponse, PaginatedResponse } from './PackageService';
+
+// Services object for convenient access
+export const services = {
+  packages: packageService,
+  addOns: addOnService,
+  attractions: attractionService,
+  rooms: roomService,
+  giftCards: giftCardService,
+  promos: promoService,
+  notificationStream: notificationStreamService,
+  metrics: metricsService,
+} as const;

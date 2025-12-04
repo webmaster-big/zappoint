@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   User, 
   MapPin, 
@@ -9,57 +9,156 @@ import {
   X,
   Camera,
   Building,
-  Users,
-  Target,
-  Star
+  AlertCircle,
+  CheckCircle
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
+import { API_BASE_URL, ASSET_URL, getStoredUser, setStoredUser } from '../../../utils/storage';
 import type { LocationManagerProfileData } from '../../../types/LocationManagerProfile.types';
+import { getAuthToken } from '../../../services';
 
 const LocationManagerProfile = () => {
   const { themeColor, fullColor } = useThemeColor();
   const [isEditing, setIsEditing] = useState(false);
   const [activeTab, setActiveTab] = useState('personal');
   const [isLoading, setIsLoading] = useState(false);
+  const [isFetching, setIsFetching] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [userId, setUserId] = useState<number | null>(null);
+  const [locationId, setLocationId] = useState<number | null>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
-  // Sample profile data for Location Manager
+  // Profile data state
   const [profileData, setProfileData] = useState<LocationManagerProfileData>({
     personal: {
-      firstName: 'Michael',
-      lastName: 'Chen',
-      email: 'michael.chen@brighton.zapzone.com',
-      phone: '+1 (555) 987-6543',
-      position: 'Location Manager',
-      avatar: '/api/placeholder/100/100',
-      department: 'Operations'
+      firstName: '',
+      lastName: '',
+      email: '',
+      phone: '',
+      position: '',
+      avatar: '',
+      department: '',
+      employeeId: '',
+      shift: '',
+      hireDate: '',
+      status: ''
     },
     location: {
-      name: 'Zap Zone Brighton',
-      type: 'Entertainment Center',
-      email: 'brighton@zapzone.com',
-      phone: '+1 (555) 123-7890',
+      name: '',
+      email: '',
+      phone: '',
       address: {
-        street: '456 Entertainment Avenue',
-        city: 'Brighton',
-        state: 'MI',
-        zipCode: '48116',
-        country: 'United States'
+        street: '',
+        city: '',
+        state: '',
+        zipCode: ''
       },
-      facilities: ['Laser Tag', 'Bowling', 'Arcade', 'VR Experience', 'Escape Room'],
-      capacity: 200,
-      squareFootage: '15,000 sq ft'
-    },
-    performance: {
-      monthlyVisitors: 4250,
-      customerRating: 4.8,
-      totalBookings: 187,
-      revenueThisMonth: 45200,
-      teamSize: 12,
-      occupancyRate: 78
-    },
+      timezone: '',
+      isActive: true
+    }
   });
 
   const [editedData, setEditedData] = useState(profileData);
+
+  // Fetch user and location data on mount
+  useEffect(() => {
+    fetchProfileData();
+  }, []);
+
+  // Update profile picture when localStorage changes
+  useEffect(() => {
+    const user = getStoredUser();
+    if (user?.profile_path && user.profile_path !== profileData.personal.avatar) {
+      setProfileData(prev => ({
+        ...prev,
+        personal: {
+          ...prev.personal,
+          avatar: user.profile_path || ''
+        }
+      }));
+    }
+  }, [profileData.personal.avatar]);
+
+  const fetchProfileData = async () => {
+    setIsFetching(true);
+    setError(null);
+    
+    try {
+      const token = getAuthToken();
+      const user = getStoredUser();
+      
+      if (!token) {
+        setError('No authentication token found. Please log in again.');
+        return;
+      }
+      
+      if (!user) {
+        setError('No user data found. Please log in again.');
+        return;
+      }
+      
+      if (!user.location_id) {
+        setError('User has no location assigned. Please contact support.');
+        return;
+      }
+      
+      setUserId(user.id);
+      setLocationId(user.location_id);
+
+      // Fetch location data
+      const locationResponse = await fetch(`${API_BASE_URL}/locations/${user.location_id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!locationResponse.ok) {
+        throw new Error('Failed to fetch location data');
+      }
+
+      const locationData = await locationResponse.json();
+      const location = locationData.data;
+      
+      const newProfileData = {
+        personal: {
+          firstName: user.first_name || '',
+          lastName: user.last_name || '',
+          email: user.email || '',
+          phone: user.phone || '',
+          position: user.position || '',
+          avatar: user.profile_path || '',
+          department: user.department || '',
+          employeeId: user.employee_id || '',
+          shift: user.shift || '',
+          hireDate: user.hire_date || '',
+          status: user.status || 'active'
+        },
+        location: {
+          name: location.name || '',
+          email: location.email || '',
+          phone: location.phone || '',
+          address: {
+            street: location.address || '',
+            city: location.city || '',
+            state: location.state || '',
+            zipCode: location.zip_code || ''
+          },
+          timezone: location.timezone || '',
+          isActive: location.is_active !== undefined ? location.is_active : true
+        }
+      };
+
+      setProfileData(newProfileData);
+      setEditedData(newProfileData);
+    } catch (err) {
+      console.error('Fetch Profile Error:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load profile data');
+    } finally {
+      setIsFetching(false);
+    }
+  };
 
   const handleEdit = () => {
     setEditedData(profileData);
@@ -73,11 +172,91 @@ const LocationManagerProfile = () => {
 
   const handleSave = async () => {
     setIsLoading(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    setProfileData(editedData);
-    setIsEditing(false);
-    setIsLoading(false);
+    setError(null);
+    
+    try {
+      const token = getAuthToken();
+      
+      if (!token || !userId || !locationId) {
+        throw new Error('Missing authentication or user data');
+      }
+      
+      // Update user data
+      const userResponse = await fetch(`${API_BASE_URL}/users/${userId}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          first_name: editedData.personal.firstName,
+          last_name: editedData.personal.lastName,
+          email: editedData.personal.email,
+          phone: editedData.personal.phone,
+          position: editedData.personal.position,
+          department: editedData.personal.department,
+          employee_id: editedData.personal.employeeId,
+          shift: editedData.personal.shift,
+          hire_date: editedData.personal.hireDate || null,
+          status: editedData.personal.status
+        })
+      });
+      
+      if (!userResponse.ok) {
+        throw new Error('Failed to update personal information');
+      }
+      
+      const userData = await userResponse.json();
+      
+      // Update location data
+      const locationResponse = await fetch(`${API_BASE_URL}/locations/${locationId}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: editedData.location.name,
+          email: editedData.location.email,
+          phone: editedData.location.phone,
+          address: editedData.location.address.street,
+          city: editedData.location.address.city,
+          state: editedData.location.address.state,
+          zip_code: editedData.location.address.zipCode,
+          timezone: editedData.location.timezone,
+          is_active: editedData.location.isActive
+        })
+      });
+      
+      if (!locationResponse.ok) {
+        throw new Error('Failed to update location information');
+      }
+      
+      // Update localStorage with new user data
+      setStoredUser({
+        ...getStoredUser(),
+        first_name: editedData.personal.firstName,
+        last_name: editedData.personal.lastName,
+        email: editedData.personal.email,
+        phone: editedData.personal.phone,
+        position: editedData.personal.position,
+        department: editedData.personal.department,
+        employee_id: editedData.personal.employeeId,
+        shift: editedData.personal.shift,
+        hire_date: editedData.personal.hireDate,
+        status: editedData.personal.status
+      }, true);
+      
+      setProfileData(editedData);
+      setIsEditing(false);
+      setSuccessMessage('Profile updated successfully!');
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } catch (err) {
+      console.error('Save Error:', err);
+      setError(err instanceof Error ? err.message : 'Failed to save changes');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleInputChange = (section: keyof LocationManagerProfileData, field: string, value: string) => {
@@ -103,26 +282,152 @@ const LocationManagerProfile = () => {
     }));
   };
 
+  const handlePhotoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !userId) return;
+
+    setUploadingPhoto(true);
+    try {
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64String = reader.result as string;
+        
+        const token = getAuthToken();
+        const response = await fetch(`${API_BASE_URL}/users/${userId}/update-profile-path`, {
+          method: 'PATCH',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            profile_path: base64String
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to upload profile picture');
+        }
+
+        const data = await response.json();
+        const newProfilePath = data.data.profile_path;
+        
+        // Update localStorage first
+        const currentUser = getStoredUser();
+        if (currentUser) {
+          setStoredUser({
+            ...currentUser,
+            profile_path: newProfilePath
+          }, true);
+        }
+        
+        // Dispatch custom event to notify other components
+        window.dispatchEvent(new Event('zapzone_profile_updated'));
+        
+        // Then update component state
+        setProfileData(prev => ({
+          ...prev,
+          personal: {
+            ...prev.personal,
+            avatar: newProfilePath
+          }
+        }));
+        
+        setSuccessMessage('Profile picture updated successfully!');
+        setTimeout(() => setSuccessMessage(null), 3000);
+      };
+      reader.readAsDataURL(file);
+    } catch (err) {
+      console.error('Upload Error:', err);
+      setError('Failed to upload profile picture');
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
   const tabs = [
     { id: 'personal', label: 'Personal Information', icon: User },
     { id: 'location', label: 'Location Details', icon: MapPin },
-    { id: 'performance', label: 'Performance Metrics', icon: Target },
   ];
+
+  if (isFetching) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading profile...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
       <div className="mx-auto">
+        {/* Success Message */}
+        {successMessage && (
+          <div className="fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-2 z-50 animate-fade-in">
+            <CheckCircle size={20} />
+            <span>{successMessage}</span>
+          </div>
+        )}
+
+        {/* Error Message */}
+        {error && (
+          <div className="fixed top-4 right-4 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-2 z-50 animate-fade-in">
+            <AlertCircle size={20} />
+            <span>{error}</span>
+            <button onClick={() => setError(null)} className="ml-2">
+              <X size={16} />
+            </button>
+          </div>
+        )}
+
         {/* Header */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between">
             <div className="flex items-center space-x-4 mb-4 sm:mb-0">
-              <div className="relative">
-                <div className={`w-16 h-16 bg-gradient-to-br from-${fullColor} to-${fullColor} rounded-full flex items-center justify-center text-white text-2xl font-bold`}>
-                  {profileData.personal.firstName[0]}{profileData.personal.lastName[0]}
-                </div>
-                <button className={`absolute -bottom-1 -right-1 bg-${fullColor} text-white p-1.5 rounded-full hover:bg-${themeColor}-900 transition`}>
-                  <Camera size={14} />
-                </button>
+              <div className="relative group">
+                {profileData.personal.avatar ? (
+                  <div className="relative">
+                    <img 
+                      src={`${ASSET_URL}${profileData.personal.avatar}`}
+                      alt="Profile" 
+                      className="w-20 h-20 rounded-full object-cover border-4 border-white shadow-lg"
+                      onError={(e) => {
+                        console.error('Image failed to load:', `${ASSET_URL}${profileData.personal.avatar}`);
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
+                    <div className="absolute inset-0 rounded-full bg-black opacity-0 group-hover:opacity-20 transition-opacity"></div>
+                  </div>
+                ) : (
+                  <div className="relative">
+                    <div className={`w-20 h-20 bg-gradient-to-br from-${themeColor}-400 via-${themeColor}-600 to-${themeColor}-800 rounded-full flex items-center justify-center text-white shadow-lg border-4 border-white`}>
+                      <span className="text-3xl font-bold tracking-tight">
+                        {profileData.personal.firstName?.[0]?.toUpperCase() || ''}{profileData.personal.lastName?.[0]?.toUpperCase() || ''}
+                      </span>
+                    </div>
+                    <div className="absolute inset-0 rounded-full bg-gradient-to-t from-black/20 to-transparent"></div>
+                  </div>
+                )}
+                <label className={`absolute -bottom-1 -right-1 bg-${fullColor} text-white p-2 rounded-full hover:bg-${themeColor}-900 transition cursor-pointer shadow-lg border-2 border-white group-hover:scale-110 transform`}>
+                  <Camera size={16} />
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    onChange={handlePhotoUpload} 
+                    className="hidden" 
+                    disabled={uploadingPhoto}
+                  />
+                </label>
+                {uploadingPhoto && (
+                  <div className="absolute inset-0 bg-black/60 rounded-full flex items-center justify-center">
+                    <div className="flex flex-col items-center">
+                      <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-t-2 border-white"></div>
+                      <span className="text-white text-xs mt-1">Uploading...</span>
+                    </div>
+                  </div>
+                )}
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">
@@ -130,14 +435,8 @@ const LocationManagerProfile = () => {
                 </h1>
                 <p className="text-gray-600 flex items-center">
                   <Building size={16} className={`mr-1.5 text-${fullColor}`} />
-                  Location Manager • {profileData.location.name}
+                  {profileData.personal.position} • {profileData.location.name}
                 </p>
-                <div className="flex items-center mt-1 space-x-4 text-sm text-gray-500">
-                  <span className="flex items-center">
-                    <Star size={14} className="mr-1 text-yellow-500" />
-                    {profileData.performance.customerRating}/5 Rating
-                  </span>
-                </div>
               </div>
             </div>
             
@@ -279,7 +578,52 @@ const LocationManagerProfile = () => {
                   />
                 </div>
 
-                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Employee ID</label>
+                  <input
+                    type="text"
+                    value={isEditing ? editedData.personal.employeeId : profileData.personal.employeeId}
+                    onChange={(e) => handleInputChange('personal', 'employeeId', e.target.value)}
+                    disabled={!isEditing}
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 disabled:bg-gray-100 disabled:text-gray-500`}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Shift</label>
+                  <input
+                    type="text"
+                    value={isEditing ? editedData.personal.shift : profileData.personal.shift}
+                    onChange={(e) => handleInputChange('personal', 'shift', e.target.value)}
+                    disabled={!isEditing}
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 disabled:bg-gray-100 disabled:text-gray-500`}
+                    placeholder="e.g., Morning, Evening, Night"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Hire Date</label>
+                  <input
+                    type="date"
+                    value={isEditing ? editedData.personal.hireDate : profileData.personal.hireDate}
+                    onChange={(e) => handleInputChange('personal', 'hireDate', e.target.value)}
+                    disabled={!isEditing}
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 disabled:bg-gray-100 disabled:text-gray-500`}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+                  <select
+                    value={isEditing ? editedData.personal.status : profileData.personal.status}
+                    onChange={(e) => handleInputChange('personal', 'status', e.target.value)}
+                    disabled={!isEditing}
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 disabled:bg-gray-100 disabled:text-gray-500`}
+                  >
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                  </select>
+                </div>
               </div>
             </div>
           )}
@@ -299,28 +643,6 @@ const LocationManagerProfile = () => {
                     type="text"
                     value={isEditing ? editedData.location.name : profileData.location.name}
                     onChange={(e) => handleInputChange('location', 'name', e.target.value)}
-                    disabled={!isEditing}
-                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 disabled:bg-gray-100 disabled:text-gray-500`}
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Location Type</label>
-                  <input
-                    type="text"
-                    value={isEditing ? editedData.location.type : profileData.location.type}
-                    onChange={(e) => handleInputChange('location', 'type', e.target.value)}
-                    disabled={!isEditing}
-                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 disabled:bg-gray-100 disabled:text-gray-500`}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Capacity</label>
-                  <input
-                    type="number"
-                    value={isEditing ? editedData.location.capacity : profileData.location.capacity}
-                    onChange={(e) => handleInputChange('location', 'capacity', e.target.value)}
                     disabled={!isEditing}
                     className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 disabled:bg-gray-100 disabled:text-gray-500`}
                   />
@@ -352,6 +674,40 @@ const LocationManagerProfile = () => {
                     disabled={!isEditing}
                     className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 disabled:bg-gray-100 disabled:text-gray-500`}
                   />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Timezone</label>
+                  <input
+                    type="text"
+                    value={isEditing ? editedData.location.timezone : profileData.location.timezone}
+                    onChange={(e) => handleInputChange('location', 'timezone', e.target.value)}
+                    disabled={!isEditing}
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 disabled:bg-gray-100 disabled:text-gray-500`}
+                    placeholder="e.g., America/New_York"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Location Status</label>
+                  <select
+                    value={isEditing ? (editedData.location.isActive ? 'active' : 'inactive') : (profileData.location.isActive ? 'active' : 'inactive')}
+                    onChange={(e) => {
+                      const newValue = e.target.value === 'active';
+                      setEditedData(prev => ({
+                        ...prev,
+                        location: {
+                          ...prev.location,
+                          isActive: newValue
+                        }
+                      }));
+                    }}
+                    disabled={!isEditing}
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 disabled:bg-gray-100 disabled:text-gray-500`}
+                  >
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                  </select>
                 </div>
 
                 <div className="md:col-span-2">
@@ -390,7 +746,7 @@ const LocationManagerProfile = () => {
                         className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 disabled:bg-gray-100 disabled:text-gray-500`}
                       />
                     </div>
-                    <div>
+                    <div className="md:col-span-2">
                       <label className="block text-sm font-medium text-gray-700 mb-2">ZIP Code</label>
                       <input
                         type="text"
@@ -401,85 +757,6 @@ const LocationManagerProfile = () => {
                       />
                     </div>
                   </div>
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Available Facilities</label>
-                  <div className="flex flex-wrap gap-2">
-                    {profileData.location.facilities.map((facility, index) => (
-                      <span key={index} className={`px-3 py-1 bg-${themeColor}-100 text-${fullColor} rounded-full text-sm`}>
-                        {facility}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Performance Metrics Tab */}
-          {activeTab === 'performance' && (
-            <div className="space-y-6">
-              <h2 className="text-lg font-semibold text-gray-900 flex items-center">
-                <Target size={20} className={`mr-2 text-${themeColor}-600`} />
-                Performance Metrics
-              </h2>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-                <div className={`bg-${themeColor}-50 rounded-lg p-4 text-center`}>
-                  <div className={`text-2xl font-bold text-${fullColor}`}>{profileData.performance.monthlyVisitors.toLocaleString()}</div>
-                  <div className="text-sm text-gray-600">Monthly Visitors</div>
-                </div>
-                <div className={`bg-${themeColor}-50 rounded-lg p-4 text-center`}>
-                  <div className={`text-2xl font-bold text-${fullColor}`}>{profileData.performance.customerRating}/5</div>
-                  <div className="text-sm text-gray-600">Customer Rating</div>
-                </div>
-                <div className={`bg-${themeColor}-50 rounded-lg p-4 text-center`}>
-                  <div className={`text-2xl font-bold text-${fullColor}`}>{profileData.performance.totalBookings}</div>
-                  <div className="text-sm text-gray-600">Total Bookings</div>
-                </div>
-                <div className={`bg-${themeColor}-50 rounded-lg p-4 text-center`}>
-                  <div className={`text-2xl font-bold text-${fullColor}`}>${profileData.performance.revenueThisMonth.toLocaleString()}</div>
-                  <div className="text-sm text-gray-600">Monthly Revenue</div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <h3 className="font-semibold text-gray-900 mb-3 flex items-center">
-                    <Users size={18} className={`mr-2 text-${themeColor}-600`} />
-                    Team Information
-                  </h3>
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Team Size</span>
-                      <span className="font-medium">{profileData.performance.teamSize} employees</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Occupancy Rate</span>
-                      <span className={`font-medium text-${fullColor}`}>{profileData.performance.occupancyRate}%</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <h3 className="font-semibold text-gray-900 mb-3 flex items-center">
-                    <Star size={18} className="mr-2 text-yellow-500" />
-                    Customer Satisfaction
-                  </h3>
-                  <div className="flex items-center space-x-2">
-                    <div className="flex">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <Star
-                          key={star}
-                          size={20}
-                          className={star <= profileData.performance.customerRating ? 'text-yellow-400 fill-current' : 'text-gray-300'}
-                        />
-                      ))}
-                    </div>
-                    <span className="text-lg font-semibold text-gray-900">{profileData.performance.customerRating}</span>
-                  </div>
-                  <p className="text-sm text-gray-600 mt-2">Based on 342 customer reviews</p>
                 </div>
               </div>
             </div>

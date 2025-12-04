@@ -8,6 +8,10 @@ export interface LocationManagerProfilePersonal {
   position: string;
   avatar: string;
   department: string;
+  employeeId: string;
+  shift: string;
+  hireDate: string;
+  status: string;
 }
 
 export interface LocationManagerProfileAddress {
@@ -15,31 +19,18 @@ export interface LocationManagerProfileAddress {
   city: string;
   state: string;
   zipCode: string;
-  country: string;
 }
 
 export interface LocationManagerProfileLocation {
   name: string;
-  type: string;
   email: string;
   phone: string;
   address: LocationManagerProfileAddress;
-  facilities: string[];
-  capacity: number;
-  squareFootage: string;
-}
-
-export interface LocationManagerProfilePerformance {
-  monthlyVisitors: number;
-  customerRating: number;
-  totalBookings: number;
-  revenueThisMonth: number;
-  teamSize: number;
-  occupancyRate: number;
+  timezone: string;
+  isActive: boolean;
 }
 
 export interface LocationManagerProfileData {
   personal: LocationManagerProfilePersonal;
   location: LocationManagerProfileLocation;
-  performance: LocationManagerProfilePerformance;
 }

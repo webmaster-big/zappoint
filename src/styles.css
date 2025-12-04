@@ -548,6 +548,220 @@ html.dark h1, html.dark h2, html.dark h3, html.dark h4, html.dark h5, html.dark 
   animation: fade-in 0.3s ease-out;
 }
 
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.5s ease-out;
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.5s ease-out;
+}
+
+@keyframes fade-in-down {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-down {
+  animation: fade-in-down 0.3s ease-out;
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-scale-in {
+  animation: scale-in 0.2s ease-out;
+}
+
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.3s ease-out;
+}
+
+@keyframes slide-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-in-left {
+  animation: slide-in-left 0.4s ease-out;
+}
+
+@keyframes slide-in-from-left {
+  from {
+    opacity: 0;
+    transform: translateX(-100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-in-from-left {
+  animation: slide-in-from-left 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Modal backdrop fade */
+@keyframes backdrop-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-backdrop-fade {
+  animation: backdrop-fade 0.2s ease-out;
+}
+
+/* Smooth transitions for common elements */
+.transition-smooth {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.transition-fast {
+  transition: all 0.15s ease-in-out;
+}
+
 .animation-delay-4000 {
   animation-delay: 4s;
+}
+
+/* Stagger animation delays for lists */
+.animate-stagger-1 {
+  animation-delay: 0.05s;
+}
+
+.animate-stagger-2 {
+  animation-delay: 0.1s;
+}
+
+.animate-stagger-3 {
+  animation-delay: 0.15s;
+}
+
+.animate-stagger-4 {
+  animation-delay: 0.2s;
+}
+
+.animate-stagger-5 {
+  animation-delay: 0.25s;
+}
+
+/* Modal animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.2s ease-out;
+}
+
+.animate-slideUp {
+  animation: slideUp 0.3s ease-out;
+}
+
+/* Toast notification animations */
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shrink {
+  from {
+    width: 100%;
+  }
+  to {
+    width: 0%;
+  }
+}
+
+.animate-slideDown {
+  animation: slideDown 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.animate-shrink {
+  animation: shrink 5s linear forwards;
+}
+
+.animate-bounce-slow {
+  animation: bounce 1.5s infinite cubic-bezier(0.28, 0.84, 0.42, 1);
 }

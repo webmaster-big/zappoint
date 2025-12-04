@@ -5,4 +5,5 @@ export interface AddOnsAddon {
   name: string;
   price: number;
   image: string;
+  location: { id?: number; name?: string } | null;
 }

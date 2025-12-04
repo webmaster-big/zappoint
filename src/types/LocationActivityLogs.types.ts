@@ -4,11 +4,11 @@ export interface LocationActivityLogsActivityLog {
   id: string;
   userId: string;
   userName: string;
-  userType: 'attendant' | 'manager' | 'system';
+  userType: 'company_admin' | 'location_manager' | 'attendant' | 'system';
   userRole?: string;
   location: string;
   action: string;
-  resourceType: 'package' | 'customer' | 'purchase' | 'attraction' | 'booking' | 'attendant' | 'manager' | 'inventory' | 'settings';
+  resourceType: 'package' | 'customer' | 'purchase' | 'attraction' | 'booking' | 'attendant' | 'manager' | 'inventory' | 'settings' | 'general';
   resourceId?: string;
   resourceName?: string;
   details: string;
@@ -27,6 +27,7 @@ export interface LocationActivityLogsFilterOptions {
 
 export interface LocationActivityLogsLocationData {
   name: string;
+  id: number;
   managers: string[];
   attendants: string[];
   recentActivity: number;

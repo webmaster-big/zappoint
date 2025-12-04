@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { 
   ShoppingCart, 
   CreditCard, 
-  Wallet, 
   DollarSign,
   Plus,
   Minus,
@@ -11,9 +10,17 @@ import {
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import type { CreatePurchaseAttraction, CreatePurchaseCustomerInfo } from '../../../types/CreatePurchase.types';
+import { attractionService } from '../../../services/AttractionService';
+import { attractionPurchaseService } from '../../../services/AttractionPurchaseService';
+import { customerService, type Customer } from '../../../services/CustomerService';
+import { generatePurchaseQRCode } from '../../../utils/qrcode';
+import Toast from '../../../components/ui/Toast';
+import { ASSET_URL, getStoredUser } from '../../../utils/storage';
+import { loadAcceptJS, processCardPayment, validateCardNumber, formatCardNumber, getCardType } from '../../../services/PaymentService';
+import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
 
 const CreatePurchase = () => {
-  const { themeColor } = useThemeColor();
+  const { themeColor, fullColor } = useThemeColor();
   const [attractions, setAttractions] = useState<CreatePurchaseAttraction[]>([]);
   const [filteredAttractions, setFilteredAttractions] = useState<CreatePurchaseAttraction[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -28,19 +35,63 @@ const CreatePurchase = () => {
   const [discount, setDiscount] = useState(0);
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const [qrCodeImage, setQrCodeImage] = useState<string | null>(null);
+  const [showQRModal, setShowQRModal] = useState(false);
+  const [purchaseId, setPurchaseId] = useState<number | null>(null);
+  const [foundCustomers, setFoundCustomers] = useState<Customer[]>([]);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null);
+  const [searchingCustomer, setSearchingCustomer] = useState(false);
+  const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
+  
+  // Card payment details
+  const [useAuthorizeNet, setUseAuthorizeNet] = useState(false); // Toggle for Authorize.Net vs manual card
+  const [cardNumber, setCardNumber] = useState('');
+  const [cardMonth, setCardMonth] = useState('');
+  const [cardYear, setCardYear] = useState('');
+  const [cardCVV, setCardCVV] = useState('');
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [paymentError, setPaymentError] = useState('');
+  const [authorizeApiLoginId, setAuthorizeApiLoginId] = useState('');
+  const [authorizeEnvironment, setAuthorizeEnvironment] = useState<'sandbox' | 'production'>('sandbox');
+  const [showNoAuthAccountModal, setShowNoAuthAccountModal] = useState(false);
 
-  // Load attractions from localStorage
+  // Load attractions from backend
   useEffect(() => {
-    const loadAttractions = () => {
+    const loadAttractions = async () => {
       try {
-        const storedAttractions = localStorage.getItem('zapzone_attractions');
-        if (storedAttractions) {
-          const parsedAttractions = JSON.parse(storedAttractions);
-          setAttractions(parsedAttractions);
-          setFilteredAttractions(parsedAttractions);
-        }
+        setLoading(true);
+        const response = await attractionService.getAttractions({
+          is_active: true,
+          per_page: 100,
+          user_id: getStoredUser()?.id
+        });
+        
+        // Convert API format to component format
+        const convertedAttractions: CreatePurchaseAttraction[] = response.data.attractions.map(attr => ({
+          id: attr.id.toString(),
+          name: attr.name,
+          description: attr.description,
+          category: attr.category,
+          price: attr.price,
+          pricingType: attr.pricing_type,
+          maxCapacity: attr.max_capacity,
+          duration: attr.duration?.toString() || '',
+          durationUnit: attr.duration_unit || 'minutes',
+          location: attr.location?.name || '',
+          locationId: attr.location?.id || attr.location_id, // Store location_id from API
+          images: attr.image ? (Array.isArray(attr.image) ? attr.image : [attr.image]) : [],
+          status: attr.is_active ? 'active' : 'inactive',
+          createdAt: attr.created_at,
+          availability: typeof attr.availability === 'object' ? attr.availability as Record<string, boolean> : {},
+        }));
+        
+        setAttractions(convertedAttractions);
+        setFilteredAttractions(convertedAttractions);
       } catch (error) {
         console.error('Error loading attractions:', error);
+        setToast({ message: 'Failed to load attractions', type: 'error' });
       } finally {
         setLoading(false);
       }
@@ -62,12 +113,103 @@ const CreatePurchase = () => {
     }
   }, [searchTerm, attractions]);
 
+  // Debounced customer search by email
+  useEffect(() => {
+    const searchCustomer = async () => {
+      const email = customerInfo.email.trim();
+      
+      if (!email || email.length < 3) {
+        setFoundCustomers([]);
+        setShowCustomerDropdown(false);
+        setSelectedCustomerId(null);
+        return;
+      }
+
+      try {
+        setSearchingCustomer(true);
+        const response = await customerService.searchCustomers(email);
+        setFoundCustomers(response.data);
+        setShowCustomerDropdown(response.data.length > 0);
+        
+        // Auto-select if exact email match
+        const exactMatch = response.data.find(c => c.email.toLowerCase() === email.toLowerCase());
+        if (exactMatch) {
+          setSelectedCustomerId(exactMatch.id);
+          setCustomerInfo(prev => ({
+            ...prev,
+            name: `${exactMatch.first_name} ${exactMatch.last_name}`,
+            phone: exactMatch.phone || prev.phone,
+          }));
+        } else {
+          setSelectedCustomerId(null);
+        }
+      } catch (error) {
+        console.error('Error searching customer:', error);
+        setFoundCustomers([]);
+        setShowCustomerDropdown(false);
+        setSelectedCustomerId(null);
+      } finally {
+        setSearchingCustomer(false);
+      }
+    };
+
+    // Debounce search by 500ms
+    const timeoutId = setTimeout(searchCustomer, 500);
+    return () => clearTimeout(timeoutId);
+  }, [customerInfo.email]);
+
+  // Initialize Authorize.Net
+  useEffect(() => {
+    const initializeAuthorizeNet = async () => {
+      try {
+        const locationId = selectedAttraction?.locationId || 1;
+        const response = await getAuthorizeNetPublicKey(locationId);
+        if (response.success && response.data) {
+          setAuthorizeApiLoginId(response.data.api_login_id);
+        } else {
+          setShowNoAuthAccountModal(true);
+        }
+        await loadAcceptJS(authorizeEnvironment);
+        console.log('✅ Accept.js loaded successfully');
+      } catch (error: any) {
+        console.error('❌ Failed to initialize Authorize.Net:', error);
+        if (error.response?.data?.message?.includes('No active Authorize.Net account')) {
+          setShowNoAuthAccountModal(true);
+        }
+      }
+    };
+    initializeAuthorizeNet();
+  }, [authorizeEnvironment, selectedAttraction]);
+
   const handleCustomerInfoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setCustomerInfo(prev => ({
       ...prev,
       [name]: value
     }));
+    
+    // Reset customer selection when email changes
+    if (name === 'email') {
+      setSelectedCustomerId(null);
+    }
+  };
+
+  const handleSelectCustomer = (customer: Customer) => {
+    setSelectedCustomerId(customer.id);
+    setCustomerInfo({
+      name: `${customer.first_name} ${customer.last_name}`,
+      email: customer.email,
+      phone: customer.phone || '',
+    });
+    setShowCustomerDropdown(false);
+  };
+
+  const handleCardNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatCardNumber(e.target.value);
+    if (formatted.replace(/\s/g, '').length <= 16) {
+      setCardNumber(formatted);
+      setPaymentError('');
+    }
   };
 
   const calculateSubtotal = () => {
@@ -86,42 +228,131 @@ const CreatePurchase = () => {
     setDiscount(0);
   };
 
-  const handleCompletePurchase = () => {
+  const handleCompletePurchase = async () => {
     if (!selectedAttraction) return;
 
-    // Create purchase object
-    const purchase = {
-      id: `purchase_${Date.now()}`,
-      type: 'attraction',
-      attractionName: selectedAttraction.name,
-      customerName: customerInfo.name || 'Walk-in Customer',
-      email: customerInfo.email,
-      phone: customerInfo.phone,
-      quantity: quantity,
-      status: 'confirmed',
-      totalAmount: calculateTotal(),
-      createdAt: new Date().toISOString(),
-      paymentMethod: paymentMethod,
-      duration: `${selectedAttraction.duration} ${selectedAttraction.durationUnit}`,
-      activity: selectedAttraction.name,
-      discount: discount,
-      notes: notes
-    };
+    // Validate card information if payment method is card AND using Authorize.Net
+    if (paymentMethod === 'card' && useAuthorizeNet) {
+      if (!cardNumber || !cardMonth || !cardYear || !cardCVV) {
+        setPaymentError('Please fill in all card details');
+        return;
+      }
+      if (!validateCardNumber(cardNumber)) {
+        setPaymentError('Invalid card number');
+        return;
+      }
+      if (!authorizeApiLoginId) {
+        setPaymentError('Payment system not initialized. Please refresh the page.');
+        return;
+      }
+    }
 
-    // Save to localStorage
-    const existingPurchases = JSON.parse(localStorage.getItem('zapzone_purchases') || '[]');
-    localStorage.setItem('zapzone_purchases', JSON.stringify([...existingPurchases, purchase]));
+    try {
+      setSubmitting(true);
+      setIsProcessingPayment(true);
+      setPaymentError('');
 
-    // Show confirmation
-    alert(`Purchase completed successfully! Total: $${calculateTotal().toFixed(2)}`);
-    
-    // Reset form
-    setSelectedAttraction(null);
-    setQuantity(1);
-    setCustomerInfo({ name: '', email: '', phone: '' });
-    setDiscount(0);
-    setNotes('');
-    setPaymentMethod('cash');
+      const totalAmount = calculateTotal();
+      let transactionId: string | undefined;
+
+      // Process card payment if payment method is card AND using Authorize.Net
+      if (paymentMethod === 'card' && useAuthorizeNet) {
+        console.log('💳 Processing card payment with Authorize.Net...');
+        
+        const cardData = {
+          cardNumber: cardNumber.replace(/\s/g, ''),
+          month: cardMonth,
+          year: cardYear,
+          cardCode: cardCVV,
+        };
+        
+        const paymentData = {
+          location_id: selectedAttraction.locationId || 1,
+          amount: totalAmount,
+          order_id: `ATTR-${selectedAttraction.id}-${Date.now()}`,
+          description: `Attraction Purchase: ${selectedAttraction.name}`,
+        };
+        
+        const paymentResponse = await processCardPayment(
+          cardData,
+          paymentData,
+          authorizeApiLoginId
+        );
+        
+        if (!paymentResponse.success) {
+          throw new Error(paymentResponse.message || 'Payment failed');
+        }
+        
+        transactionId = paymentResponse.transaction_id;
+        console.log('✅ Payment successful:', transactionId);
+      }
+
+      // Create purchase data matching backend Payment model
+      const purchaseData = {
+        attraction_id: Number(selectedAttraction.id),
+        customer_id: selectedCustomerId || undefined,
+        guest_name: customerInfo.name || 'Walk-in Customer',
+        guest_email: customerInfo.email || undefined,
+        guest_phone: customerInfo.phone || undefined,
+        quantity: quantity,
+        amount: totalAmount,
+        currency: 'USD',
+        method: paymentMethod as 'card' | 'cash',
+        status: paymentMethod === 'cash' ? 'pending' : 'completed', // Card (manual or Authorize.Net) is completed, cash is pending
+        payment_id: transactionId, // Only present if Authorize.Net was used
+        location_id: selectedAttraction.locationId || 1,
+        purchase_date: new Date().toISOString().split('T')[0],
+        notes: notes || `Attraction Purchase: ${selectedAttraction.name} (${quantity} ticket${quantity > 1 ? 's' : ''})`,
+        // transaction_id is auto-generated by backend
+      };
+
+      // Create purchase via API
+      const response = await attractionPurchaseService.createPurchase(purchaseData);
+      const createdPurchase = response.data;
+
+      setPurchaseId(createdPurchase.id);
+
+      // Generate QR code
+      const qrData = await generatePurchaseQRCode(createdPurchase.id);
+      
+      setQrCodeImage(qrData);
+      setShowQRModal(true);
+
+      // Send receipt email with QR code
+      try {
+        await attractionPurchaseService.sendReceipt(
+          createdPurchase.id,
+          qrData
+        );
+        setToast({ message: 'Purchase completed! Receipt sent to email.', type: 'success' });
+      } catch (emailError) {
+        console.error('Error sending email:', emailError);
+        setToast({ message: 'Purchase completed! (Email failed to send)', type: 'info' });
+      }
+
+      // Reset form immediately
+      setSelectedAttraction(null);
+      setQuantity(1);
+      setCustomerInfo({ name: '', email: '', phone: '' });
+      setDiscount(0);
+      setNotes('');
+      setPaymentMethod('cash');
+      setSelectedCustomerId(null);
+      setCardNumber('');
+      setCardMonth('');
+      setCardYear('');
+      setCardCVV('');
+      setPaymentError('');
+      setUseAuthorizeNet(false);
+
+    } catch (error: any) {
+      console.error('❌ Payment/Purchase error:', error);
+      setPaymentError(error.message || 'Payment processing failed. Please try again.');
+      setToast({ message: error.message || 'Failed to complete purchase. Please try again.', type: 'error' });
+    } finally {
+      setSubmitting(false);
+      setIsProcessingPayment(false);
+    }
   };
 
   if (loading) {
@@ -131,6 +362,7 @@ const CreatePurchase = () => {
       </div>
     );
   }
+
 
   return (
     <div className="min-h-screen p-6">
@@ -175,7 +407,7 @@ const CreatePurchase = () => {
                     {/* Attraction Image */}
                     <div className="w-20 h-20 flex-shrink-0 flex items-center justify-center bg-gray-100 rounded-md border border-gray-200 overflow-hidden">
                       {attraction.images && attraction.images.length > 0 ? (
-                        <img src={attraction.images[0]} alt={attraction.name} className="object-cover w-full h-full" />
+                        <img src={ASSET_URL + attraction.images[0]} alt={attraction.name} className="object-cover w-full h-full" />
                       ) : (
                         <span className="text-gray-400 text-xs">No Image</span>
                       )}
@@ -206,6 +438,49 @@ const CreatePurchase = () => {
             <div className="bg-white rounded-lg shadow-sm p-6">
               <h2 className="text-lg font-semibold text-gray-800 mb-4">Customer Information</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="relative">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Email {selectedCustomerId && <span className="text-green-600 text-xs">(Customer Found)</span>}
+                  </label>
+                  <input
+                    type="email"
+                    name="email"
+                    value={customerInfo.email}
+                    onChange={handleCustomerInfoChange}
+                    onFocus={() => foundCustomers.length > 0 && setShowCustomerDropdown(true)}
+                    onBlur={() => setTimeout(() => setShowCustomerDropdown(false), 200)}
+                    className={`w-full border ${selectedCustomerId ? 'border-green-500' : 'border-gray-300'} rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
+                    placeholder="customer@example.com"
+                  />
+                  {searchingCustomer && (
+                    <div className="absolute right-3 top-9 text-gray-400">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-400"></div>
+                    </div>
+                  )}
+                  
+                  {/* Customer Dropdown */}
+                  {showCustomerDropdown && foundCustomers.length > 0 && (
+                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                      {foundCustomers.map((customer) => (
+                        <div
+                          key={customer.id}
+                          onClick={() => handleSelectCustomer(customer)}
+                          className={`p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0 ${
+                            selectedCustomerId === customer.id ? 'bg-green-50' : ''
+                          }`}
+                        >
+                          <div className="font-medium text-gray-900">
+                            {customer.first_name} {customer.last_name}
+                          </div>
+                          <div className="text-sm text-gray-600">{customer.email}</div>
+                          {customer.phone && (
+                            <div className="text-xs text-gray-500">{customer.phone}</div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Customer Name 
@@ -219,19 +494,7 @@ const CreatePurchase = () => {
                     placeholder="Walk-in Customer"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Email 
-                  </label>
-                  <input
-                    type="email"
-                    name="email"
-                    value={customerInfo.email}
-                    onChange={handleCustomerInfoChange}
-                    className={`w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
-                    placeholder="customer@example.com"
-                  />
-                </div>
+              
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Phone (Optional)
@@ -270,7 +533,7 @@ const CreatePurchase = () => {
                     {/* Attraction Image */}
                     <div className="mb-3 w-full flex justify-center">
                       {selectedAttraction.images && selectedAttraction.images.length > 0 ? (
-                        <img src={selectedAttraction.images[0]} alt={selectedAttraction.name} className="max-h-32 rounded-lg object-contain border border-gray-200" />
+                        <img src={ASSET_URL + selectedAttraction.images[0]}  alt={selectedAttraction.name} className="max-h-32 rounded-lg object-contain border border-gray-200" />
                       ) : (
                         <span className="text-gray-400 text-xs">No Image</span>
                       )}
@@ -282,17 +545,21 @@ const CreatePurchase = () => {
                       <div className="flex items-center">
                         <button
                           onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                          className="w-8 h-8 rounded-lg bg-gray-100 text-gray-700 flex items-center justify-center hover:bg-gray-200"
+                          className="w-8 h-8 rounded-lg bg-gray-100 text-gray-700 flex items-center justify-center hover:bg-gray-200 transition-colors"
                         >
                           <Minus className="h-4 w-4" />
                         </button>
-                        <span className="mx-3 font-semibold">{quantity}</span>
+                        <span className="mx-3 font-semibold transition-all duration-300">{quantity}</span>
                         <button
                           onClick={() => setQuantity(quantity + 1)}
-                          className="w-8 h-8 rounded-lg bg-gray-100 text-gray-700 flex items-center justify-center hover:bg-gray-200"
+                          className="w-8 h-8 rounded-lg bg-gray-100 text-gray-700 flex items-center justify-center hover:bg-gray-200 transition-colors"
                         >
                           <Plus className="h-4 w-4" />
                         </button>
+                      </div>
+                      {/* Live subtotal preview */}
+                      <div className="mt-2 text-sm text-gray-600">
+                        ${selectedAttraction.price} × {quantity} = <span className="font-semibold text-gray-800 transition-all duration-300">${calculateSubtotal().toFixed(2)}</span>
                       </div>
                     </div>
 
@@ -337,21 +604,11 @@ const CreatePurchase = () => {
                         <DollarSign className="h-5 w-5 mx-auto mb-1" />
                         <span className="text-sm">Cash</span>
                       </button>
+                   
                       <button
-                        onClick={() => setPaymentMethod('e_wallet')}
+                        onClick={() => setPaymentMethod('card')}
                         className={`p-3 border rounded-lg text-center transition-colors ${
-                          paymentMethod === 'e_wallet'
-                            ? `border-${themeColor}-500 bg-${themeColor}-50 text-${themeColor}-700`
-                            : 'border-gray-300 hover:border-gray-400'
-                        }`}
-                      >
-                        <Wallet className="h-5 w-5 mx-auto mb-1" />
-                        <span className="text-sm">E-Wallet</span>
-                      </button>
-                      <button
-                        onClick={() => setPaymentMethod('credit_card')}
-                        className={`p-3 border rounded-lg text-center transition-colors ${
-                          paymentMethod === 'credit_card'
+                          paymentMethod === 'card'
                             ? `border-${themeColor}-500 bg-${themeColor}-50 text-${themeColor}-700`
                             : 'border-gray-300 hover:border-gray-400'
                         }`}
@@ -362,31 +619,172 @@ const CreatePurchase = () => {
                     </div>
                   </div>
 
+                  {/* Card Payment Form - Show only when card is selected */}
+                  {paymentMethod === 'card' && (
+                    <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                      <div className="mb-4">
+                        <h3 className="text-sm font-medium text-gray-700 mb-3">Card Payment Type</h3>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setUseAuthorizeNet(false)}
+                            className={`flex-1 px-3 py-2 text-xs rounded-lg border transition-colors ${
+                              !useAuthorizeNet
+                                ? `border-${themeColor}-500 bg-${themeColor}-50 text-${themeColor}-700 font-medium`
+                                : 'border-gray-300 text-gray-600 hover:border-gray-400'
+                            }`}
+                          >
+                            Manual Card
+                          </button>
+                          <button
+                            onClick={() => setUseAuthorizeNet(true)}
+                            className={`flex-1 px-3 py-2 text-xs rounded-lg border transition-colors ${
+                              useAuthorizeNet
+                                ? `border-${themeColor}-500 bg-${themeColor}-50 text-${themeColor}-700 font-medium`
+                                : 'border-gray-300 text-gray-600 hover:border-gray-400'
+                            }`}
+                          >
+                            Process with Authorize.Net
+                          </button>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-2">
+                          {useAuthorizeNet 
+                            ? 'Process payment online with Authorize.Net' 
+                            : 'Customer paid by card - no online processing'}
+                        </p>
+                      </div>
+                      
+                      {useAuthorizeNet && (
+                        <>
+                          <h3 className="text-sm font-medium text-gray-700 mb-3">Card Details</h3>
+                      
+                      {/* Card Number */}
+                      <div className="mb-3">
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Card Number</label>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            value={cardNumber}
+                            onChange={handleCardNumberChange}
+                            placeholder="1234 5678 9012 3456"
+                            className={`w-full rounded-lg border px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 ${
+                              cardNumber && validateCardNumber(cardNumber)
+                                ? 'border-green-400 bg-green-50'
+                                : cardNumber
+                                ? 'border-red-400'
+                                : 'border-gray-300'
+                            }`}
+                            maxLength={19}
+                            disabled={isProcessingPayment}
+                          />
+                          {cardNumber && validateCardNumber(cardNumber) && (
+                            <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                              <svg className="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path>
+                              </svg>
+                            </div>
+                          )}
+                        </div>
+                        {cardNumber && (
+                          <p className="text-xs mt-1 text-gray-600">{getCardType(cardNumber)}</p>
+                        )}
+                      </div>
+                      
+                      {/* Expiration and CVV */}
+                      <div className="grid grid-cols-3 gap-2">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Month</label>
+                          <select
+                            value={cardMonth}
+                            onChange={(e) => setCardMonth(e.target.value)}
+                            className={`w-full rounded-lg border border-gray-300 px-2 py-2 text-sm focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
+                            disabled={isProcessingPayment}
+                          >
+                            <option value="">MM</option>
+                            {Array.from({ length: 12 }, (_, i) => {
+                              const month = (i + 1).toString().padStart(2, '0');
+                              return <option key={month} value={month}>{month}</option>;
+                            })}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Year</label>
+                          <select
+                            value={cardYear}
+                            onChange={(e) => setCardYear(e.target.value)}
+                            className={`w-full rounded-lg border border-gray-300 px-2 py-2 text-sm focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
+                            disabled={isProcessingPayment}
+                          >
+                            <option value="">YYYY</option>
+                            {Array.from({ length: 10 }, (_, i) => {
+                              const year = (new Date().getFullYear() + i).toString();
+                              return <option key={year} value={year}>{year}</option>;
+                            })}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">CVV</label>
+                          <input
+                            type="text"
+                            value={cardCVV}
+                            onChange={(e) => {
+                              const value = e.target.value.replace(/\\D/g, '');
+                              if (value.length <= 4) {
+                                setCardCVV(value);
+                              }
+                            }}
+                            placeholder="123"
+                            className={`w-full rounded-lg border border-gray-300 px-2 py-2 text-sm font-mono focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
+                            maxLength={4}
+                            disabled={isProcessingPayment}
+                          />
+                        </div>
+                      </div>
+                      
+                      {/* Error Message */}
+                      {paymentError && (
+                        <div className="mt-3 bg-red-50 border border-red-200 rounded-lg p-2 text-xs text-red-800">
+                          {paymentError}
+                        </div>
+                      )}
+                      
+                          {/* Security Notice */}
+                          <div className="mt-3 flex items-start gap-2 text-xs text-gray-600">
+                            <svg className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd"></path>
+                            </svg>
+                            <span>Secure payment powered by Authorize.Net</span>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+
                   {/* Pricing Breakdown */}
                   <div className="border-t border-gray-200 pt-4 mb-6">
                     <div className="flex justify-between mb-2">
                       <span className="text-gray-600">Subtotal</span>
-                      <span className="font-medium">${calculateSubtotal().toFixed(2)}</span>
+                      <span className="font-medium transition-all duration-300">${calculateSubtotal().toFixed(2)}</span>
                     </div>
                     {discount > 0 && (
-                      <div className="flex justify-between mb-2 text-red-600">
+                      <div className="flex justify-between mb-2 text-red-600 transition-all duration-300">
                         <span>Discount</span>
                         <span>-${discount.toFixed(2)}</span>
                       </div>
                     )}
                     <div className="flex justify-between font-bold text-lg mt-3 pt-3 border-t border-gray-200">
                       <span>Total</span>
-                      <span>${calculateTotal().toFixed(2)}</span>
+                      <span className="transition-all duration-300">${calculateTotal().toFixed(2)}</span>
                     </div>
                   </div>
 
                   {/* Complete Purchase Button */}
                   <button
                     onClick={handleCompletePurchase}
-                    className={`w-full bg-${themeColor}-600 text-white py-3 rounded-lg font-semibold hover:bg-${themeColor}-700 transition-colors flex items-center justify-center`}
+                    disabled={submitting}
+                    className={`w-full bg-${fullColor} text-white py-3 rounded-lg font-semibold hover:bg-${themeColor}-700 transition-colors flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed`}
                   >
                     <ShoppingCart className="h-5 w-5 mr-2" />
-                    Complete Purchase
+                    {submitting ? 'Processing...' : 'Complete Purchase'}
                   </button>
                 </>
               ) : (
@@ -399,6 +797,115 @@ const CreatePurchase = () => {
           </div>
         </div>
       </div>
+
+      {/* No Authorize.Net Account Modal */}
+      {showNoAuthAccountModal && (
+        <div className="fixed inset-0 bg-black/75 flex items-center justify-center p-4 z-[9999] animate-backdrop-fade">
+          <div className="bg-white rounded-xl max-w-md w-full p-6 border-4 border-yellow-400 shadow-2xl animate-scale-in">
+            <div className="flex flex-col items-center text-center">
+              <div className="w-20 h-20 bg-yellow-100 rounded-full flex items-center justify-center mb-4">
+                <svg className="w-12 h-12 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              
+              <h3 className="text-2xl font-bold text-gray-900 mb-3">Authorize.Net Not Configured</h3>
+              
+              <p className="text-gray-700 mb-6">
+                This location does not have an active Authorize.Net account. Automated card processing is unavailable.
+              </p>
+              
+              <div className={`bg-${themeColor}-50 border-2 border-${themeColor}-200 rounded-lg p-4 mb-6 w-full`}>
+                <p className={`text-sm text-${themeColor}-900 font-medium`}>
+                  You can still process purchases
+                </p>
+                <p className={`text-xs text-${themeColor}-800 mt-2`}>
+                  Cash payments and manual card entry are available. For automated Authorize.Net processing, contact your system administrator or use Location Manager Account to configure the merchant account for this location.
+                </p>
+              </div>
+              
+              <button
+                onClick={() => setShowNoAuthAccountModal(false)}
+                className={`w-full px-6 py-3 bg-${fullColor} text-white rounded-lg hover:bg-${fullColor} font-semibold shadow-lg`}
+              >
+                I Understand
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* QR Code Modal */}
+      {showQRModal && qrCodeImage && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-backdrop-fade">
+          <div className="bg-white rounded-xl max-w-md w-full p-6">
+            <div className="text-center">
+              <h3 className="text-xl font-bold text-gray-900 mb-4">Purchase Complete!</h3>
+              <p className="text-gray-600 mb-6">
+                Scan this QR code at the attraction entrance
+              </p>
+              
+              {/* QR Code Image */}
+              <div className="flex justify-center mb-6">
+                <img 
+                  src={qrCodeImage} 
+                  alt="Purchase QR Code"
+                  className="w-64 h-64 border-2 border-gray-200 rounded-lg"
+                />
+              </div>
+
+              <div className="bg-gray-50 rounded-lg p-4 mb-6 text-left">
+                <p className="text-sm text-gray-600">
+                  <strong>Purchase ID:</strong> #{purchaseId}
+                </p>
+                <p className="text-sm text-gray-600">
+                  <strong>Total:</strong> ${calculateTotal().toFixed(2)}
+                </p>
+                {customerInfo.email && (
+                  <p className="text-sm text-gray-600">
+                    <strong>Receipt sent to:</strong> {customerInfo.email}
+                  </p>
+                )}
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    const link = document.createElement('a');
+                    link.href = qrCodeImage;
+                    link.download = `purchase-qr-${purchaseId}.png`;
+                    link.click();
+                  }}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                >
+                  Download QR
+                </button>
+                <button
+                  onClick={() => {
+                    setShowQRModal(false);
+                    setQrCodeImage(null);
+                    setPurchaseId(null);
+                  }}
+                  className={`flex-1 px-4 py-2 bg-${themeColor}-600 text-white rounded-lg hover:bg-${themeColor}-700`}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast Notification */}
+      {toast && (
+        <div className="fixed top-4 right-4 z-50 animate-fade-in-up">
+          <Toast
+            message={toast.message}
+            type={toast.type}
+            onClose={() => setToast(null)}
+          />
+        </div>
+      )}
     </div>
   );
 };

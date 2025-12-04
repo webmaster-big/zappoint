@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   Eye, 
@@ -16,9 +16,12 @@ import {
   X,
   Copy,
   Shield,
-  UserCheck
+  UserCheck,
+  CheckCircle
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
+import CounterAnimation from '../../../components/ui/CounterAnimation';
+import { API_BASE_URL } from '../../../utils/storage';
 import type { 
   ManageAccountsAccount, 
   ManageAccountsFilterOptions, 
@@ -28,42 +31,104 @@ import type {
 const InvitationModal: React.FC<ManageAccountsInvitationModalProps> = ({ 
   isOpen, 
   onClose, 
-  onSendInvitation, 
-  loading = false,
+  onSendInvitation,
   defaultEmail = '',
   defaultUserType = 'attendant'
 }) => {
   const { themeColor, fullColor } = useThemeColor();
   const [email, setEmail] = useState(defaultEmail);
-  const [userType, setUserType] = useState<'attendant' | 'manager'>(defaultUserType);
+  const [userType, setUserType] = useState<'attendant' | 'manager' | 'company_admin'>(defaultUserType as 'attendant' | 'manager' | 'company_admin');
   const [generatedLink, setGeneratedLink] = useState('');
+  const [isSending, setIsSending] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
       setEmail(defaultEmail);
       setUserType(defaultUserType);
-      // Generate a unique invitation link
-      const token = Math.random().toString(36).substring(2) + Date.now().toString(36);
-      const link = `${window.location.origin}/register?token=${token}&type=${userType}`;
-      setGeneratedLink(link);
+      setGeneratedLink('');
+      setError('');
+      setSuccess(false);
     }
-  }, [isOpen, defaultEmail, defaultUserType, userType]);
+  }, [isOpen, defaultEmail, defaultUserType]);
 
-  const handleSend = () => {
-    if (email && generatedLink) {
-      onSendInvitation(email, userType);
+  const handleSend = async () => {
+    if (!email) {
+      setError('Please enter an email address');
+      return;
+    }
+
+    setIsSending(true);
+    setError('');
+    setSuccess(false);
+
+    try {
+      // Get auth token from localStorage
+      const userData = localStorage.getItem('zapzone_user');
+      const authToken = userData ? JSON.parse(userData).token : null;
+
+      if (!authToken) {
+        throw new Error('Authentication required. Please log in again.');
+      }
+
+      // Map userType to backend role
+      const role = userType === 'manager' ? 'location_manager' : userType === 'company_admin' ? 'company_admin' : 'attendant';
+
+      console.log("bearer " + authToken)
+      const response = await fetch(`${API_BASE_URL}/shareable-tokens`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${authToken}`, 
+        },
+        body: JSON.stringify({
+          email: email,
+          role: role,
+        }),
+      });
+
+      const data = await response.json();
+      console.log(data)
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || 'Failed to create invitation');
+      }
+
+      // Set the generated link from backend
+      setGeneratedLink(data.data.link);
+      setSuccess(true);
+
+      // Call the parent callback
+      if (onSendInvitation) {
+        onSendInvitation(email, userType);
+      }
+
+      // Show success message
+      setTimeout(() => {
+        setSuccess(false);
+      }, 3000);
+
+    } catch (err) {
+      console.error('Error sending invitation:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to send invitation. Please try again.';
+      setError(errorMessage);
+    } finally {
+      setIsSending(false);
     }
   };
 
   const copyToClipboard = () => {
-    navigator.clipboard.writeText(generatedLink);
-    alert('Link copied to clipboard!');
+    if (generatedLink) {
+      navigator.clipboard.writeText(generatedLink);
+      alert('Link copied to clipboard!');
+    }
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-backdrop-fade">
       <div className="bg-white rounded-xl shadow-lg max-w-md w-full">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
@@ -71,6 +136,7 @@ const InvitationModal: React.FC<ManageAccountsInvitationModalProps> = ({
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 transition-colors"
+            disabled={isSending}
           >
             <X className="h-5 w-5" />
           </button>
@@ -78,17 +144,37 @@ const InvitationModal: React.FC<ManageAccountsInvitationModalProps> = ({
 
         {/* Content */}
         <div className="p-6 space-y-4">
+          {/* Success Message */}
+          {success && (
+            <div className="p-3 bg-green-50 border border-green-200 rounded-lg flex items-start gap-2">
+              <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-green-800">Invitation sent successfully!</p>
+                <p className="text-xs text-green-600 mt-1">The invitation email has been sent to {email}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Error Message */}
+          {error && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-sm text-red-700">{error}</p>
+            </div>
+          )}
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               User Type
             </label>
             <select
               value={userType}
-              onChange={(e) => setUserType(e.target.value as 'attendant' | 'manager')}
-              className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
+              onChange={(e) => setUserType(e.target.value as 'attendant' | 'manager' | 'company_admin')}
+              disabled={isSending || success}
+              className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 disabled:bg-gray-100 disabled:cursor-not-allowed`}
             >
-              <option value="attendant">Attendant</option>
+              <option value="company_admin">Company Admin</option>
               <option value="manager">Location Manager</option>
+              <option value="attendant">Attendant</option>
             </select>
           </div>
 
@@ -101,61 +187,67 @@ const InvitationModal: React.FC<ManageAccountsInvitationModalProps> = ({
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="Enter email address"
-              className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
+              disabled={isSending || success}
+              className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 disabled:bg-gray-100 disabled:cursor-not-allowed`}
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Invitation Link
-            </label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={generatedLink}
-                readOnly
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm text-gray-600"
-              />
-              <button
-                onClick={copyToClipboard}
-                className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                title="Copy to clipboard"
-              >
-                <Copy className="h-4 w-4" />
-              </button>
+          {/* Show generated link after successful creation */}
+          {generatedLink && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Invitation Link
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={generatedLink}
+                  readOnly
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm text-gray-600"
+                />
+                <button
+                  onClick={copyToClipboard}
+                  className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                  title="Copy to clipboard"
+                >
+                  <Copy className="h-4 w-4" />
+                </button>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                This link will expire once the account is created
+              </p>
             </div>
-            <p className="text-xs text-gray-500 mt-1">
-              This link will expire once the account is created or after 7 days
-            </p>
-          </div>
+          )}
         </div>
 
         {/* Footer */}
         <div className="flex gap-3 p-6 border-t border-gray-200">
           <button
             onClick={onClose}
-            disabled={loading}
+            disabled={isSending}
             className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
           >
-            Cancel
+            {success ? 'Close' : 'Cancel'}
           </button>
-          <button
-            onClick={handleSend}
-            disabled={!email || loading}
-            className={`flex-1 px-4 py-2 bg-${fullColor} text-white rounded-lg hover:bg-${themeColor}-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2`}
-          >
-            {loading ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                Sending...
-              </>
-            ) : (
-              <>
-                <Send className="h-4 w-4" />
-                Send Invitation
-              </>
-            )}
-          </button>
+          {!success && (
+            <button
+              onClick={handleSend}
+              disabled={!email || isSending}
+              className={`flex-1 px-4 py-2 bg-${fullColor} text-white rounded-lg hover:bg-${themeColor}-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2`}
+            >
+              {isSending ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  Sending...
+                </>
+              ) : (
+                <>
+                  <Send className="h-4 w-4" />
+                  Send Invitation
+                </>
+              )}
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -179,8 +271,6 @@ const ManageAccounts = () => {
   const [itemsPerPage] = useState(10);
   const [showFilters, setShowFilters] = useState(false);
   const [showInvitationModal, setShowInvitationModal] = useState(false);
-  const [sendingInvitation, setSendingInvitation] = useState(false);
-  const [selectedAccountForInvite, setSelectedAccountForInvite] = useState<ManageAccountsAccount | null>(null);
 
   // Locations
   const locations = [
@@ -241,136 +331,87 @@ const ManageAccounts = () => {
     }
   ];
 
-  // Load accounts from localStorage
+  // Load accounts from backend API
   useEffect(() => {
     loadAccounts();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Apply filters when accounts or filters change
   useEffect(() => {
     applyFilters();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accounts, filters]);
 
-  const loadAccounts = () => {
+  const loadAccounts = useCallback(async () => {
     try {
-      const storedAccounts = localStorage.getItem('zapzone_accounts');
-      if (storedAccounts) {
-        const parsedAccounts = JSON.parse(storedAccounts);
-        setAccounts(parsedAccounts);
-      } else {
-        // Sample data for demonstration
-        const sampleAccounts: ManageAccountsAccount[] = [
-          // Location Managers
-          {
-            id: 'mgr_1',
-            firstName: 'John',
-            lastName: 'Smith',
-            email: 'john.smith@zapzone.com',
-            phone: '(555) 111-2222',
-            hireDate: '2023-05-15',
-            position: 'Location Manager',
-            employeeId: 'ZAP-MGR-001',
-            department: 'Administration',
-            location: 'Brighton',
-            userType: 'manager',
-            status: 'active',
-            username: 'john.smith',
-            createdAt: '2023-05-15T08:00:00Z',
-            accountCreated: true,
-            lastLogin: '2024-01-15T14:30:00Z'
-          },
-          {
-            id: 'mgr_2',
-            firstName: 'Sarah',
-            lastName: 'Wilson',
-            email: 'sarah.wilson@zapzone.com',
-            phone: '(555) 222-3333',
-            hireDate: '2024-01-10',
-            position: 'Location Manager',
-            employeeId: 'ZAP-MGR-002',
-            department: 'Administration',
-            location: 'Canton',
-            userType: 'manager',
-            status: 'active',
-            username: 'sarah.wilson',
-            createdAt: '2024-01-10T09:00:00Z',
-            accountCreated: false,
-            invitationSent: true,
-            invitationLink: `${window.location.origin}/register?token=xyz789&type=manager`,
-            invitationExpiry: '2024-12-31T23:59:59Z'
-          },
-          // Attendants
-          {
-            id: 'att_1',
-            firstName: 'Mike',
-            lastName: 'Chen',
-            email: 'mike.chen@zapzone.com',
-            phone: '(555) 333-4444',
-            hireDate: '2024-02-01',
-            position: 'Senior Attendant',
-            employeeId: 'ZAP-ATT-001',
-            department: 'Guest Services',
-            location: 'Brighton',
-            userType: 'attendant',
-            shift: 'Morning Shift (8:00 AM - 4:00 PM)',
-            assignedAreas: ['Laser Tag Arena', 'Bowling Alley'],
-            status: 'active',
-            username: 'mike.chen',
-            createdAt: '2024-02-01T09:30:00Z',
-            accountCreated: true,
-            lastLogin: '2024-01-15T08:15:00Z'
-          },
-          {
-            id: 'att_2',
-            firstName: 'Emily',
-            lastName: 'Rodriguez',
-            email: 'emily.rodriguez@zapzone.com',
-            phone: '(555) 444-5555',
-            hireDate: '2023-11-20',
-            position: 'Team Lead',
-            employeeId: 'ZAP-ATT-002',
-            department: 'Entertainment',
-            location: 'Canton',
-            userType: 'attendant',
-            shift: 'Weekend Shift (10:00 AM - 6:00 PM)',
-            assignedAreas: ['VR Experience', 'Arcade Zone'],
-            status: 'inactive',
-            username: 'emily.rodriguez',
-            createdAt: '2023-11-20T14:15:00Z',
-            accountCreated: false
-          },
-          {
-            id: 'att_3',
-            firstName: 'David',
-            lastName: 'Kim',
-            email: 'david.kim@zapzone.com',
-            phone: '(555) 555-6666',
-            hireDate: '2024-03-10',
-            position: 'Attendant',
-            employeeId: 'ZAP-ATT-003',
-            department: 'Maintenance',
-            location: 'Farmington',
-            userType: 'attendant',
-            shift: 'Night Shift (6:00 PM - 2:00 AM)',
-            assignedAreas: ['Escape Room', 'VR Experience'],
-            status: 'active',
-            username: 'david.kim',
-            createdAt: '2024-03-10T10:00:00Z',
-            accountCreated: false,
-            invitationSent: true,
-            invitationLink: `${window.location.origin}/register?token=abc123&type=attendant`,
-            invitationExpiry: '2024-12-31T23:59:59Z'
-          }
-        ];
-        setAccounts(sampleAccounts);
-        localStorage.setItem('zapzone_accounts', JSON.stringify(sampleAccounts));
+      const userData = localStorage.getItem('zapzone_user');
+      const authToken = userData ? JSON.parse(userData).token : null;
+
+      if (!authToken) {
+        console.error('No auth token found');
+        setLoading(false);
+        return;
       }
+
+      // Build query parameters
+      const params = new URLSearchParams();
+      if (filters.status !== 'all') params.append('status', filters.status);
+      if (filters.userType !== 'all') {
+        const roleMap: Record<string, string> = {
+          'manager': 'location_manager',
+          'attendant': 'attendant',
+          'company_admin': 'company_admin'
+        };
+        params.append('role', roleMap[filters.userType] || filters.userType);
+      }
+      if (filters.location !== 'all') params.append('location_id', filters.location);
+      if (filters.search) params.append('search', filters.search);
+
+      const response = await fetch(`${API_BASE_URL}/users?${params.toString()}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || 'Failed to load accounts');
+      }
+
+      // Transform backend users to frontend account format
+      const transformedAccounts: ManageAccountsAccount[] = data.data.users.map((user: Record<string, unknown>) => ({
+        id: String(user.id),
+        firstName: String(user.first_name || ''),
+        lastName: String(user.last_name || ''),
+        email: String(user.email || ''),
+        phone: String(user.phone || ''),
+        hireDate: String(user.hire_date || (typeof user.created_at === 'string' ? user.created_at.split('T')[0] : '')),
+        position: String(user.position || (user.role === 'company_admin' ? 'Company Admin' : user.role === 'location_manager' ? 'Location Manager' : 'Attendant')),
+        employeeId: String(user.employee_id || `ZAP-${user.id}`),
+        department: String(user.department || 'Administration'),
+        location: (user.location as { name?: string })?.name || 'Unknown',
+        userType: user.role === 'location_manager' ? 'manager' : (user.role === 'company_admin' ? 'company_admin' : 'attendant'),
+        shift: String(user.shift || ''),
+        assignedAreas: [],
+        status: (user.status as 'active' | 'inactive') || 'active',
+        username: typeof user.email === 'string' ? user.email.split('@')[0] : '',
+        createdAt: String(user.created_at || ''),
+        accountCreated: true,
+        lastLogin: user.last_login ? String(user.last_login) : undefined,
+      }));
+
+      setAccounts(transformedAccounts);
     } catch (error) {
       console.error('Error loading accounts:', error);
+      setAccounts([]);
     } finally {
       setLoading(false);
     }
-  };
+  }, [filters.status, filters.userType, filters.location, filters.search]);
 
   const applyFilters = () => {
     let result = [...accounts];
@@ -445,115 +486,160 @@ const ManageAccounts = () => {
     }
   };
 
-  const handleStatusChange = (id: string, newStatus: ManageAccountsAccount['status']) => {
-    const updatedAccounts = accounts.map(account =>
-      account.id === id ? { ...account, status: newStatus } : account
-    );
-    setAccounts(updatedAccounts);
-    localStorage.setItem('zapzone_accounts', JSON.stringify(updatedAccounts));
-  };
+  const handleStatusChange = async (id: string, newStatus: ManageAccountsAccount['status']) => {
+    try {
+      const userData = localStorage.getItem('zapzone_user');
+      const authToken = userData ? JSON.parse(userData).token : null;
 
-  const handleDeleteAccount = (id: string) => {
-    if (window.confirm('Are you sure you want to delete this account? This action cannot be undone.')) {
-      const updatedAccounts = accounts.filter(account => account.id !== id);
+      if (!authToken) {
+        alert('Authentication required. Please log in again.');
+        return;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/users/${id}/toggle-status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || 'Failed to update status');
+      }
+
+      // Update local state
+      const updatedAccounts = accounts.map(account =>
+        account.id === id ? { ...account, status: newStatus } : account
+      );
       setAccounts(updatedAccounts);
-      localStorage.setItem('zapzone_accounts', JSON.stringify(updatedAccounts));
+    } catch (error) {
+      console.error('Error updating status:', error);
+      alert('Failed to update account status. Please try again.');
     }
   };
 
-  const handleBulkDelete = () => {
+  const handleDeleteAccount = async (id: string) => {
+    if (!window.confirm('Are you sure you want to delete this account? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const userData = localStorage.getItem('zapzone_user');
+      const authToken = userData ? JSON.parse(userData).token : null;
+
+      if (!authToken) {
+        alert('Authentication required. Please log in again.');
+        return;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/users/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || 'Failed to delete account');
+      }
+
+      // Update local state
+      const updatedAccounts = accounts.filter(account => account.id !== id);
+      setAccounts(updatedAccounts);
+    } catch (error) {
+      console.error('Error deleting account:', error);
+      alert('Failed to delete account. Please try again.');
+    }
+  };
+
+  const handleBulkDelete = async () => {
     if (selectedAccounts.length === 0) return;
     
-    if (window.confirm(`Are you sure you want to delete ${selectedAccounts.length} account(s)? This action cannot be undone.`)) {
+    if (!window.confirm(`Are you sure you want to delete ${selectedAccounts.length} account(s)? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const userData = localStorage.getItem('zapzone_user');
+      const authToken = userData ? JSON.parse(userData).token : null;
+
+      if (!authToken) {
+        alert('Authentication required. Please log in again.');
+        return;
+      }
+
+      // Delete all selected accounts
+      await Promise.all(selectedAccounts.map(id => 
+        fetch(`${API_BASE_URL}/users/${id}`, {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`,
+          },
+        })
+      ));
+
+      // Update local state
       const updatedAccounts = accounts.filter(account => !selectedAccounts.includes(account.id));
       setAccounts(updatedAccounts);
       setSelectedAccounts([]);
-      localStorage.setItem('zapzone_accounts', JSON.stringify(updatedAccounts));
+    } catch (error) {
+      console.error('Error deleting accounts:', error);
+      alert('Failed to delete some accounts. Please try again.');
     }
   };
 
-  const handleBulkStatusChange = (newStatus: ManageAccountsAccount['status']) => {
+  const handleBulkStatusChange = async (newStatus: ManageAccountsAccount['status']) => {
     if (selectedAccounts.length === 0) return;
     
-    const updatedAccounts = accounts.map(account =>
-      selectedAccounts.includes(account.id) ? { ...account, status: newStatus } : account
-    );
-    setAccounts(updatedAccounts);
-    setSelectedAccounts([]);
-    localStorage.setItem('zapzone_accounts', JSON.stringify(updatedAccounts));
+    try {
+      const userData = localStorage.getItem('zapzone_user');
+      const authToken = userData ? JSON.parse(userData).token : null;
+
+      if (!authToken) {
+        alert('Authentication required. Please log in again.');
+        return;
+      }
+
+      // Update status for all selected accounts
+      await Promise.all(selectedAccounts.map(id => 
+        fetch(`${API_BASE_URL}/users/${id}/toggle-status`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`,
+          },
+        })
+      ));
+
+      // Update local state
+      const updatedAccounts = accounts.map(account =>
+        selectedAccounts.includes(account.id) ? { ...account, status: newStatus } : account
+      );
+      setAccounts(updatedAccounts);
+      setSelectedAccounts([]);
+    } catch (error) {
+      console.error('Error updating account status:', error);
+      alert('Failed to update some account statuses. Please try again.');
+    }
   };
 
   // Send invitation to create account
-  const handleSendInvitation = (email: string, userType: 'attendant' | 'manager') => {
-    setSendingInvitation(true);
-    
-    // Simulate API call
-    setTimeout(() => {
-      const token = Math.random().toString(36).substring(2) + Date.now().toString(36);
-      const invitationLink = `${window.location.origin}/register?token=${token}&type=${userType}`;
-      const expiryDate = new Date();
-      expiryDate.setDate(expiryDate.getDate() + 7);
-
-      let updatedAccounts: ManageAccountsAccount[];
-      
-      if (selectedAccountForInvite) {
-        // Update existing account
-        updatedAccounts = accounts.map(account => {
-          if (account.id === selectedAccountForInvite.id) {
-            return {
-              ...account,
-              invitationSent: true,
-              invitationLink: invitationLink,
-              invitationExpiry: expiryDate.toISOString()
-            };
-          }
-          return account;
-        });
-      } else {
-        // Create new account entry
-        const newAccount: ManageAccountsAccount = {
-          id: `new_${Date.now()}`,
-          firstName: '',
-          lastName: '',
-          email: email,
-          phone: '',
-          hireDate: new Date().toISOString().split('T')[0],
-          position: userType === 'manager' ? 'Location Manager' : 'Attendant',
-          employeeId: `ZAP-${userType === 'manager' ? 'MGR' : 'ATT'}-${String(accounts.length + 1).padStart(3, '0')}`,
-          department: userType === 'manager' ? 'Administration' : 'Guest Services',
-          location: 'Brighton',
-          userType: userType,
-          status: 'inactive',
-          username: email.split('@')[0],
-          createdAt: new Date().toISOString(),
-          accountCreated: false,
-          invitationSent: true,
-          invitationLink: invitationLink,
-          invitationExpiry: expiryDate.toISOString()
-        };
-        updatedAccounts = [...accounts, newAccount];
-      }
-
-      setAccounts(updatedAccounts);
-      localStorage.setItem('zapzone_accounts', JSON.stringify(updatedAccounts));
-      
-      setSendingInvitation(false);
-      setShowInvitationModal(false);
-      setSelectedAccountForInvite(null);
-      
-      alert(`Invitation sent successfully to ${email}`);
-    }, 2000);
+  const handleSendInvitation = () => {
+    // The actual API call is handled in the modal
+    // Reload accounts to get updated data from backend
+    loadAccounts();
   };
 
-  // Open invitation modal for specific account or new invitation
-  const handleInviteAccount = (account?: ManageAccountsAccount) => {
-    if (account) {
-      setSelectedAccountForInvite(account);
-      setShowInvitationModal(true);
-    } else {
-      setSelectedAccountForInvite(null);
-      setShowInvitationModal(true);
-    }
+  // Open invitation modal for new invitation
+  const handleInviteAccount = () => {
+    setShowInvitationModal(true);
   };
 
   // Get unique values for filters
@@ -561,25 +647,6 @@ const ManageAccounts = () => {
     const departments = accounts.map(account => account.department);
     return [...new Set(departments)];
   };
-
-  // const getUniqueUserTypes = () => {
-  //   const userTypes = accounts.map(account => account.userType);
-  //   return [...new Set(userTypes)];
-  // };
-
-  // // Calculate experience in months
-  // const getExperience = (hireDate: string) => {
-  //   const hire = new Date(hireDate);
-  //   const today = new Date();
-  //   const months = (today.getFullYear() - hire.getFullYear()) * 12 + (today.getMonth() - hire.getMonth());
-  //   return Math.max(0, months);
-  // };
-
-  // // Check if invitation is expired
-  // const isInvitationExpired = (expiryDate?: string) => {
-  //   if (!expiryDate) return true;
-  //   return new Date(expiryDate) < new Date();
-  // };
 
   // Format last login date
   const formatLastLogin = (lastLogin?: string) => {
@@ -595,6 +662,8 @@ const ManageAccounts = () => {
     
     return date.toLocaleDateString();
   };
+
+  console.log('Filtered Accounts:', filteredAccounts);
 
   // Pagination
   const indexOfLastItem = currentPage * itemsPerPage;
@@ -623,18 +692,18 @@ const ManageAccounts = () => {
         <div className="flex gap-2 mt-4 sm:mt-0">
           <button
             onClick={() => handleInviteAccount()}
-            className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+            className={`inline-flex items-center px-4 py-2 bg-${fullColor} text-white rounded-lg hover:bg-${fullColor}-900 transition-colors`}
           >
             <Send className="h-5 w-5 mr-2" />
             Send Invitation
           </button>
-          <Link
+          {/* <Link
             to="/accounts/create"
             className={`inline-flex items-center px-4 py-2 bg-${fullColor} text-white rounded-lg hover:bg-${themeColor}-900 transition-colors`}
           >
             <Plus className="h-5 w-5 mr-2" />
             Create Account
-          </Link>
+          </Link> */}
         </div>
       </div>
 
@@ -654,7 +723,7 @@ const ManageAccounts = () => {
                 <span className="text-base font-semibold text-gray-800">{metric.title}</span>
               </div>
               <div className="flex items-end gap-2 mt-2">
-                <h3 className="text-2xl font-bold text-gray-900">{metric.value}</h3>
+                <CounterAnimation value={metric.value} className="text-2xl font-bold text-gray-900" />
               </div>
               <p className="text-xs mt-1 text-gray-400">{metric.change}</p>
             </div>
@@ -835,9 +904,6 @@ const ManageAccounts = () => {
                           <div className="font-medium text-gray-900">
                             {account.firstName} {account.lastName}
                           </div>
-                          <div className="text-xs text-gray-600 mt-1">
-                            {account.position} • {account.employeeId}
-                          </div>
                         </div>
                       </div>
                     </td>
@@ -848,20 +914,21 @@ const ManageAccounts = () => {
                           <span className="text-gray-900">{account.email}</span>
                         </div>
                         <div className="flex items-center gap-2 text-sm">
-                          <Phone className="h-3 w-3 text-gray-400" />
-                          <span className="text-gray-600">{account.phone}</span>
+                          {account.phone ? <><Phone className="h-3 w-3 text-gray-400" />
+                          <span className="text-gray-600">{account.phone}</span></> : null}
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4">
                       <div className="space-y-2">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${userTypeBadgeColor}`}>
-                          {account.userType === 'manager' ? 'Location Manager' : 'Attendant'}
+                          {account.userType === 'manager' ? 'Location Manager' : account.userType === 'company_admin' ? 'Company Admin' : 'Attendant'}
                         </span>
-                        <div className="flex items-center gap-1 text-xs text-gray-600">
+                       
+                       {account.location !== 'Unknown' ? <div className="flex items-center gap-1 text-xs text-gray-600">
                           <MapPin className="h-3 w-3" />
                           {account.location}
-                        </div>
+                        </div> : null} 
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -966,14 +1033,10 @@ const ManageAccounts = () => {
       {/* Invitation Modal */}
       <InvitationModal
         isOpen={showInvitationModal}
-        onClose={() => {
-          setShowInvitationModal(false);
-          setSelectedAccountForInvite(null);
-        }}
+        onClose={() => setShowInvitationModal(false)}
         onSendInvitation={handleSendInvitation}
-        loading={sendingInvitation}
-        defaultEmail={selectedAccountForInvite?.email || ''}
-        defaultUserType={selectedAccountForInvite?.userType || 'attendant'}
+        defaultEmail=''
+        defaultUserType='attendant'
       />
     </div>
   );

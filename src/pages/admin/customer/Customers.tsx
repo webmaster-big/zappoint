@@ -6,7 +6,6 @@ import {
   Phone,
   Calendar,
   DollarSign,
-  Star,
   Edit,
   Trash2,
   Eye,
@@ -18,6 +17,8 @@ import {
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import type { CustomersCustomer } from '../../../types/Customers.types';
+import { customerService, type CustomerListItem } from '../../../services/CustomerService';
+import { getStoredUser } from '../../../utils/storage';
 
 const CustomerListing: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
@@ -26,278 +27,110 @@ const CustomerListing: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<string>('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [loading, setLoading] = useState(false);
+  const [totalCustomers, setTotalCustomers] = useState(0);
+  const currentUser = getStoredUser();
 
-  // Sample customer data
-  const sampleCustomers: CustomersCustomer[] = [
-    {
-      id: '1',
-      name: 'John Smith',
-      email: 'john.smith@email.com',
-      phone: '(555) 123-4567',
-      joinDate: '2024-01-15',
-      lastActivity: '2024-09-20',
-      totalSpent: 1250,
-      bookings: 8,
-      ticketsPurchased: 15,
-      status: 'active',
-      satisfaction: 4.8,
-      tags: ['VIP', 'Regular']
-    },
-    {
-      id: '2',
-      name: 'Sarah Johnson',
-      email: 'sarah.j@email.com',
-      phone: '(555) 987-6543',
-      joinDate: '2024-02-20',
-      lastActivity: '2024-09-18',
-      totalSpent: 850,
-      bookings: 5,
-      ticketsPurchased: 10,
-      status: 'active',
-      satisfaction: 4.5,
-      tags: ['Regular']
-    },
-    {
-      id: '3',
-      name: 'Michael Brown',
-      email: 'm.brown@email.com',
-      phone: '(555) 456-7890',
-      joinDate: '2024-03-10',
-      lastActivity: '2024-09-15',
-      totalSpent: 420,
-      bookings: 3,
-      ticketsPurchased: 5,
-      status: 'active',
-      satisfaction: 4.2,
-      tags: ['New']
-    },
-    {
-      id: '4',
-      name: 'Emily Davis',
-      email: 'emily.davis@email.com',
-      phone: '(555) 234-5678',
-      joinDate: '2024-04-05',
-      lastActivity: '2024-09-10',
-      totalSpent: 680,
-      bookings: 4,
-      ticketsPurchased: 8,
-      status: 'active',
-      satisfaction: 4.9,
-      tags: ['VIP']
-    },
-    {
-      id: '5',
-      name: 'David Wilson',
-      email: 'd.wilson@email.com',
-      phone: '(555) 876-5432',
-      joinDate: '2024-05-12',
-      lastActivity: '2024-08-28',
-      totalSpent: 320,
-      bookings: 2,
-      ticketsPurchased: 3,
-      status: 'inactive',
-      satisfaction: 3.8,
-      tags: []
-    },
-    {
-      id: '6',
-      name: 'Jennifer Lee',
-      email: 'j.lee@email.com',
-      phone: '(555) 345-6789',
-      joinDate: '2024-06-18',
-      lastActivity: '2024-09-22',
-      totalSpent: 950,
-      bookings: 6,
-      ticketsPurchased: 12,
-      status: 'active',
-      satisfaction: 4.7,
-      tags: ['Regular', 'Corporate']
-    },
-    {
-      id: '7',
-      name: 'Robert Taylor',
-      email: 'r.taylor@email.com',
-      phone: '(555) 765-4321',
-      joinDate: '2024-07-22',
-      lastActivity: '2024-09-19',
-      totalSpent: 580,
-      bookings: 3,
-      ticketsPurchased: 7,
-      status: 'active',
-      satisfaction: 4.3,
-      tags: ['New']
-    },
-    {
-      id: '8',
-      name: 'Amanda Clark',
-      email: 'a.clark@email.com',
-      phone: '(555) 111-2222',
-      joinDate: '2024-08-05',
-      lastActivity: '2024-09-21',
-      totalSpent: 1200,
-      bookings: 7,
-      ticketsPurchased: 14,
-      status: 'active',
-      satisfaction: 4.6,
-      tags: ['VIP', 'Regular']
-    },
-    {
-      id: '9',
-      name: 'Christopher Martinez',
-      email: 'c.martinez@email.com',
-      phone: '(555) 333-4444',
-      joinDate: '2024-08-15',
-      lastActivity: '2024-09-16',
-      totalSpent: 750,
-      bookings: 4,
-      ticketsPurchased: 9,
-      status: 'active',
-      satisfaction: 4.4,
-      tags: ['Regular']
-    },
-    {
-      id: '10',
-      name: 'Jessica Anderson',
-      email: 'j.anderson@email.com',
-      phone: '(555) 555-6666',
-      joinDate: '2024-09-01',
-      lastActivity: '2024-09-23',
-      totalSpent: 180,
-      bookings: 1,
-      ticketsPurchased: 1,
-      status: 'new',
-      satisfaction: 0,
-      tags: ['New']
-    },
-    {
-      id: '11',
-      name: 'Daniel Thompson',
-      email: 'd.thompson@email.com',
-      phone: '(555) 777-8888',
-      joinDate: '2024-09-05',
-      lastActivity: '2024-09-20',
-      totalSpent: 420,
-      bookings: 2,
-      ticketsPurchased: 6,
-      status: 'active',
-      satisfaction: 4.1,
-      tags: ['New']
-    },
-    {
-      id: '12',
-      name: 'Michelle White',
-      email: 'm.white@email.com',
-      phone: '(555) 999-0000',
-      joinDate: '2024-09-10',
-      lastActivity: '2024-09-18',
-      totalSpent: 890,
-      bookings: 5,
-      ticketsPurchased: 11,
-      status: 'active',
-      satisfaction: 4.8,
-      tags: ['Regular']
-    },
-    {
-      id: '13',
-      name: 'Kevin Harris',
-      email: 'k.harris@email.com',
-      phone: '(555) 123-7890',
-      joinDate: '2024-09-12',
-      lastActivity: '2024-09-22',
-      totalSpent: 310,
-      bookings: 2,
-      ticketsPurchased: 4,
-      status: 'active',
-      satisfaction: 4.0,
-      tags: ['New']
-    },
-    {
-      id: '14',
-      name: 'Lisa Garcia',
-      email: 'l.garcia@email.com',
-      phone: '(555) 456-1234',
-      joinDate: '2024-09-15',
-      lastActivity: '2024-09-21',
-      totalSpent: 670,
-      bookings: 3,
-      ticketsPurchased: 8,
-      status: 'active',
-      satisfaction: 4.5,
-      tags: ['Regular']
-    },
-    {
-      id: '15',
-      name: 'Matthew Robinson',
-      email: 'm.robinson@email.com',
-      phone: '(555) 789-4561',
-      joinDate: '2024-09-18',
-      lastActivity: '2024-09-23',
-      totalSpent: 230,
-      bookings: 1,
-      ticketsPurchased: 2,
-      status: 'new',
-      satisfaction: 0,
-      tags: ['New']
+  // Debounce search term
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Fetch customers from API
+  const fetchCustomers = async () => {
+    if (!currentUser?.id) return;
+    
+    try {
+      setLoading(true);
+      const filters: any = {
+        page: currentPage,
+        per_page: itemsPerPage,
+      };
+
+      if (debouncedSearchTerm) {
+        filters.search = debouncedSearchTerm;
+      }
+
+      if (statusFilter !== 'all') {
+        filters.status = statusFilter;
+      }
+
+      // Map frontend sort fields to backend
+      const sortMapping: { [key: string]: string } = {
+        'name': 'first_name',
+        'joinDate': 'created_at',
+        'totalSpent': 'total_spent',
+        'bookings': 'total_bookings',
+        'ticketsPurchased': 'total_ticket_quantity'
+      };
+
+      filters.sort_by = sortMapping[sortBy] || 'first_name';
+      filters.sort_order = sortOrder;
+
+      const response = await customerService.fetchCustomerList(currentUser.id, filters);
+      
+      if (response.success && response.data) {
+        // Transform backend data to frontend format
+        const formattedCustomers: CustomersCustomer[] = response.data.customers
+          .filter((customer: CustomerListItem) => customer && (customer.id || customer.email)) // Filter customers with ID or email
+          .map((customer: CustomerListItem) => ({
+            id: customer.id ? customer.id.toString() : `guest_${customer.email}`, // Use email-based ID for guests
+            name: `${customer.first_name || ''} ${customer.last_name || ''}`.trim() || 'Unknown',
+            email: customer.email || 'No email',
+            phone: customer.phone || 'N/A',
+            joinDate: customer.created_at || new Date().toISOString(),
+            lastActivity: customer.last_visit || customer.created_at || new Date().toISOString(),
+            totalSpent: customer.total_spent || 0,
+            bookings: customer.total_bookings || 0,
+            ticketsPurchased: customer.total_ticket_quantity || 0,
+            status: determineStatus(customer),
+            satisfaction: customer.satisfaction || 0,
+            tags: customer.status === 'guest' ? ['Guest'] : (customer.tags || [])
+          }));
+
+        setCustomers(formattedCustomers);
+        setFilteredCustomers(formattedCustomers);
+        setTotalCustomers(response.data.pagination.total);
+      }
+    } catch (error) {
+      console.error('Error fetching customers:', error);
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
+
+  // Determine customer status based on activity
+  const determineStatus = (customer: CustomerListItem): string => {
+    if (customer.status) return customer.status;
+    
+    const lastVisit = customer.last_visit ? new Date(customer.last_visit) : new Date(customer.created_at);
+    const daysSinceVisit = Math.floor((new Date().getTime() - lastVisit.getTime()) / (1000 * 60 * 60 * 24));
+    
+    if (customer.total_bookings === 0) return 'new';
+    if (daysSinceVisit > 90) return 'inactive';
+    return 'active';
+  };
 
   // Initialize customers
   useEffect(() => {
-    setCustomers(sampleCustomers);
-    setFilteredCustomers(sampleCustomers);
-  }, []);
+    fetchCustomers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage, itemsPerPage, debouncedSearchTerm, statusFilter, sortBy, sortOrder]);
 
-  // Filter and sort customers
-  useEffect(() => {
-    let result = [...customers];
+  // Note: Filtering and sorting is now handled by the backend API
 
-    // Apply search filter
-    if (searchTerm) {
-      result = result.filter(customer =>
-        customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        customer.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        customer.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()))
-      );
-    }
-
-    // Apply status filter
-    if (statusFilter !== 'all') {
-      result = result.filter(customer => customer.status === statusFilter);
-    }
-
-    // Apply sorting
-    result.sort((a, b) => {
-      // If not filtering by status and status is different, push 'inactive' to last
-      if (statusFilter === 'all' && a.status !== b.status) {
-        if (a.status === 'inactive') return 1;
-        if (b.status === 'inactive') return -1;
-      }
-      let aValue: any = a[sortBy as keyof CustomersCustomer];
-      let bValue: any = b[sortBy as keyof CustomersCustomer];
-
-      if (sortBy === 'joinDate' || sortBy === 'lastActivity') {
-        aValue = new Date(aValue).getTime();
-        bValue = new Date(bValue).getTime();
-      }
-
-      if (sortOrder === 'asc') {
-        return aValue > bValue ? 1 : -1;
-      } else {
-        return aValue < bValue ? 1 : -1;
-      }
-    });
-
-    setFilteredCustomers(result);
-    setCurrentPage(1); // Reset to first page when filters change
-  }, [customers, searchTerm, statusFilter, sortBy, sortOrder]);
-
-  // Pagination calculations
-  const totalPages = Math.ceil(filteredCustomers.length / itemsPerPage);
+  // Pagination calculations (backend handles pagination)
+  const totalPages = Math.ceil(totalCustomers / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const currentCustomers = filteredCustomers.slice(startIndex, startIndex + itemsPerPage);
+  const currentCustomers = filteredCustomers; // Already paginated from backend
 
   // Handle page change
   const goToPage = (page: number) => {
@@ -308,6 +141,7 @@ const CustomerListing: React.FC = () => {
   const handleItemsPerPageChange = (value: number) => {
     setItemsPerPage(value);
     setCurrentPage(1);
+    // Fetch will trigger automatically via useEffect
   };
 
   // Handle sort
@@ -318,6 +152,7 @@ const CustomerListing: React.FC = () => {
       setSortBy(column);
       setSortOrder('asc');
     }
+    setCurrentPage(1); // Reset to first page when sorting changes
   };
 
   // Status badge component
@@ -325,10 +160,11 @@ const CustomerListing: React.FC = () => {
     const statusConfig = {
       active: { color: 'bg-green-100 text-green-800', label: 'Active' },
       inactive: { color: 'bg-gray-100 text-gray-800', label: 'Inactive' },
-      new: { color: `bg-${themeColor}-100 text-${fullColor}`, label: 'New' }
+      new: { color: `bg-${themeColor}-100 text-${fullColor}`, label: 'New' },
+      guest: { color: 'bg-blue-100 text-blue-800', label: 'Guest' }
     };
 
-    const config = statusConfig[status as keyof typeof statusConfig];
+    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.new;
     return (
       <span className={`px-2 py-1 rounded-full text-xs font-medium ${config.color}`}>
         {config.label}
@@ -337,272 +173,289 @@ const CustomerListing: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-2 sm:p-4 md:p-6">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 flex items-center gap-2 mb-1">
-            <Users className={`w-6 h-6 text-${themeColor}-600`} />
-            Customers
-          </h1>
-          <p className="text-sm md:text-base text-gray-600">
-            Manage and view all customer information
-          </p>
-        </div>
-        <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-3 mt-4 md:mt-0">
-          <button className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm flex items-center gap-2 hover:bg-gray-50 w-full sm:w-auto">
-            <Download className="w-4 h-4" />
-            Export
-          </button>
-          <button className={`px-4 py-2 bg-${themeColor}-600 text-white rounded-lg text-sm flex items-center gap-2 hover:bg-${themeColor}-700 w-full sm:w-auto`}>
-            <Plus className="w-4 h-4" />
-            Add Customer
-          </button>
-        </div>
-      </div>
-
-      {/* Filters and Search */}
-      <div className="bg-white rounded-lg p-3 sm:p-4 mb-6 shadow-sm border border-gray-200">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-          {/* Search */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-            <input
-              type="text"
-              placeholder="Search customers..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className={`w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-${themeColor}-500`}
-            />
+    <div className="w-full mx-auto px-4 pb-6 flex flex-col items-center">
+      <div className="bg-white rounded-xl p-6 w-full shadow-sm border border-gray-100 mt-8 animate-fade-in">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+          <div>
+            <h2 className="text-2xl font-semibold text-gray-900">Customers</h2>
+            <p className="text-gray-500 mt-1">Manage and view all customer information</p>
           </div>
-
-          {/* Status Filter */}
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className={`px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-${themeColor}-500 w-full`}
-          >
-            <option value="all">All Statuses</option>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-            <option value="new">New</option>
-          </select>
-
-          {/* Items Per Page */}
-          <select
-            value={itemsPerPage}
-            onChange={(e) => handleItemsPerPageChange(Number(e.target.value))}
-            className={`px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-${themeColor}-500 w-full`}
-          >
-            <option value="5">5 per page</option>
-            <option value="10">10 per page</option>
-            <option value="20">20 per page</option>
-            <option value="50">50 per page</option>
-          </select>
+          <div className="flex gap-2">
+            <button className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-semibold whitespace-nowrap flex items-center gap-2">
+              <Download className="w-4 h-4" />
+              Export
+            </button>
+            <button className={`bg-${fullColor} hover:bg-${themeColor}-900 text-white px-6 py-2 rounded-lg font-semibold whitespace-nowrap inline-flex items-center gap-2`}>
+              <Plus className="h-5 w-5" />
+              Add Customer
+            </button>
+          </div>
         </div>
-      </div>
 
-      {/* Results Count */}
-      <div className="flex flex-col sm:flex-row items-center justify-between mb-4 gap-2">
-        <p className="text-sm text-gray-600">
-          Showing {startIndex + 1}-{Math.min(startIndex + itemsPerPage, filteredCustomers.length)} of{' '}
-          {filteredCustomers.length} customers
-        </p>
-        <div className="flex items-center gap-2 text-sm text-gray-600">
-          <span>Sort by:</span>
-          <select
-            value={`${sortBy}-${sortOrder}`}
-            onChange={(e) => {
-              const [column, order] = e.target.value.split('-');
-              setSortBy(column);
-              setSortOrder(order as 'asc' | 'desc');
-            }}
-            className="px-2 py-1 border border-gray-300 rounded text-sm"
-          >
-            <option value="name-asc">Name (A-Z)</option>
-            <option value="name-desc">Name (Z-A)</option>
-            <option value="joinDate-desc">Newest First</option>
-            <option value="joinDate-asc">Oldest First</option>
-            <option value="totalSpent-desc">Highest Spent</option>
-            <option value="totalSpent-asc">Lowest Spent</option>
-            <option value="bookings-desc">Most Bookings</option>
-            <option value="bookings-asc">Fewest Bookings</option>
-            <option value="ticketsPurchased-desc">Most Tickets</option>
-            <option value="ticketsPurchased-asc">Fewest Tickets</option>
-          </select>
+        {/* Filters and Search */}
+        <div className="mb-6">
+          <div className="flex flex-col sm:flex-row gap-3 mb-4">
+            {/* Search */}
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search customers..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className={`w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 outline-none`}
+              />
+            </div>
+
+            {/* Status Filter */}
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className={`px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 outline-none min-w-[150px]`}
+            >
+              <option value="all">All Statuses</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+              <option value="new">New</option>
+            </select>
+
+            {/* Items Per Page */}
+            <select
+              value={itemsPerPage}
+              onChange={(e) => handleItemsPerPageChange(Number(e.target.value))}
+              className={`px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 outline-none min-w-[130px]`}
+            >
+              <option value="5">5 per page</option>
+              <option value="10">10 per page</option>
+              <option value="20">20 per page</option>
+              <option value="50">50 per page</option>
+            </select>
+
+            {/* Sort Dropdown */}
+            <select
+              value={`${sortBy}-${sortOrder}`}
+              onChange={(e) => {
+                const [column, order] = e.target.value.split('-');
+                setSortBy(column);
+                setSortOrder(order as 'asc' | 'desc');
+              }}
+              className={`px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 outline-none min-w-[180px]`}
+            >
+              <option value="name-asc">Name (A-Z)</option>
+              <option value="name-desc">Name (Z-A)</option>
+              <option value="joinDate-desc">Newest First</option>
+              <option value="joinDate-asc">Oldest First</option>
+              <option value="totalSpent-desc">Highest Spent</option>
+              <option value="totalSpent-asc">Lowest Spent</option>
+              <option value="bookings-desc">Most Bookings</option>
+              <option value="bookings-asc">Fewest Bookings</option>
+              <option value="ticketsPurchased-desc">Most Tickets</option>
+              <option value="ticketsPurchased-asc">Fewest Tickets</option>
+            </select>
+          </div>
+          
+          {/* Results count */}
+          <div className="text-sm text-gray-500">
+            {loading ? 'Loading...' : `Showing ${totalCustomers > 0 ? startIndex + 1 : 0}-${Math.min(startIndex + itemsPerPage, totalCustomers)} of ${totalCustomers} customer${totalCustomers !== 1 ? 's' : ''}`}
+          </div>
         </div>
-      </div>
 
-      {/* Customers Table */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-x-auto">
-        <table className="min-w-[700px] w-full">
-          <thead className="bg-gray-50 border-b border-gray-200">
-            <tr>
-              <th 
-                className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                onClick={() => handleSort('name')}
-              >
-                <div className="flex items-center gap-1">
-                  Customer
-                  {sortBy === 'name' && (
-                    <span className={`text-${themeColor}-600`}>{sortOrder === 'asc' ? '↑' : '↓'}</span>
-                  )}
-                </div>
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Contact
-              </th>
-              <th 
-                className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                onClick={() => handleSort('joinDate')}
-              >
-                <div className="flex items-center gap-1">
-                  Join Date
-                  {sortBy === 'joinDate' && (
-                    <span className={`text-${themeColor}-600`}>{sortOrder === 'asc' ? '↑' : '↓'}</span>
-                  )}
-                </div>
-              </th>
-              <th 
-                className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                onClick={() => handleSort('totalSpent')}
-              >
-                <div className="flex items-center gap-1">
-                  Total Spent
-                  {sortBy === 'totalSpent' && (
-                    <span className={`text-${themeColor}-600`}>{sortOrder === 'asc' ? '↑' : '↓'}</span>
-                  )}
-                </div>
-              </th>
-              <th 
-                className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                onClick={() => handleSort('bookings')}
-              >
-                <div className="flex items-center gap-1">
-                  Bookings
-                  {sortBy === 'bookings' && (
-                    <span className={`text-${themeColor}-600`}>{sortOrder === 'asc' ? '↑' : '↓'}</span>
-                  )}
-                </div>
-              </th>
-              <th 
-                className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                onClick={() => handleSort('ticketsPurchased')}
-              >
-                <div className="flex items-center gap-1">
-                  Tickets <br/> Purchased
-                  {sortBy === 'ticketsPurchased' && (
-                    <span className={`text-${themeColor}-600`}>{sortOrder === 'asc' ? '↑' : '↓'}</span>
-                  )}
-                </div>
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Status
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200">
-            {currentCustomers.length > 0 ? (
-              currentCustomers.map((customer) => (
-                <tr key={customer.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-4">
-                    <div>
-                      <div className="font-medium text-gray-900">{customer.name}</div>
-                      <div className="flex items-center gap-1 mt-1">
-                        <Star className="w-3 h-3 text-yellow-400 fill-current" />
-                        <span className="text-xs text-gray-500">
-                          {customer.satisfaction > 0 ? customer.satisfaction : 'No rating'}
-                        </span>
-                      </div>
-                      {customer.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {customer.tags.map((tag, index) => (
-                            <span
-                              key={index}
-                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-${themeColor}-100 text-${fullColor}`}
-                            >
-                              <Tag className="w-3 h-3" />
-                              {tag}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-4 py-4">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
-                        <Mail className="w-3 h-3" />
-                        {customer.email}
-                      </div>
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
-                        <Phone className="w-3 h-3" />
-                        {customer.phone}
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-4 py-4 text-sm text-gray-600">
-                    <div className="flex items-center gap-2">
-                      <Calendar className="w-3 h-3" />
-                      {new Date(customer.joinDate).toLocaleDateString()}
-                    </div>
-                  </td>
-                  <td className="px-4 py-4">
-                    <div className="flex items-center gap-2 font-medium text-gray-900">
-                      <DollarSign className="w-3 h-3 text-green-600" />
-                      ${customer.totalSpent.toLocaleString()}
-                    </div>
-                  </td>
-                  <td className="px-4 py-4 text-sm text-gray-600">
-                    {customer.bookings} bookings
-                  </td>
-                  <td className="px-4 py-4 text-sm text-center text-gray-600">
-                    {customer.ticketsPurchased}
-                  </td>
-                  <td className="px-4 py-4">
-                    <StatusBadge status={customer.status} />
-                  </td>
-                  <td className="px-4 py-4">
-                    <div className="flex items-center gap-2">
-                      <button className={`p-1 text-${themeColor}-600 hover:text-${themeColor}-800`} title="View">
-                        <Eye className="w-4 h-4" />
-                      </button>
-                      <button className="p-1 text-gray-600 hover:text-gray-800" title="Edit">
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button className="p-1 text-red-600 hover:text-red-800" title="Delete">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+        {/* Customers Table */}
+        <div className="overflow-x-auto mb-6">
+          <table className="min-w-full w-full">
+            <thead className="bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th 
+                  className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                  onClick={() => handleSort('name')}
+                >
+                  <div className="flex items-center gap-1">
+                    Customer
+                    {sortBy === 'name' && (
+                      <span className={`text-${themeColor}-600`}>{sortOrder === 'asc' ? '↑' : '↓'}</span>
+                    )}
+                  </div>
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Contact
+                </th>
+                <th 
+                  className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                  onClick={() => handleSort('joinDate')}
+                >
+                  <div className="flex items-center gap-1">
+                    Join Date
+                    {sortBy === 'joinDate' && (
+                      <span className={`text-${themeColor}-600`}>{sortOrder === 'asc' ? '↑' : '↓'}</span>
+                    )}
+                  </div>
+                </th>
+                <th 
+                  className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                  onClick={() => handleSort('totalSpent')}
+                >
+                  <div className="flex items-center gap-1">
+                    Total Spent
+                    {sortBy === 'totalSpent' && (
+                      <span className={`text-${themeColor}-600`}>{sortOrder === 'asc' ? '↑' : '↓'}</span>
+                    )}
+                  </div>
+                </th>
+                <th 
+                  className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                  onClick={() => handleSort('bookings')}
+                >
+                  <div className="flex items-center gap-1">
+                    Bookings
+                    {sortBy === 'bookings' && (
+                      <span className={`text-${themeColor}-600`}>{sortOrder === 'asc' ? '↑' : '↓'}</span>
+                    )}
+                  </div>
+                </th>
+                <th 
+                  className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                  onClick={() => handleSort('ticketsPurchased')}
+                >
+                  <div className="flex items-center gap-1">
+                    Tickets
+                    {sortBy === 'ticketsPurchased' && (
+                      <span className={`text-${themeColor}-600`}>{sortOrder === 'asc' ? '↑' : '↓'}</span>
+                    )}
+                  </div>
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Status
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200 bg-white">
+              {loading ? (
+                <tr>
+                  <td colSpan={8} className="px-4 py-12 text-center">
+                    <div className="flex flex-col items-center justify-center gap-3">
+                      <div className={`animate-spin rounded-full h-10 w-10 border-b-2 border-${themeColor}-600`}></div>
+                      <span className="text-gray-500 text-sm">Loading customers...</span>
                     </div>
                   </td>
                 </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
-                  No customers found matching your criteria
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+              ) : currentCustomers.length > 0 ? (
+                currentCustomers.map((customer, index) => (
+                  <tr 
+                    key={customer.id} 
+                    className="hover:bg-gray-50 transition-colors animate-fade-in-up"
+                    style={{ animationDelay: `${index * 0.02}s` }}
+                  >
+                    <td className="px-4 py-4">
+                      <div>
+                        <div className="font-medium text-gray-900">{customer.name}</div>
+                        {customer.tags.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-2">
+                            {customer.tags.map((tag, idx) => (
+                              <span
+                                key={idx}
+                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-${themeColor}-50 text-${themeColor}-700 border border-${themeColor}-200`}
+                              >
+                                <Tag className="w-3 h-3" />
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-4">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                          <Mail className="w-3.5 h-3.5 text-gray-400" />
+                          <span className="truncate max-w-[200px]">{customer.email}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                          <Phone className="w-3.5 h-3.5 text-gray-400" />
+                          {customer.phone}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-4 text-sm text-gray-600">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="w-3.5 h-3.5 text-gray-400" />
+                        {new Date(customer.joinDate).toLocaleDateString()}
+                      </div>
+                    </td>
+                    <td className="px-4 py-4">
+                      <div className="flex items-center gap-1.5 font-semibold text-gray-900">
+                        <DollarSign className={`w-4 h-4 text-${themeColor}-600`} />
+                        ${customer.totalSpent.toLocaleString()}
+                      </div>
+                    </td>
+                    <td className="px-4 py-4 text-sm text-gray-600 font-medium">
+                      {customer.bookings}
+                    </td>
+                    <td className="px-4 py-4 text-sm text-gray-600 font-medium text-center">
+                      {customer.ticketsPurchased}
+                    </td>
+                    <td className="px-4 py-4">
+                      <StatusBadge status={customer.status} />
+                    </td>
+                    <td className="px-4 py-4">
+                      <div className="flex items-center gap-1">
+                        <button 
+                          className={`p-2 text-${themeColor}-600 hover:bg-${themeColor}-50 rounded-lg transition-colors`} 
+                          title="View Customer"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                        <button 
+                          className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors" 
+                          title="Edit Customer"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button 
+                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors" 
+                          title="Delete Customer"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={8} className="px-4 py-12 text-center">
+                    <div className="flex flex-col items-center justify-center">
+                      <div className={`inline-flex p-4 rounded-full bg-${themeColor}-50 mb-4`}>
+                        <Users className={`h-12 w-12 text-${themeColor}-400`} />
+                      </div>
+                      <h3 className="text-lg font-medium text-gray-900 mb-2">No customers found</h3>
+                      <p className="text-gray-500">
+                        {searchTerm || statusFilter !== 'all' 
+                          ? 'Try adjusting your search or filters' 
+                          : 'No customers have been created yet'}
+                      </p>
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
 
-      {/* Pagination */}
-      {filteredCustomers.length > 0 && (
-        <div className="px-4 py-3 bg-gray-50 border-t border-gray-200">
-          <div className="flex items-center justify-between">
+        {/* Pagination */}
+        {!loading && totalCustomers > 0 && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-gray-100">
             <div className="text-sm text-gray-700">
-              Page {currentPage} of {totalPages}
+              Page <span className="font-medium">{currentPage}</span> of <span className="font-medium">{totalPages}</span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex gap-2">
               <button
                 onClick={() => goToPage(currentPage - 1)}
                 disabled={currentPage === 1}
-                className="p-2 border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
+                className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
@@ -624,10 +477,10 @@ const CustomerListing: React.FC = () => {
                   <button
                     key={pageNum}
                     onClick={() => goToPage(pageNum)}
-                    className={`px-3 py-1 border rounded-md text-sm ${
+                    className={`px-3 py-2 border rounded-lg text-sm font-medium transition-colors ${
                       currentPage === pageNum
-                        ? `bg-${themeColor}-600 text-white border-${themeColor}-600`
-                        : 'border-gray-300 hover:bg-gray-100'
+                        ? `border-${themeColor}-700 bg-${themeColor}-700 text-white`
+                        : 'border-gray-200 text-gray-700 hover:bg-gray-50'
                     }`}
                   >
                     {pageNum}
@@ -638,14 +491,14 @@ const CustomerListing: React.FC = () => {
               <button
                 onClick={() => goToPage(currentPage + 1)}
                 disabled={currentPage === totalPages}
-                className="p-2 border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
+                className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };

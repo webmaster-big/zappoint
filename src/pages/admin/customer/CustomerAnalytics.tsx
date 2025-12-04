@@ -12,6 +12,7 @@ import {
   ChevronDown,
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
+import CounterAnimation from '../../../components/ui/CounterAnimation';
 
 // Recharts for charts
 import {
@@ -184,7 +185,7 @@ const CustomerAnalytics: React.FC = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">{metric.label}</p>
-                  <p className="text-2xl font-bold text-gray-900 mt-1">{metric.value}</p>
+                  <CounterAnimation value={metric.value} className="text-2xl font-bold text-gray-900 mt-1" />
                   <p className={`text-xs mt-1 ${
                     metric.trend === 'up' ? 'text-green-600' : 'text-red-600'
                   }`}>
