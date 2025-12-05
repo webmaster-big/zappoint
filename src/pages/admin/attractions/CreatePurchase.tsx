@@ -13,7 +13,6 @@ import type { CreatePurchaseAttraction, CreatePurchaseCustomerInfo } from '../..
 import { attractionService, type Attraction } from '../../../services/AttractionService';
 import { attractionPurchaseService } from '../../../services/AttractionPurchaseService';
 import { customerService, type Customer } from '../../../services/CustomerService';
-import { generatePurchaseQRCode } from '../../../utils/qrcode';
 import Toast from '../../../components/ui/Toast';
 import { ASSET_URL, getStoredUser } from '../../../utils/storage';
 import { loadAcceptJS, processCardPayment, validateCardNumber, formatCardNumber, getCardType } from '../../../services/PaymentService';
@@ -53,9 +52,6 @@ const CreatePurchase = () => {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
-  const [qrCodeImage, setQrCodeImage] = useState<string | null>(null);
-  const [showQRModal, setShowQRModal] = useState(false);
-  const [purchaseId, setPurchaseId] = useState<number | null>(null);
   const [foundCustomers, setFoundCustomers] = useState<Customer[]>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null);
   const [searchingCustomer, setSearchingCustomer] = useState(false);
@@ -174,14 +170,20 @@ const CreatePurchase = () => {
     return () => clearTimeout(timeoutId);
   }, [customerInfo.email]);
 
-  // Initialize Authorize.Net
+  // Initialize Authorize.Net only when needed
   useEffect(() => {
+    // Only initialize if card payment and Authorize.Net is selected
+    if (paymentMethod !== 'card' || !useAuthorizeNet) {
+      return;
+    }
+
     const initializeAuthorizeNet = async () => {
       try {
         const locationId = selectedAttraction?.locationId || 1;
         const response = await getAuthorizeNetPublicKey(locationId);
         if (response.success && response.data) {
           setAuthorizeApiLoginId(response.data.api_login_id);
+          setShowNoAuthAccountModal(false);
         } else {
           setShowNoAuthAccountModal(true);
         }
@@ -195,7 +197,7 @@ const CreatePurchase = () => {
       }
     };
     initializeAuthorizeNet();
-  }, [authorizeEnvironment, selectedAttraction]);
+  }, [authorizeEnvironment, selectedAttraction, paymentMethod, useAuthorizeNet]);
 
   const handleCustomerInfoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -330,19 +332,11 @@ const CreatePurchase = () => {
       const response = await attractionPurchaseService.createPurchase(purchaseData);
       const createdPurchase = response.data;
 
-      setPurchaseId(createdPurchase.id);
-
-      // Generate QR code
-      const qrData = await generatePurchaseQRCode(createdPurchase.id);
-      
-      setQrCodeImage(qrData);
-      setShowQRModal(true);
-
-      // Send receipt email with QR code
+      // Send receipt email (without QR code)
       try {
         await attractionPurchaseService.sendReceipt(
           createdPurchase.id,
-          qrData
+          '' // No QR code data
         );
         setToast({ message: 'Purchase completed! Receipt sent to email.', type: 'success' });
       } catch (emailError) {
@@ -850,67 +844,6 @@ const CreatePurchase = () => {
               >
                 I Understand
               </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* QR Code Modal */}
-      {showQRModal && qrCodeImage && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-backdrop-fade">
-          <div className="bg-white rounded-xl max-w-md w-full p-6">
-            <div className="text-center">
-              <h3 className="text-xl font-bold text-gray-900 mb-4">Purchase Complete!</h3>
-              <p className="text-gray-600 mb-6">
-                Scan this QR code at the attraction entrance
-              </p>
-              
-              {/* QR Code Image */}
-              <div className="flex justify-center mb-6">
-                <img 
-                  src={qrCodeImage} 
-                  alt="Purchase QR Code"
-                  className="w-64 h-64 border-2 border-gray-200 rounded-lg"
-                />
-              </div>
-
-              <div className="bg-gray-50 rounded-lg p-4 mb-6 text-left">
-                <p className="text-sm text-gray-600">
-                  <strong>Purchase ID:</strong> #{purchaseId}
-                </p>
-                <p className="text-sm text-gray-600">
-                  <strong>Total:</strong> ${calculateTotal().toFixed(2)}
-                </p>
-                {customerInfo.email && (
-                  <p className="text-sm text-gray-600">
-                    <strong>Receipt sent to:</strong> {customerInfo.email}
-                  </p>
-                )}
-              </div>
-
-              <div className="flex gap-3">
-                <button
-                  onClick={() => {
-                    const link = document.createElement('a');
-                    link.href = qrCodeImage;
-                    link.download = `purchase-qr-${purchaseId}.png`;
-                    link.click();
-                  }}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
-                >
-                  Download QR
-                </button>
-                <button
-                  onClick={() => {
-                    setShowQRModal(false);
-                    setQrCodeImage(null);
-                    setPurchaseId(null);
-                  }}
-                  className={`flex-1 px-4 py-2 bg-${themeColor}-600 text-white rounded-lg hover:bg-${themeColor}-700`}
-                >
-                  Close
-                </button>
-              </div>
             </div>
           </div>
         </div>
