@@ -363,31 +363,35 @@ const Settings = () => {
       });
       
       if (response.success) {
-        // Reset and close modal first
+        // Show success message first
+        setSuccessMessage('Authorize.Net account connected successfully!');
+        setShowSuccess(true);
+        setTimeout(() => setShowSuccess(false), 3000);
+        
+        // Reset form fields
         setAuthorizeApiLoginId('');
         setAuthorizeTransactionKey('');
         setSelectedLocationId(null);
+        setLoadingAuthorize(false);
+        
+        // Close modal
         setShowAuthorizeModal(false);
         
-        // Refresh account status to update UI automatically
+        // Refresh account status to update UI
         await fetchAuthorizeAccount();
         
         // If company_admin, also refresh all accounts
         if (userRole === 'company_admin') {
           await fetchAllAuthorizeAccounts();
         }
-        
-        setSuccessMessage('Authorize.Net account connected successfully!');
-        setShowSuccess(true);
-        setTimeout(() => setShowSuccess(false), 3000);
       } else {
+        setLoadingAuthorize(false);
         alert(response.message || 'Failed to connect Authorize.Net account');
       }
     } catch (error: any) {
       console.error('Error connecting Authorize.Net:', error);
-      alert(error.response?.data?.message || 'Failed to connect account. Please try again.');
-    } finally {
       setLoadingAuthorize(false);
+      alert(error.response?.data?.message || 'Failed to connect account. Please try again.');
     }
   };
   
@@ -400,11 +404,17 @@ const Settings = () => {
       const response = await disconnectAuthorizeNetAccount();
       
       if (response.success) {
+        // Update UI immediately
         setAuthorizeConnected(false);
         setAuthorizeAccount(null);
+        
+        // Show success message
         setSuccessMessage('Authorize.Net account disconnected successfully');
         setShowSuccess(true);
         setTimeout(() => setShowSuccess(false), 3000);
+        
+        // Refresh to ensure consistency
+        await fetchAuthorizeAccount();
       } else {
         alert(response.message || 'Failed to disconnect account');
       }
@@ -423,12 +433,16 @@ const Settings = () => {
       const response = await disconnectAuthorizeNetAccount(locationId);
       
       if (response.success) {
-        // Refresh the list of all accounts
-        await fetchAllAuthorizeAccounts();
-        
+        // Show success message
         setSuccessMessage(`Authorize.Net disconnected for ${locationName}`);
         setShowSuccess(true);
         setTimeout(() => setShowSuccess(false), 3000);
+        
+        // Refresh the list of all accounts and main account status
+        await Promise.all([
+          fetchAllAuthorizeAccounts(),
+          fetchAuthorizeAccount()
+        ]);
       } else {
         alert(response.message || 'Failed to disconnect account');
       }
@@ -998,7 +1012,13 @@ const Settings = () => {
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-backdrop-fade">
             <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-5 relative animate-scale-in">
               <button
-                onClick={() => setShowAuthorizeModal(false)}
+                onClick={() => {
+                  setShowAuthorizeModal(false);
+                  setAuthorizeApiLoginId('');
+                  setAuthorizeTransactionKey('');
+                  setSelectedLocationId(null);
+                  setShowTransactionKey(false);
+                }}
                 className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 transition-colors"
               >
                 <X size={20} />
@@ -1115,7 +1135,13 @@ const Settings = () => {
                 <div className="flex gap-2 pt-3">
                   <button
                     type="button"
-                    onClick={() => setShowAuthorizeModal(false)}
+                    onClick={() => {
+                      setShowAuthorizeModal(false);
+                      setAuthorizeApiLoginId('');
+                      setAuthorizeTransactionKey('');
+                      setSelectedLocationId(null);
+                      setShowTransactionKey(false);
+                    }}
                     className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition-colors"
                     disabled={loadingAuthorize}
                   >
