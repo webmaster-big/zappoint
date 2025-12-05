@@ -177,6 +177,15 @@ const EditPackage: React.FC = () => {
                     ? pkg.available_month_days.map((d: any) => String(d)) 
                     : [];
 
+                // Format time values from HH:MM:SS to HH:MM for HTML time input
+                const formatTime = (time: string) => {
+                    if (!time) return "09:00";
+                    // If time is already in HH:MM format, return as is
+                    if (time.length === 5) return time;
+                    // If time is in HH:MM:SS format, extract HH:MM
+                    return time.substring(0, 5);
+                };
+
                 setForm({
                     name: pkg.name || "",
                     description: pkg.description || "",
@@ -197,8 +206,8 @@ const EditPackage: React.FC = () => {
                     availableWeekDays: availableWeekDays,
                     availableMonthDays: availableMonthDays,
                     image: pkg.image || "",
-                    timeSlotStart: pkg.time_slot_start || "09:00",
-                    timeSlotEnd: pkg.time_slot_end || "17:00",
+                    timeSlotStart: formatTime(pkg.time_slot_start || "09:00"),
+                    timeSlotEnd: formatTime(pkg.time_slot_end || "17:00"),
                     timeSlotInterval: String(pkg.time_slot_interval || "30"),
                 });
 
