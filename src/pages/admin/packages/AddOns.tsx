@@ -381,10 +381,9 @@ const ManageAddons = () => {
   if (loading && addons.length === 0) {
     return (
       <div className="w-full mx-auto px-4 pb-6 flex flex-col items-center">
-        <div className="bg-white rounded-xl p-6 w-full shadow-sm border border-gray-100 mt-8">
+        <div className="p-6 w-full mt-8">
           <div className="flex flex-col items-center justify-center py-20">
             <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mb-4"></div>
-            <p className="text-gray-600 font-medium">Loading add-ons...</p>
           </div>
         </div>
       </div>
@@ -505,7 +504,7 @@ const ManageAddons = () => {
                 <div className="h-40 bg-gradient-to-br from-gray-50 to-gray-100 relative">
                   {addon.image && addon.image !== '/api/placeholder/200/200' ? (
                     <img
-                      src={addon.image}
+                      src={ASSET_URL + addon.image}
                       alt={addon.name}
                       className="w-full h-full object-cover"
                     />
