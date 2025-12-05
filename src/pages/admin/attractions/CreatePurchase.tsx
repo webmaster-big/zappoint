@@ -17,6 +17,7 @@ import Toast from '../../../components/ui/Toast';
 import { ASSET_URL, getStoredUser } from '../../../utils/storage';
 import { loadAcceptJS, processCardPayment, validateCardNumber, formatCardNumber, getCardType } from '../../../services/PaymentService';
 import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
+import { generatePurchaseQRCode } from '../../../utils/qrcode';
 
 const CreatePurchase = () => {
   const { themeColor, fullColor } = useThemeColor();
@@ -334,11 +335,19 @@ const CreatePurchase = () => {
       const response = await attractionPurchaseService.createPurchase(purchaseData);
       const createdPurchase = response.data;
 
-      // Send receipt email (without QR code)
+      // Generate QR code for email (not displayed in UI)
+      let qrCodeData = '';
+      try {
+        qrCodeData = await generatePurchaseQRCode(createdPurchase.id);
+      } catch (qrError) {
+        console.error('QR code generation failed:', qrError);
+      }
+
+      // Send receipt email with QR code
       try {
         await attractionPurchaseService.sendReceipt(
           createdPurchase.id,
-          '' // No QR code data
+          qrCodeData
         );
         setToast({ message: 'Purchase completed! Receipt sent to email.', type: 'success' });
       } catch (emailError) {
