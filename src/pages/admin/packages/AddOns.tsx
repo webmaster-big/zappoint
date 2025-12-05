@@ -12,7 +12,7 @@ const ManageAddons = () => {
   const [filteredAddons, setFilteredAddons] = useState<AddOnsAddon[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(6);
+  const [itemsPerPage] = useState(8);
   const [showModal, setShowModal] = useState(false);
   const [editingAddon, setEditingAddon] = useState<AddOnsAddon | null>(null);
   const [showExportModal, setShowExportModal] = useState(false);
@@ -378,43 +378,9 @@ const ManageAddons = () => {
     return (
       <div className="w-full mx-auto px-4 pb-6 flex flex-col items-center">
         <div className="bg-white rounded-xl p-6 w-full shadow-sm border border-gray-100 mt-8">
-          {/* Header Skeleton */}
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-            <div className="flex-1">
-              <div className="h-8 bg-gray-200 rounded w-48 mb-2 animate-pulse"></div>
-              <div className="h-4 bg-gray-100 rounded w-64 animate-pulse"></div>
-            </div>
-            <div className="flex gap-2">
-              <div className="h-10 w-24 bg-gray-200 rounded-lg animate-pulse"></div>
-              <div className="h-10 w-24 bg-gray-200 rounded-lg animate-pulse"></div>
-              <div className="h-10 w-40 bg-gray-200 rounded-lg animate-pulse"></div>
-            </div>
-          </div>
-
-          {/* Search Bar Skeleton */}
-          <div className="mb-6">
-            <div className="h-11 bg-gray-100 rounded-lg mb-4 animate-pulse"></div>
-            <div className="h-4 bg-gray-100 rounded w-32 animate-pulse"></div>
-          </div>
-
-          {/* Grid Skeleton */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="border border-gray-200 rounded-xl overflow-hidden animate-pulse">
-                <div className="h-40 bg-gray-200"></div>
-                <div className="p-4">
-                  <div className="h-5 bg-gray-200 rounded w-3/4 mb-3"></div>
-                  <div className="h-4 bg-gray-100 rounded w-1/2 mb-3"></div>
-                  <div className="flex justify-between items-center">
-                    <div className="h-6 bg-gray-200 rounded w-16"></div>
-                    <div className="flex gap-2">
-                      <div className="h-8 w-8 bg-gray-200 rounded-lg"></div>
-                      <div className="h-8 w-8 bg-gray-200 rounded-lg"></div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
+          <div className="flex flex-col items-center justify-center py-20">
+            <div className={`animate-spin rounded-full h-16 w-16 border-b-4 border-${fullColor} mb-4`}></div>
+            <p className="text-gray-600 font-medium">Loading add-ons...</p>
           </div>
         </div>
       </div>
@@ -597,29 +563,58 @@ const ManageAddons = () => {
               <button
                 onClick={() => paginate(Math.max(1, currentPage - 1))}
                 disabled={currentPage === 1}
-                className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                className={`px-4 py-2 border rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                  currentPage === 1
+                    ? 'border-gray-200 text-gray-400 bg-gray-50'
+                    : `border-${themeColor}-200 text-${fullColor} hover:bg-${themeColor}-50`
+                }`}
               >
                 Previous
               </button>
               
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                <button
-                  key={page}
-                  onClick={() => paginate(page)}
-                  className={`px-3 py-2 border rounded-lg text-sm font-medium transition-colors ${
-                    currentPage === page
-                      ? `border-${themeColor}-700 bg-${themeColor}-700 text-white`
-                      : 'border-gray-200 text-gray-700 hover:bg-gray-50'
-                  }`}
-                >
-                  {page}
-                </button>
-              ))}
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                // Show first, last, current, and adjacent pages
+                const showPage = page === 1 || 
+                                page === totalPages || 
+                                (page >= currentPage - 1 && page <= currentPage + 1);
+                
+                // Show ellipsis
+                const showEllipsisBefore = page === currentPage - 2 && currentPage > 3;
+                const showEllipsisAfter = page === currentPage + 2 && currentPage < totalPages - 2;
+                
+                if (!showPage && !showEllipsisBefore && !showEllipsisAfter) return null;
+                
+                if (showEllipsisBefore || showEllipsisAfter) {
+                  return (
+                    <span key={page} className="px-3 py-2 text-gray-400">
+                      ...
+                    </span>
+                  );
+                }
+                
+                return (
+                  <button
+                    key={page}
+                    onClick={() => paginate(page)}
+                    className={`px-3 py-2 border rounded-lg text-sm font-medium transition-colors ${
+                      currentPage === page
+                        ? `border-${fullColor} bg-${fullColor} text-white shadow-sm`
+                        : `border-gray-200 text-gray-700 hover:border-${themeColor}-300 hover:bg-${themeColor}-50`
+                    }`}
+                  >
+                    {page}
+                  </button>
+                );
+              })}
               
               <button
                 onClick={() => paginate(Math.min(totalPages, currentPage + 1))}
                 disabled={currentPage === totalPages}
-                className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                className={`px-4 py-2 border rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                  currentPage === totalPages
+                    ? 'border-gray-200 text-gray-400 bg-gray-50'
+                    : `border-${themeColor}-200 text-${fullColor} hover:bg-${themeColor}-50`
+                }`}
               >
                 Next
               </button>
