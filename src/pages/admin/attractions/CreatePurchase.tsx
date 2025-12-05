@@ -98,6 +98,8 @@ const CreatePurchase = () => {
           createdAt: attr.created_at,
           availability: typeof attr.availability === 'object' ? attr.availability as Record<string, boolean> : {},
         }));
+
+        console.log('Loaded attractions for purchase:', convertedAttractions);
         
         setAttractions(convertedAttractions);
         setFilteredAttractions(convertedAttractions);
