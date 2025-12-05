@@ -1,5 +1,5 @@
 export const API_BASE_URL = "https://zapzone-backend-1oulhaj4.on-forge.com/api"
-export const ASSET_URL = "https://zapzone-backend-1oulhaj4.on-forge.com/"
+export const ASSET_URL = "https://zapzone-backend-1oulhaj4.on-forge.com/public/"
 
 // Sanitize user data to ensure no nested objects are stored
 export const sanitizeUserData = (userData: any, preserveToken: boolean = false) => {
