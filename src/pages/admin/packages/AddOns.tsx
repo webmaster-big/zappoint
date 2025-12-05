@@ -107,13 +107,26 @@ const ManageAddons = () => {
       console.log('Add-ons response:', response);
       
       if (response.data && response.data.add_ons) {
-        const formattedAddons: AddOnsAddon[] = response.data.add_ons.map(addon => ({
-          id: addon.id.toString(),
-          name: addon.name,
-          price: addon.price || 0,
-          image: addon.image ? `${ASSET_URL}${addon.image}` : '/api/placeholder/200/200',
-          location: addon.location && typeof addon.location === 'object' ? addon.location : null,
-        }));
+        const formattedAddons: AddOnsAddon[] = response.data.add_ons.map(addon => {
+          // Normalize image to a full URL when possible. If backend returns a full URL, keep it.
+          let imageFull = '';
+          if (addon.image) {
+            const imgStr = String(addon.image);
+            if (imgStr.startsWith('http') || imgStr.startsWith(ASSET_URL)) {
+              imageFull = imgStr;
+            } else {
+              imageFull = `${ASSET_URL}${imgStr}`;
+            }
+          }
+
+          return {
+            id: addon.id.toString(),
+            name: addon.name,
+            price: addon.price || 0,
+            image: imageFull,
+            location: addon.location && typeof addon.location === 'object' ? addon.location : null,
+          };
+        });
         setAddons(formattedAddons);
       }
     } catch (error) {
@@ -502,9 +515,9 @@ const ManageAddons = () => {
                 style={{ animationDelay: `${index * 0.05}s` }}
               >
                 <div className="h-40 bg-gradient-to-br from-gray-50 to-gray-100 relative">
-                  {addon.image && addon.image !== '/api/placeholder/200/200' ? (
+                  {addon.image ? (
                     <img
-                      src={ASSET_URL + addon.image}
+                      src={addon.image}
                       alt={addon.name}
                       className="w-full h-full object-cover"
                     />
@@ -789,9 +802,9 @@ const ManageAddons = () => {
                           )}
                         </div>
                         <div className="flex-1 flex items-center gap-3">
-                          {addon.image && addon.image !== '/api/placeholder/200/200' ? (
+                          {addon.image ? (
                             <img
-                              src={ASSET_URL +addon.image}
+                              src={addon.image}
                               alt={addon.name}
                               className="w-12 h-12 object-cover rounded-lg"
                             />
