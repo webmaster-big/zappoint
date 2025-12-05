@@ -6,7 +6,7 @@ import type { CreateAttractionsFormData } from '../../../types/createAttractions
 import { attractionService } from '../../../services/AttractionService';
 import type { UpdateAttractionData } from '../../../services/AttractionService';
 import Toast from '../../../components/ui/Toast';
-import { ASSET_URL } from '../../../utils/storage';
+import { ASSET_URL, getStoredUser } from '../../../utils/storage';
 
 const EditAttraction = () => {
   const navigate = useNavigate();
@@ -222,8 +222,9 @@ const EditAttraction = () => {
       setIsSubmitting(true);
 
       // Convert form data to API format
-      // Note: location_id is automatically handled by backend
+      // Include location_id from the currently stored user (if available)
       const attractionData: UpdateAttractionData = {
+        location_id: getStoredUser()?.location_id || undefined,
         name: formData.name,
         description: formData.description,
         price: Number(formData.price),

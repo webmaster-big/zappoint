@@ -6,6 +6,7 @@ import type { CreateAttractionsFormData } from '../../../types/createAttractions
 import { attractionService } from '../../../services/AttractionService';
 import type { CreateAttractionData } from '../../../services/AttractionService';
 import Toast from '../../../components/ui/Toast';
+import { getStoredUser } from '../../../utils/storage';
 
 const CreateAttraction = () => {
   const navigate = useNavigate();
@@ -150,8 +151,9 @@ const CreateAttraction = () => {
       setIsSubmitting(true);
 
       // Convert form data to API format
-      // Note: location_id is automatically set by backend from auth user
-      const attractionData: Omit<CreateAttractionData, 'location_id'> = {
+      // Include location_id from the currently stored user (if available)
+      const attractionData: CreateAttractionData = {
+        location_id: getStoredUser()?.location_id || undefined,
         name: formData.name,
         description: formData.description,
         price: Number(formData.price),
