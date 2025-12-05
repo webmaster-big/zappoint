@@ -140,11 +140,15 @@ const EntertainmentLandingPage = () => {
 
   const getImageUrl = (img?: string | null) => {
     if (!img) return '';
-    try {
-      if (img.startsWith('http') || img.startsWith(ASSET_URL)) return img;
-    } catch (e) {
-      // fallback to prefixing
+    // If already a full URL (http/https) or data URI, use as-is
+    if (img.startsWith('http://') || img.startsWith('https://') || img.startsWith('data:')) {
+      return img;
     }
+    // If already starts with ASSET_URL, use as-is
+    if (img.startsWith(ASSET_URL)) {
+      return img;
+    }
+    // Otherwise prefix with ASSET_URL
     return ASSET_URL + img;
   };
 
