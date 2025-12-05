@@ -791,7 +791,7 @@ const ManageAddons = () => {
                         <div className="flex-1 flex items-center gap-3">
                           {addon.image && addon.image !== '/api/placeholder/200/200' ? (
                             <img
-                              src={addon.image}
+                              src={ASSET_URL +addon.image}
                               alt={addon.name}
                               className="w-12 h-12 object-cover rounded-lg"
                             />
