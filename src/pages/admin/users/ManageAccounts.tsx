@@ -64,28 +64,35 @@ const InvitationModal: React.FC<ManageAccountsInvitationModalProps> = ({
     setSuccess(false);
 
     try {
-      // Get auth token from localStorage
-      const userData = localStorage.getItem('zapzone_user');
-      const authToken = userData ? JSON.parse(userData).token : null;
-
-      if (!authToken) {
-        throw new Error('Authentication required. Please log in again.');
-      }
-
       // Map userType to backend role
       const role = userType === 'manager' ? 'location_manager' : userType === 'company_admin' ? 'company_admin' : 'attendant';
 
-      console.log("bearer " + authToken)
+      // Get optional user data for company_id and location_id
+      const userData = localStorage.getItem('zapzone_user');
+      const user = userData ? JSON.parse(userData) : null;
+
+      // Prepare request body
+      const requestBody: Record<string, string> = {
+        email: email,
+        role: role,
+      };
+
+      // Add company_id if available
+      if (user?.company_id) {
+        requestBody.company_id = String(user.company_id);
+      }
+
+      // Add location_id for manager and attendant roles
+      if ((role === 'location_manager' || role === 'attendant') && user?.location_id) {
+        requestBody.location_id = String(user.location_id);
+      }
+
       const response = await fetch(`${API_BASE_URL}/shareable-tokens`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${authToken}`, 
         },
-        body: JSON.stringify({
-          email: email,
-          role: role,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       const data = await response.json();
