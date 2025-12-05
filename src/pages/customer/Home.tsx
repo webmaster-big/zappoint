@@ -138,6 +138,16 @@ const EntertainmentLandingPage = () => {
     setShowAttractionModal(true);
   };
 
+  const getImageUrl = (img?: string | null) => {
+    if (!img) return '';
+    try {
+      if (img.startsWith('http') || img.startsWith(ASSET_URL)) return img;
+    } catch (e) {
+      // fallback to prefixing
+    }
+    return ASSET_URL + img;
+  };
+
   const handlePackageClick = (pkg: PackageType) => {
     setSelectedPackage(pkg);
     setShowPackageModal(true);
@@ -316,7 +326,7 @@ const EntertainmentLandingPage = () => {
                   <div className="h-48 bg-gray-200 relative">
                     {attraction.image ? (
                       <img 
-                        src={ASSET_URL + attraction.image} 
+                        src={getImageUrl(attraction.image)} 
                         alt={attraction.name}
                         className="w-full h-full object-cover"
                       />
@@ -386,7 +396,7 @@ const EntertainmentLandingPage = () => {
                   <div className="h-48 bg-gray-200 relative">
                     {pkg.image ? (
                       <img 
-                        src={ASSET_URL + pkg.image} 
+                        src={getImageUrl(pkg.image)} 
                         alt={pkg.name}
                         className="w-full h-full object-cover"
                       />
