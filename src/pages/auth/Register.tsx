@@ -213,14 +213,20 @@ export default function Register() {
     setIsSubmitting(true);
     setErrorMessage("");
 
+    console.log("=== REGISTRATION STARTED ===");
+    console.log("Token Data:", tokenData);
+    console.log("Form Data:", formData);
+
     // Basic validation
     if (formData.password !== formData.confirmPassword) {
+      console.error("❌ Validation Error: Passwords do not match");
       setErrorMessage("Passwords do not match");
       setIsSubmitting(false);
       return;
     }
 
     if (formData.password.length < 8) {
+      console.error("❌ Validation Error: Password too short");
       setErrorMessage("Password must be at least 8 characters long");
       setIsSubmitting(false);
       return;
@@ -229,73 +235,94 @@ export default function Register() {
     // Validate all password requirements
     const allRequirementsMet = passwordRequirements.every(req => req.met);
     if (!allRequirementsMet) {
+      console.error("❌ Validation Error: Password requirements not met", passwordRequirements);
       setErrorMessage("Please meet all password requirements");
       setIsSubmitting(false);
       return;
     }
+
+    console.log("✅ All validations passed");
 
     // Register user with backend API
     try {
       let companyId = tokenData!.company_id;
       let locationId = tokenData!.location_id;
 
+      console.log("Initial IDs - Company:", companyId, "Location:", locationId);
+
       // Step 1: Create company if needed (company_admin with no company_id)
       if (tokenData!.role === 'company_admin' && !companyId) {
+        console.log("📤 STEP 1: Creating company...");
+        const companyPayload = {
+          name: formData.companyName,
+          email: formData.companyEmail,
+          phone: formData.companyPhone,
+          address: formData.companyAddress
+        };
+        console.log("Company Payload:", companyPayload);
+
         const companyResponse = await fetch(`${API_BASE_URL}/companies`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: formData.companyName,
-            email: formData.companyEmail,
-            phone: formData.companyPhone,
-            address: formData.companyAddress
-          })
+          body: JSON.stringify(companyPayload)
         });
         
+        console.log("Company Response Status:", companyResponse.status);
         const companyData = await companyResponse.json();
+        console.log("Company Response Data:", companyData);
         
         if (!companyResponse.ok || !companyData.success) {
+          console.error("❌ Failed to create company:", companyData);
           setErrorMessage(companyData.message || 'Failed to create company');
           setIsSubmitting(false);
           return;
         }
         
         companyId = companyData.data.id;
+        console.log("✅ Company created with ID:", companyId);
       }
 
       // Step 2: Create or use existing location for location_manager
       if (tokenData!.role === 'location_manager' && !locationId) {
         if (isNewLocation) {
-          // Create new location
+          console.log("📤 STEP 2: Creating new location...");
+          const locationPayload = {
+            company_id: companyId,
+            name: formData.locationName,
+            address: formData.locationAddress,
+            city: formData.locationCity,
+            state: formData.locationState,
+            zip_code: formData.locationZipCode,
+            phone: formData.locationPhone,
+            email: formData.locationEmail,
+            timezone: formData.locationTimezone
+          };
+          console.log("Location Payload:", locationPayload);
+
           const locationResponse = await fetch(`${API_BASE_URL}/locations`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              company_id: companyId,
-              name: formData.locationName,
-              address: formData.locationAddress,
-              city: formData.locationCity,
-              state: formData.locationState,
-              zip_code: formData.locationZipCode,
-              phone: formData.locationPhone,
-              email: formData.locationEmail,
-              timezone: formData.locationTimezone
-            })
+            body: JSON.stringify(locationPayload)
           });
           
+          console.log("Location Response Status:", locationResponse.status);
           const locationData = await locationResponse.json();
+          console.log("Location Response Data:", locationData);
           
           if (!locationResponse.ok || !locationData.success) {
+            console.error("❌ Failed to create location:", locationData);
             setErrorMessage(locationData.message || 'Failed to create location');
             setIsSubmitting(false);
             return;
           }
           
           locationId = locationData.data.id;
+          console.log("✅ Location created with ID:", locationId);
         } else if (selectedLocationId) {
-          // Use existing location
+          console.log("📌 STEP 2: Using existing location ID:", selectedLocationId);
           locationId = selectedLocationId;
         } else {
+          console.error("❌ No location selected");
           setErrorMessage('Please select a location or create a new one');
           setIsSubmitting(false);
           return;
@@ -303,6 +330,7 @@ export default function Register() {
       }
 
       // Step 3: Create user account
+      console.log("📤 STEP 3: Creating user account...");
       const userPayload: Record<string, unknown> = {
         company_id: companyId,
         first_name: formData.firstName,
@@ -329,23 +357,31 @@ export default function Register() {
         if (formData.hireDate) userPayload.hire_date = formData.hireDate;
       }
 
+      console.log("User Payload:", userPayload);
+
       const response = await fetch(`${API_BASE_URL}/users`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(userPayload)
       });
       
+      console.log("User Response Status:", response.status);
       const data = await response.json();
+      console.log("User Response Data:", data);
       
       if (!response.ok || !data.success) {
+        console.error("❌ Failed to create user:", data);
         setErrorMessage(data.message || 'Registration failed');
         setIsSubmitting(false);
         return;
       }
 
+      console.log("✅ User created successfully with ID:", data.data.id);
+
       // Mark token as used (optional - backend might auto-mark it)
       try {
-        await fetch(`${API_BASE_URL}/shareable-tokens/mark-used`, {
+        console.log("📤 Marking token as used...");
+        const markUsedResponse = await fetch(`${API_BASE_URL}/shareable-tokens/mark-used`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
@@ -353,18 +389,26 @@ export default function Register() {
             user_id: data.data.id 
           })
         });
+        const markUsedData = await markUsedResponse.json();
+        console.log("Mark Used Response:", markUsedData);
       } catch (err) {
-        console.error('Failed to mark token as used:', err);
+        console.error('⚠️ Failed to mark token as used (non-critical):', err);
         // Don't fail registration if this fails
       }
       
+      console.log("✅ REGISTRATION COMPLETE - Redirecting to login...");
       // Redirect to login page
       window.location.href = '/';
     } catch (error) {
-      console.error("Registration failed:", error);
+      console.error("❌ REGISTRATION FAILED:", error);
+      if (error instanceof Error) {
+        console.error("Error message:", error.message);
+        console.error("Error stack:", error.stack);
+      }
       setErrorMessage("Registration failed. Please try again.");
     } finally {
       setIsSubmitting(false);
+      console.log("=== REGISTRATION PROCESS ENDED ===");
     }
   };
 
