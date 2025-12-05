@@ -25,6 +25,8 @@ const ManageAddons = () => {
     image: ''
   });
   const [loading, setLoading] = useState(false);
+
+  console.log("Form Data:", formData);
   
   // Location filtering for company_admin
   const currentUser = getStoredUser();
