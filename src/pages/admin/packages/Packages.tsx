@@ -575,16 +575,6 @@ const Packages: React.FC = () => {
                     </div>
 
                     <div className="grid gap-3 mb-4">
-                      {pkg.features && (
-                        <div className="flex items-start gap-2">
-                          <Tag className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                          <div className="text-sm">
-                            <span className="font-medium">Features: </span>
-                            <span className="text-gray-600">{pkg.features}</span>
-                          </div>
-                        </div>
-                      )}
-
                       <div className="flex items-start gap-2">
                         <Calendar className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
                         <div className="text-sm">
@@ -602,26 +592,6 @@ const Packages: React.FC = () => {
                             {pkg.price_per_additional && (
                               <span className="text-gray-600"> (${pkg.price_per_additional} per additional)</span>
                             )}
-                          </div>
-                        </div>
-                      )}
-
-                      {pkg.attractions && pkg.attractions.length > 0 && (
-                        <div className="flex items-start gap-2">
-                          <div className="w-4 h-4 flex-shrink-0" />
-                          <div className="text-sm">
-                            <span className="font-medium">Attractions: </span>
-                            {displayList(pkg.attractions)}
-                          </div>
-                        </div>
-                      )}
-
-                      {pkg.add_ons && pkg.add_ons.length > 0 && (
-                        <div className="flex items-start gap-2">
-                          <div className="w-4 h-4 flex-shrink-0" />
-                          <div className="text-sm">
-                            <span className="font-medium">Add-ons: </span>
-                            {displayList(pkg.add_ons, 'name')}
                           </div>
                         </div>
                       )}
