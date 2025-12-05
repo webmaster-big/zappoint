@@ -12,6 +12,22 @@ const EditAttraction = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const { themeColor, fullColor } = useThemeColor();
+
+  // Get auth token from localStorage
+  const getAuthToken = () => {
+    const userData = localStorage.getItem('zapzone_user');
+    if (userData) {
+      try {
+        const user = JSON.parse(userData);
+        return user.token;
+      } catch (error) {
+        console.error('Error parsing user data:', error);
+        return null;
+      }
+    }
+    return null;
+  };
+
   const [notFound, setNotFound] = useState(false);
   const [formData, setFormData] = useState<CreateAttractionsFormData>({
     name: '',
@@ -52,6 +68,8 @@ const EditAttraction = () => {
 
     const loadAttraction = async () => {
       try {
+        const authToken = getAuthToken();
+        console.log('🔐 Loading attraction for edit - Auth Token:', authToken ? 'Present' : 'Missing');
         const response = await attractionService.getAttraction(Number(id));
         const attraction = response.data;
         

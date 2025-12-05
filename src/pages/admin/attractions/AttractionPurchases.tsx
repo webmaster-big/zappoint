@@ -22,6 +22,22 @@ import { getStoredUser } from '../../../utils/storage';
 
 const ManagePurchases = () => {
   const { themeColor, fullColor } = useThemeColor();
+
+  // Get auth token from localStorage
+  const getAuthToken = () => {
+    const userData = localStorage.getItem('zapzone_user');
+    if (userData) {
+      try {
+        const user = JSON.parse(userData);
+        return user.token;
+      } catch (error) {
+        console.error('Error parsing user data:', error);
+        return null;
+      }
+    }
+    return null;
+  };
+
   const [purchases, setPurchases] = useState<AttractionPurchasesPurchase[]>([]);
   const [filteredPurchases, setFilteredPurchases] = useState<AttractionPurchasesPurchase[]>([]);
   const [loading, setLoading] = useState(true);
@@ -82,6 +98,8 @@ const ManagePurchases = () => {
   const loadPurchases = async () => {
     try {
       setLoading(true);
+      const authToken = getAuthToken();
+      console.log('🔐 Loading purchases - Auth Token:', authToken ? 'Present' : 'Missing');
       const response = await attractionPurchaseService.getPurchases({
         per_page: 100,
         user_id: getStoredUser()?.id

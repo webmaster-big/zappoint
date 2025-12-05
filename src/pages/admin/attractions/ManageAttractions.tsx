@@ -33,6 +33,21 @@ import { getStoredUser } from '../../../utils/storage';
 const ManageAttractions = () => {
   const { themeColor, fullColor } = useThemeColor();
   const [attractions, setAttractions] = useState<ManageAttractionsAttraction[]>([]);
+
+  // Get auth token from localStorage
+  const getAuthToken = () => {
+    const userData = localStorage.getItem('zapzone_user');
+    if (userData) {
+      try {
+        const user = JSON.parse(userData);
+        return user.token;
+      } catch (error) {
+        console.error('Error parsing user data:', error);
+        return null;
+      }
+    }
+    return null;
+  };
   const [filteredAttractions, setFilteredAttractions] = useState<ManageAttractionsAttraction[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedAttractions, setSelectedAttractions] = useState<string[]>([]);
@@ -198,6 +213,8 @@ const ManageAttractions = () => {
   const loadAttractions = async () => {
     try {
       setLoading(true);
+      const authToken = getAuthToken();
+      console.log('🔐 Loading attractions - Auth Token:', authToken ? 'Present' : 'Missing');
       const params: Record<string, string | number | boolean | undefined> = {
         search: filters.search || undefined,
         category: filters.category !== 'all' ? filters.category : undefined,

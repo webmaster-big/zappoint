@@ -22,6 +22,21 @@ import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
 const PurchaseAttraction = () => {
   const { location, id } = useParams<{ location: string; id: string }>();
   const navigate = useNavigate();
+
+  // Get auth token from localStorage
+  const getAuthToken = () => {
+    const userData = localStorage.getItem('zapzone_user');
+    if (userData) {
+      try {
+        const user = JSON.parse(userData);
+        return user.token;
+      } catch (error) {
+        console.error('Error parsing user data:', error);
+        return null;
+      }
+    }
+    return null;
+  };
   const [attraction, setAttraction] = useState<PurchaseAttractionAttraction | null>(null);
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
@@ -93,6 +108,8 @@ const PurchaseAttraction = () => {
 
       try {
         setLoading(true);
+        const authToken = getAuthToken();
+        console.log('🔐 Loading attraction - Auth Token:', authToken ? 'Present' : 'Missing');
         
         // If location parameter exists, use it (future enhancement for location-based filtering)
         // For now, we fetch by ID directly
@@ -265,6 +282,8 @@ const PurchaseAttraction = () => {
       setSubmitting(true);
       setIsProcessingPayment(true);
       setPaymentError('');
+      const authToken = getAuthToken();
+      console.log('🔐 Creating purchase - Auth Token:', authToken ? 'Present' : 'Missing');
 
       const totalAmount = calculateTotal();
       let transactionId: string | undefined;

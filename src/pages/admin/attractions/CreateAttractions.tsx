@@ -10,6 +10,22 @@ import Toast from '../../../components/ui/Toast';
 const CreateAttraction = () => {
   const navigate = useNavigate();
   const { themeColor, fullColor } = useThemeColor();
+
+  // Get auth token from localStorage
+  const getAuthToken = () => {
+    const userData = localStorage.getItem('zapzone_user');
+    if (userData) {
+      try {
+        const user = JSON.parse(userData);
+        return user.token;
+      } catch (error) {
+        console.error('Error parsing user data:', error);
+        return null;
+      }
+    }
+    return null;
+  };
+
   const [formData, setFormData] = useState<CreateAttractionsFormData>({
     name: '',
     description: '',
@@ -149,6 +165,8 @@ const CreateAttraction = () => {
         is_active: true,
       };
 
+      const authToken = getAuthToken();
+      console.log('🔐 Creating attraction - Auth Token:', authToken ? 'Present' : 'Missing');
       console.log('Submitting attraction data:', attractionData);
 
       const response = await attractionService.createAttraction(attractionData as CreateAttractionData);

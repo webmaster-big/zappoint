@@ -37,6 +37,21 @@ const AttractionCheckIn = () => {
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const scannerContainerRef = useRef<HTMLDivElement>(null);
 
+  // Get auth token from localStorage
+  const getAuthToken = () => {
+    const userData = localStorage.getItem('zapzone_user');
+    if (userData) {
+      try {
+        const user = JSON.parse(userData);
+        return user.token;
+      } catch (error) {
+        console.error('Error parsing user data:', error);
+        return null;
+      }
+    }
+    return null;
+  };
+
   // Start scanning
   const startScanning = async () => {
     try {
@@ -141,6 +156,9 @@ const AttractionCheckIn = () => {
       }
 
       // Verify purchase exists
+      const authToken = getAuthToken();
+      console.log('🔐 Auth Token:', authToken ? 'Present' : 'Missing');
+      
       const verifyResponse = await attractionPurchaseService.verifyPurchase(purchaseId);
       
       if (!verifyResponse.success) {
@@ -201,6 +219,9 @@ const AttractionCheckIn = () => {
 
     try {
       setProcessing(true);
+      const authToken = getAuthToken();
+      console.log('🔐 Check-in Auth Token:', authToken ? 'Present' : 'Missing');
+      
       const checkInResponse = await attractionPurchaseService.checkInPurchase(verifiedPurchase.id);
       
       if (checkInResponse.success) {
