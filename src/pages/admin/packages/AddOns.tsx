@@ -240,10 +240,14 @@ const ManageAddons = () => {
 
   const handleEdit = (addon: AddOnsAddon) => {
     setEditingAddon(addon);
+    // Remove ASSET_URL prefix if present for proper display in modal
+    const imageUrl = addon.image?.startsWith(ASSET_URL) 
+      ? addon.image 
+      : addon.image;
     setFormData({
       name: addon.name,
       price: addon.price.toString(),
-      image: addon.image
+      image: imageUrl
     });
     setShowModal(true);
   };
@@ -379,7 +383,7 @@ const ManageAddons = () => {
       <div className="w-full mx-auto px-4 pb-6 flex flex-col items-center">
         <div className="bg-white rounded-xl p-6 w-full shadow-sm border border-gray-100 mt-8">
           <div className="flex flex-col items-center justify-center py-20">
-            <div className={`animate-spin rounded-full h-16 w-16 border-b-4 border-${fullColor} mb-4`}></div>
+            <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mb-4"></div>
             <p className="text-gray-600 font-medium">Loading add-ons...</p>
           </div>
         </div>
