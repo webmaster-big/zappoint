@@ -339,20 +339,26 @@ const CreatePurchase = () => {
       let qrCodeData = '';
       try {
         qrCodeData = await generatePurchaseQRCode(createdPurchase.id);
+        console.log('✅ QR code generated successfully');
       } catch (qrError) {
-        console.error('QR code generation failed:', qrError);
+        console.error('❌ QR code generation failed:', qrError);
       }
 
-      // Send receipt email with QR code
-      try {
-        await attractionPurchaseService.sendReceipt(
-          createdPurchase.id,
-          qrCodeData
-        );
-        setToast({ message: 'Purchase completed! Receipt sent to email.', type: 'success' });
-      } catch (emailError) {
-        console.error('Error sending email:', emailError);
-        setToast({ message: 'Purchase completed! (Email failed to send)', type: 'info' });
+      // Send receipt email with QR code only if QR code was generated
+      if (qrCodeData) {
+        try {
+          await attractionPurchaseService.sendReceipt(
+            createdPurchase.id,
+            qrCodeData
+          );
+          setToast({ message: 'Purchase completed! Receipt sent to email.', type: 'success' });
+        } catch (emailError) {
+          console.error('❌ Error sending email:', emailError);
+          setToast({ message: 'Purchase completed! (Email failed to send)', type: 'info' });
+        }
+      } else {
+        console.warn('⚠️ Skipping email - QR code not generated');
+        setToast({ message: 'Purchase completed! (Email not sent - QR code generation failed)', type: 'info' });
       }
 
       // Reset form immediately

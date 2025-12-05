@@ -354,6 +354,14 @@ const OnsiteBooking: React.FC = () => {
       return;
     }
     
+    console.log('🕐 Fetching time slots for:', {
+      package_id: selectedPackage.id,
+      package_name: selectedPackage.name,
+      room_id: selectedRoomId,
+      room_name: selectedRoom,
+      date: bookingData.date,
+    });
+    
     setLoadingTimeSlots(true);
     
     // Create SSE connection
@@ -371,6 +379,12 @@ const OnsiteBooking: React.FC = () => {
       try {
         const data = JSON.parse(event.data);
 
+        console.log('✅ Received time slots:', {
+          available_count: data.available_slots?.length || 0,
+          booked_count: data.booked_slots?.length || 0,
+          available_slots: data.available_slots,
+          booked_slots: data.booked_slots,
+        });
         
         setAvailableTimeSlots(data.available_slots);
         setLoadingTimeSlots(false);
@@ -407,6 +421,11 @@ const OnsiteBooking: React.FC = () => {
     eventSource.onerror = (err) => {
       console.error('❌ SSE connection error:', err);
       console.error('EventSource readyState:', eventSource.readyState);
+      console.error('Failed to fetch time slots for:', {
+        package_id: selectedPackage?.id,
+        room_id: selectedRoomId,
+        date: bookingData.date,
+      });
       setLoadingTimeSlots(false);
       eventSource.close();
     };
