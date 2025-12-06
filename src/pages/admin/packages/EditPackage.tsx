@@ -717,6 +717,7 @@ const EditPackage: React.FC = () => {
                                             onChange={handleChange}
                                             className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400`}
                                             min="0"
+                                            step="0.01"
                                             placeholder="Enter price per additional participant"
                                         />
                                     </div>
@@ -946,13 +947,7 @@ const EditPackage: React.FC = () => {
                                                                 <div className="text-sm font-semibold text-blue-900">
                                                                     {slot.start_time}
                                                                 </div>
-                                                                <div className="text-xs text-gray-500">to</div>
-                                                                
-                                                                {idx === generateTimeSlots().length - 1 && (
-                                                                    <div className="text-sm font-semibold text-blue-900">
-                                                                        {slot.end_time}
-                                                                    </div>
-                                                                )}
+                                                              
                                                             </div>
                                                         ))}
                                                     </div>
@@ -1174,6 +1169,7 @@ const EditPackage: React.FC = () => {
                                 onChange={handleChange}
                                 className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400`}
                                 min="0"
+                                step="0.01"
                                 placeholder="Enter price"
                                 required
                             />
