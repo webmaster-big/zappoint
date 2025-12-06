@@ -456,6 +456,47 @@ const CreatePackage: React.FC = () => {
         return `${form.duration} ${form.durationUnit}`;
     };
 
+    // Generate time slots based on backend logic
+    const generateTimeSlots = () => {
+        if (!form.duration || !form.timeSlotStart || !form.timeSlotEnd || !form.timeSlotInterval) {
+            return [];
+        }
+
+        const slots = [];
+        const slotDuration = form.durationUnit === 'hours' ? parseInt(form.duration) * 60 : parseInt(form.duration);
+        const interval = parseInt(form.timeSlotInterval);
+        
+        // Parse start and end times
+        const [startHour, startMin] = form.timeSlotStart.split(':').map(Number);
+        const [endHour, endMin] = form.timeSlotEnd.split(':').map(Number);
+        
+        let currentMinutes = startHour * 60 + startMin;
+        const endMinutes = endHour * 60 + endMin;
+        
+        while (currentMinutes < endMinutes) {
+            const slotEndMinutes = currentMinutes + slotDuration;
+            
+            // Only add slot if it fits before end time
+            if (slotEndMinutes <= endMinutes) {
+                const startH = Math.floor(currentMinutes / 60);
+                const startM = currentMinutes % 60;
+                const endH = Math.floor(slotEndMinutes / 60);
+                const endM = slotEndMinutes % 60;
+                
+                slots.push({
+                    start_time: `${String(startH).padStart(2, '0')}:${String(startM).padStart(2, '0')}`,
+                    end_time: `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`,
+                    duration: form.duration,
+                    duration_unit: form.durationUnit
+                });
+            }
+            
+            currentMinutes += interval;
+        }
+        
+        return slots;
+    };
+
     if (loading) {
         return (
             <div className="w-full mx-auto sm:px-4 md:mt-8 pb-6 flex justify-center items-center min-h-64">
@@ -816,37 +857,42 @@ const CreatePackage: React.FC = () => {
                                             </div>
                                         </div>
                                         
-                                        {/* Preview time slots */}
-                                        <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                                            <p className="text-sm font-medium text-gray-700 mb-2">Preview Time Slots:</p>
-                                            <div className="flex flex-wrap gap-2">
-                                                {(() => {
-                                                    const slots = [];
-                                                    const [startHour, startMin] = form.timeSlotStart.split(':').map(Number);
-                                                    const [endHour, endMin] = form.timeSlotEnd.split(':').map(Number);
-                                                    const startMinutes = startHour * 60 + startMin;
-                                                    const endMinutes = endHour * 60 + endMin;
-                                                    const interval = parseInt(form.timeSlotInterval);
-                                                    
-                                                    for (let time = startMinutes; time <= endMinutes - interval; time += interval) {
-                                                        const hours = Math.floor(time / 60);
-                                                        const mins = time % 60;
-                                                        const displayTime = `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
-                                                        slots.push(
-                                                            <span key={time} className="px-2 py-1 bg-white border border-gray-300 rounded text-xs text-gray-700">
-                                                                {displayTime}
-                                                            </span>
-                                                        );
-                                                    }
-                                                    
-                                                    if (slots.length === 0) {
-                                                        return <span className="text-xs text-gray-500">No time slots generated. Please check your start/end times.</span>;
-                                                    }
-                                                    
-                                                    return slots;
-                                                })()}
+                                        {/* Time Slot Preview */}
+                                        {form.duration && (
+                                            <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                                                <h4 className="text-sm font-semibold text-blue-900 mb-3 flex items-center gap-2">
+                                                    <Clock className="w-4 h-4" />
+                                                    Generated Time Slots Preview
+                                                </h4>
+                                                {generateTimeSlots().length > 0 ? (
+                                                    <>
+                                                        <p className="text-xs text-blue-700 mb-3">
+                                                            {generateTimeSlots().length} slot(s) available based on your configuration
+                                                        </p>
+                                                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-60 overflow-y-auto">
+                                                            {generateTimeSlots().map((slot, idx) => (
+                                                                <div
+                                                                    key={idx}
+                                                                    className="bg-white px-3 py-2 rounded border border-blue-300 text-center"
+                                                                >
+                                                                    <div className="text-sm font-semibold text-blue-900">
+                                                                        {slot.start_time}
+                                                                    </div>
+                                                                    <div className="text-xs text-gray-500">to</div>
+                                                                    <div className="text-sm font-semibold text-blue-900">
+                                                                        {slot.end_time}
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </>
+                                                ) : (
+                                                    <p className="text-xs text-blue-700">
+                                                        No available slots - check if duration fits within the time range
+                                                    </p>
+                                                )}
                                             </div>
-                                        </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -1181,57 +1227,6 @@ const CreatePackage: React.FC = () => {
                     <div className="rounded-xl border border-gray-200 bg-white p-4 sm:p-6 md:p-8 shadow-none">
                         <h3 className="text-2xl font-bold mb-6 text-neutral-900 tracking-tight">Live Preview</h3>
                         <div className="space-y-4">
-                            {/* Time Slots Preview */}
-                            {form.timeSlotStart && form.timeSlotEnd && form.duration && form.timeSlotInterval && (
-                                <div className="mb-4">
-                                    <h4 className="text-sm font-semibold text-gray-700 mb-2">Available Time Slots</h4>
-                                    <div className="text-xs text-gray-500 mb-2">
-                                        Slots: {form.timeSlotStart} - {form.timeSlotEnd} (Interval: {form.timeSlotInterval}min)
-                                    </div>
-                                    <div className="space-y-1 max-h-48 overflow-y-auto">
-                                        {(() => {
-                                            const slots = [];
-                                            const duration = parseInt(form.duration);
-                                            const interval = parseInt(form.timeSlotInterval);
-                                            const slotDurationMinutes = form.durationUnit === 'hours' ? duration * 60 : duration;
-                                            
-                                            const [startHour, startMin] = form.timeSlotStart.split(':').map(Number);
-                                            const [endHour, endMin] = form.timeSlotEnd.split(':').map(Number);
-                                            
-                                            let currentMinutes = startHour * 60 + startMin;
-                                            const endMinutes = endHour * 60 + endMin;
-                                            
-                                            while (currentMinutes < endMinutes) {
-                                                const slotEndMinutes = currentMinutes + slotDurationMinutes;
-                                                
-                                                if (slotEndMinutes <= endMinutes) {
-                                                    const startH = Math.floor(currentMinutes / 60);
-                                                    const startM = currentMinutes % 60;
-                                                    const endH = Math.floor(slotEndMinutes / 60);
-                                                    const endM = slotEndMinutes % 60;
-                                                    
-                                                    slots.push({
-                                                        start: `${String(startH).padStart(2, '0')}:${String(startM).padStart(2, '0')}`,
-                                                        end: `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`
-                                                    });
-                                                }
-                                                
-                                                currentMinutes += interval;
-                                            }
-                                            
-                                            return slots.length > 0 ? (
-                                                slots.map((slot, idx) => (
-                                                    <div key={idx} className="text-xs px-2 py-1 bg-green-50 text-green-700 rounded border border-green-200">
-                                                        {slot.start} - {slot.end} ({duration} {form.durationUnit})
-                                                    </div>
-                                                ))
-                                            ) : (
-                                                <div className="text-xs text-gray-400">No valid slots</div>
-                                            );
-                                        })()}
-                                    </div>
-                                </div>
-                            )}
                             <div className="flex items-center justify-between mb-2">
                                 <span className="font-bold text-2xl text-primary tracking-tight">{form.name || <span className='text-gray-400'>Package Name</span>}</span>
                                 <span className="text-lg text-gray-500 font-semibold">${form.price || '--'}</span>
