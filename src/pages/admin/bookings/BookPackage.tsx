@@ -966,8 +966,15 @@ const BookPackage: React.FC = () => {
                     <label className="block font-medium mb-3 text-gray-800 text-xs md:text-sm uppercase tracking-wide">Additional Attractions</label>
                     <div className="space-y-4">
                       {pkg.attractions.map((attraction) => (
-                        <div key={attraction.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                          <div>
+                        <div key={attraction.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg gap-4">
+                          {attraction.image && (
+                            <img 
+                              src={getImageUrl(attraction.image)} 
+                              alt={attraction.name} 
+                              className="w-16 h-16 object-cover rounded-lg border border-gray-200 flex-shrink-0" 
+                            />
+                          )}
+                          <div className="flex-1 min-w-0">
                             <span className="font-medium text-gray-800 text-sm">{attraction.name}</span>
                             <span className="block text-xs text-gray-500 mt-1">
                               ${Number(attraction.price).toFixed(2)}
