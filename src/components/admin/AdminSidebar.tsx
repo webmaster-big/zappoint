@@ -376,21 +376,6 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
         isInitialConnection: isInitialConnectionRef.current
       });
 
-      // Check if this notification has already been shown (FIRST CHECK - before any filtering)
-      if (shownNotificationIdsRef.current.has(notification.id)) {
-        console.log('[AdminSidebar] ⏭️ Notification already shown (exists in Set):', notification.id);
-        
-        // After processing initial notifications, mark connection as no longer initial
-        if (isInitialConnectionRef.current) {
-          // Add small delay before marking as ready to ensure we process all initial notifications
-          setTimeout(() => {
-            isInitialConnectionRef.current = false;
-            console.log('[AdminSidebar] ✅ Initial connection complete, will show toasts for new notifications');
-          }, 2000);
-        }
-        return;
-      }
-
       // Filter: Skip if user_id matches current user (notification created by current user)
       if (notification.user_id && notification.user_id === userId) {
         console.log('[AdminSidebar] ⏭️ Skipping notification from current user:', notification.id);
@@ -403,6 +388,21 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
         return;
       }
 
+      // Check if this notification has already been shown
+      const alreadyShown = shownNotificationIdsRef.current.has(notification.id);
+      
+      if (alreadyShown) {
+        console.log('[AdminSidebar] ⏭️ Notification already shown (exists in Set):', notification.id);
+        
+        // First time seeing a duplicate during initial connection means we've processed all old notifications
+        // Mark connection as ready for showing new notifications
+        if (isInitialConnectionRef.current) {
+          isInitialConnectionRef.current = false;
+          console.log('[AdminSidebar] ✅ Initial connection complete (saw first duplicate), will show toasts for new notifications');
+        }
+        return;
+      }
+
       // Mark this notification as shown IMMEDIATELY
       shownNotificationIdsRef.current.add(notification.id);
       console.log('[AdminSidebar] ✅ New notification passed filters:', notification.id, '(Set now has', shownNotificationIdsRef.current.size, 'IDs)');
@@ -410,10 +410,11 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
       // CRITICAL: Don't show toasts during initial connection (when backend sends existing notifications)
       if (isInitialConnectionRef.current) {
         console.log('[AdminSidebar] 🚫 Suppressing toast during initial connection:', notification.id);
-        return;
+        // Don't return here - we still want to add to localStorage for new notifications
+        // Just don't show the toast yet
+      } else {
+        console.log('[AdminSidebar] 💾 Adding notification to localStorage and showing toast:', notification.id);
       }
-
-      console.log('[AdminSidebar] 💾 Adding notification to localStorage and showing toast:', notification.id);
 
       // Get existing notifications from localStorage
       const stored = localStorage.getItem('zapzone_notifications');
@@ -421,9 +422,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
       
       // Check if notification already exists in localStorage (extra safety)
       const existsInStorage = notifications.some((n: NotificationObject) => n.id === notification.id);
-      if (existsInStorage) {
-        console.log('[AdminSidebar] ⚠️ Notification already in localStorage, skipping storage update:', notification.id);
-      } else {
+      if (!existsInStorage) {
         // Add new notification at the beginning
         notifications.unshift(notification);
         
@@ -433,6 +432,8 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
         // Save back to localStorage
         localStorage.setItem('zapzone_notifications', JSON.stringify(trimmed));
         console.log('[AdminSidebar] ✅ Saved notification to localStorage');
+      } else {
+        console.log('[AdminSidebar] ⚠️ Notification already in localStorage, skipping storage update:', notification.id);
       }
       
       // Update unread count
@@ -442,30 +443,35 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
       // Dispatch custom event for other components
       window.dispatchEvent(new Event('zapzone_notifications_updated'));
       
-      // Show toast for this new notification
-      if (toastTimeoutRef.current) {
-        clearTimeout(toastTimeoutRef.current);
-      }
-      
-      console.log('[AdminSidebar] 🎉 Showing toast for notification:', notification.id);
-      setToastData({
-        title: notification.title,
-        message: notification.message,
-        type: notification.type
-      });
-      setShowToast(true);
-      
-      toastTimeoutRef.current = setTimeout(() => {
-        setShowToast(false);
-      }, 5000);
-      
-      // Optional: Show browser notification if permitted
-      if ('Notification' in window && Notification.permission === 'granted') {
-        new Notification(notification.title, {
-          body: notification.message,
-          icon: '/Zap-Zone.png',
-          tag: notification.id
+      // Only show toast if NOT in initial connection mode
+      if (!isInitialConnectionRef.current) {
+        // Show toast for this new notification
+        if (toastTimeoutRef.current) {
+          clearTimeout(toastTimeoutRef.current);
+        }
+        
+        console.log('[AdminSidebar] 🎉 Showing toast for notification:', notification.id);
+        setToastData({
+          title: notification.title,
+          message: notification.message,
+          type: notification.type
         });
+        setShowToast(true);
+        
+        toastTimeoutRef.current = setTimeout(() => {
+          setShowToast(false);
+        }, 5000);
+        
+        // Optional: Show browser notification if permitted
+        if ('Notification' in window && Notification.permission === 'granted') {
+          new Notification(notification.title, {
+            body: notification.message,
+            icon: '/Zap-Zone.png',
+            tag: notification.id
+          });
+        }
+      } else {
+        console.log('[AdminSidebar] 🔕 Skipping toast (initial connection mode):', notification.id);
       }
     };
 
