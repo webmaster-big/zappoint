@@ -292,22 +292,14 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
 
   // Initialize notification count FIRST before SSE connection - Critical timing!
   useEffect(() => {
-    // Initialize notification count from localStorage IMMEDIATELY on mount
-    // This MUST happen before SSE connection to prevent showing toasts for old notifications
-    const stored = localStorage.getItem('zapzone_notifications');
-    if (stored) {
-      try {
-        const notifications = JSON.parse(stored);
-        notificationCountRef.current = notifications.length;
-        console.log('[AdminSidebar] 🔄 Initialized notification count:', notifications.length);
-      } catch (error) {
-        console.error('[AdminSidebar] Error parsing existing notifications:', error);
-        notificationCountRef.current = 0;
-      }
-    } else {
-      notificationCountRef.current = 0;
-      console.log('[AdminSidebar] 🔄 No existing notifications in localStorage, starting with count 0');
-    }
+    // Initialize notification count from backend API IMMEDIATELY on mount
+    const initializeCount = async () => {
+      const count = await getUnreadCount();
+      notificationCountRef.current = count;
+      console.log('[AdminSidebar] 🔄 Initialized notification count from backend:', count);
+    };
+    
+    initializeCount();
   }, []);
 
   // Sync unread count on mount, when localStorage changes, and when custom event is dispatched
@@ -383,27 +375,9 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
         return;
       }
 
-      // Get existing notifications from localStorage
-      const stored = localStorage.getItem('zapzone_notifications');
-      const notifications = stored ? JSON.parse(stored) : [];
-      
-      // Check if notification already exists in localStorage (prevent duplicates)
-      const existsInStorage = notifications.some((n: NotificationObject) => n.id === notification.id);
-      if (existsInStorage) {
-        console.log('[AdminSidebar] ⚠️ Notification already in localStorage, skipping:', notification.id);
-        return;
-      }
-
-      // Add new notification at the beginning
-      notifications.unshift(notification);
-      
-      // Keep only last 100 notifications
-      const trimmed = notifications.slice(0, 100);
-      const newCount = trimmed.length;
-      
-      // Save back to localStorage
-      localStorage.setItem('zapzone_notifications', JSON.stringify(trimmed));
-      console.log('[AdminSidebar] ✅ Saved notification to localStorage. Old count:', notificationCountRef.current, 'New count:', newCount);
+      // Get new count from backend
+      const newCount = await getUnreadCount();
+      console.log('[AdminSidebar] 📊 Count check - Old:', notificationCountRef.current, 'New:', newCount);
       
       // CRITICAL: Only show toast if count increased (meaning this is a genuinely NEW notification)
       const countIncreased = newCount > notificationCountRef.current;
@@ -411,12 +385,8 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
       // Update the count
       notificationCountRef.current = newCount;
       
-      // Update unread count
-      const newUnreadCount = await getUnreadCount();
-      setUnreadNotifications(newUnreadCount);
-      
-      // Dispatch custom event for other components
-      window.dispatchEvent(new Event('zapzone_notifications_updated'));
+      // Update unread count display
+      setUnreadNotifications(newCount);
       
       // Only show toast if count increased
       if (countIncreased) {
