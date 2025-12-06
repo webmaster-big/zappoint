@@ -1014,7 +1014,7 @@ const OnsiteBooking: React.FC = () => {
               <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Attractions</h4>
               <div className="space-y-2">
                 {bookingData.selectedAttractions.map(({ id, quantity }) => {
-                  const attraction = selectedPackage?.attractions?.find(a => a.id === Number(id));
+                  const attraction = selectedPackage?.attractions?.find(a => String(a.id) === String(id));
                   if (!attraction) return null;
                   const price = attraction.price * quantity * (attraction.pricingType === 'per_person' ? bookingData.participants : 1);
                   return (
