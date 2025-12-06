@@ -1,9 +1,9 @@
 // src/pages/onsite-booking/OnsiteBooking.tsx
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Calendar, Clock, Users, CreditCard, Gift, Tag, Plus, Minus, DollarSign } from 'lucide-react';
 import QRCode from 'qrcode';
 import { useThemeColor } from '../../../hooks/useThemeColor';
+import Toast from '../../../components/ui/Toast';
 import type { 
   OnsiteBookingRoom, 
   OnsiteBookingPackage, 
@@ -46,7 +46,6 @@ interface BookingData extends Omit<OnsiteBookingData, 'customer'> {
 }
 
 const OnsiteBooking: React.FC = () => {
-  const navigate = useNavigate();
   const { themeColor, fullColor } = useThemeColor();
   const [packages, setPackages] = useState<OnsiteBookingPackage[]>([]);
   const [selectedPackage, setSelectedPackage] = useState<OnsiteBookingPackage | null>(null);
@@ -71,6 +70,8 @@ const OnsiteBooking: React.FC = () => {
   const [authorizeApiLoginId, setAuthorizeApiLoginId] = useState('');
   const [authorizeEnvironment, setAuthorizeEnvironment] = useState<'sandbox' | 'production'>('sandbox');
   const [showNoAuthAccountModal, setShowNoAuthAccountModal] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [bookingData, setBookingData] = useState<BookingData>({
     packageId: null,
     selectedAttractions: [],
@@ -668,11 +669,45 @@ const OnsiteBooking: React.FC = () => {
     return Math.max(0, total);
   };
 
+  const resetForm = () => {
+    setSelectedPackage(null);
+    setSelectedRoom('');
+    setSelectedRoomId(null);
+    setBookingData({
+      packageId: null,
+      selectedAttractions: [],
+      selectedAddOns: [],
+      date: '',
+      time: '',
+      participants: 0,
+      customer: {
+        firstName: '',
+        lastName: '',
+        email: '',
+        phone: ''
+      },
+      room: '',
+      paymentMethod: 'cash',
+      paymentType: 'full',
+      giftCardCode: '',
+      promoCode: '',
+      notes: '',
+      total: 0
+    });
+    setCardNumber('');
+    setCardMonth('');
+    setCardYear('');
+    setCardCVV('');
+    setUseAuthorizeNet(false);
+    setPaymentError('');
+    setStep(1);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!selectedPackage) {
-      alert('Please select a package');
+      setToast({ message: 'Please select a package', type: 'error' });
       return;
     }
     
@@ -689,6 +724,7 @@ const OnsiteBooking: React.FC = () => {
     }
     
     try {
+      setSubmitting(true);
       // Calculate duration in hours or days (convert days to hours if needed)
       const durationValue = selectedPackage.duration ? Number(selectedPackage.duration) : 2;
       const durationUnit = selectedPackage.durationUnit || 'hours';
@@ -876,18 +912,21 @@ const OnsiteBooking: React.FC = () => {
           // Don't fail the entire process if QR storage fails
         }
         
-        // Navigate to success page
-        navigate('/bookings', { 
-          state: { 
-            message: 'On-site booking created successfully!',
-            bookingId: bookingId,
-            referenceNumber: referenceNumber
-          } 
+        // Show success toast
+        setToast({ 
+          message: `Booking created successfully! Reference: ${referenceNumber}`, 
+          type: 'success' 
         });
+        
+        // Reset form for new booking
+        resetForm();
       }
     } catch (err) {
       console.error('❌ Error creating booking:', err);
-      alert('Failed to create booking. Please try again.');
+      setToast({ message: 'Failed to create booking. Please try again.', type: 'error' });
+    } finally {
+      setSubmitting(false);
+      setIsProcessingPayment(false);
     }
   };
 
@@ -2153,14 +2192,14 @@ const OnsiteBooking: React.FC = () => {
         </button>
         <button
           type="submit"
-          disabled={!isBookingValid() || isProcessingPayment}
+          disabled={!isBookingValid() || isProcessingPayment || submitting}
           className={`flex-2 px-6 py-3 rounded-lg font-semibold transition-colors flex items-center justify-center ${
-            !isBookingValid() || isProcessingPayment
+            !isBookingValid() || isProcessingPayment || submitting
               ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
               : `bg-${themeColor}-600 text-white hover:bg-${themeColor}-700`
           }`}
         >
-          {isProcessingPayment ? (
+          {isProcessingPayment || submitting ? (
             <>
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
               Processing...
@@ -2180,6 +2219,17 @@ const OnsiteBooking: React.FC = () => {
 
   return (
     <>
+      {/* Toast Notification */}
+      {toast && (
+        <div className="fixed top-4 right-4 z-50">
+          <Toast
+            message={toast.message}
+            type={toast.type}
+            onClose={() => setToast(null)}
+          />
+        </div>
+      )}
+
       {/* No Authorize.Net Account Modal */}
       {showNoAuthAccountModal && (
         <div className="fixed inset-0 bg-black/75 flex items-center justify-center p-4 z-[9999] animate-backdrop-fade">
