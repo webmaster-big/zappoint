@@ -63,9 +63,12 @@ const InvitationModal: React.FC<ManageAccountsInvitationModalProps> = ({
   const fetchLocations = async () => {
     try {
       const response = await locationService.getLocations({ per_page: 100 });
+      console.log('Location API Response:', response);
 
       if (response.success) {
-        setLocations(response.data.locations || []);
+        const locationsList = response.data.locations || [];
+        console.log('Locations list:', locationsList);
+        setLocations(locationsList);
       }
     } catch (error) {
       console.error('Error fetching locations:', error);
