@@ -2,8 +2,18 @@ export const API_BASE_URL = "https://zapzone-backend-yt1lm2w5.on-forge.com/api"
 export const ASSET_URL = "https://zapzone-backend-yt1lm2w5.on-forge.com/storage/"
 
 // Helper function to get correct image URL
-export const getImageUrl = (img?: string | null): string => {
+export const getImageUrl = (img?: string | null | any): string => {
   if (!img) return '';
+  
+  // If img is not a string, try to convert it or return empty
+  if (typeof img !== 'string') {
+    // If it's an array, take the first element
+    if (Array.isArray(img) && img.length > 0) {
+      img = img[0];
+    } else {
+      return '';
+    }
+  }
   
   // If already a full URL (http://, https://, or data:), use as-is
   if (img.startsWith('http://') || img.startsWith('https://') || img.startsWith('data:')) {
