@@ -12,7 +12,7 @@ import type {
 import bookingService, { type CreateBookingData } from '../../../services/bookingService';
 import timeSlotService, { type TimeSlot } from '../../../services/timeSlotService';
 import customerService from '../../../services/CustomerService';
-import { ASSET_URL, getStoredUser, formatTimeTo12Hour } from '../../../utils/storage';
+import { getImageUrl, getStoredUser, formatTimeTo12Hour } from '../../../utils/storage';
 import { Link } from 'react-router-dom';
 import { loadAcceptJS, processCardPayment, validateCardNumber, formatCardNumber, getCardType } from '../../../services/PaymentService';
 import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
@@ -913,7 +913,7 @@ const OnsiteBooking: React.FC = () => {
               <div className="flex gap-3 items-start">
                 {selectedPackage.image && (
                   <img 
-                    src={ASSET_URL + selectedPackage.image} 
+                    src={getImageUrl(selectedPackage.image)} 
                     alt={selectedPackage.name} 
                     className="w-16 h-16 object-cover rounded-lg border border-gray-200 flex-shrink-0" 
                   />
@@ -1426,7 +1426,7 @@ const OnsiteBooking: React.FC = () => {
                 {attraction.image && (
                   <div className="mb-3 -mx-4 -mt-4">
                     <img 
-                      src={attraction.image} 
+                      src={getImageUrl(attraction.image)} 
                       alt={attraction.name} 
                       className="w-full h-32 object-cover rounded-t-lg" 
                     />
@@ -1503,7 +1503,7 @@ const OnsiteBooking: React.FC = () => {
                   {/* Add-on Image */}
                   <div className="w-20 h-20 flex-shrink-0 flex items-center justify-center bg-gray-100 rounded-lg border-2 border-gray-200 overflow-hidden">
                     {addOn.image ? (
-                      <img src={addOn.image} alt={addOn.name} className="object-cover w-full h-full" />
+                      <img src={getImageUrl(addOn.image)} alt={addOn.name} className="object-cover w-full h-full" />
                     ) : (
                       <span className="text-gray-400 text-xs">No Image</span>
                     )}
@@ -1748,7 +1748,7 @@ const OnsiteBooking: React.FC = () => {
               <div className="flex gap-4 items-start pb-4 border-b border-gray-200">
                 {selectedPackage.image && (
                   <img 
-                    src={ASSET_URL + selectedPackage.image} 
+                    src={getImageUrl(selectedPackage.image)} 
                     alt={selectedPackage.name} 
                     className="w-24 h-24 object-cover rounded-lg border border-gray-200 flex-shrink-0" 
                   />
@@ -1846,7 +1846,7 @@ const OnsiteBooking: React.FC = () => {
                     <div key={name} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
                       <div className="flex items-center gap-3 flex-1">
                         {addOn?.image && (
-                          <img src={addOn.image} alt={addOn.name} className="w-10 h-10 object-cover rounded border" />
+                          <img src={getImageUrl(addOn.image)} alt={addOn.name} className="w-10 h-10 object-cover rounded border" />
                         )}
                         <div>
                           <p className="font-medium text-gray-900 text-sm">{name}</p>

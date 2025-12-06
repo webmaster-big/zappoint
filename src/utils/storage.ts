@@ -1,6 +1,24 @@
 export const API_BASE_URL = "https://zapzone-backend-yt1lm2w5.on-forge.com/api"
 export const ASSET_URL = "https://zapzone-backend-yt1lm2w5.on-forge.com/storage/"
 
+// Helper function to get correct image URL
+export const getImageUrl = (img?: string | null): string => {
+  if (!img) return '';
+  
+  // If already a full URL (http://, https://, or data:), use as-is
+  if (img.startsWith('http://') || img.startsWith('https://') || img.startsWith('data:')) {
+    return img;
+  }
+  
+  // If already starts with ASSET_URL, use as-is
+  if (img.startsWith(ASSET_URL)) {
+    return img;
+  }
+  
+  // Otherwise prefix with ASSET_URL
+  return ASSET_URL + img;
+};
+
 // Convert 24-hour time format (HH:MM) to 12-hour format (h:MM AM/PM)
 export const formatTimeTo12Hour = (time24: string): string => {
   if (!time24) return '';

@@ -4,7 +4,7 @@ import QRCode from 'qrcode';
 import type { BookPackagePackage } from '../../../types/BookPackage.types';
 import bookingService from '../../../services/bookingService';
 import timeSlotService, { type TimeSlot } from '../../../services/timeSlotService';
-import { ASSET_URL, formatTimeTo12Hour } from "../../../utils/storage";
+import { getImageUrl, formatTimeTo12Hour } from "../../../utils/storage";
 import { loadAcceptJS, processCardPayment, validateCardNumber, formatCardNumber, getCardType } from '../../../services/PaymentService';
 import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
 import customerService from '../../../services/CustomerService';
@@ -67,6 +67,9 @@ const BookPackage: React.FC = () => {
       try {
         setLoadingPackage(true);
         const response = await bookingService.getPackageById(Number(id));
+        console.log('📦 Package data received:', response.data);
+        console.log('📷 Package image:', response.data.image);
+        console.log('🎨 Add-ons:', response.data.add_ons);
         setPkg(response.data);
         
         // Set default participants to max_participants
@@ -1006,7 +1009,7 @@ const BookPackage: React.FC = () => {
                           {/* Add-on Image */}
                           <div className="w-16 h-16 flex-shrink-0 flex items-center justify-center bg-gray-100 rounded-md border border-gray-200 overflow-hidden">
                             {addOn.image ? (
-                              <img src={ASSET_URL + addOn.image} alt={addOn.name} className="object-cover w-full h-full" />
+                              <img src={getImageUrl(addOn.image)} alt={addOn.name} className="object-cover w-full h-full" />
                             ) : (
                               <span className="text-gray-400 text-xs">No Image</span>
                             )}
@@ -1404,7 +1407,7 @@ const BookPackage: React.FC = () => {
               {/* Package Image in Order Summary */}
               {pkg.image && (
                 <div className="mb-4 w-full flex justify-center">
-                  <img src={ASSET_URL + pkg.image} alt={pkg.name} className="max-h-32 rounded-lg object-contain border border-gray-200" />
+                  <img src={getImageUrl(pkg.image)} alt={pkg.name} className="max-h-32 rounded-lg object-contain border border-gray-200" />
                 </div>
               )}
               <div className="mb-5">
