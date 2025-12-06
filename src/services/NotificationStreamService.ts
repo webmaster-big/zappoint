@@ -69,9 +69,11 @@ class NotificationStreamService {
     // Listen for 'notification' events
     this.eventSource.addEventListener('notification', (event: MessageEvent) => {
       try {
+        console.log('[NotificationStream] 📨 Raw SSE event received:', event.data);
         const data: StreamNotificationData = JSON.parse(event.data);
 
         const notification = this.transformToNotification(data);
+        console.log('[NotificationStream] 🔄 Transformed notification:', notification.id, notification.title);
 
         if (this.onNotificationCallback) {
           this.onNotificationCallback(notification);

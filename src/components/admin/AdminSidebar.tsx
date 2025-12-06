@@ -300,13 +300,14 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
     updateUnread();
     
     // Initialize shown notification IDs from localStorage on mount
+    // This prevents showing toasts for old notifications when page loads
     const stored = localStorage.getItem('zapzone_notifications');
     if (stored) {
       try {
         const notifications = JSON.parse(stored);
         const existingIds = notifications.map((n: NotificationObject) => n.id);
         shownNotificationIdsRef.current = new Set(existingIds);
-        console.log('[AdminSidebar] Initialized with existing notification IDs:', existingIds.length);
+        console.log('[AdminSidebar] 🔄 Initialized with existing notification IDs (won\'t show toasts for these):', existingIds.length);
       } catch (error) {
         console.error('[AdminSidebar] Error parsing existing notifications:', error);
       }
