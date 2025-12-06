@@ -8,6 +8,7 @@ import { getImageUrl, formatTimeTo12Hour } from "../../../utils/storage";
 import { loadAcceptJS, processCardPayment, validateCardNumber, formatCardNumber, getCardType } from '../../../services/PaymentService';
 import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
 import customerService from '../../../services/CustomerService';
+import DatePicker from '../../../components/ui/DatePicker';
 
 const BookPackage: React.FC = () => {
   const { id } = useParams<{ location: string; id: string }>();
@@ -872,20 +873,14 @@ const BookPackage: React.FC = () => {
                 <div className="bg-blue-50 p-4 md:p-5 rounded-xl">
                   <h3 className="font-medium mb-3 md:mb-4 text-gray-800 text-xs md:text-sm uppercase tracking-wide">Select Date & Time</h3>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  <div className="space-y-4">
                     <div>
                       <label className="block font-medium mb-2 text-gray-800 text-sm">Date</label>
-                      <select
-                        value={selectedDate}
-                        onChange={(e) => setSelectedDate(e.target.value)}
-                        className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
-                      >
-                        {availableDates.map((date) => (
-                          <option key={date.toISOString()} value={date.toISOString().split('T')[0]}>
-                            {date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
-                          </option>
-                        ))}
-                      </select>
+                      <DatePicker
+                        selectedDate={selectedDate}
+                        availableDates={availableDates}
+                        onChange={(date) => setSelectedDate(date)}
+                      />
                     </div>
                     
                     <div>

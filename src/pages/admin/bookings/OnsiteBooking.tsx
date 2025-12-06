@@ -4,6 +4,7 @@ import { Calendar, Clock, Users, CreditCard, Gift, Tag, Plus, Minus, DollarSign 
 import QRCode from 'qrcode';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import Toast from '../../../components/ui/Toast';
+import DatePicker from '../../../components/ui/DatePicker';
 import type { 
   OnsiteBookingRoom, 
   OnsiteBookingPackage, 
@@ -156,7 +157,7 @@ const OnsiteBooking: React.FC = () => {
               id: a.id,
               name: a.name,
               price: Number(a.price),
-              image: a.image || null
+              image: Array.isArray(a.image) ? a.image[0] : a.image
             })) || [],
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             rooms: pkg.rooms?.map((r: any) => ({
@@ -164,7 +165,7 @@ const OnsiteBooking: React.FC = () => {
               name: r.name,
               capacity: r.capacity
             })) || [],
-            image: pkg.image?.[0] || null,
+            image: Array.isArray(pkg.image) ? pkg.image[0] : pkg.image,
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             giftCards: pkg.gift_cards?.map((gc: any) => ({
               id: gc.id,
@@ -1297,26 +1298,18 @@ const OnsiteBooking: React.FC = () => {
 
 
         {/* Date and Time Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Date Selection */}
+        <div className="grid grid-cols-1 gap-6">
+          {/* Date Selection with Calendar */}
           <div>
             <label className="block text-sm font-semibold text-gray-900 mb-3 flex items-center">
               <Calendar className="w-4 h-4 mr-2" />
               Select Date
             </label>
-            <select
-              name="date"
-              value={bookingData.date}
-              onChange={handleInputChange}
-              className={`w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:ring-2 focus:ring-${themeColor}-400 focus:border-${themeColor}-500 transition-colors`}
-              required
-            >
-              {availableDates.map(date => (
-                <option key={date.toISOString()} value={date.toISOString().split('T')[0]}>
-                  {date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
-                </option>
-              ))}
-            </select>
+            <DatePicker
+              selectedDate={bookingData.date}
+              availableDates={availableDates}
+              onChange={(date) => setBookingData(prev => ({ ...prev, date }))}
+            />
           </div>
 
           {/* Participants */}
