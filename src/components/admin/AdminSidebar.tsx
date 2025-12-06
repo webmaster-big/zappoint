@@ -227,13 +227,12 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
   // Unread notifications count from localStorage (zapzone_notifications)
   const [unreadNotifications, setUnreadNotifications] = useState<number>(0);
   const isStreamConnectedRef = useRef<boolean>(false);
-  const isInitialConnectionRef = useRef<boolean>(true);
+  const notificationCountRef = useRef<number>(0);
   
   // Toast notification state
   const [showToast, setShowToast] = useState(false);
   const [toastData, setToastData] = useState<{ title: string; message: string; type: string } | null>(null);
   const toastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const shownNotificationIdsRef = useRef<Set<string>>(new Set());
 
   // Get CSS variable value for the current theme color
   const getThemeColorValue = () => {
@@ -291,27 +290,24 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
   };
 
 
-  // Initialize notification IDs FIRST before SSE connection - Critical timing!
+  // Initialize notification count FIRST before SSE connection - Critical timing!
   useEffect(() => {
-    // Initialize shown notification IDs from localStorage IMMEDIATELY on mount
+    // Initialize notification count from localStorage IMMEDIATELY on mount
     // This MUST happen before SSE connection to prevent showing toasts for old notifications
     const stored = localStorage.getItem('zapzone_notifications');
     if (stored) {
       try {
         const notifications = JSON.parse(stored);
-        const existingIds = notifications.map((n: NotificationObject) => n.id);
-        shownNotificationIdsRef.current = new Set(existingIds);
-        console.log('[AdminSidebar] 🔄 Initialized shownNotificationIdsRef with', existingIds.length, 'existing IDs (won\'t show toasts for these):', existingIds);
+        notificationCountRef.current = notifications.length;
+        console.log('[AdminSidebar] 🔄 Initialized notification count:', notifications.length);
       } catch (error) {
         console.error('[AdminSidebar] Error parsing existing notifications:', error);
+        notificationCountRef.current = 0;
       }
     } else {
-      console.log('[AdminSidebar] 🔄 No existing notifications in localStorage, starting with empty Set');
+      notificationCountRef.current = 0;
+      console.log('[AdminSidebar] 🔄 No existing notifications in localStorage, starting with count 0');
     }
-    
-    // Mark this as initial connection to prevent showing toasts during initial SSE burst
-    isInitialConnectionRef.current = true;
-    console.log('[AdminSidebar] 🔄 Set isInitialConnection to true');
   }, []);
 
   // Sync unread count on mount, when localStorage changes, and when custom event is dispatched
@@ -372,8 +368,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
         current_user_id: userId,
         current_location_id: locationId,
         user_role: user.role,
-        shownSetSize: shownNotificationIdsRef.current.size,
-        isInitialConnection: isInitialConnectionRef.current
+        currentCount: notificationCountRef.current
       });
 
       // Filter: Skip if user_id matches current user (notification created by current user)
@@ -388,53 +383,33 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
         return;
       }
 
-      // Check if this notification has already been shown
-      const alreadyShown = shownNotificationIdsRef.current.has(notification.id);
-      
-      if (alreadyShown) {
-        console.log('[AdminSidebar] ⏭️ Notification already shown (exists in Set):', notification.id);
-        
-        // First time seeing a duplicate during initial connection means we've processed all old notifications
-        // Mark connection as ready for showing new notifications
-        if (isInitialConnectionRef.current) {
-          isInitialConnectionRef.current = false;
-          console.log('[AdminSidebar] ✅ Initial connection complete (saw first duplicate), will show toasts for new notifications');
-        }
-        return;
-      }
-
-      // Mark this notification as shown IMMEDIATELY
-      shownNotificationIdsRef.current.add(notification.id);
-      console.log('[AdminSidebar] ✅ New notification passed filters:', notification.id, '(Set now has', shownNotificationIdsRef.current.size, 'IDs)');
-
-      // CRITICAL: Don't show toasts during initial connection (when backend sends existing notifications)
-      if (isInitialConnectionRef.current) {
-        console.log('[AdminSidebar] 🚫 Suppressing toast during initial connection:', notification.id);
-        // Don't return here - we still want to add to localStorage for new notifications
-        // Just don't show the toast yet
-      } else {
-        console.log('[AdminSidebar] 💾 Adding notification to localStorage and showing toast:', notification.id);
-      }
-
       // Get existing notifications from localStorage
       const stored = localStorage.getItem('zapzone_notifications');
       const notifications = stored ? JSON.parse(stored) : [];
       
-      // Check if notification already exists in localStorage (extra safety)
+      // Check if notification already exists in localStorage (prevent duplicates)
       const existsInStorage = notifications.some((n: NotificationObject) => n.id === notification.id);
-      if (!existsInStorage) {
-        // Add new notification at the beginning
-        notifications.unshift(notification);
-        
-        // Keep only last 100 notifications
-        const trimmed = notifications.slice(0, 100);
-        
-        // Save back to localStorage
-        localStorage.setItem('zapzone_notifications', JSON.stringify(trimmed));
-        console.log('[AdminSidebar] ✅ Saved notification to localStorage');
-      } else {
-        console.log('[AdminSidebar] ⚠️ Notification already in localStorage, skipping storage update:', notification.id);
+      if (existsInStorage) {
+        console.log('[AdminSidebar] ⚠️ Notification already in localStorage, skipping:', notification.id);
+        return;
       }
+
+      // Add new notification at the beginning
+      notifications.unshift(notification);
+      
+      // Keep only last 100 notifications
+      const trimmed = notifications.slice(0, 100);
+      const newCount = trimmed.length;
+      
+      // Save back to localStorage
+      localStorage.setItem('zapzone_notifications', JSON.stringify(trimmed));
+      console.log('[AdminSidebar] ✅ Saved notification to localStorage. Old count:', notificationCountRef.current, 'New count:', newCount);
+      
+      // CRITICAL: Only show toast if count increased (meaning this is a genuinely NEW notification)
+      const countIncreased = newCount > notificationCountRef.current;
+      
+      // Update the count
+      notificationCountRef.current = newCount;
       
       // Update unread count
       const newUnreadCount = await getUnreadCount();
@@ -443,14 +418,15 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
       // Dispatch custom event for other components
       window.dispatchEvent(new Event('zapzone_notifications_updated'));
       
-      // Only show toast if NOT in initial connection mode
-      if (!isInitialConnectionRef.current) {
+      // Only show toast if count increased
+      if (countIncreased) {
+        console.log('[AdminSidebar] 🎉 Count increased! Showing toast for notification:', notification.id);
+        
         // Show toast for this new notification
         if (toastTimeoutRef.current) {
           clearTimeout(toastTimeoutRef.current);
         }
         
-        console.log('[AdminSidebar] 🎉 Showing toast for notification:', notification.id);
         setToastData({
           title: notification.title,
           message: notification.message,
@@ -471,7 +447,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
           });
         }
       } else {
-        console.log('[AdminSidebar] 🔕 Skipping toast (initial connection mode):', notification.id);
+        console.log('[AdminSidebar] 🔕 Count did not increase, skipping toast (old notification re-sent via SSE)');
       }
     };
 
