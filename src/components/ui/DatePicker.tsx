@@ -71,7 +71,7 @@ const DatePicker: React.FC<DatePickerProps> = ({
     // Add empty cells for days before the first day of month
     for (let i = 0; i < firstDay; i++) {
       days.push(
-        <div key={`empty-${i}`} className="h-10 md:h-12"></div>
+        <div key={`empty-${i}`} className="aspect-square"></div>
       );
     }
 
@@ -88,11 +88,11 @@ const DatePicker: React.FC<DatePickerProps> = ({
           type="button"
           onClick={() => handleDateClick(day)}
           disabled={!available || isPast}
-          className={`h-10 md:h-12 rounded-lg text-sm font-medium transition-all ${
+          className={`aspect-square w-full rounded-lg text-sm font-medium transition-all flex items-center justify-center ${
             selected
               ? 'bg-blue-600 text-white shadow-md ring-2 ring-blue-600 ring-offset-2'
               : available && !isPast
-              ? 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200'
+              ? 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 hover:scale-105'
               : isPast
               ? 'text-gray-300 cursor-not-allowed'
               : 'text-gray-400 cursor-not-allowed'
@@ -139,7 +139,7 @@ const DatePicker: React.FC<DatePickerProps> = ({
       </div>
 
       {/* Calendar grid */}
-      <div className="grid grid-cols-7 gap-1">
+      <div className="grid grid-cols-7 gap-2">
         {renderCalendar()}
       </div>
 
