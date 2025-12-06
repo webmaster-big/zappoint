@@ -58,7 +58,11 @@ const DatePicker: React.FC<DatePickerProps> = ({
   const handleDateClick = (day: number) => {
     const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
     if (isDateAvailable(date)) {
-      const isoDate = date.toISOString().split('T')[0];
+      // Format date as YYYY-MM-DD in local timezone
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const dayStr = String(day).padStart(2, '0');
+      const isoDate = `${year}-${month}-${dayStr}`;
       onChange(isoDate);
     }
   };
@@ -88,7 +92,7 @@ const DatePicker: React.FC<DatePickerProps> = ({
           type="button"
           onClick={() => handleDateClick(day)}
           disabled={!available || isPast}
-          className={`aspect-square w-full rounded-lg text-sm font-medium transition-all flex items-center justify-center ${
+          className={`aspect-square w-full min-h-[44px] rounded-lg text-xs md:text-sm font-medium transition-all flex items-center justify-center ${
             selected
               ? 'bg-blue-600 text-white shadow-md ring-2 ring-blue-600 ring-offset-2'
               : available && !isPast
@@ -107,13 +111,13 @@ const DatePicker: React.FC<DatePickerProps> = ({
   };
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-4">
+    <div className="bg-white rounded-lg border border-gray-200 p-2 md:p-3">
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-2 md:mb-3">
         <button
           type="button"
           onClick={previousMonth}
-          className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+          className="p-1.5 md:p-2 hover:bg-gray-100 rounded-lg transition-colors"
         >
           <ChevronLeft className="w-5 h-5 text-gray-600" />
         </button>
@@ -130,21 +134,21 @@ const DatePicker: React.FC<DatePickerProps> = ({
       </div>
 
       {/* Day labels */}
-      <div className="grid grid-cols-7 gap-1 mb-2">
+      <div className="grid grid-cols-7 gap-1 md:gap-1.5 mb-1 md:mb-2">
         {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-          <div key={day} className="text-center text-xs font-medium text-gray-500 py-2">
+          <div key={day} className="text-center text-xs md:text-sm font-medium text-gray-500 py-1">
             {day}
           </div>
         ))}
       </div>
 
       {/* Calendar grid */}
-      <div className="grid grid-cols-7 gap-2">
+      <div className="grid grid-cols-7 gap-1 md:gap-1.5">
         {renderCalendar()}
       </div>
 
       {/* Legend */}
-      <div className="flex items-center justify-center gap-4 mt-4 pt-4 border-t border-gray-200 text-xs">
+      <div className="flex items-center justify-center gap-3 md:gap-4 mt-2 md:mt-3 pt-2 md:pt-3 border-t border-gray-200 text-xs">
         <div className="flex items-center gap-2">
           <div className="w-4 h-4 bg-blue-50 border border-blue-200 rounded"></div>
           <span className="text-gray-600">Available</span>
