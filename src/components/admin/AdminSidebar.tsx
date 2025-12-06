@@ -290,6 +290,25 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
   };
 
 
+  // Initialize notification IDs FIRST before SSE connection - Critical timing!
+  useEffect(() => {
+    // Initialize shown notification IDs from localStorage IMMEDIATELY on mount
+    // This MUST happen before SSE connection to prevent showing toasts for old notifications
+    const stored = localStorage.getItem('zapzone_notifications');
+    if (stored) {
+      try {
+        const notifications = JSON.parse(stored);
+        const existingIds = notifications.map((n: NotificationObject) => n.id);
+        shownNotificationIdsRef.current = new Set(existingIds);
+        console.log('[AdminSidebar] 🔄 Initialized shownNotificationIdsRef with', existingIds.length, 'existing IDs (won\'t show toasts for these):', existingIds);
+      } catch (error) {
+        console.error('[AdminSidebar] Error parsing existing notifications:', error);
+      }
+    } else {
+      console.log('[AdminSidebar] 🔄 No existing notifications in localStorage, starting with empty Set');
+    }
+  }, []);
+
   // Sync unread count on mount, when localStorage changes, and when custom event is dispatched
   useEffect(() => {
     const updateUnread = async () => {
@@ -298,20 +317,6 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
     };
     
     updateUnread();
-    
-    // Initialize shown notification IDs from localStorage on mount
-    // This prevents showing toasts for old notifications when page loads
-    const stored = localStorage.getItem('zapzone_notifications');
-    if (stored) {
-      try {
-        const notifications = JSON.parse(stored);
-        const existingIds = notifications.map((n: NotificationObject) => n.id);
-        shownNotificationIdsRef.current = new Set(existingIds);
-        console.log('[AdminSidebar] 🔄 Initialized with existing notification IDs (won\'t show toasts for these):', existingIds.length);
-      } catch (error) {
-        console.error('[AdminSidebar] Error parsing existing notifications:', error);
-      }
-    }
     
     window.addEventListener('zapzone_notifications_updated', updateUnread);
     return () => {
@@ -361,8 +366,15 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
         location_id: notification.location_id,
         current_user_id: userId,
         current_location_id: locationId,
-        user_role: user.role
+        user_role: user.role,
+        shownSetSize: shownNotificationIdsRef.current.size
       });
+
+      // Check if this notification has already been shown (FIRST CHECK - before any filtering)
+      if (shownNotificationIdsRef.current.has(notification.id)) {
+        console.log('[AdminSidebar] ⏭️ Notification already shown (exists in Set):', notification.id);
+        return;
+      }
 
       // Filter: Skip if user_id matches current user (notification created by current user)
       if (notification.user_id && notification.user_id === userId) {
@@ -376,15 +388,9 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
         return;
       }
 
-      // Check if this notification has already been shown
-      if (shownNotificationIdsRef.current.has(notification.id)) {
-        console.log('[AdminSidebar] ⏭️ Notification already shown:', notification.id);
-        return;
-      }
-
-      // Mark this notification as shown
+      // Mark this notification as shown IMMEDIATELY
       shownNotificationIdsRef.current.add(notification.id);
-      console.log('[AdminSidebar] ✅ New notification will be displayed:', notification.id);
+      console.log('[AdminSidebar] ✅ New notification will be displayed:', notification.id, '(Set now has', shownNotificationIdsRef.current.size, 'IDs)');
 
       // Get existing notifications from localStorage
       const stored = localStorage.getItem('zapzone_notifications');
