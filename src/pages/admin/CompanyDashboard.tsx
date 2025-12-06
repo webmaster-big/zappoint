@@ -1090,7 +1090,6 @@ const CompanyDashboard: React.FC = () => {
                 <th className="px-3 md:px-4 py-2 md:py-3 font-medium">Status</th>
                 <th className="px-3 md:px-4 py-2 md:py-3 font-medium">Payment</th>
                 <th className="px-3 md:px-4 py-2 md:py-3 font-medium">Amount</th>
-                <th className="px-3 md:px-4 py-2 md:py-3 font-medium">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -1142,19 +1141,6 @@ const CompanyDashboard: React.FC = () => {
                     </td>
                     <td className="px-3 md:px-4 py-2 md:py-3">
                       <span className="font-medium text-xs md:text-sm">${parseFloat(String(booking.total_amount || 0)).toFixed(2)}</span>
-                    </td>
-                    <td className="px-3 md:px-4 py-2 md:py-3">
-                      <div className="flex space-x-2">
-                        <button className="text-${fullColor} hover:text-${fullColor}">
-                          <Eye size={16} />
-                        </button>
-                        <button className="text-${fullColor} hover:text-${fullColor}">
-                          <Edit size={16} />
-                        </button>
-                        <button className="text-red-800 hover:text-red-800">
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
                     </td>
                   </tr>
                 );
