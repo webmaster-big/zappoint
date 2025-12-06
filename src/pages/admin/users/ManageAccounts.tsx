@@ -22,6 +22,7 @@ import {
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
 import { API_BASE_URL } from '../../../utils/storage';
+import { locationService } from '../../../services/LocationService';
 import type { 
   ManageAccountsAccount, 
   ManageAccountsFilterOptions, 
@@ -38,6 +39,8 @@ const InvitationModal: React.FC<ManageAccountsInvitationModalProps> = ({
   const { themeColor, fullColor } = useThemeColor();
   const [email, setEmail] = useState(defaultEmail);
   const [userType, setUserType] = useState<'attendant' | 'manager' | 'company_admin'>(defaultUserType as 'attendant' | 'manager' | 'company_admin');
+  const [selectedLocationId, setSelectedLocationId] = useState<string>('');
+  const [locations, setLocations] = useState<Array<{ id: number; name: string }>>([]);
   const [generatedLink, setGeneratedLink] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState('');
@@ -47,15 +50,37 @@ const InvitationModal: React.FC<ManageAccountsInvitationModalProps> = ({
     if (isOpen) {
       setEmail(defaultEmail);
       setUserType(defaultUserType);
+      setSelectedLocationId('');
       setGeneratedLink('');
       setError('');
       setSuccess(false);
+      
+      // Fetch locations when modal opens
+      fetchLocations();
     }
   }, [isOpen, defaultEmail, defaultUserType]);
+
+  const fetchLocations = async () => {
+    try {
+      const response = await locationService.getLocations({ per_page: 100 });
+
+      if (response.success) {
+        setLocations(response.data.locations || []);
+      }
+    } catch (error) {
+      console.error('Error fetching locations:', error);
+    }
+  };
 
   const handleSend = async () => {
     if (!email) {
       setError('Please enter an email address');
+      return;
+    }
+
+    // Validate location selection for attendant
+    if (userType === 'attendant' && !selectedLocationId) {
+      setError('Please select a location for the attendant');
       return;
     }
 
@@ -82,8 +107,12 @@ const InvitationModal: React.FC<ManageAccountsInvitationModalProps> = ({
         requestBody.company_id = String(user.company_id);
       }
 
-      // Add location_id for manager and attendant roles
-      if ((role === 'location_manager' || role === 'attendant') && user?.location_id) {
+      // Add location_id based on user type
+      if (role === 'attendant' && selectedLocationId) {
+        // For attendant, use the selected location
+        requestBody.location_id = selectedLocationId;
+      } else if (role === 'location_manager' && user?.location_id) {
+        // For manager, use current user's location
         requestBody.location_id = String(user.location_id);
       }
 
@@ -175,7 +204,10 @@ const InvitationModal: React.FC<ManageAccountsInvitationModalProps> = ({
             </label>
             <select
               value={userType}
-              onChange={(e) => setUserType(e.target.value as 'attendant' | 'manager' | 'company_admin')}
+              onChange={(e) => {
+                setUserType(e.target.value as 'attendant' | 'manager' | 'company_admin');
+                setSelectedLocationId(''); // Reset location when user type changes
+              }}
               disabled={isSending || success}
               className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 disabled:bg-gray-100 disabled:cursor-not-allowed`}
             >
@@ -184,6 +216,28 @@ const InvitationModal: React.FC<ManageAccountsInvitationModalProps> = ({
               <option value="attendant">Attendant</option>
             </select>
           </div>
+
+          {/* Location Selector - Only for Attendant */}
+          {userType === 'attendant' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Location <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={selectedLocationId}
+                onChange={(e) => setSelectedLocationId(e.target.value)}
+                disabled={isSending || success}
+                className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 disabled:bg-gray-100 disabled:cursor-not-allowed`}
+              >
+                <option value="">Select a location</option>
+                {locations.map((location) => (
+                  <option key={location.id} value={location.id}>
+                    {location.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
