@@ -358,8 +358,8 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
         return;
       }
 
-      // Filter: Only show if location_id matches
-      if (notification.location_id && notification.location_id !== locationId) {
+      // Filter: Only show if location_id matches (unless user is company_admin)
+      if (user.role !== 'company_admin' && notification.location_id && notification.location_id !== locationId) {
         console.log('[AdminSidebar] Skipping notification from different location:', notification.id);
         return;
       }
