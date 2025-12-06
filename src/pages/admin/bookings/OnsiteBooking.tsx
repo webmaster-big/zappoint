@@ -1012,18 +1012,25 @@ const OnsiteBooking: React.FC = () => {
           {bookingData.selectedAttractions.length > 0 && (
             <div className="pb-4 border-b border-gray-200">
               <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Attractions</h4>
-              <div className="space-y-1.5">
+              <div className="space-y-2">
                 {bookingData.selectedAttractions.map(({ id, quantity }) => {
                   const attraction = selectedPackage?.attractions?.find(a => a.id === Number(id));
                   if (!attraction) return null;
                   const price = attraction.price * quantity * (attraction.pricingType === 'per_person' ? bookingData.participants : 1);
                   return (
-                    <div key={id} className="flex justify-between items-start text-sm">
+                    <div key={id} className="flex gap-2 items-start">
+                      {attraction.image && (
+                        <img 
+                          src={getImageUrl(attraction.image)} 
+                          alt={attraction.name}
+                          className="w-12 h-12 rounded object-cover flex-shrink-0"
+                        />
+                      )}
                       <div className="flex-1 min-w-0">
-                        <p className="text-gray-900 truncate">{attraction.name}</p>
-                        <p className="text-xs text-gray-500">Qty: {quantity}</p>
+                        <p className="text-sm text-gray-900 font-medium truncate">{attraction.name}</p>
+                        <p className="text-xs text-gray-500">Qty: {quantity} × ${attraction.price.toFixed(2)}</p>
                       </div>
-                      <span className="font-medium text-gray-900 ml-2">${price.toFixed(2)}</span>
+                      <span className="font-medium text-sm text-gray-900 ml-2">${price.toFixed(2)}</span>
                     </div>
                   );
                 })}
@@ -1035,18 +1042,25 @@ const OnsiteBooking: React.FC = () => {
           {bookingData.selectedAddOns.length > 0 && (
             <div className="pb-4 border-b border-gray-200">
               <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Add-ons</h4>
-              <div className="space-y-1.5">
+              <div className="space-y-2">
                 {bookingData.selectedAddOns.map(({ name, quantity }) => {
                   const addOn = selectedPackage?.addOns.find(a => a.name === name);
                   if (!addOn) return null;
                   const price = addOn.price * quantity;
                   return (
-                    <div key={name} className="flex justify-between items-start text-sm">
+                    <div key={name} className="flex gap-2 items-start">
+                      {addOn.image && (
+                        <img 
+                          src={getImageUrl(addOn.image)} 
+                          alt={name}
+                          className="w-12 h-12 rounded object-cover flex-shrink-0"
+                        />
+                      )}
                       <div className="flex-1 min-w-0">
-                        <p className="text-gray-900 truncate">{name}</p>
-                        <p className="text-xs text-gray-500">Qty: {quantity}</p>
+                        <p className="text-sm text-gray-900 font-medium truncate">{name}</p>
+                        <p className="text-xs text-gray-500">Qty: {quantity} × ${addOn.price.toFixed(2)}</p>
                       </div>
-                      <span className="font-medium text-gray-900 ml-2">${price.toFixed(2)}</span>
+                      <span className="font-medium text-sm text-gray-900 ml-2">${price.toFixed(2)}</span>
                     </div>
                   );
                 })}
