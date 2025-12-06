@@ -28,6 +28,8 @@ export interface NotificationObject {
   read: boolean;
   timestamp: string;
   created_at: string;
+  user_id?: number;
+  location_id?: number;
 }
 
 type NotificationCallback = (notification: NotificationObject) => void;

@@ -232,7 +232,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
   const [showToast, setShowToast] = useState(false);
   const [toastData, setToastData] = useState<{ title: string; message: string; type: string } | null>(null);
   const toastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const previousNotificationCountRef = useRef<number>(0);
+  const shownNotificationIdsRef = useRef<Set<string>>(new Set());
 
   // Get CSS variable value for the current theme color
   const getThemeColorValue = () => {
@@ -299,13 +299,18 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
     
     updateUnread();
     
-    // Initialize previous count on mount
-    updateUnread().then(() => {
-      // Set initial previous count after first fetch
-      getUnreadCount().then(count => {
-        previousNotificationCountRef.current = count;
-      });
-    });
+    // Initialize shown notification IDs from localStorage on mount
+    const stored = localStorage.getItem('zapzone_notifications');
+    if (stored) {
+      try {
+        const notifications = JSON.parse(stored);
+        const existingIds = notifications.map((n: NotificationObject) => n.id);
+        shownNotificationIdsRef.current = new Set(existingIds);
+        console.log('[AdminSidebar] Initialized with existing notification IDs:', existingIds.length);
+      } catch (error) {
+        console.error('[AdminSidebar] Error parsing existing notifications:', error);
+      }
+    }
     
     window.addEventListener('zapzone_notifications_updated', updateUnread);
     return () => {
@@ -321,13 +326,15 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
 
     // Try to get location_id from user prop first, then from localStorage
     let locationId = user.location_id;
+    let userId = user.id;
     
-    if (!locationId) {
+    if (!locationId || !userId) {
       try {
         const storedUser = localStorage.getItem('zapzone_user');
         if (storedUser) {
           const parsedUser = JSON.parse(storedUser);
-          locationId = parsedUser.location_id;
+          locationId = locationId || parsedUser.location_id;
+          userId = userId || parsedUser.id;
         }
       } catch (error) {
         console.error('[AdminSidebar] Error parsing localStorage zapzone_user:', error);
@@ -345,17 +352,37 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
 
     // Handle incoming notifications
     const handleNotification = async (notification: NotificationObject) => {
+      // Filter: Skip if user_id matches current user (notification created by current user)
+      if (notification.user_id && notification.user_id === userId) {
+        console.log('[AdminSidebar] Skipping notification from current user:', notification.id);
+        return;
+      }
+
+      // Filter: Only show if location_id matches
+      if (notification.location_id && notification.location_id !== locationId) {
+        console.log('[AdminSidebar] Skipping notification from different location:', notification.id);
+        return;
+      }
+
+      // Check if this notification has already been shown
+      if (shownNotificationIdsRef.current.has(notification.id)) {
+        console.log('[AdminSidebar] Notification already shown:', notification.id);
+        return;
+      }
+
+      // Mark this notification as shown
+      shownNotificationIdsRef.current.add(notification.id);
+      console.log('[AdminSidebar] New notification received during SSE:', notification.id);
+
       // Get existing notifications from localStorage
       const stored = localStorage.getItem('zapzone_notifications');
       const notifications = stored ? JSON.parse(stored) : [];
-      const previousCount = previousNotificationCountRef.current;
       
       // Add new notification at the beginning
       notifications.unshift(notification);
       
       // Keep only last 100 notifications
       const trimmed = notifications.slice(0, 100);
-      const newCount = trimmed.length;
       
       // Save back to localStorage
       localStorage.setItem('zapzone_notifications', JSON.stringify(trimmed));
@@ -367,35 +394,30 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
       // Dispatch custom event for other components
       window.dispatchEvent(new Event('zapzone_notifications_updated'));
       
-      // Show toast ONLY if the new count exceeds or is not equal to previous count
-      // This prevents toasts from showing on page reload/login
-      if (newCount > previousCount && previousCount > 0) {
-        if (toastTimeoutRef.current) {
-          clearTimeout(toastTimeoutRef.current);
-        }
-        setToastData({
-          title: notification.title,
-          message: notification.message,
-          type: notification.type
-        });
-        setShowToast(true);
-        
-        toastTimeoutRef.current = setTimeout(() => {
-          setShowToast(false);
-        }, 5000);
-        
-        // Optional: Show browser notification if permitted
-        if ('Notification' in window && Notification.permission === 'granted') {
-          new Notification(notification.title, {
-            body: notification.message,
-            icon: '/Zap-Zone.png',
-            tag: notification.id
-          });
-        }
+      // Show toast for this new notification
+      if (toastTimeoutRef.current) {
+        clearTimeout(toastTimeoutRef.current);
       }
       
-      // Update previous count reference for next comparison
-      previousNotificationCountRef.current = newCount;
+      setToastData({
+        title: notification.title,
+        message: notification.message,
+        type: notification.type
+      });
+      setShowToast(true);
+      
+      toastTimeoutRef.current = setTimeout(() => {
+        setShowToast(false);
+      }, 5000);
+      
+      // Optional: Show browser notification if permitted
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification(notification.title, {
+          body: notification.message,
+          icon: '/Zap-Zone.png',
+          tag: notification.id
+        });
+      }
     };
 
     // Handle connection errors

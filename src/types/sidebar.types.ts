@@ -10,6 +10,7 @@ export interface NavItem {
 }
 
 export interface UserData {
+  id?: number;
   name: string;
   company: string;
   location_name?: string;
