@@ -66,7 +66,8 @@ const InvitationModal: React.FC<ManageAccountsInvitationModalProps> = ({
       console.log('Location API Response:', response);
 
       if (response.success) {
-        const locationsList = response.data.locations || [];
+        // API returns data as array directly, not data.locations
+        const locationsList = Array.isArray(response.data) ? response.data : (response.data.locations || []);
         console.log('Locations list:', locationsList);
         setLocations(locationsList);
       }
