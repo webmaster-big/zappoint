@@ -18,7 +18,7 @@ import type {
     CreatePackagePromo,
     CreatePackageGiftCard
 } from '../../../types/createPackage.types';
-import { getStoredUser } from "../../../utils/storage";
+import { getStoredUser, formatTimeTo12Hour } from "../../../utils/storage";
 
 // Only categories remain in localStorage
 const initialCategories = ["Birthday", "Special", "Event"];
@@ -877,7 +877,7 @@ const CreatePackage: React.FC = () => {
                                                                     className="bg-white px-3 py-2 rounded border border-blue-300 text-center"
                                                                 >
                                                                     <div className="text-sm font-semibold text-blue-900">
-                                                                        {slot.start_time}
+                                                                        {formatTimeTo12Hour(slot.start_time)}
                                                                     </div>                                                        
                                                                 </div>
                                                             ))}

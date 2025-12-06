@@ -4,7 +4,7 @@ import QRCode from 'qrcode';
 import type { BookPackagePackage } from '../../../types/BookPackage.types';
 import bookingService from '../../../services/bookingService';
 import timeSlotService, { type TimeSlot } from '../../../services/timeSlotService';
-import { ASSET_URL } from "../../../utils/storage";
+import { ASSET_URL, formatTimeTo12Hour } from "../../../utils/storage";
 import { loadAcceptJS, processCardPayment, validateCardNumber, formatCardNumber, getCardType } from '../../../services/PaymentService';
 import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
 import customerService from '../../../services/CustomerService';
@@ -907,8 +907,8 @@ const BookPackage: React.FC = () => {
                                   disabled={!selectedRoomId}
                                 />
                                 <div className="flex flex-col">
-                                  <span className="text-sm text-gray-800">{slot.start_time}</span>
-                                  <span className="text-xs text-gray-500">{slot.end_time}</span>
+                                  <span className="text-sm text-gray-800">{formatTimeTo12Hour(slot.start_time)}</span>
+                                  <span className="text-xs text-gray-500">{formatTimeTo12Hour(slot.end_time)}</span>
                                 </div>
                               </label>
                             ))

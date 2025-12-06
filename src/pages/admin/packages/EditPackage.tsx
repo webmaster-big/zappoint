@@ -18,6 +18,7 @@ import type {
     CreatePackagePromo,
     CreatePackageGiftCard
 } from '../../../types/createPackage.types';
+import { formatTimeTo12Hour } from '../../../utils/storage';
 
 // Only categories remain in localStorage
 const initialCategories = ["Birthday", "Special", "Event", "Arcade Party", "Corporate", "Other"];
@@ -62,6 +63,8 @@ const EditPackage: React.FC = () => {
         timeSlotStart: "09:00", // Start time for available time slots
         timeSlotEnd: "17:00", // End time for available time slots
         timeSlotInterval: "30", // Interval between time slots in minutes
+        partialPaymentPercentage: "0", // Percentage for partial payments
+        partialPaymentFixed: "0", // Fixed amount for partial payments
     });
 
     // Image preview state
@@ -209,6 +212,8 @@ const EditPackage: React.FC = () => {
                     timeSlotStart: formatTime(pkg.time_slot_start || "09:00"),
                     timeSlotEnd: formatTime(pkg.time_slot_end || "17:00"),
                     timeSlotInterval: String(pkg.time_slot_interval || "30"),
+                    partialPaymentPercentage: String(pkg.partial_payment_percentage || "0"),
+                    partialPaymentFixed: String(pkg.partial_payment_fixed || "0"),
                 });
 
                 if (pkg.image) {
@@ -489,6 +494,8 @@ const EditPackage: React.FC = () => {
                 time_slot_start: form.timeSlotStart || "09:00",
                 time_slot_end: form.timeSlotEnd || "17:00",
                 time_slot_interval: timeSlotInterval || 30,
+                partial_payment_percentage: form.partialPaymentPercentage ? parseInt(form.partialPaymentPercentage) : undefined,
+                partial_payment_fixed: form.partialPaymentFixed ? parseInt(form.partialPaymentFixed) : undefined,
                 image: form.image || undefined,
                 attraction_ids,
                 addon_ids,
@@ -768,17 +775,42 @@ const EditPackage: React.FC = () => {
                             </h3>
                             <div className="space-y-4">
                                 <div>
-                                    <label className="block font-semibold mb-2 text-base text-neutral-800">Availability Type</label>
-                                    <select
-                                        name="availabilityType"
-                                        value={form.availabilityType}
-                                        onChange={handleChange}
-                                        className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all`}
-                                    >
-                                        <option value="daily">Daily</option>
-                                        <option value="weekly">Weekly</option>
-                                        <option value="monthly">Monthly</option>
-                                    </select>
+                                    <label className="block font-semibold mb-2 text-base text-neutral-800">Schedule Type</label>
+                                    <div className="flex flex-wrap gap-4">
+                                        <label className="flex items-center gap-2">
+                                            <input
+                                                type="radio"
+                                                name="availabilityType"
+                                                value="daily"
+                                                checked={form.availabilityType === "daily"}
+                                                onChange={handleChange}
+                                                className="accent-primary"
+                                            />
+                                            <span>Daily</span>
+                                        </label>
+                                        <label className="flex items-center gap-2">
+                                            <input
+                                                type="radio"
+                                                name="availabilityType"
+                                                value="weekly"
+                                                checked={form.availabilityType === "weekly"}
+                                                onChange={handleChange}
+                                                className="accent-primary"
+                                            />
+                                            <span>Weekly</span>
+                                        </label>
+                                        <label className="flex items-center gap-2">
+                                            <input
+                                                type="radio"
+                                                name="availabilityType"
+                                                value="monthly"
+                                                checked={form.availabilityType === "monthly"}
+                                                onChange={handleChange}
+                                                className="accent-primary"
+                                            />
+                                            <span>Monthly</span>
+                                        </label>
+                                    </div>
                                 </div>
                                 
                                 {form.availabilityType === "daily" && (
@@ -945,7 +977,7 @@ const EditPackage: React.FC = () => {
                                                                 className="bg-white px-3 py-2 rounded border border-blue-300 text-center"
                                                             >
                                                                 <div className="text-sm font-semibold text-blue-900">
-                                                                    {slot.start_time}
+                                                                    {formatTimeTo12Hour(slot.start_time)}
                                                                 </div>
                                                               
                                                             </div>
@@ -1173,6 +1205,46 @@ const EditPackage: React.FC = () => {
                                 placeholder="Enter price"
                                 required
                             />
+                        </div>
+                        
+                        {/* Partial Payment Section */}
+                        <div>
+                            <h3 className={`text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2 relative group`}>
+                                <Info className={`w-5 h-5 text-${themeColor}-600`} /> Partial Payment Options
+                                <span className="absolute z-20 left-0 top-full mt-2 min-w-[250px] max-w-xs bg-gray-900 text-white text-xs rounded-md px-3 py-2 opacity-0 group-hover:opacity-100 pointer-events-none transition-all">
+                                    Configure partial payment options for customers (percentage or fixed amount)
+                                </span>
+                            </h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block font-semibold mb-2 text-base text-neutral-800">Partial Payment Percentage (%)</label>
+                                    <input
+                                        type="number"
+                                        name="partialPaymentPercentage"
+                                        value={form.partialPaymentPercentage}
+                                        onChange={handleChange}
+                                        className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400`}
+                                        min="0"
+                                        max="100"
+                                        placeholder="e.g. 20 for 20%"
+                                    />
+                                    <p className="text-xs text-gray-500 mt-1">Leave 0 to disable percentage-based partial payment</p>
+                                </div>
+                                <div>
+                                    <label className="block font-semibold mb-2 text-base text-neutral-800">Partial Payment Fixed Amount ($)</label>
+                                    <input
+                                        type="number"
+                                        name="partialPaymentFixed"
+                                        value={form.partialPaymentFixed}
+                                        onChange={handleChange}
+                                        className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400`}
+                                        min="0"
+                                        step="0.01"
+                                        placeholder="e.g. 50 for $50"
+                                    />
+                                    <p className="text-xs text-gray-500 mt-1">Leave 0 to disable fixed amount partial payment</p>
+                                </div>
+                            </div>
                         </div>
                         
                         <div className="flex gap-2 mt-6">

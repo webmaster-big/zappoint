@@ -12,7 +12,7 @@ import type {
 import bookingService, { type CreateBookingData } from '../../../services/bookingService';
 import timeSlotService, { type TimeSlot } from '../../../services/timeSlotService';
 import customerService from '../../../services/CustomerService';
-import { ASSET_URL, getStoredUser } from '../../../utils/storage';
+import { ASSET_URL, getStoredUser, formatTimeTo12Hour } from '../../../utils/storage';
 import { Link } from 'react-router-dom';
 import { loadAcceptJS, processCardPayment, validateCardNumber, formatCardNumber, getCardType } from '../../../services/PaymentService';
 import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
@@ -1339,9 +1339,9 @@ const OnsiteBooking: React.FC = () => {
                         className={`accent-${fullColor} w-4 h-4`}
                         disabled={!selectedRoomId}
                       />
-                      <span className="font-semibold text-sm text-gray-900">{slot.start_time}</span>
+                      <span className="font-semibold text-sm text-gray-900">{formatTimeTo12Hour(slot.start_time)}</span>
                     </div>
-                    <span className="text-xs text-gray-500 ml-6">to {slot.end_time}</span>
+                    <span className="text-xs text-gray-500 ml-6">to {formatTimeTo12Hour(slot.end_time)}</span>
                   </label>
                 ))
               ) : (

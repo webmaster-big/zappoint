@@ -1,5 +1,17 @@
 export const API_BASE_URL = "https://zapzone-backend-yt1lm2w5.on-forge.com/api"
 export const ASSET_URL = "https://zapzone-backend-yt1lm2w5.on-forge.com/storage/"
+
+// Convert 24-hour time format (HH:MM) to 12-hour format (h:MM AM/PM)
+export const formatTimeTo12Hour = (time24: string): string => {
+  if (!time24) return '';
+  
+  const [hours24, minutes] = time24.split(':').map(Number);
+  const period = hours24 >= 12 ? 'PM' : 'AM';
+  const hours12 = hours24 % 12 || 12; // Convert 0 to 12
+  
+  return `${hours12}:${minutes.toString().padStart(2, '0')} ${period}`;
+};
+
 // Sanitize user data to ensure no nested objects are stored
 export const sanitizeUserData = (userData: any, preserveToken: boolean = false) => {
   if (!userData) return null;
