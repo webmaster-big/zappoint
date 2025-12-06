@@ -31,6 +31,7 @@ const EditBooking: React.FC = () => {
   const [searchParams] = useSearchParams();
   const referenceNumber = searchParams.get('ref');
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [notFound, setNotFound] = useState(false);
   const [originalBooking, setOriginalBooking] = useState<Booking | null>(null);
   const [packageDetails, setPackageDetails] = useState<PackageType | null>(null);
@@ -184,9 +185,10 @@ const EditBooking: React.FC = () => {
     
     let total = Number(packageDetails.price);
     
-    // Additional participants cost
-    if (packageDetails.price_per_additional && formData.participants > 1) {
-      total += (formData.participants - 1) * Number(packageDetails.price_per_additional);
+    // Additional participants cost only if exceeding max_participants
+    if (packageDetails.price_per_additional && packageDetails.max_participants && formData.participants > packageDetails.max_participants) {
+      const additionalCount = formData.participants - packageDetails.max_participants;
+      total += additionalCount * Number(packageDetails.price_per_additional);
     }
     
     // Attractions - all calculated as price × quantity
@@ -294,6 +296,8 @@ const EditBooking: React.FC = () => {
       return;
     }
 
+    setSubmitting(true);
+
     try {
       const totalAmount = calculateTotal();
       // Keep the original amount paid, don't recalculate
@@ -343,17 +347,21 @@ const EditBooking: React.FC = () => {
         navigate('/bookings');
       } else {
         alert('Failed to update booking. Please try again.');
+        setSubmitting(false);
       }
     } catch (error) {
       console.error('Error updating booking:', error);
       alert('Error updating booking. Please try again.');
+      setSubmitting(false);
     }
   };
 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className={`animate-spin rounded-full h-12 w-12 border-b-2 border-${fullColor}`}></div>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-800 mx-auto"></div>
+        </div>
       </div>
     );
   }
@@ -749,10 +757,10 @@ const EditBooking: React.FC = () => {
                   <span className="text-gray-600">Package Price:</span>
                   <span className="font-medium">${packageDetails?.price || 0}</span>
                 </div>
-                {packageDetails?.price_per_additional && formData.participants > 1 && (
+                {packageDetails?.price_per_additional && packageDetails?.max_participants && formData.participants > packageDetails.max_participants && (
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Additional Participants ({formData.participants - 1}):</span>
-                    <span className="font-medium">${((formData.participants - 1) * Number(packageDetails.price_per_additional)).toFixed(2)}</span>
+                    <span className="text-gray-600">Additional Participants ({formData.participants - packageDetails.max_participants}):</span>
+                    <span className="font-medium">${((formData.participants - packageDetails.max_participants) * Number(packageDetails.price_per_additional)).toFixed(2)}</span>
                   </div>
                 )}
                 {selectedAttractions.length > 0 && (
@@ -840,15 +848,20 @@ const EditBooking: React.FC = () => {
             <button
               type="button"
               onClick={() => navigate('/bookings')}
-              className="px-5 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-800 hover:bg-gray-100 transition-colors"
+              disabled={submitting}
+              className="px-5 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-800 hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className={`px-5 py-2.5 bg-${fullColor} border border-transparent rounded-lg shadow-sm text-sm font-medium text-white hover:bg-${themeColor}-900 transition-all`}
+              disabled={submitting}
+              className={`px-5 py-2.5 bg-${fullColor} border border-transparent rounded-lg shadow-sm text-sm font-medium text-white hover:bg-${themeColor}-900 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 inline-flex`}
             >
-              Update Booking
+              {submitting && (
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+              )}
+              {submitting ? 'Updating...' : 'Update Booking'}
             </button>
           </div>
         </form>

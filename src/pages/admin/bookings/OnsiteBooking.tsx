@@ -614,9 +614,10 @@ const OnsiteBooking: React.FC = () => {
     if (selectedPackage) {
       total += selectedPackage.price;
       
-      // Additional participants cost if applicable
-      if (selectedPackage.pricePerAdditional && bookingData.participants > 1) {
-        total += (bookingData.participants - 1) * selectedPackage.pricePerAdditional;
+      // Additional participants cost only if exceeding max_participants
+      if (selectedPackage.pricePerAdditional && bookingData.participants > selectedPackage.maxParticipants) {
+        const additionalCount = bookingData.participants - selectedPackage.maxParticipants;
+        total += additionalCount * selectedPackage.pricePerAdditional;
       }
     }
     
