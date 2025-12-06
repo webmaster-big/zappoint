@@ -352,27 +352,38 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
 
     // Handle incoming notifications
     const handleNotification = async (notification: NotificationObject) => {
+      console.log('[AdminSidebar] 📬 Notification received:', {
+        id: notification.id,
+        type: notification.type,
+        title: notification.title,
+        user_id: notification.user_id,
+        location_id: notification.location_id,
+        current_user_id: userId,
+        current_location_id: locationId,
+        user_role: user.role
+      });
+
       // Filter: Skip if user_id matches current user (notification created by current user)
       if (notification.user_id && notification.user_id === userId) {
-        console.log('[AdminSidebar] Skipping notification from current user:', notification.id);
+        console.log('[AdminSidebar] ⏭️ Skipping notification from current user:', notification.id);
         return;
       }
 
       // Filter: Only show if location_id matches (unless user is company_admin)
       if (user.role !== 'company_admin' && notification.location_id && notification.location_id !== locationId) {
-        console.log('[AdminSidebar] Skipping notification from different location:', notification.id);
+        console.log('[AdminSidebar] ⏭️ Skipping notification from different location:', notification.id);
         return;
       }
 
       // Check if this notification has already been shown
       if (shownNotificationIdsRef.current.has(notification.id)) {
-        console.log('[AdminSidebar] Notification already shown:', notification.id);
+        console.log('[AdminSidebar] ⏭️ Notification already shown:', notification.id);
         return;
       }
 
       // Mark this notification as shown
       shownNotificationIdsRef.current.add(notification.id);
-      console.log('[AdminSidebar] New notification received during SSE:', notification.id);
+      console.log('[AdminSidebar] ✅ New notification will be displayed:', notification.id);
 
       // Get existing notifications from localStorage
       const stored = localStorage.getItem('zapzone_notifications');

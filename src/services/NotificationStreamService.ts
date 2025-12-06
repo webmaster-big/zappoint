@@ -17,6 +17,8 @@ export interface StreamNotificationData {
   purchase_date?: string;
   created_at: string;
   timestamp: string;
+  user_id?: number;
+  location_id?: number;
 }
 
 export interface NotificationObject {
@@ -141,7 +143,9 @@ class NotificationStreamService {
       data,
       read: false,
       timestamp: data.timestamp,
-      created_at: data.created_at
+      created_at: data.created_at,
+      user_id: data.user_id,
+      location_id: data.location_id
     };
   }
 
