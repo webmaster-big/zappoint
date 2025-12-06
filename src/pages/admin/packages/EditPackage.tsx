@@ -947,9 +947,12 @@ const EditPackage: React.FC = () => {
                                                                     {slot.start_time}
                                                                 </div>
                                                                 <div className="text-xs text-gray-500">to</div>
-                                                                <div className="text-sm font-semibold text-blue-900">
-                                                                    {slot.end_time}
-                                                                </div>
+                                                                
+                                                                {idx === generateTimeSlots().length - 1 && (
+                                                                    <div className="text-sm font-semibold text-blue-900">
+                                                                        {slot.end_time}
+                                                                    </div>
+                                                                )}
                                                             </div>
                                                         ))}
                                                     </div>
