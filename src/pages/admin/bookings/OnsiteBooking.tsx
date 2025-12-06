@@ -30,6 +30,7 @@ interface ExtendedBookingData extends CreateBookingData {
     quantity: number;
     price_at_booking: number;
   }>;
+  created_by?: number;
 }
 
 interface BookingData extends Omit<OnsiteBookingData, 'customer'> {
@@ -812,6 +813,10 @@ const OnsiteBooking: React.FC = () => {
         ? partialAmount 
         : totalAmount;
       
+      // Get created_by from localStorage
+      const currentUser = getStoredUser();
+      const createdBy = currentUser?.id;
+      
       // Create booking data matching Laravel BookingController validation
       const bookingData_request: ExtendedBookingData = {
         guest_name: `${bookingData.customer.firstName} ${bookingData.customer.lastName}`,
@@ -836,6 +841,7 @@ const OnsiteBooking: React.FC = () => {
         notes: bookingData.notes || undefined,
         additional_attractions: additionalAttractions.length > 0 ? additionalAttractions : undefined,
         additional_addons: additionalAddons.length > 0 ? additionalAddons : undefined,
+        created_by: createdBy,
       };
       
       console.log('📤 Sending on-site booking request:', bookingData_request);
