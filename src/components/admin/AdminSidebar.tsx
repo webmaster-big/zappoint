@@ -227,6 +227,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
   // Unread notifications count from localStorage (zapzone_notifications)
   const [unreadNotifications, setUnreadNotifications] = useState<number>(0);
   const isStreamConnectedRef = useRef<boolean>(false);
+  const isInitialConnectionRef = useRef<boolean>(true);
   
   // Toast notification state
   const [showToast, setShowToast] = useState(false);
@@ -307,6 +308,10 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
     } else {
       console.log('[AdminSidebar] 🔄 No existing notifications in localStorage, starting with empty Set');
     }
+    
+    // Mark this as initial connection to prevent showing toasts during initial SSE burst
+    isInitialConnectionRef.current = true;
+    console.log('[AdminSidebar] 🔄 Set isInitialConnection to true');
   }, []);
 
   // Sync unread count on mount, when localStorage changes, and when custom event is dispatched
@@ -367,12 +372,22 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
         current_user_id: userId,
         current_location_id: locationId,
         user_role: user.role,
-        shownSetSize: shownNotificationIdsRef.current.size
+        shownSetSize: shownNotificationIdsRef.current.size,
+        isInitialConnection: isInitialConnectionRef.current
       });
 
       // Check if this notification has already been shown (FIRST CHECK - before any filtering)
       if (shownNotificationIdsRef.current.has(notification.id)) {
         console.log('[AdminSidebar] ⏭️ Notification already shown (exists in Set):', notification.id);
+        
+        // After processing initial notifications, mark connection as no longer initial
+        if (isInitialConnectionRef.current) {
+          // Add small delay before marking as ready to ensure we process all initial notifications
+          setTimeout(() => {
+            isInitialConnectionRef.current = false;
+            console.log('[AdminSidebar] ✅ Initial connection complete, will show toasts for new notifications');
+          }, 2000);
+        }
         return;
       }
 
@@ -390,20 +405,35 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
 
       // Mark this notification as shown IMMEDIATELY
       shownNotificationIdsRef.current.add(notification.id);
-      console.log('[AdminSidebar] ✅ New notification will be displayed:', notification.id, '(Set now has', shownNotificationIdsRef.current.size, 'IDs)');
+      console.log('[AdminSidebar] ✅ New notification passed filters:', notification.id, '(Set now has', shownNotificationIdsRef.current.size, 'IDs)');
+
+      // CRITICAL: Don't show toasts during initial connection (when backend sends existing notifications)
+      if (isInitialConnectionRef.current) {
+        console.log('[AdminSidebar] 🚫 Suppressing toast during initial connection:', notification.id);
+        return;
+      }
+
+      console.log('[AdminSidebar] 💾 Adding notification to localStorage and showing toast:', notification.id);
 
       // Get existing notifications from localStorage
       const stored = localStorage.getItem('zapzone_notifications');
       const notifications = stored ? JSON.parse(stored) : [];
       
-      // Add new notification at the beginning
-      notifications.unshift(notification);
-      
-      // Keep only last 100 notifications
-      const trimmed = notifications.slice(0, 100);
-      
-      // Save back to localStorage
-      localStorage.setItem('zapzone_notifications', JSON.stringify(trimmed));
+      // Check if notification already exists in localStorage (extra safety)
+      const existsInStorage = notifications.some((n: NotificationObject) => n.id === notification.id);
+      if (existsInStorage) {
+        console.log('[AdminSidebar] ⚠️ Notification already in localStorage, skipping storage update:', notification.id);
+      } else {
+        // Add new notification at the beginning
+        notifications.unshift(notification);
+        
+        // Keep only last 100 notifications
+        const trimmed = notifications.slice(0, 100);
+        
+        // Save back to localStorage
+        localStorage.setItem('zapzone_notifications', JSON.stringify(trimmed));
+        console.log('[AdminSidebar] ✅ Saved notification to localStorage');
+      }
       
       // Update unread count
       const newUnreadCount = await getUnreadCount();
@@ -417,6 +447,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
         clearTimeout(toastTimeoutRef.current);
       }
       
+      console.log('[AdminSidebar] 🎉 Showing toast for notification:', notification.id);
       setToastData({
         title: notification.title,
         message: notification.message,
