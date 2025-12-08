@@ -263,7 +263,10 @@ const Settings = () => {
         // Update localStorage with new user data
         updateStoredUser(response.data);
         
+        // Update UI state immediately
         setCurrentEmail(newEmail);
+        
+        // Show success message
         setSuccessMessage('Email updated successfully!');
         setShowSuccess(true);
         setTimeout(() => setShowSuccess(false), 3000);
@@ -314,6 +317,12 @@ const Settings = () => {
       });
       
       if (response.success) {
+        // Update localStorage if backend returns updated user data
+        if (response.data) {
+          updateStoredUser(response.data);
+        }
+        
+        // Show success message - password UI doesn't need state update
         setSuccessMessage('Password updated successfully!');
         setShowSuccess(true);
         setTimeout(() => setShowSuccess(false), 3000);
