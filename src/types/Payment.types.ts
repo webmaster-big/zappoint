@@ -13,7 +13,7 @@ export interface PaymentChargeRequest {
   customer_id?: number;
   booking_id?: number;
   description?: string;
-  customer_data?: {
+  customer?: {
     first_name?: string;
     last_name?: string;
     email?: string;

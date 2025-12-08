@@ -252,7 +252,7 @@ export const processCardPayment = async (
     const chargeRequest: PaymentChargeRequest = {
       ...paymentData,
       opaqueData,
-      customer_data: customerData, // Include customer billing info if provided
+      customer: customerData, // Include customer billing info if provided
     };
     
     const response = await chargePayment(chargeRequest);
