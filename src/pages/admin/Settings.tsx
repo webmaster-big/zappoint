@@ -366,7 +366,35 @@ const Settings = () => {
       });
       
       if (response.success) {
-        // Show success message first
+        // Update UI state immediately
+        const newAccount: SettingsAuthorizeNetAccount = {
+          id: response.data?.id || Date.now(),
+          location_id: selectedLocationId || 0,
+          environment: authorizeEnvironment,
+          is_active: true,
+          connected_at: new Date().toISOString(),
+          location: {
+            id: selectedLocationId || 0,
+            name: availableLocations.find(loc => loc.id === selectedLocationId)?.name || '',
+            city: availableLocations.find(loc => loc.id === selectedLocationId)?.city || '',
+            state: availableLocations.find(loc => loc.id === selectedLocationId)?.state || '',
+          },
+        };
+        
+        // Update connected state immediately
+        if (userRole !== 'company_admin') {
+          setAuthorizeConnected(true);
+          setAuthorizeAccount(newAccount);
+        }
+        
+        // For company_admin, add to all accounts list
+        if (userRole === 'company_admin') {
+          setAllAuthorizeAccounts(prev => [...prev, newAccount]);
+          // Remove from available locations
+          setAvailableLocations(prev => prev.filter(loc => loc.id !== selectedLocationId));
+        }
+        
+        // Show success message
         setSuccessMessage('Authorize.Net account connected successfully!');
         setShowSuccess(true);
         setTimeout(() => setShowSuccess(false), 3000);
@@ -380,14 +408,6 @@ const Settings = () => {
         
         // Close modal
         setShowAuthorizeModal(false);
-        
-        // Refresh account status to update UI
-        await fetchAuthorizeAccount();
-        
-        // If company_admin, also refresh all accounts
-        if (userRole === 'company_admin') {
-          await fetchAllAuthorizeAccounts();
-        }
       } else {
         setLoadingAuthorize(false);
         alert(response.message || 'Failed to connect Authorize.Net account');
@@ -408,7 +428,7 @@ const Settings = () => {
       const response = await disconnectAuthorizeNetAccount();
       
       if (response.success) {
-        // Update UI immediately
+        // Update UI state immediately - no refetch needed
         setAuthorizeConnected(false);
         setAuthorizeAccount(null);
         
@@ -416,9 +436,6 @@ const Settings = () => {
         setSuccessMessage('Authorize.Net account disconnected successfully');
         setShowSuccess(true);
         setTimeout(() => setShowSuccess(false), 3000);
-        
-        // Refresh to ensure consistency
-        await fetchAuthorizeAccount();
       } else {
         alert(response.message || 'Failed to disconnect account');
       }
@@ -437,16 +454,21 @@ const Settings = () => {
       const response = await disconnectAuthorizeNetAccount(locationId);
       
       if (response.success) {
+        // Find the disconnected account to get location details
+        const disconnectedAccount = allAuthorizeAccounts.find(acc => acc.location_id === locationId);
+        
+        // Update UI state immediately - remove from all accounts list
+        setAllAuthorizeAccounts(prev => prev.filter(acc => acc.location_id !== locationId));
+        
+        // Add back to available locations if we have the account details
+        if (disconnectedAccount) {
+          setAvailableLocations(prev => [...prev, disconnectedAccount.location]);
+        }
+        
         // Show success message
         setSuccessMessage(`Authorize.Net disconnected for ${locationName}`);
         setShowSuccess(true);
         setTimeout(() => setShowSuccess(false), 3000);
-        
-        // Refresh the list of all accounts and main account status
-        await Promise.all([
-          fetchAllAuthorizeAccounts(),
-          fetchAuthorizeAccount()
-        ]);
       } else {
         alert(response.message || 'Failed to disconnect account');
       }
