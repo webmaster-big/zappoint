@@ -633,6 +633,49 @@ const BookPackage: React.FC = () => {
         transaction_id: paymentResponse.transaction_id,
       };
       
+      console.log('📦 === BOOKING DATA BEING SENT TO BACKEND ===');
+      console.log('Full Booking Object:', JSON.stringify(bookingData, null, 2));
+      console.log('Guest Information:', {
+        name: bookingData.guest_name,
+        email: bookingData.guest_email,
+        phone: bookingData.guest_phone
+      });
+      console.log('Billing Information:', {
+        address: form.address,
+        address2: form.address2,
+        city: form.city,
+        state: form.state,
+        zip: form.zip,
+        country: form.country
+      });
+      console.log('Booking Details:', {
+        location_id: bookingData.location_id,
+        package_id: bookingData.package_id,
+        room_id: bookingData.room_id,
+        type: bookingData.type,
+        date: bookingData.booking_date,
+        time: bookingData.booking_time,
+        participants: bookingData.participants,
+        duration: `${bookingData.duration} ${bookingData.duration_unit}`
+      });
+      console.log('Payment Information:', {
+        total_amount: bookingData.total_amount,
+        amount_paid: bookingData.amount_paid,
+        payment_method: bookingData.payment_method,
+        payment_status: bookingData.payment_status,
+        transaction_id: bookingData.transaction_id
+      });
+      console.log('Add-ons & Attractions:', {
+        attractions: bookingData.additional_attractions,
+        addons: bookingData.additional_addons
+      });
+      console.log('Discounts:', {
+        promo_code: bookingData.promo_code,
+        gift_card_code: bookingData.gift_card_code
+      });
+      console.log('Additional Notes:', bookingData.notes);
+      console.log('==============================================');
+      
       const response = await bookingService.createBooking(bookingData);
       
       if (response.success && response.data) {
