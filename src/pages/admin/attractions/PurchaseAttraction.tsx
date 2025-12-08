@@ -103,6 +103,7 @@ const PurchaseAttraction = () => {
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
   const [countrySearch, setCountrySearch] = useState('');
   const [showCountrySuggestions, setShowCountrySuggestions] = useState(false);
+  const [countryDebounceTimer, setCountryDebounceTimer] = useState<NodeJS.Timeout | null>(null);
 
   // Auto-fill form if customer is logged in
   useEffect(() => {
@@ -234,7 +235,7 @@ const PurchaseAttraction = () => {
       }
     };
     initializeAuthorizeNet();
-  }, [authorizeEnvironment]);
+  }, [attraction, authorizeEnvironment]);
 
   // Debounced customer search by email
   useEffect(() => {
@@ -769,25 +770,56 @@ const PurchaseAttraction = () => {
                           <input
                             type="text"
                             name="country"
-                            value={countrySearch}
+                            value={countrySearch || customerInfo.country}
                             onChange={(e) => {
                               const value = e.target.value;
                               setCountrySearch(value);
-                              setShowCountrySuggestions(true);
+                              
+                              // Clear existing timer
+                              if (countryDebounceTimer) {
+                                clearTimeout(countryDebounceTimer);
+                              }
+                              
+                              // Set new timer to show suggestions after 300ms
+                              const timer = setTimeout(() => {
+                                setShowCountrySuggestions(true);
+                              }, 300);
+                              setCountryDebounceTimer(timer);
                             }}
-                            onFocus={() => setShowCountrySuggestions(true)}
-                            onBlur={() => setTimeout(() => setShowCountrySuggestions(false), 200)}
-                            placeholder={customerInfo.country || "Start typing country name..."}
+                            onFocus={() => {
+                              // Clear the input to allow typing when focused
+                              if (customerInfo.country && !countrySearch) {
+                                setCountrySearch('');
+                              }
+                              // Show suggestions after debounce
+                              if (countryDebounceTimer) {
+                                clearTimeout(countryDebounceTimer);
+                              }
+                              const timer = setTimeout(() => {
+                                setShowCountrySuggestions(true);
+                              }, 300);
+                              setCountryDebounceTimer(timer);
+                            }}
+                            onBlur={() => {
+                              setTimeout(() => {
+                                setShowCountrySuggestions(false);
+                                // If nothing typed, keep the selected country
+                                if (!countrySearch && customerInfo.country) {
+                                  setCountrySearch('');
+                                }
+                              }, 200);
+                            }}
+                            placeholder="Start typing country name..."
                             className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition"
                             required
                             autoComplete="off"
                           />
                           {/* Country Suggestions Dropdown */}
-                          {showCountrySuggestions && countrySearch && (
+                          {showCountrySuggestions && (countrySearch || customerInfo.country) && (
                             <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                               {countries
                                 .filter(country => 
-                                  country.toLowerCase().includes(countrySearch.toLowerCase())
+                                  country.toLowerCase().includes((countrySearch || customerInfo.country || '').toLowerCase())
                                 )
                                 .slice(0, 10)
                                 .map(country => (
@@ -805,7 +837,7 @@ const PurchaseAttraction = () => {
                                   </button>
                                 ))}
                               {countries.filter(country => 
-                                country.toLowerCase().includes(countrySearch.toLowerCase())
+                                country.toLowerCase().includes((countrySearch || customerInfo.country || '').toLowerCase())
                               ).length === 0 && (
                                 <div className="px-4 py-2 text-sm text-gray-500">
                                   No countries found

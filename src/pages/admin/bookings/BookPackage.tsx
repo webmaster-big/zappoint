@@ -96,6 +96,7 @@ const BookPackage: React.FC = () => {
   const [countrySearch, setCountrySearch] = useState('');
   const [showCountrySuggestions, setShowCountrySuggestions] = useState(false);
   const [customerId, setCustomerId] = useState<number | null>(null);
+  const [countryDebounceTimer, setCountryDebounceTimer] = useState<NodeJS.Timeout | null>(null);
 
   // Load package from backend
   useEffect(() => {
@@ -1339,24 +1340,55 @@ const BookPackage: React.FC = () => {
                       <label className="block font-medium mb-2 text-gray-800 text-sm">Country</label>
                       <input
                         type="text"
-                        value={countrySearch}
+                        value={countrySearch || form.country}
                         onChange={(e) => {
                           const value = e.target.value;
                           setCountrySearch(value);
-                          setShowCountrySuggestions(true);
+                          
+                          // Clear existing timer
+                          if (countryDebounceTimer) {
+                            clearTimeout(countryDebounceTimer);
+                          }
+                          
+                          // Set new timer to show suggestions after 300ms
+                          const timer = setTimeout(() => {
+                            setShowCountrySuggestions(true);
+                          }, 300);
+                          setCountryDebounceTimer(timer);
                         }}
-                        onFocus={() => setShowCountrySuggestions(true)}
-                        onBlur={() => setTimeout(() => setShowCountrySuggestions(false), 200)}
-                        placeholder={form.country || "Start typing country name..."}
+                        onFocus={() => {
+                          // Clear the input to allow typing when focused
+                          if (form.country && !countrySearch) {
+                            setCountrySearch('');
+                          }
+                          // Show suggestions after debounce
+                          if (countryDebounceTimer) {
+                            clearTimeout(countryDebounceTimer);
+                          }
+                          const timer = setTimeout(() => {
+                            setShowCountrySuggestions(true);
+                          }, 300);
+                          setCountryDebounceTimer(timer);
+                        }}
+                        onBlur={() => {
+                          setTimeout(() => {
+                            setShowCountrySuggestions(false);
+                            // If nothing typed, keep the selected country
+                            if (!countrySearch && form.country) {
+                              setCountrySearch('');
+                            }
+                          }, 200);
+                        }}
+                        placeholder="Start typing country name..."
                         className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
                         autoComplete="off"
                       />
                       {/* Country Suggestions Dropdown */}
-                      {showCountrySuggestions && countrySearch && (
+                      {showCountrySuggestions && (countrySearch || form.country) && (
                         <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                           {countries
                             .filter(country => 
-                              country.toLowerCase().includes(countrySearch.toLowerCase())
+                              country.toLowerCase().includes((countrySearch || form.country || '').toLowerCase())
                             )
                             .slice(0, 10)
                             .map(country => (
@@ -1374,7 +1406,7 @@ const BookPackage: React.FC = () => {
                               </button>
                             ))}
                           {countries.filter(country => 
-                            country.toLowerCase().includes(countrySearch.toLowerCase())
+                            country.toLowerCase().includes((countrySearch || form.country || '').toLowerCase())
                           ).length === 0 && (
                             <div className="px-4 py-2 text-sm text-gray-500">
                               No countries found
