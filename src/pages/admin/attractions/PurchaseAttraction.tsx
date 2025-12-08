@@ -157,14 +157,20 @@ const PurchaseAttraction = () => {
         console.log('🔧 Initializing Authorize.Net for location:', locationId);
         
         const response = await getAuthorizeNetPublicKey(locationId);
-        console.log('📡 Authorize.Net API Response:', {
+        console.log('📡 Authorize.Net API Response:', response);
+        
+        // Check if response has the api_login_id directly or nested in data
+        const apiLoginId = response.data?.api_login_id || (response as any).api_login_id;
+        
+        console.log('📡 Authorize.Net parsed data:', {
           success: response.success,
           hasData: !!response.data,
-          apiLoginId: response.data?.api_login_id ? '✅ Present' : '❌ Missing'
+          hasApiLoginId: !!apiLoginId,
+          apiLoginId: apiLoginId ? '✅ Present' : '❌ Missing'
         });
         
-        if (response.success && response.data) {
-          setAuthorizeApiLoginId(response.data.api_login_id);
+        if (apiLoginId) {
+          setAuthorizeApiLoginId(apiLoginId);
           console.log('✅ Authorize.Net API Login ID set successfully');
         } else {
           console.warn('⚠️ No Authorize.Net credentials found for location:', locationId);
