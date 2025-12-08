@@ -787,11 +787,11 @@ const PurchaseAttraction = () => {
                             autoComplete="off"
                           />
                           {/* Country Suggestions Dropdown */}
-                          {showCountrySuggestions && (countrySearch || !customerInfo.country) && (
+                          {showCountrySuggestions && countrySearch && (
                             <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                               {countries
                                 .filter(country => 
-                                  country.toLowerCase().includes((countrySearch || '').toLowerCase())
+                                  country.toLowerCase().includes(countrySearch.toLowerCase())
                                 )
                                 .slice(0, 10)
                                 .map(country => (
@@ -809,7 +809,7 @@ const PurchaseAttraction = () => {
                                   </button>
                                 ))}
                               {countries.filter(country => 
-                                country.toLowerCase().includes((countrySearch || '').toLowerCase())
+                                country.toLowerCase().includes(countrySearch.toLowerCase())
                               ).length === 0 && (
                                 <div className="px-4 py-2 text-sm text-gray-500">
                                   No countries found

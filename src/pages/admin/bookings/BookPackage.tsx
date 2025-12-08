@@ -5,7 +5,7 @@ import type { BookPackagePackage } from '../../../types/BookPackage.types';
 import bookingService from '../../../services/bookingService';
 import timeSlotService, { type TimeSlot } from '../../../services/timeSlotService';
 import { getImageUrl, formatTimeTo12Hour } from "../../../utils/storage";
-import { loadAcceptJS, processCardPayment, validateCardNumber, formatCardNumber, getCardType } from '../../../services/PaymentService';
+import { loadAcceptJS, processCardPayment, validateCardNumber, formatCardNumber, getCardType, updatePayment } from '../../../services/PaymentService';
 import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
 import customerService from '../../../services/CustomerService';
 import DatePicker from '../../../components/ui/DatePicker';
@@ -95,6 +95,7 @@ const BookPackage: React.FC = () => {
   } | null>(null);
   const [countrySearch, setCountrySearch] = useState('');
   const [showCountrySuggestions, setShowCountrySuggestions] = useState(false);
+  const [customerId, setCustomerId] = useState<number | null>(null);
 
   // Load package from backend
   useEffect(() => {
@@ -136,6 +137,7 @@ const BookPackage: React.FC = () => {
             const response = await customerService.getCustomerById(customer.id);
             if (response.success && response.data) {
               const data = response.data;
+              setCustomerId(customer.id); // Store customer ID
               setForm(prev => ({
                 ...prev,
                 firstName: data.first_name || '',
@@ -562,6 +564,7 @@ const BookPackage: React.FC = () => {
         amount: amountToPay,
         order_id: `PKG-${pkg.id}-${Date.now()}`,
         description: `Package Booking: ${pkg.name}`,
+        customer_id: customerId || undefined,
       };
       
       console.log('🔑 Using Authorize.Net credentials:', {
@@ -611,6 +614,7 @@ const BookPackage: React.FC = () => {
         guest_name: `${form.firstName} ${form.lastName}`,
         guest_email: form.email,
         guest_phone: form.phone,
+        customer_id: customerId || undefined,
         location_id: pkg.location_id || 1,
         package_id: pkg.id,
         room_id: selectedRoomId,
@@ -638,7 +642,8 @@ const BookPackage: React.FC = () => {
       console.log('Guest Information:', {
         name: bookingData.guest_name,
         email: bookingData.guest_email,
-        phone: bookingData.guest_phone
+        phone: bookingData.guest_phone,
+        customer_id: bookingData.customer_id
       });
       console.log('Billing Information:', {
         address: form.address,
@@ -683,6 +688,16 @@ const BookPackage: React.FC = () => {
         const referenceNumber = response.data.reference_number;
         
         console.log('✅ Booking created:', { bookingId, referenceNumber });
+        
+        // Update payment record with booking_id
+        if (paymentResponse.payment?.id) {
+          try {
+            await updatePayment(paymentResponse.payment.id, { booking_id: bookingId });
+            console.log('✅ Payment record updated with booking_id:', bookingId);
+          } catch (paymentUpdateError) {
+            console.error('⚠️ Failed to update payment with booking_id:', paymentUpdateError);
+          }
+        }
         
         // Generate and store QR code
         const qrCodeBase64 = await QRCode.toDataURL(referenceNumber, {
@@ -1341,11 +1356,11 @@ const BookPackage: React.FC = () => {
                         autoComplete="off"
                       />
                       {/* Country Suggestions Dropdown */}
-                      {showCountrySuggestions && (countrySearch || !form.country) && (
+                      {showCountrySuggestions && countrySearch && (
                         <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                           {countries
                             .filter(country => 
-                              country.toLowerCase().includes((countrySearch || '').toLowerCase())
+                              country.toLowerCase().includes(countrySearch.toLowerCase())
                             )
                             .slice(0, 10)
                             .map(country => (
@@ -1363,7 +1378,7 @@ const BookPackage: React.FC = () => {
                               </button>
                             ))}
                           {countries.filter(country => 
-                            country.toLowerCase().includes((countrySearch || '').toLowerCase())
+                            country.toLowerCase().includes(countrySearch.toLowerCase())
                           ).length === 0 && (
                             <div className="px-4 py-2 text-sm text-gray-500">
                               No countries found
