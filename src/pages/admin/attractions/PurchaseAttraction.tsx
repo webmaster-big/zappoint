@@ -59,7 +59,6 @@ const PurchaseAttraction = () => {
   const [paymentError, setPaymentError] = useState('');
   const [authorizeApiLoginId, setAuthorizeApiLoginId] = useState('');
   const [authorizeEnvironment] = useState<'sandbox' | 'production'>('sandbox');
-  const [showNoAuthAccountModal, setShowNoAuthAccountModal] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [qrCodeImage, setQrCodeImage] = useState<string | null>(null);
   const [showQRModal, setShowQRModal] = useState(false);
@@ -155,19 +154,33 @@ const PurchaseAttraction = () => {
       
       try {
         const locationId = attraction.locationId || 1;
+        console.log('🔧 Initializing Authorize.Net for location:', locationId);
+        
         const response = await getAuthorizeNetPublicKey(locationId);
+        console.log('📡 Authorize.Net API Response:', {
+          success: response.success,
+          hasData: !!response.data,
+          apiLoginId: response.data?.api_login_id ? '✅ Present' : '❌ Missing'
+        });
+        
         if (response.success && response.data) {
           setAuthorizeApiLoginId(response.data.api_login_id);
+          console.log('✅ Authorize.Net API Login ID set successfully');
         } else {
-          setShowNoAuthAccountModal(true);
+          console.warn('⚠️ No Authorize.Net credentials found for location:', locationId);
+          console.warn('Response:', response);
         }
+        
         await loadAcceptJS(authorizeEnvironment);
         console.log('✅ Accept.js loaded successfully');
       } catch (error: any) {
-        console.error('❌ Failed to initialize Authorize.Net:', error);
-        if (error.response?.data?.message?.includes('No active Authorize.Net account')) {
-          setShowNoAuthAccountModal(true);
-        }
+        console.error('❌ Failed to initialize Authorize.Net');
+        console.error('Error details:', {
+          message: error.message,
+          response: error.response?.data,
+          status: error.response?.status,
+          fullError: error
+        });
       }
     };
     initializeAuthorizeNet();
@@ -889,42 +902,7 @@ const PurchaseAttraction = () => {
         </div>
       </div>
 
-      {/* No Authorize.Net Account Modal */}
-      {showNoAuthAccountModal && (
-        <div className="fixed inset-0 bg-black/75 flex items-center justify-center p-4 z-[9999] animate-backdrop-fade">
-          <div className="bg-white rounded-xl max-w-md w-full p-6 border-4 border-red-500 shadow-2xl">
-            <div className="flex flex-col items-center text-center">
-              <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mb-4">
-                <svg className="w-12 h-12 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-              </div>
-              
-              <h3 className="text-2xl font-bold text-gray-900 mb-3">Payment System Unavailable</h3>
-              
-              <p className="text-gray-700 mb-6">
-                This location does not have an active Authorize.Net account configured. Card payments cannot be processed at this time.
-              </p>
-              
-              <div className="bg-red-50 border-2 border-red-200 rounded-lg p-4 mb-6 w-full">
-                <p className="text-sm text-red-900 font-medium">
-                  ⚠️ Unable to proceed with payment
-                </p>
-                <p className="text-xs text-red-800 mt-2">
-                  Contact your location manager or system administrator to set up an Authorize.Net merchant account for this location.
-                </p>
-              </div>
-              
-              <button
-                onClick={() => window.history.back()}
-                className="w-full px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold shadow-lg"
-              >
-                Go Back
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+
 
       {/* QR Code Modal */}
       {showQRModal && qrCodeImage && (
