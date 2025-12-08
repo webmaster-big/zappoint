@@ -180,6 +180,7 @@ export interface RegisterFormData {
   confirmPassword: string;
   // Billing Information
   address: string;
+  address2?: string; // Apartment, suite, unit number (optional)
   city: string;
   state: string;
   zip: string;

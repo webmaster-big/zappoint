@@ -4,6 +4,33 @@ import { Eye, EyeOff } from 'lucide-react';
 import type { RegisterFormData } from '../../types/customer';
 import customerService from '../../services/CustomerService';
 
+const countries = [
+  'United States', 'Canada', 'United Kingdom', 'Afghanistan', 'Albania', 'Algeria', 'Andorra', 'Angola',
+  'Argentina', 'Armenia', 'Australia', 'Austria', 'Azerbaijan', 'Bahamas', 'Bahrain', 'Bangladesh',
+  'Barbados', 'Belarus', 'Belgium', 'Belize', 'Benin', 'Bhutan', 'Bolivia', 'Bosnia and Herzegovina',
+  'Botswana', 'Brazil', 'Brunei', 'Bulgaria', 'Burkina Faso', 'Burundi', 'Cambodia', 'Cameroon',
+  'Cape Verde', 'Central African Republic', 'Chad', 'Chile', 'China', 'Colombia', 'Comoros',
+  'Congo', 'Costa Rica', 'Croatia', 'Cuba', 'Cyprus', 'Czech Republic', 'Denmark', 'Djibouti',
+  'Dominica', 'Dominican Republic', 'East Timor', 'Ecuador', 'Egypt', 'El Salvador', 'Equatorial Guinea',
+  'Eritrea', 'Estonia', 'Ethiopia', 'Fiji', 'Finland', 'France', 'Gabon', 'Gambia', 'Georgia',
+  'Germany', 'Ghana', 'Greece', 'Grenada', 'Guatemala', 'Guinea', 'Guinea-Bissau', 'Guyana', 'Haiti',
+  'Honduras', 'Hungary', 'Iceland', 'India', 'Indonesia', 'Iran', 'Iraq', 'Ireland', 'Israel', 'Italy',
+  'Jamaica', 'Japan', 'Jordan', 'Kazakhstan', 'Kenya', 'Kiribati', 'North Korea', 'South Korea', 'Kuwait',
+  'Kyrgyzstan', 'Laos', 'Latvia', 'Lebanon', 'Lesotho', 'Liberia', 'Libya', 'Liechtenstein', 'Lithuania',
+  'Luxembourg', 'Macedonia', 'Madagascar', 'Malawi', 'Malaysia', 'Maldives', 'Mali', 'Malta', 'Marshall Islands',
+  'Mauritania', 'Mauritius', 'Mexico', 'Micronesia', 'Moldova', 'Monaco', 'Mongolia', 'Montenegro', 'Morocco',
+  'Mozambique', 'Myanmar', 'Namibia', 'Nauru', 'Nepal', 'Netherlands', 'New Zealand', 'Nicaragua', 'Niger',
+  'Nigeria', 'Norway', 'Oman', 'Pakistan', 'Palau', 'Panama', 'Papua New Guinea', 'Paraguay', 'Peru',
+  'Philippines', 'Poland', 'Portugal', 'Qatar', 'Romania', 'Russia', 'Rwanda', 'Saint Kitts and Nevis',
+  'Saint Lucia', 'Saint Vincent and the Grenadines', 'Samoa', 'San Marino', 'Sao Tome and Principe',
+  'Saudi Arabia', 'Senegal', 'Serbia', 'Seychelles', 'Sierra Leone', 'Singapore', 'Slovakia', 'Slovenia',
+  'Solomon Islands', 'Somalia', 'South Africa', 'South Sudan', 'Spain', 'Sri Lanka', 'Sudan', 'Suriname',
+  'Swaziland', 'Sweden', 'Switzerland', 'Syria', 'Taiwan', 'Tajikistan', 'Tanzania', 'Thailand', 'Togo',
+  'Tonga', 'Trinidad and Tobago', 'Tunisia', 'Turkey', 'Turkmenistan', 'Tuvalu', 'Uganda', 'Ukraine',
+  'United Arab Emirates', 'Uruguay', 'Uzbekistan', 'Vanuatu', 'Vatican City', 'Venezuela', 'Vietnam',
+  'Yemen', 'Zambia', 'Zimbabwe'
+];
+
 const CustomerRegister = () => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState<RegisterFormData>({
@@ -15,6 +42,7 @@ const CustomerRegister = () => {
     confirmPassword: '',
     // Billing Information
     address: '',
+    address2: '',
     city: '',
     state: '',
     zip: '',
@@ -27,6 +55,9 @@ const CustomerRegister = () => {
   const [error, setError] = useState('');
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
+  const [activeTab, setActiveTab] = useState<'account' | 'billing'>('account');
+  const [countrySearch, setCountrySearch] = useState('');
+  const [showCountrySuggestions, setShowCountrySuggestions] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -38,6 +69,7 @@ const CustomerRegister = () => {
   };
 
   const validateForm = (): boolean => {
+    // Validate required fields only (address2 and company are optional)
     if (!formData.firstName || !formData.lastName || !formData.email || !formData.phone || !formData.password || !formData.confirmPassword || !formData.address || !formData.city || !formData.state || !formData.zip || !formData.country) {
       setError('Please fill in all required fields');
       return false;
@@ -55,7 +87,42 @@ const CustomerRegister = () => {
       setError('Please enter a valid email address');
       return false;
     }
+    if (!formData.agreeToTerms) {
+      setError('Please agree to the Terms of Service and Privacy Policy');
+      return false;
+    }
     return true;
+  };
+
+  // Check if account tab is complete
+  const isAccountTabComplete = (): boolean => {
+    return !!(
+      formData.firstName &&
+      formData.lastName &&
+      formData.email &&
+      formData.phone &&
+      formData.password &&
+      formData.confirmPassword &&
+      formData.password === formData.confirmPassword &&
+      formData.password.length >= 8 &&
+      /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)
+    );
+  };
+
+  // Check if billing tab is complete
+  const isBillingTabComplete = (): boolean => {
+    return !!(
+      formData.address &&
+      formData.city &&
+      formData.state &&
+      formData.zip &&
+      formData.country
+    );
+  };
+
+  // Check if form is ready to submit
+  const isFormValid = (): boolean => {
+    return isAccountTabComplete() && isBillingTabComplete() && formData.agreeToTerms;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -182,6 +249,49 @@ const CustomerRegister = () => {
           )}
 
           <form className="flex flex-col gap-5" onSubmit={handleSubmit}>
+            {/* Tab Navigation */}
+            <div className="flex border-b border-zinc-200">
+              <button
+                type="button"
+                onClick={() => setActiveTab('account')}
+                className={`flex-1 py-3 px-4 text-sm font-medium transition-colors relative ${
+                  activeTab === 'account'
+                    ? 'text-blue-800 border-b-2 border-blue-800'
+                    : 'text-zinc-500 hover:text-zinc-700'
+                }`}
+              >
+                <span className="flex items-center justify-center gap-2">
+                  Account Information
+                  {isAccountTabComplete() && (
+                    <svg className="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                  )}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('billing')}
+                className={`flex-1 py-3 px-4 text-sm font-medium transition-colors relative ${
+                  activeTab === 'billing'
+                    ? 'text-blue-800 border-b-2 border-blue-800'
+                    : 'text-zinc-500 hover:text-zinc-700'
+                }`}
+              >
+                <span className="flex items-center justify-center gap-2">
+                  Billing Information
+                  {isBillingTabComplete() && (
+                    <svg className="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                  )}
+                </span>
+              </button>
+            </div>
+
+            {/* Account Information Tab */}
+            {activeTab === 'account' && (
+              <div className="space-y-5">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-zinc-800 mb-1">First Name</label>
@@ -289,22 +399,56 @@ const CustomerRegister = () => {
               </div>
             </div>
 
-            {/* Billing Information Section */}
-            <div className="pt-4 border-t border-zinc-200">
-              <h3 className="text-base font-semibold text-zinc-900 mb-3">Billing Information</h3>
-              
-              <div className="space-y-4">
+            {/* Next button for Account tab */}
+            {!isAccountTabComplete() && (
+              <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+                Please complete all required fields to continue
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                if (isAccountTabComplete()) {
+                  setActiveTab('billing');
+                  setError('');
+                }
+              }}
+              disabled={!isAccountTabComplete()}
+              className="w-full py-3 font-semibold text-base shadow-sm transition-all bg-blue-800 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-none"
+            >
+              Continue to Billing Information →
+            </button>
+              </div>
+            )}
+
+            {/* Billing Information Tab */}
+            {activeTab === 'billing' && (
+              <div className="space-y-5">
+            <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-zinc-800 mb-1">Street Address</label>
                   <input
                     type="text"
                     name="address"
-                    autoComplete="street-address"
+                    autoComplete="address-line1"
                     required
                     value={formData.address}
                     onChange={handleChange}
                     className="w-full border border-zinc-200 px-3 py-2 text-zinc-900 bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-800 focus:border-blue-800 transition text-base rounded-none"
                     placeholder="123 Main Street"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-zinc-800 mb-1">Apartment, Suite, Unit <span className="text-zinc-400 font-normal">(Optional)</span></label>
+                  <input
+                    type="text"
+                    name="address2"
+                    autoComplete="address-line2"
+                    value={formData.address2}
+                    onChange={handleChange}
+                    className="w-full border border-zinc-200 px-3 py-2 text-zinc-900 bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-800 focus:border-blue-800 transition text-base rounded-none"
+                    placeholder="Apt 4B, Suite 200, etc."
                   />
                 </div>
 
@@ -323,7 +467,7 @@ const CustomerRegister = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-zinc-800 mb-1">State</label>
+                    <label className="block text-sm font-medium text-zinc-800 mb-1">State / Province</label>
                     <input
                       type="text"
                       name="state"
@@ -332,14 +476,14 @@ const CustomerRegister = () => {
                       value={formData.state}
                       onChange={handleChange}
                       className="w-full border border-zinc-200 px-3 py-2 text-zinc-900 bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-800 focus:border-blue-800 transition text-base rounded-none"
-                      placeholder="State"
+                      placeholder="State / Province"
                     />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-zinc-800 mb-1">ZIP Code</label>
+                    <label className="block text-sm font-medium text-zinc-800 mb-1">ZIP / Postal Code</label>
                     <input
                       type="text"
                       name="zip"
@@ -351,28 +495,70 @@ const CustomerRegister = () => {
                       placeholder="12345"
                     />
                   </div>
-                  <div>
+                  <div className="relative">
                     <label className="block text-sm font-medium text-zinc-800 mb-1">Country</label>
                     <input
                       type="text"
                       name="country"
-                      autoComplete="country-name"
-                      required
-                      value={formData.country}
-                      onChange={handleChange}
+                      value={countrySearch || formData.country}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setCountrySearch(value);
+                        setShowCountrySuggestions(true);
+                        // Only update formData if exact match
+                        if (countries.includes(value)) {
+                          setFormData({ ...formData, country: value });
+                        }
+                      }}
+                      onFocus={() => setShowCountrySuggestions(true)}
+                      onBlur={() => setTimeout(() => setShowCountrySuggestions(false), 200)}
+                      placeholder="Start typing country name..."
                       className="w-full border border-zinc-200 px-3 py-2 text-zinc-900 bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-800 focus:border-blue-800 transition text-base rounded-none"
-                      placeholder="United States"
+                      required
+                      autoComplete="off"
                     />
+                    {/* Country Suggestions Dropdown */}
+                    {showCountrySuggestions && (countrySearch || !formData.country) && (
+                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                        {countries
+                          .filter(country => 
+                            country.toLowerCase().includes((countrySearch || '').toLowerCase())
+                          )
+                          .slice(0, 10)
+                          .map(country => (
+                            <button
+                              key={country}
+                              type="button"
+                              className="w-full text-left px-4 py-2 hover:bg-blue-50 transition-colors text-sm"
+                              onClick={() => {
+                                setFormData({ ...formData, country });
+                                setCountrySearch('');
+                                setShowCountrySuggestions(false);
+                              }}
+                            >
+                              {country}
+                            </button>
+                          ))}
+                        {countries.filter(country => 
+                          country.toLowerCase().includes((countrySearch || '').toLowerCase())
+                        ).length === 0 && (
+                          <div className="px-4 py-2 text-sm text-gray-500">
+                            No countries found
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
-            </div>
 
             <div className="flex items-start space-x-3">
               <input
                 id="terms"
                 name="terms"
                 type="checkbox"
+                checked={formData.agreeToTerms}
+                onChange={(e) => setFormData(prev => ({ ...prev, agreeToTerms: e.target.checked }))}
                 required
                 className="h-4 w-4 text-blue-800 focus:ring-blue-800 border-gray-300 rounded mt-1"
               />
@@ -396,20 +582,32 @@ const CustomerRegister = () => {
               </label>
             </div>
 
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="mt-2 w-full py-3 font-semibold text-base shadow-sm transition-all bg-blue-800 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-none"
-            >
-              {isLoading ? (
-                <div className="flex items-center justify-center">
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                  Creating account...
-                </div>
-              ) : (
-                'Create Account'
-              )}
-            </button>
+            {/* Navigation buttons for Billing tab */}
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setActiveTab('account')}
+                className="flex-1 py-3 font-semibold text-base shadow-sm transition-all bg-zinc-200 text-zinc-700 hover:bg-zinc-300 rounded-none"
+              >
+                ← Back to Account
+              </button>
+              <button
+                type="submit"
+                disabled={isLoading || !isFormValid()}
+                className="flex-1 py-3 font-semibold text-base shadow-sm transition-all bg-blue-800 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-none"
+              >
+                {isLoading ? (
+                  <div className="flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                    Creating account...
+                  </div>
+                ) : (
+                  'Create Account'
+                )}
+              </button>
+            </div>
+              </div>
+            )}
           </form>
 
           <div className="mt-8 text-center text-xs text-zinc-400">

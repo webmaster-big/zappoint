@@ -19,6 +19,33 @@ import { ASSET_URL } from '../../../utils/storage';
 import { loadAcceptJS, processCardPayment, validateCardNumber, formatCardNumber, getCardType } from '../../../services/PaymentService';
 import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
 
+const countries = [
+  'United States', 'Canada', 'United Kingdom', 'Afghanistan', 'Albania', 'Algeria', 'Andorra', 'Angola',
+  'Argentina', 'Armenia', 'Australia', 'Austria', 'Azerbaijan', 'Bahamas', 'Bahrain', 'Bangladesh',
+  'Barbados', 'Belarus', 'Belgium', 'Belize', 'Benin', 'Bhutan', 'Bolivia', 'Bosnia and Herzegovina',
+  'Botswana', 'Brazil', 'Brunei', 'Bulgaria', 'Burkina Faso', 'Burundi', 'Cambodia', 'Cameroon',
+  'Cape Verde', 'Central African Republic', 'Chad', 'Chile', 'China', 'Colombia', 'Comoros',
+  'Congo', 'Costa Rica', 'Croatia', 'Cuba', 'Cyprus', 'Czech Republic', 'Denmark', 'Djibouti',
+  'Dominica', 'Dominican Republic', 'East Timor', 'Ecuador', 'Egypt', 'El Salvador', 'Equatorial Guinea',
+  'Eritrea', 'Estonia', 'Ethiopia', 'Fiji', 'Finland', 'France', 'Gabon', 'Gambia', 'Georgia',
+  'Germany', 'Ghana', 'Greece', 'Grenada', 'Guatemala', 'Guinea', 'Guinea-Bissau', 'Guyana', 'Haiti',
+  'Honduras', 'Hungary', 'Iceland', 'India', 'Indonesia', 'Iran', 'Iraq', 'Ireland', 'Israel', 'Italy',
+  'Jamaica', 'Japan', 'Jordan', 'Kazakhstan', 'Kenya', 'Kiribati', 'North Korea', 'South Korea', 'Kuwait',
+  'Kyrgyzstan', 'Laos', 'Latvia', 'Lebanon', 'Lesotho', 'Liberia', 'Libya', 'Liechtenstein', 'Lithuania',
+  'Luxembourg', 'Macedonia', 'Madagascar', 'Malawi', 'Malaysia', 'Maldives', 'Mali', 'Malta', 'Marshall Islands',
+  'Mauritania', 'Mauritius', 'Mexico', 'Micronesia', 'Moldova', 'Monaco', 'Mongolia', 'Montenegro', 'Morocco',
+  'Mozambique', 'Myanmar', 'Namibia', 'Nauru', 'Nepal', 'Netherlands', 'New Zealand', 'Nicaragua', 'Niger',
+  'Nigeria', 'Norway', 'Oman', 'Pakistan', 'Palau', 'Panama', 'Papua New Guinea', 'Paraguay', 'Peru',
+  'Philippines', 'Poland', 'Portugal', 'Qatar', 'Romania', 'Russia', 'Rwanda', 'Saint Kitts and Nevis',
+  'Saint Lucia', 'Saint Vincent and the Grenadines', 'Samoa', 'San Marino', 'Sao Tome and Principe',
+  'Saudi Arabia', 'Senegal', 'Serbia', 'Seychelles', 'Sierra Leone', 'Singapore', 'Slovakia', 'Slovenia',
+  'Solomon Islands', 'Somalia', 'South Africa', 'South Sudan', 'Spain', 'Sri Lanka', 'Sudan', 'Suriname',
+  'Swaziland', 'Sweden', 'Switzerland', 'Syria', 'Taiwan', 'Tajikistan', 'Tanzania', 'Thailand', 'Togo',
+  'Tonga', 'Trinidad and Tobago', 'Tunisia', 'Turkey', 'Turkmenistan', 'Tuvalu', 'Uganda', 'Ukraine',
+  'United Arab Emirates', 'Uruguay', 'Uzbekistan', 'Vanuatu', 'Vatican City', 'Venezuela', 'Vietnam',
+  'Yemen', 'Zambia', 'Zimbabwe'
+];
+
 const PurchaseAttraction = () => {
   const { location, id } = useParams<{ location: string; id: string }>();
   const navigate = useNavigate();
@@ -44,7 +71,14 @@ const PurchaseAttraction = () => {
     firstName: '',
     lastName: '',
     email: '',
-    phone: ''
+    phone: '',
+    // Billing Information
+    address: '',
+    address2: '',
+    city: '',
+    state: '',
+    zip: '',
+    country: 'United States'
   });
   const [currentStep, setCurrentStep] = useState(1);
   const [purchaseComplete, setPurchaseComplete] = useState(false);
@@ -67,6 +101,8 @@ const PurchaseAttraction = () => {
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null);
   const [searchingCustomer, setSearchingCustomer] = useState(false);
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
+  const [countrySearch, setCountrySearch] = useState('');
+  const [showCountrySuggestions, setShowCountrySuggestions] = useState(false);
 
   // Auto-fill form if customer is logged in
   useEffect(() => {
@@ -80,12 +116,13 @@ const PurchaseAttraction = () => {
             const response = await customerService.getCustomerById(customer.id);
             if (response.success && response.data) {
               const data = response.data;
-              setCustomerInfo({
+              setCustomerInfo(prev => ({
+                ...prev,
                 firstName: data.first_name || '',
                 lastName: data.last_name || '',
                 email: data.email || '',
                 phone: data.phone || ''
-              });
+              }));
               setSelectedCustomerId(customer.id);
             }
           }
@@ -330,6 +367,12 @@ const PurchaseAttraction = () => {
         last_name: customerInfo.lastName,
         email: customerInfo.email,
         phone: customerInfo.phone,
+        address: customerInfo.address,
+        address2: customerInfo.address2,
+        city: customerInfo.city,
+        state: customerInfo.state,
+        zip: customerInfo.zip,
+        country: customerInfo.country,
       };
       
       const paymentData = {
@@ -621,6 +664,130 @@ const PurchaseAttraction = () => {
                     </div>
                   </div>
                   
+                  {/* Billing Information Section */}
+                  <div className="mt-6 pt-6 border-t border-gray-200">
+                    <h4 className="text-base font-semibold text-gray-900 mb-4">Billing Information</h4>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-900 mb-2">Street Address <span className="text-red-500">*</span></label>
+                        <input
+                          type="text"
+                          name="address"
+                          value={customerInfo.address}
+                          onChange={handleInputChange}
+                          placeholder="123 Main Street"
+                          className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-900 mb-2">Apartment, Suite, Unit <span className="text-gray-500 text-xs">(Optional)</span></label>
+                        <input
+                          type="text"
+                          name="address2"
+                          value={customerInfo.address2}
+                          onChange={handleInputChange}
+                          placeholder="Apt 4B, Suite 200, etc."
+                          className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition"
+                        />
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-900 mb-2">City <span className="text-red-500">*</span></label>
+                          <input
+                            type="text"
+                            name="city"
+                            value={customerInfo.city}
+                            onChange={handleInputChange}
+                            placeholder="City"
+                            className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-900 mb-2">State / Province <span className="text-red-500">*</span></label>
+                          <input
+                            type="text"
+                            name="state"
+                            value={customerInfo.state}
+                            onChange={handleInputChange}
+                            placeholder="State / Province"
+                            className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition"
+                            required
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-900 mb-2">ZIP / Postal Code <span className="text-red-500">*</span></label>
+                          <input
+                            type="text"
+                            name="zip"
+                            value={customerInfo.zip}
+                            onChange={handleInputChange}
+                            placeholder="12345"
+                            className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition"
+                            required
+                          />
+                        </div>
+                        <div className="relative">
+                          <label className="block text-sm font-medium text-gray-900 mb-2">Country <span className="text-red-500">*</span></label>
+                          <input
+                            type="text"
+                            name="country"
+                            value={countrySearch || customerInfo.country}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              setCountrySearch(value);
+                              setShowCountrySuggestions(true);
+                              // Only update customerInfo if exact match
+                              if (countries.includes(value)) {
+                                setCustomerInfo(prev => ({ ...prev, country: value }));
+                              }
+                            }}
+                            onFocus={() => setShowCountrySuggestions(true)}
+                            onBlur={() => setTimeout(() => setShowCountrySuggestions(false), 200)}
+                            placeholder="Start typing country name..."
+                            className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition"
+                            required
+                            autoComplete="off"
+                          />
+                          {/* Country Suggestions Dropdown */}
+                          {showCountrySuggestions && (countrySearch || !customerInfo.country) && (
+                            <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                              {countries
+                                .filter(country => 
+                                  country.toLowerCase().includes((countrySearch || '').toLowerCase())
+                                )
+                                .slice(0, 10)
+                                .map(country => (
+                                  <button
+                                    key={country}
+                                    type="button"
+                                    className="w-full text-left px-4 py-2 hover:bg-blue-50 transition-colors text-sm"
+                                    onClick={() => {
+                                      setCustomerInfo(prev => ({ ...prev, country }));
+                                      setCountrySearch('');
+                                      setShowCountrySuggestions(false);
+                                    }}
+                                  >
+                                    {country}
+                                  </button>
+                                ))}
+                              {countries.filter(country => 
+                                country.toLowerCase().includes((countrySearch || '').toLowerCase())
+                              ).length === 0 && (
+                                <div className="px-4 py-2 text-sm text-gray-500">
+                                  No countries found
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
                   <div className="flex justify-between gap-2 pt-4">
                     <button
                       onClick={() => setCurrentStep(1)}
@@ -631,7 +798,7 @@ const PurchaseAttraction = () => {
                     </button>
                     <button
                       onClick={() => setCurrentStep(3)}
-                      disabled={!customerInfo.firstName || !customerInfo.lastName || !customerInfo.email}
+                      disabled={!customerInfo.firstName || !customerInfo.lastName || !customerInfo.email || !customerInfo.address || !customerInfo.city || !customerInfo.state || !customerInfo.zip || !customerInfo.country}
                       className="py-2.5 md:py-3 px-6 md:px-8 rounded-lg bg-blue-800 text-white font-medium hover:bg-blue-900 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md text-sm md:text-base"
                     >
                       Continue to Payment →

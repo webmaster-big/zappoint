@@ -10,6 +10,33 @@ import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
 import customerService from '../../../services/CustomerService';
 import DatePicker from '../../../components/ui/DatePicker';
 
+const countries = [
+  'United States', 'Canada', 'United Kingdom', 'Afghanistan', 'Albania', 'Algeria', 'Andorra', 'Angola',
+  'Argentina', 'Armenia', 'Australia', 'Austria', 'Azerbaijan', 'Bahamas', 'Bahrain', 'Bangladesh',
+  'Barbados', 'Belarus', 'Belgium', 'Belize', 'Benin', 'Bhutan', 'Bolivia', 'Bosnia and Herzegovina',
+  'Botswana', 'Brazil', 'Brunei', 'Bulgaria', 'Burkina Faso', 'Burundi', 'Cambodia', 'Cameroon',
+  'Cape Verde', 'Central African Republic', 'Chad', 'Chile', 'China', 'Colombia', 'Comoros',
+  'Congo', 'Costa Rica', 'Croatia', 'Cuba', 'Cyprus', 'Czech Republic', 'Denmark', 'Djibouti',
+  'Dominica', 'Dominican Republic', 'East Timor', 'Ecuador', 'Egypt', 'El Salvador', 'Equatorial Guinea',
+  'Eritrea', 'Estonia', 'Ethiopia', 'Fiji', 'Finland', 'France', 'Gabon', 'Gambia', 'Georgia',
+  'Germany', 'Ghana', 'Greece', 'Grenada', 'Guatemala', 'Guinea', 'Guinea-Bissau', 'Guyana', 'Haiti',
+  'Honduras', 'Hungary', 'Iceland', 'India', 'Indonesia', 'Iran', 'Iraq', 'Ireland', 'Israel', 'Italy',
+  'Jamaica', 'Japan', 'Jordan', 'Kazakhstan', 'Kenya', 'Kiribati', 'North Korea', 'South Korea', 'Kuwait',
+  'Kyrgyzstan', 'Laos', 'Latvia', 'Lebanon', 'Lesotho', 'Liberia', 'Libya', 'Liechtenstein', 'Lithuania',
+  'Luxembourg', 'Macedonia', 'Madagascar', 'Malawi', 'Malaysia', 'Maldives', 'Mali', 'Malta', 'Marshall Islands',
+  'Mauritania', 'Mauritius', 'Mexico', 'Micronesia', 'Moldova', 'Monaco', 'Mongolia', 'Montenegro', 'Morocco',
+  'Mozambique', 'Myanmar', 'Namibia', 'Nauru', 'Nepal', 'Netherlands', 'New Zealand', 'Nicaragua', 'Niger',
+  'Nigeria', 'Norway', 'Oman', 'Pakistan', 'Palau', 'Panama', 'Papua New Guinea', 'Paraguay', 'Peru',
+  'Philippines', 'Poland', 'Portugal', 'Qatar', 'Romania', 'Russia', 'Rwanda', 'Saint Kitts and Nevis',
+  'Saint Lucia', 'Saint Vincent and the Grenadines', 'Samoa', 'San Marino', 'Sao Tome and Principe',
+  'Saudi Arabia', 'Senegal', 'Serbia', 'Seychelles', 'Sierra Leone', 'Singapore', 'Slovakia', 'Slovenia',
+  'Solomon Islands', 'Somalia', 'South Africa', 'South Sudan', 'Spain', 'Sri Lanka', 'Sudan', 'Suriname',
+  'Swaziland', 'Sweden', 'Switzerland', 'Syria', 'Taiwan', 'Tajikistan', 'Tanzania', 'Thailand', 'Togo',
+  'Tonga', 'Trinidad and Tobago', 'Tunisia', 'Turkey', 'Turkmenistan', 'Tuvalu', 'Uganda', 'Ukraine',
+  'United Arab Emirates', 'Uruguay', 'Uzbekistan', 'Vanuatu', 'Vatican City', 'Venezuela', 'Vietnam',
+  'Yemen', 'Zambia', 'Zimbabwe'
+];
+
 const BookPackage: React.FC = () => {
   const { id } = useParams<{ location: string; id: string }>();
   const [pkg, setPkg] = useState<BookPackagePackage | null>(null);
@@ -29,7 +56,14 @@ const BookPackage: React.FC = () => {
     lastName: "",
     email: "",
     phone: "",
-    notes: ""
+    notes: "",
+    // Billing Information
+    address: "",
+    address2: "",
+    city: "",
+    state: "",
+    zip: "",
+    country: "United States"
   });
   const [paymentType, setPaymentType] = useState<'full' | 'partial'>('full');
   const [currentStep, setCurrentStep] = useState(1);
@@ -59,6 +93,8 @@ const BookPackage: React.FC = () => {
     qrCode: string;
     bookingId: number;
   } | null>(null);
+  const [countrySearch, setCountrySearch] = useState('');
+  const [showCountrySuggestions, setShowCountrySuggestions] = useState(false);
 
   // Load package from backend
   useEffect(() => {
@@ -100,13 +136,13 @@ const BookPackage: React.FC = () => {
             const response = await customerService.getCustomerById(customer.id);
             if (response.success && response.data) {
               const data = response.data;
-              setForm({
+              setForm(prev => ({
+                ...prev,
                 firstName: data.first_name || '',
                 lastName: data.last_name || '',
                 email: data.email || '',
-                phone: data.phone || '',
-                notes: ''
-              });
+                phone: data.phone || ''
+              }));
             }
           }
         }
@@ -377,7 +413,13 @@ const BookPackage: React.FC = () => {
       lastName: "",
       email: "",
       phone: "",
-      notes: ""
+      notes: "",
+      address: "",
+      address2: "",
+      city: "",
+      state: "",
+      zip: "",
+      country: "United States"
     });
     setPaymentType('full');
     setCurrentStep(1);
@@ -507,6 +549,12 @@ const BookPackage: React.FC = () => {
         last_name: form.lastName,
         email: form.email,
         phone: form.phone,
+        address: form.address,
+        address2: form.address2,
+        city: form.city,
+        state: form.state,
+        zip: form.zip,
+        country: form.country,
       };
       
       const paymentData = {
@@ -626,82 +674,81 @@ const BookPackage: React.FC = () => {
     }
   };
 
-
   
   // Confirmation Modal Component
   const ConfirmationModal = () => {
     if (!showConfirmation || !confirmationData) return null;
     
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 animate-backdrop-fade">
-        <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-          <div className="p-8">
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto animate-backdrop-fade">
+        <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full my-8 max-h-[calc(100vh-4rem)] overflow-y-auto">
+          <div className="p-4 sm:p-8">
             {/* Success Header */}
-            <div className="text-center mb-6">
-              <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
-                <svg className="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="text-center mb-4 sm:mb-6">
+              <div className="mx-auto w-12 h-12 sm:w-16 sm:h-16 bg-green-100 rounded-full flex items-center justify-center mb-3 sm:mb-4">
+                <svg className="w-7 h-7 sm:w-10 sm:h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
                 </svg>
               </div>
-              <h2 className="text-3xl font-bold text-gray-900 mb-2">Booking Confirmed!</h2>
-              <p className="text-gray-600">Your booking has been successfully created</p>
+              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Booking Confirmed!</h2>
+              <p className="text-sm sm:text-base text-gray-600">Your booking has been successfully created</p>
             </div>
             
             {/* QR Code Display */}
-            <div className="bg-gray-50 rounded-xl p-6 mb-6">
+            <div className="bg-gray-50 rounded-xl p-4 sm:p-6 mb-4 sm:mb-6">
               <div className="flex flex-col items-center">
-                <img src={confirmationData.qrCode} alt="Booking QR Code" className="w-64 h-64 mb-4" />
+                <img src={confirmationData.qrCode} alt="Booking QR Code" className="w-48 h-48 sm:w-64 sm:h-64 mb-3 sm:mb-4" />
                 <div className="text-center">
-                  <p className="text-sm text-gray-600 mb-1">Reference Number</p>
-                  <p className="text-2xl font-bold text-blue-800">{confirmationData.referenceNumber}</p>
+                  <p className="text-xs sm:text-sm text-gray-600 mb-1">Reference Number</p>
+                  <p className="text-xl sm:text-2xl font-bold text-blue-800">{confirmationData.referenceNumber}</p>
                 </div>
               </div>
             </div>
             
             {/* Booking Details */}
-            <div className="bg-blue-50 rounded-xl p-6 mb-6">
-              <h3 className="font-semibold text-lg mb-4 text-gray-800">Booking Details</h3>
-              <div className="space-y-3">
-                <div className="flex justify-between">
+            <div className="bg-blue-50 rounded-xl p-4 sm:p-6 mb-4 sm:mb-6">
+              <h3 className="font-semibold text-base sm:text-lg mb-3 sm:mb-4 text-gray-800">Booking Details</h3>
+              <div className="space-y-2 sm:space-y-3">
+                <div className="flex justify-between text-sm sm:text-base">
                   <span className="text-gray-600">Package:</span>
-                  <span className="font-medium text-gray-900">{pkg?.name}</span>
+                  <span className="font-medium text-gray-900 text-right ml-2">{pkg?.name}</span>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex justify-between text-sm sm:text-base">
                   <span className="text-gray-600">Guest Name:</span>
                   <span className="font-medium text-gray-900">{form.firstName} {form.lastName}</span>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex justify-between text-sm sm:text-base">
                   <span className="text-gray-600">Email:</span>
-                  <span className="font-medium text-gray-900">{form.email}</span>
+                  <span className="font-medium text-gray-900 text-right ml-2 break-all">{form.email}</span>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex justify-between text-sm sm:text-base">
                   <span className="text-gray-600">Phone:</span>
                   <span className="font-medium text-gray-900">{form.phone}</span>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex justify-between text-sm sm:text-base">
                   <span className="text-gray-600">Date:</span>
-                  <span className="font-medium text-gray-900">
+                  <span className="font-medium text-gray-900 text-right ml-2">
                     {new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
                   </span>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex justify-between text-sm sm:text-base">
                   <span className="text-gray-600">Time:</span>
                   <span className="font-medium text-gray-900">{selectedTime}</span>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex justify-between text-sm sm:text-base">
                   <span className="text-gray-600">Participants:</span>
                   <span className="font-medium text-gray-900">{participants}</span>
                 </div>
-                <div className="flex justify-between border-t pt-3 mt-3">
+                <div className="flex justify-between border-t pt-2 sm:pt-3 mt-2 sm:mt-3 text-sm sm:text-base">
                   <span className="text-gray-600 font-semibold">Total Amount:</span>
-                  <span className="font-bold text-blue-800 text-xl">${total.toFixed(2)}</span>
+                  <span className="font-bold text-blue-800 text-lg sm:text-xl">${total.toFixed(2)}</span>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex justify-between text-sm sm:text-base">
                   <span className="text-gray-600">Amount Paid:</span>
                   <span className="font-medium text-green-600">${(paymentType === 'full' ? total : partialAmount).toFixed(2)}</span>
                 </div>
                 {paymentType === 'partial' && (
-                  <div className="flex justify-between">
+                  <div className="flex justify-between text-sm sm:text-base">
                     <span className="text-gray-600">Remaining Balance:</span>
                     <span className="font-medium text-orange-600">${(total - partialAmount).toFixed(2)}</span>
                   </div>
@@ -710,12 +757,12 @@ const BookPackage: React.FC = () => {
             </div>
             
             {/* Information Notice */}
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 sm:p-4 mb-4 sm:mb-6">
               <div className="flex">
-                <svg className="w-5 h-5 text-yellow-600 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <svg className="w-5 h-5 text-yellow-600 mr-2 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd"></path>
                 </svg>
-                <div className="text-sm text-yellow-800">
+                <div className="text-xs sm:text-sm text-yellow-800">
                   <p className="font-semibold mb-1">Important Information</p>
                   <ul className="list-disc list-inside space-y-1">
                     <li>A confirmation email has been sent to {form.email}</li>
@@ -727,21 +774,21 @@ const BookPackage: React.FC = () => {
             </div>
             
             {/* Action Buttons */}
-            <div className="flex flex-col sm:flex-row gap-3">
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
               <button
                 onClick={() => window.print()}
-                className="flex-1 py-3 px-6 rounded-lg border border-blue-800 text-blue-800 font-medium hover:bg-blue-50 transition flex items-center justify-center"
+                className="flex-1 py-2.5 sm:py-3 px-4 sm:px-6 rounded-lg border border-blue-800 text-blue-800 font-medium hover:bg-blue-50 transition flex items-center justify-center text-sm sm:text-base"
               >
-                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 sm:w-5 sm:h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path>
                 </svg>
                 Print Confirmation
               </button>
               <button
                 onClick={resetForm}
-                className="flex-1 py-3 px-6 rounded-lg bg-blue-800 text-white font-medium hover:bg-blue-900 transition flex items-center justify-center"
+                className="flex-1 py-2.5 sm:py-3 px-4 sm:px-6 rounded-lg bg-blue-800 text-white font-medium hover:bg-blue-900 transition flex items-center justify-center text-sm sm:text-base"
               >
-                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 sm:w-5 sm:h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
                 </svg>
                 New Booking
@@ -1165,7 +1212,7 @@ const BookPackage: React.FC = () => {
                   </div>
                   {/* Additional Notes */}
                   <div className="md:col-span-2">
-                    <label className="block font-medium mb-2 text-gray-800 text-sm">Additional Notes</label>
+                    <label className="block font-medium mb-2 text-gray-800 text-sm">Additional Notes <span className="text-gray-400 font-normal">(Optional)</span></label>
                     <textarea
                       placeholder="Any special requests or notes..."
                       className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
@@ -1173,6 +1220,115 @@ const BookPackage: React.FC = () => {
                       onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
                       rows={3}
                     />
+                  </div>
+                </div>
+
+                {/* Billing Information Section */}
+                <div className="mt-6 pt-6 border-t border-gray-200">
+                  <h4 className="text-base font-semibold text-gray-900 mb-4">Billing Information</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div className="md:col-span-2">
+                      <label className="block font-medium mb-2 text-gray-800 text-sm">Street Address</label>
+                      <input 
+                        type="text" 
+                        placeholder="123 Main Street" 
+                        className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600" 
+                        value={form.address} 
+                        onChange={e => setForm(f => ({ ...f, address: e.target.value }))} 
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block font-medium mb-2 text-gray-800 text-sm">Apartment, Suite, Unit <span className="text-gray-400 font-normal">(Optional)</span></label>
+                      <input 
+                        type="text" 
+                        placeholder="Apt 4B, Suite 200, etc." 
+                        className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600" 
+                        value={form.address2} 
+                        onChange={e => setForm(f => ({ ...f, address2: e.target.value }))} 
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-medium mb-2 text-gray-800 text-sm">City</label>
+                      <input 
+                        type="text" 
+                        placeholder="City" 
+                        className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600" 
+                        value={form.city} 
+                        onChange={e => setForm(f => ({ ...f, city: e.target.value }))} 
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-medium mb-2 text-gray-800 text-sm">State / Province</label>
+                      <input 
+                        type="text" 
+                        placeholder="State / Province" 
+                        className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600" 
+                        value={form.state} 
+                        onChange={e => setForm(f => ({ ...f, state: e.target.value }))} 
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-medium mb-2 text-gray-800 text-sm">ZIP / Postal Code</label>
+                      <input 
+                        type="text" 
+                        placeholder="12345" 
+                        className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600" 
+                        value={form.zip} 
+                        onChange={e => setForm(f => ({ ...f, zip: e.target.value }))} 
+                      />
+                    </div>
+                    <div className="relative">
+                      <label className="block font-medium mb-2 text-gray-800 text-sm">Country</label>
+                      <input
+                        type="text"
+                        value={countrySearch || form.country}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setCountrySearch(value);
+                          setShowCountrySuggestions(true);
+                          // Only update form if exact match
+                          if (countries.includes(value)) {
+                            setForm(f => ({ ...f, country: value }));
+                          }
+                        }}
+                        onFocus={() => setShowCountrySuggestions(true)}
+                        onBlur={() => setTimeout(() => setShowCountrySuggestions(false), 200)}
+                        placeholder="Start typing country name..."
+                        className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                        autoComplete="off"
+                      />
+                      {/* Country Suggestions Dropdown */}
+                      {showCountrySuggestions && (countrySearch || !form.country) && (
+                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                          {countries
+                            .filter(country => 
+                              country.toLowerCase().includes((countrySearch || '').toLowerCase())
+                            )
+                            .slice(0, 10)
+                            .map(country => (
+                              <button
+                                key={country}
+                                type="button"
+                                className="w-full text-left px-4 py-2 hover:bg-blue-50 transition-colors text-sm"
+                                onClick={() => {
+                                  setForm(f => ({ ...f, country }));
+                                  setCountrySearch('');
+                                  setShowCountrySuggestions(false);
+                                }}
+                              >
+                                {country}
+                              </button>
+                            ))}
+                          {countries.filter(country => 
+                            country.toLowerCase().includes((countrySearch || '').toLowerCase())
+                          ).length === 0 && (
+                            <div className="px-4 py-2 text-sm text-gray-500">
+                              No countries found
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
                 
@@ -1187,9 +1343,9 @@ const BookPackage: React.FC = () => {
                     <span className="hidden sm:inline">Back</span>
                   </button>
                   <button 
-                    className={`py-2.5 md:py-3 px-4 md:px-6 rounded-lg font-medium transition shadow-sm flex items-center text-sm md:text-base ${(!form.firstName || !form.lastName || !form.email || !form.phone) ? 'bg-gray-300 text-gray-400 cursor-not-allowed' : 'bg-blue-800 text-white hover:bg-blue-800'}`}
+                    className={`py-2.5 md:py-3 px-4 md:px-6 rounded-lg font-medium transition shadow-sm flex items-center text-sm md:text-base ${(!form.firstName || !form.lastName || !form.email || !form.phone || !form.address || !form.city || !form.state || !form.zip || !form.country) ? 'bg-gray-300 text-gray-400 cursor-not-allowed' : 'bg-blue-800 text-white hover:bg-blue-800'}`}
                     onClick={() => setCurrentStep(3)}
-                    disabled={!form.firstName || !form.lastName || !form.email || !form.phone}
+                    disabled={!form.firstName || !form.lastName || !form.email || !form.phone || !form.address || !form.city || !form.state || !form.zip || !form.country}
                   >
                     Continue to Payment
                     <svg className="ml-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">

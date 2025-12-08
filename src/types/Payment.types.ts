@@ -19,6 +19,7 @@ export interface PaymentChargeRequest {
     email?: string;
     phone?: string;
     address?: string;
+    address2?: string; // Apartment, suite, unit number
     city?: string;
     state?: string;
     zip?: string;

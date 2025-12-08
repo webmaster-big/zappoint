@@ -23,4 +23,11 @@ export interface PurchaseAttractionCustomerInfo {
   lastName: string;
   email: string;
   phone: string;
+  // Billing Information
+  address?: string;
+  address2?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
+  country?: string;
 }

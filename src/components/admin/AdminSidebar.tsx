@@ -483,15 +483,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
   const getAllLinks = (nav: NavItem[]): { label: string; href: string; description?: string; fragmentId?: string }[] => {
     const links: { label: string; href: string; description?: string; fragmentId?: string }[] = [];
     nav.forEach(item => {
-      // Add badge for Notifications link
-      if (item.label === 'Notifications' && item.href) {
-        links.push({
-          label: item.label,
-          href: item.href,
-          description: item.description,
-          fragmentId: undefined
-        });
-      } else if (item.href) {
+      if (item.href) {
         links.push({ label: item.label, href: item.href, description: item.description });
       }
       if (item.items) links.push(...getAllLinks(item.items));
@@ -563,22 +555,6 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
         {!isMinimized && (
           <span className="ml-3 text-sm flex-1 relative transition-all duration-300 opacity-100">
             {item.label}
-            {/* Modern notification badge for Notifications link */}
-            {item.label === 'Notifications' && unreadNotifications > 0 && (
-              <span
-                className="absolute -top-2 -right-5 min-w-[22px] h-5 flex items-center justify-center px-1 text-xs font-semibold text-white shadow-md rounded-full border-2 border-white animate-bounce-slow"
-                style={{
-                  backgroundColor: getThemeColorValue(),
-                  boxShadow: '0 2px 8px rgba(30, 64, 175, 0.15)',
-                  letterSpacing: '0.02em',
-                  fontVariantNumeric: 'tabular-nums',
-                  transition: 'background 0.2s',
-                }}
-                aria-label={`${unreadNotifications} unread notifications`}
-              >
-                {unreadNotifications > 99 ? '99+' : unreadNotifications}
-              </span>
-            )}
           </span>
         )}
         {hasItems && !isMinimized && (
@@ -648,14 +624,6 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
             }}
           >
             {item.label}
-            {item.label === 'Notifications' && unreadNotifications > 0 && (
-              <span 
-                className="ml-2 px-2 py-0.5 rounded-full text-xs"
-                style={{ backgroundColor: getThemeColorValue() }}
-              >
-                {unreadNotifications}
-              </span>
-            )}
             <div className="absolute left-0 top-1/2 -translate-x-1 -translate-y-1/2 w-2 h-2 bg-gray-900 rotate-45"></div>
           </div>
         )}
@@ -872,43 +840,69 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
             </button>
           </div>
 
-          {/* Search */}
+          {/* Search and Notifications */}
           {!isMinimized && (
             <div className="p-4" ref={searchRef}>
-              <div className="relative">
-                <Search size={18} className="absolute left-3 top-2.5 text-gray-800" />
-                <input
-                  type="text"
-                  placeholder="Search..."
-                  className={`w-full pl-10 pr-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-${fullColor} focus:border-${fullColor}`}
-                  value={searchValue}
-                  onChange={handleSearchChange}
-                  onFocus={() => searchValue.trim() && setShowSuggestions(true)}
-                  autoComplete="off"
-                />
-                {/* Custom search suggestions dropdown */}
-                {showSuggestions && searchSuggestions.length > 0 && (
-                  <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded shadow-lg z-50 max-h-60 overflow-y-auto">
-                    {searchSuggestions.map(suggestion => (
-                      <button
-                        key={suggestion.href}
-                        className={`w-full text-left px-4 py-2 text-sm hover:bg-${themeColor}-50 transition-colors`}
-                        onClick={() => {
-                          navigate(suggestion.href);
-                          setSearchValue('');
-                          setSearchSuggestions([]);
-                          setShowSuggestions(false);
-                          setIsOpen(false);
-                        }}
-                      >
-                        <div className="font-medium text-gray-900 transition-colors duration-200">{suggestion.label}</div>
-                        {suggestion.description && (
-                          <div className="text-xs text-gray-500 mt-1 transition-colors duration-200">{suggestion.description}</div>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                )}
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <Search size={18} className="absolute left-3 top-2.5 text-gray-800" />
+                  <input
+                    type="text"
+                    placeholder="Search..."
+                    className={`w-full pl-10 pr-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-${fullColor} focus:border-${fullColor}`}
+                    value={searchValue}
+                    onChange={handleSearchChange}
+                    onFocus={() => searchValue.trim() && setShowSuggestions(true)}
+                    autoComplete="off"
+                  />
+                  {/* Custom search suggestions dropdown */}
+                  {showSuggestions && searchSuggestions.length > 0 && (
+                    <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded shadow-lg z-50 max-h-60 overflow-y-auto">
+                      {searchSuggestions.map(suggestion => (
+                        <button
+                          key={suggestion.href}
+                          className={`w-full text-left px-4 py-2 text-sm hover:bg-${themeColor}-50 transition-colors`}
+                          onClick={() => {
+                            navigate(suggestion.href);
+                            setSearchValue('');
+                            setSearchSuggestions([]);
+                            setShowSuggestions(false);
+                            setIsOpen(false);
+                          }}
+                        >
+                          <div className="font-medium text-gray-900 transition-colors duration-200">{suggestion.label}</div>
+                          {suggestion.description && (
+                            <div className="text-xs text-gray-500 mt-1 transition-colors duration-200">{suggestion.description}</div>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                
+                {/* Notification Icon with Badge */}
+                <Link
+                  to="/notifications"
+                  className={`relative p-2 rounded-md hover:bg-${themeColor}-50 transition-colors flex-shrink-0`}
+                  onClick={() => {
+                    if (window.innerWidth < 1024) {
+                      setIsOpen(false);
+                    }
+                  }}
+                >
+                  <Bell size={20} className="text-gray-700" />
+                  {unreadNotifications > 0 && (
+                    <span
+                      className="absolute -top-1 -right-1 min-w-[18px] h-[18px] flex items-center justify-center px-1 text-xs font-bold text-white rounded-full border-2 border-white"
+                      style={{
+                        backgroundColor: getThemeColorValue(),
+                        fontSize: '10px'
+                      }}
+                    >
+                      {unreadNotifications > 99 ? '99+' : unreadNotifications}
+                    </span>
+                  )}
+                </Link>
               </div>
             </div>
           )}
