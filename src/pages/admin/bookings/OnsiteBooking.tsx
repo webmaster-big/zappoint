@@ -223,9 +223,9 @@ const OnsiteBooking: React.FC = () => {
         const user = JSON.parse(localStorage.getItem('zapzone_user') || '{}');
         const locationId = user.location_id || 1;
         const settings = await getAuthorizeNetPublicKey(locationId);
-        if (settings && settings.data) {
-          setAuthorizeApiLoginId(settings.data.api_login_id);
-          setAuthorizeEnvironment(settings.data.environment);
+        if (settings && settings.api_login_id) {
+          setAuthorizeApiLoginId(settings.api_login_id);
+          setAuthorizeEnvironment(settings.environment);
         } else {
           setShowNoAuthAccountModal(true);
         }

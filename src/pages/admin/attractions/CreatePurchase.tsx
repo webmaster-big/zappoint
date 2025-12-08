@@ -184,8 +184,8 @@ const CreatePurchase = () => {
       try {
         const locationId = selectedAttraction?.locationId || 1;
         const response = await getAuthorizeNetPublicKey(locationId);
-        if (response.success && response.data) {
-          setAuthorizeApiLoginId(response.data.api_login_id);
+        if (response && response.api_login_id) {
+          setAuthorizeApiLoginId(response.api_login_id);
           setShowNoAuthAccountModal(false);
         } else {
           setShowNoAuthAccountModal(true);

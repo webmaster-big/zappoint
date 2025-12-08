@@ -28,6 +28,7 @@ export interface SettingsAuthorizeNetStatus {
 export interface SettingsConnectAuthorizeNetData {
   api_login_id: string;
   transaction_key: string;
+  public_client_key: string; // Public Client Key for Accept.js
   environment: 'sandbox' | 'production';
   location_id?: number; // For company_admin to connect for specific location
 }
@@ -58,6 +59,13 @@ export interface SettingsApiResponse<T = any> {
   success: boolean;
   message: string;
   data: T;
+}
+
+// Public key response from getPublicKey endpoint
+export interface SettingsAuthorizeNetPublicKey {
+  api_login_id: string;
+  client_key: string; // Public Client Key for Accept.js authentication
+  environment: 'sandbox' | 'production';
 }
 
 export interface SettingsColorOption {

@@ -104,8 +104,10 @@ const Settings = () => {
   const [authorizeAccount, setAuthorizeAccount] = useState<SettingsAuthorizeNetAccount | null>(null);
   const [authorizeApiLoginId, setAuthorizeApiLoginId] = useState('');
   const [authorizeTransactionKey, setAuthorizeTransactionKey] = useState('');
+  const [authorizePublicClientKey, setAuthorizePublicClientKey] = useState('');
   const [authorizeEnvironment, setAuthorizeEnvironment] = useState<'sandbox' | 'production'>('sandbox');
   const [showTransactionKey, setShowTransactionKey] = useState(false);
+  const [showPublicClientKey, setShowPublicClientKey] = useState(false);
   const [loadingAuthorize, setLoadingAuthorize] = useState(false);
   const [loadingAuthorizeAccount, setLoadingAuthorizeAccount] = useState(true);
   
@@ -358,6 +360,7 @@ const Settings = () => {
       const response = await connectAuthorizeNetAccount({
         api_login_id: authorizeApiLoginId,
         transaction_key: authorizeTransactionKey,
+        public_client_key: authorizePublicClientKey,
         environment: authorizeEnvironment,
         ...(userRole === 'company_admin' && selectedLocationId && { location_id: selectedLocationId }),
       });
@@ -371,6 +374,7 @@ const Settings = () => {
         // Reset form fields
         setAuthorizeApiLoginId('');
         setAuthorizeTransactionKey('');
+        setAuthorizePublicClientKey('');
         setSelectedLocationId(null);
         setLoadingAuthorize(false);
         
@@ -1016,8 +1020,10 @@ const Settings = () => {
                   setShowAuthorizeModal(false);
                   setAuthorizeApiLoginId('');
                   setAuthorizeTransactionKey('');
+                  setAuthorizePublicClientKey('');
                   setSelectedLocationId(null);
                   setShowTransactionKey(false);
+                  setShowPublicClientKey(false);
                 }}
                 className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 transition-colors"
               >
@@ -1092,6 +1098,32 @@ const Settings = () => {
 
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                    Public Client Key
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showPublicClientKey ? 'text' : 'password'}
+                      value={authorizePublicClientKey}
+                      onChange={(e) => setAuthorizePublicClientKey(e.target.value)}
+                      className={`w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 pr-10`}
+                      placeholder="Enter Public Client Key"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPublicClientKey(!showPublicClientKey)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      {showPublicClientKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Required for Accept.js payment processing
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1.5">
                     Environment
                   </label>
                   <div className="grid grid-cols-2 gap-2">
@@ -1139,8 +1171,10 @@ const Settings = () => {
                       setShowAuthorizeModal(false);
                       setAuthorizeApiLoginId('');
                       setAuthorizeTransactionKey('');
+                      setAuthorizePublicClientKey('');
                       setSelectedLocationId(null);
                       setShowTransactionKey(false);
+                      setShowPublicClientKey(false);
                     }}
                     className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition-colors"
                     disabled={loadingAuthorize}

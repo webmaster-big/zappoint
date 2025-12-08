@@ -42,7 +42,8 @@ const BookPackage: React.FC = () => {
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [paymentError, setPaymentError] = useState("");
   const [authorizeApiLoginId, setAuthorizeApiLoginId] = useState("");
-  const [authorizeEnvironment] = useState<'sandbox' | 'production'>('sandbox');
+  const [authorizeClientKey, setAuthorizeClientKey] = useState("");
+  const [authorizeEnvironment, setAuthorizeEnvironment] = useState<'sandbox' | 'production'>('sandbox');
   
   // Date and time selection
   const [selectedDate, setSelectedDate] = useState<string>("");
@@ -128,19 +129,25 @@ const BookPackage: React.FC = () => {
         const response = await getAuthorizeNetPublicKey(locationId);
         console.log('📡 Authorize.Net API Response:', response);
         
-        // Check if response has the api_login_id directly or nested in data
-        const apiLoginId = response.data?.api_login_id || (response as any).api_login_id;
+        // API returns data directly: { api_login_id, client_key, environment }
+        const apiLoginId = response.api_login_id;
+        const clientKey = response.client_key;
+        const environment = response.environment || 'sandbox';
         
         console.log('📡 Authorize.Net parsed data:', {
-          success: response.success,
-          hasData: !!response.data,
-          hasApiLoginId: !!apiLoginId,
-          apiLoginId: apiLoginId ? '✅ Present' : '❌ Missing'
+          apiLoginId: apiLoginId ? '✅ Present' : '❌ Missing',
+          clientKey: clientKey ? '✅ Present' : '⚠️ Missing (will use API Login ID)',
+          environment: environment
         });
         
         if (apiLoginId) {
           setAuthorizeApiLoginId(apiLoginId);
-          console.log('✅ Authorize.Net API Login ID set successfully');
+          setAuthorizeClientKey(clientKey || apiLoginId); // Fallback to apiLoginId if no clientKey
+          setAuthorizeEnvironment(environment as 'sandbox' | 'production');
+          console.log('✅ Authorize.Net credentials set:', {
+            usingClientKey: !!clientKey,
+            environment: environment
+          });
         } else {
           console.warn('⚠️ No Authorize.Net credentials found for location:', locationId);
           console.warn('Full response:', response);
@@ -501,10 +508,17 @@ const BookPackage: React.FC = () => {
         description: `Package Booking: ${pkg.name}`,
       };
       
+      console.log('🔑 Using Authorize.Net credentials:', {
+        apiLoginId: authorizeApiLoginId ? '✅ Set' : '❌ Missing',
+        clientKey: authorizeClientKey ? '✅ Set' : '❌ Missing',
+        environment: authorizeEnvironment
+      });
+      
       const paymentResponse = await processCardPayment(
         cardData,
         paymentData,
-        authorizeApiLoginId
+        authorizeApiLoginId,
+        authorizeClientKey // Pass the client key
       );
       
       if (!paymentResponse.success) {
