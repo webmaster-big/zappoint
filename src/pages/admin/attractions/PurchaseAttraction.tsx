@@ -769,19 +769,15 @@ const PurchaseAttraction = () => {
                           <input
                             type="text"
                             name="country"
-                            value={countrySearch || customerInfo.country}
+                            value={countrySearch}
                             onChange={(e) => {
                               const value = e.target.value;
                               setCountrySearch(value);
                               setShowCountrySuggestions(true);
-                              // Only update customerInfo if exact match
-                              if (countries.includes(value)) {
-                                setCustomerInfo(prev => ({ ...prev, country: value }));
-                              }
                             }}
                             onFocus={() => setShowCountrySuggestions(true)}
                             onBlur={() => setTimeout(() => setShowCountrySuggestions(false), 200)}
-                            placeholder="Start typing country name..."
+                            placeholder={customerInfo.country || "Start typing country name..."}
                             className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition"
                             required
                             autoComplete="off"

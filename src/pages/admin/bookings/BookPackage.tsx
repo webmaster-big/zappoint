@@ -1339,19 +1339,15 @@ const BookPackage: React.FC = () => {
                       <label className="block font-medium mb-2 text-gray-800 text-sm">Country</label>
                       <input
                         type="text"
-                        value={countrySearch || form.country}
+                        value={countrySearch}
                         onChange={(e) => {
                           const value = e.target.value;
                           setCountrySearch(value);
                           setShowCountrySuggestions(true);
-                          // Only update form if exact match
-                          if (countries.includes(value)) {
-                            setForm(f => ({ ...f, country: value }));
-                          }
                         }}
                         onFocus={() => setShowCountrySuggestions(true)}
                         onBlur={() => setTimeout(() => setShowCountrySuggestions(false), 200)}
-                        placeholder="Start typing country name..."
+                        placeholder={form.country || "Start typing country name..."}
                         className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
                         autoComplete="off"
                       />

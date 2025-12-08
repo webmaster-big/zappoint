@@ -500,19 +500,15 @@ const CustomerRegister = () => {
                     <input
                       type="text"
                       name="country"
-                      value={countrySearch || formData.country}
+                      value={countrySearch}
                       onChange={(e) => {
                         const value = e.target.value;
                         setCountrySearch(value);
                         setShowCountrySuggestions(true);
-                        // Only update formData if exact match
-                        if (countries.includes(value)) {
-                          setFormData({ ...formData, country: value });
-                        }
                       }}
                       onFocus={() => setShowCountrySuggestions(true)}
                       onBlur={() => setTimeout(() => setShowCountrySuggestions(false), 200)}
-                      placeholder="Start typing country name..."
+                      placeholder={formData.country || "Start typing country name..."}
                       className="w-full border border-zinc-200 px-3 py-2 text-zinc-900 bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-800 focus:border-blue-800 transition text-base rounded-none"
                       required
                       autoComplete="off"
