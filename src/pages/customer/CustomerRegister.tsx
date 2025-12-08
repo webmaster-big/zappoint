@@ -148,12 +148,20 @@ const CustomerRegister = () => {
       });
 
       if (response.success && response.data) {
-        // Store customer data in localStorage
+        // Store complete customer data including billing information in localStorage
         const customerData = {
           id: response.data.id,
-          name: `${response.data.first_name} ${response.data.last_name}`,
-          email: response.data.email,
-          phone: response.data.phone,
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          name: `${formData.firstName} ${formData.lastName}`,
+          email: formData.email,
+          phone: formData.phone,
+          address: formData.address,
+          address2: formData.address2,
+          city: formData.city,
+          state: formData.state,
+          zip: formData.zip,
+          country: formData.country,
           createdAt: new Date().toISOString(),
         };
         localStorage.setItem('zapzone_customer', JSON.stringify(customerData));

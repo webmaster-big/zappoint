@@ -111,25 +111,65 @@ const PurchaseAttraction = () => {
       try {
         const customerData = localStorage.getItem('zapzone_customer');
         if (customerData) {
-          const customer = JSON.parse(customerData);
+          const customer: any = JSON.parse(customerData);
           if (customer.id) {
             // Fetch fresh customer data from API
             const response = await customerService.getCustomerById(customer.id);
             if (response.success && response.data) {
-              const data = response.data;
+              const data: any = response.data;
               setCustomerInfo(prev => ({
                 ...prev,
-                firstName: data.first_name || '',
-                lastName: data.last_name || '',
-                email: data.email || '',
-                phone: data.phone || ''
+                firstName: data.first_name || customer.firstName || '',
+                lastName: data.last_name || customer.lastName || '',
+                email: data.email || customer.email || '',
+                phone: data.phone || customer.phone || '',
+                address: data.address || customer.address || '',
+                address2: data.address2 || customer.address2 || '',
+                city: data.city || customer.city || '',
+                state: data.state || customer.state || '',
+                zip: data.zip || customer.zip || '',
+                country: data.country || customer.country || 'United States'
               }));
               setSelectedCustomerId(customer.id);
+              console.log('✅ Customer billing information auto-filled from localStorage');
             }
+          } else {
+            // If no ID but customer data exists in localStorage, use it directly
+            setCustomerInfo({
+              firstName: customer.firstName || '',
+              lastName: customer.lastName || '',
+              email: customer.email || '',
+              phone: customer.phone || '',
+              address: customer.address || '',
+              address2: customer.address2 || '',
+              city: customer.city || '',
+              state: customer.state || '',
+              zip: customer.zip || '',
+              country: customer.country || 'United States'
+            });
+            console.log('✅ Customer information auto-filled from localStorage (no API call)');
           }
         }
       } catch (error) {
         console.error('Error fetching customer data:', error);
+        // Fallback to localStorage data if API fails
+        const customerData = localStorage.getItem('zapzone_customer');
+        if (customerData) {
+          const customer: any = JSON.parse(customerData);
+          setCustomerInfo({
+            firstName: customer.firstName || '',
+            lastName: customer.lastName || '',
+            email: customer.email || '',
+            phone: customer.phone || '',
+            address: customer.address || '',
+            address2: customer.address2 || '',
+            city: customer.city || '',
+            state: customer.state || '',
+            zip: customer.zip || '',
+            country: customer.country || 'United States'
+          });
+          console.log('✅ Customer information auto-filled from localStorage (fallback)');
+        }
       }
     };
     
@@ -516,6 +556,37 @@ const PurchaseAttraction = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8">
+        {/* Customer Account Suggestion Banner */}
+        {!selectedCustomerId && currentStep < 4 && (
+          <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4 shadow-sm">
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0">
+                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-sm font-semibold text-blue-900 mb-1">Have an account?</h3>
+                <p className="text-xs text-blue-800 mb-3">Sign in to your customer account for faster checkout and to track your purchases.</p>
+                <div className="flex gap-2">
+                  <a
+                    href="/customer/login"
+                    className="inline-flex items-center px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-md hover:bg-blue-700 transition"
+                  >
+                    Sign In
+                  </a>
+                  <a
+                    href="/customer/register"
+                    className="inline-flex items-center px-3 py-1.5 bg-white text-blue-600 text-xs font-medium rounded-md border border-blue-600 hover:bg-blue-50 transition"
+                  >
+                    Create Account
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
           {/* Left Column - Purchase Form */}
           <div className="lg:col-span-2">
@@ -1038,31 +1109,101 @@ const PurchaseAttraction = () => {
 
               {/* Step 4: Confirmation */}
               {currentStep === 4 && purchaseComplete && (
-                <div className="p-4 md:p-6 text-center">
-                  <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
-                  <h2 className="text-2xl font-bold text-gray-900 mb-2">Purchase Confirmed!</h2>
-                  <p className="text-gray-800 mb-6">
-                    Your tickets for {attraction.name} have been confirmed. A confirmation email has been sent to {customerInfo.email}.
-                  </p>
-                  
-                  <div className="bg-gray-50 rounded-lg p-4 mb-6 text-left">
-                    <h3 className="font-semibold text-gray-900 mb-2">Purchase Details</h3>
-                    <p><strong>Attraction:</strong> {attraction.name}</p>
-                    <p><strong>Quantity:</strong> {quantity}</p>
-                    <p><strong>Payment Method:</strong> Credit/Debit Card</p>
-                    <p><strong>Total:</strong> ${calculateTotal().toFixed(2)}</p>
+                <div className="p-4 md:p-6">
+                  <div className="text-center mb-6">
+                    <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
+                    <h2 className="text-2xl font-bold text-gray-900 mb-2">Purchase Confirmed!</h2>
+                    <p className="text-gray-600 mb-2">
+                      Your tickets for <span className="font-semibold text-gray-900">{attraction.name}</span> have been confirmed.
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      A confirmation email has been sent to <span className="font-medium text-gray-700">{customerInfo.email}</span>
+                    </p>
                   </div>
                   
-                  <div className="flex justify-center space-x-4">
+                  {/* Customer Information */}
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                    <h3 className="font-semibold text-blue-900 mb-3 flex items-center">
+                      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                      </svg>
+                      Customer Information
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                      <p><span className="text-gray-600">Name:</span> <span className="font-medium text-gray-900">{customerInfo.firstName} {customerInfo.lastName}</span></p>
+                      <p><span className="text-gray-600">Email:</span> <span className="font-medium text-gray-900">{customerInfo.email}</span></p>
+                      {customerInfo.phone && (
+                        <p><span className="text-gray-600">Phone:</span> <span className="font-medium text-gray-900">{customerInfo.phone}</span></p>
+                      )}
+                      {selectedCustomerId && (
+                        <p><span className="text-gray-600">Customer ID:</span> <span className="font-medium text-gray-900">#{selectedCustomerId}</span></p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Purchase Details */}
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
+                    <h3 className="font-semibold text-gray-900 mb-3 flex items-center">
+                      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                      </svg>
+                      Purchase Details
+                    </h3>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Attraction:</span>
+                        <span className="font-medium text-gray-900">{attraction.name}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Location:</span>
+                        <span className="font-medium text-gray-900">{attraction.location}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Quantity:</span>
+                        <span className="font-medium text-gray-900">{quantity} {quantity === 1 ? 'ticket' : 'tickets'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Purchase Date:</span>
+                        <span className="font-medium text-gray-900">{new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Payment Method:</span>
+                        <span className="font-medium text-gray-900">Credit/Debit Card</span>
+                      </div>
+                      <div className="border-t border-gray-300 pt-2 mt-2 flex justify-between">
+                        <span className="text-gray-900 font-semibold">Total Paid:</span>
+                        <span className="text-lg font-bold text-green-600">${calculateTotal().toFixed(2)}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Billing Address */}
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
+                    <h3 className="font-semibold text-gray-900 mb-3 flex items-center">
+                      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                      </svg>
+                      Billing Address
+                    </h3>
+                    <div className="text-sm text-gray-700">
+                      <p className="font-medium">{customerInfo.address}</p>
+                      {customerInfo.address2 && <p>{customerInfo.address2}</p>}
+                      <p>{customerInfo.city}, {customerInfo.state} {customerInfo.zip}</p>
+                      <p>{customerInfo.country}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex flex-col sm:flex-row justify-center gap-3">
                     <button
                       onClick={() => navigate('/')}
-                      className="bg-gray-200 text-gray-800 px-6 py-2 rounded-lg hover:bg-gray-300"
+                      className="px-6 py-2.5 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition font-medium"
                     >
-                      Home
+                      Back to Home
                     </button>
                     <button
                       onClick={() => navigate('/my-purchases')}
-                      className="bg-blue-800 text-white px-6 py-2 rounded-lg hover:bg-blue-800"
+                      className="px-6 py-2.5 bg-blue-800 text-white rounded-lg hover:bg-blue-900 transition font-medium"
                     >
                       View My Purchases
                     </button>

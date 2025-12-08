@@ -132,25 +132,67 @@ const BookPackage: React.FC = () => {
       try {
         const customerData = localStorage.getItem('zapzone_customer');
         if (customerData) {
-          const customer = JSON.parse(customerData);
+          const customer: any = JSON.parse(customerData);
           if (customer.id) {
             // Fetch fresh customer data from API
             const response = await customerService.getCustomerById(customer.id);
             if (response.success && response.data) {
-              const data = response.data;
+              const data: any = response.data;
               setCustomerId(customer.id); // Store customer ID
               setForm(prev => ({
                 ...prev,
-                firstName: data.first_name || '',
-                lastName: data.last_name || '',
-                email: data.email || '',
-                phone: data.phone || ''
+                firstName: data.first_name || customer.firstName || '',
+                lastName: data.last_name || customer.lastName || '',
+                email: data.email || customer.email || '',
+                phone: data.phone || customer.phone || '',
+                address: data.address || customer.address || '',
+                address2: data.address2 || customer.address2 || '',
+                city: data.city || customer.city || '',
+                state: data.state || customer.state || '',
+                zip: data.zip || customer.zip || '',
+                country: data.country || customer.country || 'United States'
               }));
+              console.log('✅ Customer billing information auto-filled from localStorage');
             }
+          } else {
+            // If no ID but customer data exists in localStorage, use it directly
+            setForm(prev => ({
+              ...prev,
+              firstName: customer.firstName || '',
+              lastName: customer.lastName || '',
+              email: customer.email || '',
+              phone: customer.phone || '',
+              address: customer.address || '',
+              address2: customer.address2 || '',
+              city: customer.city || '',
+              state: customer.state || '',
+              zip: customer.zip || '',
+              country: customer.country || 'United States'
+            }));
+            console.log('✅ Customer information auto-filled from localStorage (no API call)');
           }
         }
       } catch (error) {
         console.error('Error fetching customer data:', error);
+        // Fallback to localStorage data if API fails
+        const customerData = localStorage.getItem('zapzone_customer');
+        if (customerData) {
+          const customer: any = JSON.parse(customerData);
+          setForm(prev => ({
+            ...prev,
+            firstName: customer.firstName || '',
+            lastName: customer.lastName || '',
+            email: customer.email || '',
+            phone: customer.phone || '',
+            address: customer.address || '',
+            address2: customer.address2 || '',
+            city: customer.city || '',
+            state: customer.state || '',
+            zip: customer.zip || '',
+            country: customer.country || 'United States'
+          }));
+          console.log('✅ Customer information auto-filled from localStorage (fallback)');
+        }
       }
     };
     
@@ -832,20 +874,11 @@ const BookPackage: React.FC = () => {
               </div>
             </div>
             
-            {/* Action Buttons */}
-            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
-              <button
-                onClick={() => window.print()}
-                className="flex-1 py-2.5 sm:py-3 px-4 sm:px-6 rounded-lg border border-blue-800 text-blue-800 font-medium hover:bg-blue-50 transition flex items-center justify-center text-sm sm:text-base"
-              >
-                <svg className="w-4 h-4 sm:w-5 sm:h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path>
-                </svg>
-                Print Confirmation
-              </button>
+            {/* Action Button */}
+            <div className="flex justify-center">
               <button
                 onClick={resetForm}
-                className="flex-1 py-2.5 sm:py-3 px-4 sm:px-6 rounded-lg bg-blue-800 text-white font-medium hover:bg-blue-900 transition flex items-center justify-center text-sm sm:text-base"
+                className="py-2.5 sm:py-3 px-6 sm:px-8 rounded-lg bg-blue-800 text-white font-medium hover:bg-blue-900 transition flex items-center justify-center text-sm sm:text-base shadow-md hover:shadow-lg"
               >
                 <svg className="w-4 h-4 sm:w-5 sm:h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>

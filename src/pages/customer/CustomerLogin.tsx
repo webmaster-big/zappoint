@@ -80,12 +80,20 @@ const CustomerLogin = () => {
       await animateProgress(65, 600);
       if (response.token && response.user) {
         await animateProgress(85, 600);
-        // Store user data and token in localStorage
+        // Store complete user data and token in localStorage
         const customerData = {
           id: response.user.id,
+          firstName: response.user.first_name || '',
+          lastName: response.user.last_name || '',
           name: response.user.name || `${response.user.first_name || ''} ${response.user.last_name || ''}`.trim(),
           email: response.user.email,
           phone: response.user.phone,
+          address: response.user.address || '',
+          address2: response.user.address2 || '',
+          city: response.user.city || '',
+          state: response.user.state || '',
+          zip: response.user.zip || '',
+          country: response.user.country || 'United States',
           token: response.token,
           role: response.role,
         };
