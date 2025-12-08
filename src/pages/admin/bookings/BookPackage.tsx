@@ -501,6 +501,14 @@ const BookPackage: React.FC = () => {
         cardCode: cardCVV,
       };
       
+      // Customer billing data for Authorize.Net
+      const customerData = {
+        first_name: form.firstName,
+        last_name: form.lastName,
+        email: form.email,
+        phone: form.phone,
+      };
+      
       const paymentData = {
         location_id: pkg.location_id || 1,
         amount: amountToPay,
@@ -518,7 +526,8 @@ const BookPackage: React.FC = () => {
         cardData,
         paymentData,
         authorizeApiLoginId,
-        authorizeClientKey // Pass the client key
+        authorizeClientKey, // Pass the client key
+        customerData // Pass customer billing data
       );
       
       if (!paymentResponse.success) {

@@ -324,6 +324,14 @@ const PurchaseAttraction = () => {
         cardCode: cardCVV,
       };
       
+      // Customer billing data for Authorize.Net
+      const customerData = {
+        first_name: customerInfo.firstName,
+        last_name: customerInfo.lastName,
+        email: customerInfo.email,
+        phone: customerInfo.phone,
+      };
+      
       const paymentData = {
         location_id: attraction.locationId || 1, // Use attraction's location_id or default to 1
         amount: totalAmount,
@@ -341,7 +349,8 @@ const PurchaseAttraction = () => {
         cardData,
         paymentData,
         authorizeApiLoginId,
-        authorizeClientKey // Pass the client key
+        authorizeClientKey, // Pass the client key
+        customerData // Pass customer billing data
       );
       
       if (!paymentResponse.success) {

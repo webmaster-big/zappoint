@@ -217,6 +217,7 @@ export const tokenizeCard = (
  * @param paymentData - Payment details (amount, booking_id, etc.)
  * @param apiLoginID - Authorize.Net API Login ID
  * @param clientKey - Public client key (optional)
+ * @param customerData - Customer billing information (optional)
  * @returns Payment charge response
  */
 export const processCardPayment = async (
@@ -228,7 +229,18 @@ export const processCardPayment = async (
   },
   paymentData: Omit<PaymentChargeRequest, 'opaqueData'>,
   apiLoginID: string,
-  clientKey?: string
+  clientKey?: string,
+  customerData?: {
+    first_name?: string;
+    last_name?: string;
+    email?: string;
+    phone?: string;
+    address?: string;
+    city?: string;
+    state?: string;
+    zip?: string;
+    country?: string;
+  }
 ): Promise<PaymentChargeResponse> => {
   try {
     // Step 1: Tokenize card data
@@ -240,6 +252,7 @@ export const processCardPayment = async (
     const chargeRequest: PaymentChargeRequest = {
       ...paymentData,
       opaqueData,
+      customer_data: customerData, // Include customer billing info if provided
     };
     
     const response = await chargePayment(chargeRequest);

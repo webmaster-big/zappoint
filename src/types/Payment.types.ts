@@ -13,6 +13,17 @@ export interface PaymentChargeRequest {
   customer_id?: number;
   booking_id?: number;
   description?: string;
+  customer_data?: {
+    first_name?: string;
+    last_name?: string;
+    email?: string;
+    phone?: string;
+    address?: string;
+    city?: string;
+    state?: string;
+    zip?: string;
+    country?: string;
+  };
 }
 
 export interface PaymentChargeResponse {

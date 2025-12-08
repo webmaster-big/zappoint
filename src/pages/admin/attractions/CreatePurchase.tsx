@@ -287,6 +287,14 @@ const CreatePurchase = () => {
           cardCode: cardCVV,
         };
         
+        // Customer billing data for Authorize.Net
+        const customerData = {
+          first_name: customerInfo.name?.split(' ')[0] || '',
+          last_name: customerInfo.name?.split(' ').slice(1).join(' ') || '',
+          email: customerInfo.email || '',
+          phone: customerInfo.phone || '',
+        };
+        
         const paymentData = {
           location_id: selectedAttraction.locationId || 1,
           amount: totalAmount,
@@ -297,7 +305,9 @@ const CreatePurchase = () => {
         const paymentResponse = await processCardPayment(
           cardData,
           paymentData,
-          authorizeApiLoginId
+          authorizeApiLoginId,
+          undefined, // No client key for this flow
+          customerData // Pass customer billing data
         );
         
         if (!paymentResponse.success) {

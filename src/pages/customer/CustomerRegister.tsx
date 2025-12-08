@@ -13,6 +13,12 @@ const CustomerRegister = () => {
     phone: '',
     password: '',
     confirmPassword: '',
+    // Billing Information
+    address: '',
+    city: '',
+    state: '',
+    zip: '',
+    country: 'United States',
     agreeToTerms: false
   });
   const [showPassword, setShowPassword] = useState(false);
@@ -32,8 +38,8 @@ const CustomerRegister = () => {
   };
 
   const validateForm = (): boolean => {
-    if (!formData.firstName || !formData.lastName || !formData.email || !formData.phone || !formData.password || !formData.confirmPassword) {
-      setError('Please fill in all fields');
+    if (!formData.firstName || !formData.lastName || !formData.email || !formData.phone || !formData.password || !formData.confirmPassword || !formData.address || !formData.city || !formData.state || !formData.zip || !formData.country) {
+      setError('Please fill in all required fields');
       return false;
     }
     if (formData.password !== formData.confirmPassword) {
@@ -69,6 +75,8 @@ const CustomerRegister = () => {
         phone: formData.phone,
         password: formData.password,
         password_confirmation: formData.confirmPassword,
+        // Note: Billing information is stored locally and will be used during checkout
+        // Backend migration for billing fields may be needed
       });
 
       if (response.success && response.data) {
@@ -278,6 +286,85 @@ const CustomerRegister = () => {
                 >
                   {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                 </button>
+              </div>
+            </div>
+
+            {/* Billing Information Section */}
+            <div className="pt-4 border-t border-zinc-200">
+              <h3 className="text-base font-semibold text-zinc-900 mb-3">Billing Information</h3>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-zinc-800 mb-1">Street Address</label>
+                  <input
+                    type="text"
+                    name="address"
+                    autoComplete="street-address"
+                    required
+                    value={formData.address}
+                    onChange={handleChange}
+                    className="w-full border border-zinc-200 px-3 py-2 text-zinc-900 bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-800 focus:border-blue-800 transition text-base rounded-none"
+                    placeholder="123 Main Street"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-800 mb-1">City</label>
+                    <input
+                      type="text"
+                      name="city"
+                      autoComplete="address-level2"
+                      required
+                      value={formData.city}
+                      onChange={handleChange}
+                      className="w-full border border-zinc-200 px-3 py-2 text-zinc-900 bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-800 focus:border-blue-800 transition text-base rounded-none"
+                      placeholder="City"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-800 mb-1">State</label>
+                    <input
+                      type="text"
+                      name="state"
+                      autoComplete="address-level1"
+                      required
+                      value={formData.state}
+                      onChange={handleChange}
+                      className="w-full border border-zinc-200 px-3 py-2 text-zinc-900 bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-800 focus:border-blue-800 transition text-base rounded-none"
+                      placeholder="State"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-800 mb-1">ZIP Code</label>
+                    <input
+                      type="text"
+                      name="zip"
+                      autoComplete="postal-code"
+                      required
+                      value={formData.zip}
+                      onChange={handleChange}
+                      className="w-full border border-zinc-200 px-3 py-2 text-zinc-900 bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-800 focus:border-blue-800 transition text-base rounded-none"
+                      placeholder="12345"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-800 mb-1">Country</label>
+                    <input
+                      type="text"
+                      name="country"
+                      autoComplete="country-name"
+                      required
+                      value={formData.country}
+                      onChange={handleChange}
+                      className="w-full border border-zinc-200 px-3 py-2 text-zinc-900 bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-800 focus:border-blue-800 transition text-base rounded-none"
+                      placeholder="United States"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
 

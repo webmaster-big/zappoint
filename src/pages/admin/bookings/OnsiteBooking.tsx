@@ -858,6 +858,14 @@ const OnsiteBooking: React.FC = () => {
           await loadAcceptJS(authorizeEnvironment);
           
           // Process payment
+        // Customer billing data for Authorize.Net
+        const customerData = {
+          first_name: bookingData.customer.firstName || '',
+          last_name: bookingData.customer.lastName || '',
+          email: bookingData.customer.email || '',
+          phone: bookingData.customer.phone || '',
+        };
+        
         const paymentResult = await processCardPayment(
           {
             cardNumber: cardNumber.replace(/\s/g, ''),
@@ -869,7 +877,9 @@ const OnsiteBooking: React.FC = () => {
             location_id: 1,
             amount: amountPaid
           },
-          authorizeApiLoginId
+          authorizeApiLoginId,
+          undefined, // clientKey
+          customerData // Pass customer billing data as optional parameter
         );          if (!paymentResult.success) {
             setPaymentError(paymentResult.message || 'Payment processing failed');
             setIsProcessingPayment(false);

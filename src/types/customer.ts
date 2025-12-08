@@ -178,6 +178,12 @@ export interface RegisterFormData {
   phone: string;
   password: string;
   confirmPassword: string;
+  // Billing Information
+  address: string;
+  city: string;
+  state: string;
+  zip: string;
+  country: string;
   agreeToTerms: boolean;
 }
 
