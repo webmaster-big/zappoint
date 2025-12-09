@@ -25,7 +25,9 @@ const ManualBooking: React.FC = () => {
     paymentMethod: 'cash' as const,
     paymentStatus: 'paid' as const,
     status: 'completed' as const,
-    notes: ''
+    notes: '',
+    totalAmount: '',
+    amountPaid: ''
   });
 
   useEffect(() => {
@@ -70,10 +72,6 @@ const ManualBooking: React.FC = () => {
       const response = await bookingService.getPackageById(packageId);
       console.log('📦 Package data received:', response.data);
       setPkg(response.data);
-      
-      if (response.data.max_participants) {
-        setForm(prev => ({ ...prev, participants: response.data.max_participants }));
-      }
     } catch (error) {
       console.error('Error loading package details:', error);
     }
@@ -117,7 +115,12 @@ const ManualBooking: React.FC = () => {
     if (pkg.pricing_type === 'per_person') {
       total += Number(pkg.price) * form.participants;
     } else {
+      // Fixed pricing: base price + additional charge for extra participants
       total += Number(pkg.price);
+      const extraParticipants = Math.max(0, form.participants - (pkg.max_participants || 0));
+      if (extraParticipants > 0 && pkg.additional_participant_price) {
+        total += Number(pkg.additional_participant_price) * extraParticipants;
+      }
     }
 
     Object.entries(selectedAddOns).forEach(([id, quantity]) => {
@@ -162,7 +165,10 @@ const ManualBooking: React.FC = () => {
       setLoading(true);
       
       const user = getStoredUser();
-      const totalAmount = calculateTotal();
+      const calculatedTotal = calculateTotal();
+      const finalTotalAmount = form.totalAmount ? Number(form.totalAmount) : calculatedTotal;
+      const finalAmountPaid = form.amountPaid ? Number(form.amountPaid) : 
+        (form.paymentStatus === 'paid' ? finalTotalAmount : (form.paymentStatus === 'partial' ? finalTotalAmount / 2 : 0));
       
       // Prepare add-ons with price_at_booking
       const additionalAddons = Object.entries(selectedAddOns).map(([id, quantity]) => {
@@ -196,8 +202,8 @@ const ManualBooking: React.FC = () => {
         participants: form.participants,
         duration: pkg.duration,
         duration_unit: pkg.duration_unit,
-        total_amount: totalAmount,
-        amount_paid: form.paymentStatus === 'paid' ? totalAmount : (form.paymentStatus === 'partial' ? totalAmount / 2 : 0),
+        total_amount: finalTotalAmount,
+        amount_paid: finalAmountPaid,
         payment_method: form.paymentMethod,
         payment_status: form.paymentStatus,
         status: form.status,
@@ -596,10 +602,19 @@ const ManualBooking: React.FC = () => {
                 value={form.participants}
                 onChange={handleInputChange}
                 min="1"
-                max={pkg?.max_participants}
                 required
                 className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
               />
+              {pkg && pkg.pricing_type === 'fixed' && form.participants > (pkg.max_participants || 0) && pkg.additional_participant_price && (
+                <p className="text-xs text-amber-600 mt-1">
+                  ⚠️ {form.participants - pkg.max_participants} extra participant(s) @ ${pkg.additional_participant_price} each
+                </p>
+              )}
+              {pkg && pkg.max_participants && (
+                <p className="text-xs text-gray-500 mt-1">
+                  Base capacity: {pkg.max_participants} participants
+                </p>
+              )}
             </div>
             
             <div>
@@ -628,14 +643,51 @@ const ManualBooking: React.FC = () => {
             <h2 className="text-xl font-semibold text-gray-900">Payment Information</h2>
           </div>
           
-          <div className="mb-4 p-4 bg-blue-50 rounded-lg">
-            <div className="flex justify-between items-center">
-              <span className="text-lg font-semibold text-gray-900">Total Amount:</span>
-              <span className="text-2xl font-bold text-blue-600">${Number(calculateTotal() || 0).toFixed(2)}</span>
+          <div className="mb-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-100">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-sm font-medium text-gray-700">Calculated Total:</span>
+              <span className="text-lg font-bold text-blue-600">${Number(calculateTotal() || 0).toFixed(2)}</span>
             </div>
+            <p className="text-xs text-gray-500">Based on selected package, add-ons, and attractions</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Total Amount <span className="text-xs font-normal text-gray-500">(override calculated)</span>
+              </label>
+              <input
+                type="number"
+                name="totalAmount"
+                value={form.totalAmount}
+                onChange={handleInputChange}
+                step="0.01"
+                min="0"
+                placeholder={`${Number(calculateTotal() || 0).toFixed(2)}`}
+                className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
+              />
+              <p className="text-xs text-gray-500 mt-1">Leave blank to use calculated total</p>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Amount Paid <span className="text-xs font-normal text-gray-500">(custom amount)</span>
+              </label>
+              <input
+                type="number"
+                name="amountPaid"
+                value={form.amountPaid}
+                onChange={handleInputChange}
+                step="0.01"
+                min="0"
+                placeholder="Auto-calculated based on payment status"
+                className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
+              />
+              <p className="text-xs text-gray-500 mt-1">Leave blank for auto-calculation</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Payment Method *
