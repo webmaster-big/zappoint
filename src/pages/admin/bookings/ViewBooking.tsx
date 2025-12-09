@@ -350,6 +350,18 @@ const ViewBooking: React.FC = () => {
                 </div>
               </div>
 
+              {Number(booking.total_amount) - Number(booking.amount_paid) > 0 && (
+                <div className="flex items-start gap-3">
+                  <div className={`p-2 bg-red-100 rounded-lg`}>
+                    <DollarSign className={`h-5 w-5 text-red-600`} />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Remaining Balance</p>
+                    <p className="font-medium text-red-600 text-2xl">${(Number(booking.total_amount) - Number(booking.amount_paid)).toFixed(2)}</p>
+                  </div>
+                </div>
+              )}
+
               {booking.discount_amount && Number(booking.discount_amount) > 0 && (
                 <div className="flex items-start gap-3">
                   <div className={`p-2 bg-${themeColor}-100 rounded-lg`}>
@@ -362,6 +374,34 @@ const ViewBooking: React.FC = () => {
                 </div>
               )}
 
+              {(booking as any).promo && (
+                <div className="flex items-start gap-3">
+                  <div className={`p-2 bg-green-100 rounded-lg`}>
+                    <CheckCircle className={`h-5 w-5 text-green-600`} />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Promo Code</p>
+                    <p className="font-medium text-gray-900">{(booking as any).promo.code}</p>
+                    {(booking as any).promo.discount_percentage && (
+                      <p className="text-sm text-gray-600">{(booking as any).promo.discount_percentage}% off</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {(booking as any).gift_card && (
+                <div className="flex items-start gap-3">
+                  <div className={`p-2 bg-purple-100 rounded-lg`}>
+                    <CheckCircle className={`h-5 w-5 text-purple-600`} />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Gift Card</p>
+                    <p className="font-medium text-gray-900">{(booking as any).gift_card.code}</p>
+                    <p className="text-sm text-gray-600">Balance: ${Number((booking as any).gift_card.balance).toFixed(2)}</p>
+                  </div>
+                </div>
+              )}
+
               {booking.payment_method && (
                 <div className="flex items-start gap-3">
                   <div className={`p-2 bg-${themeColor}-100 rounded-lg`}>
@@ -369,7 +409,7 @@ const ViewBooking: React.FC = () => {
                   </div>
                   <div>
                     <p className="text-sm text-gray-500">Payment Method</p>
-                    <p className="font-medium text-gray-900 capitalize">{booking.payment_method}</p>
+                    <p className="font-medium text-gray-900 capitalize">{booking.payment_method.replace('_', ' ')}</p>
                   </div>
                 </div>
               )}
@@ -386,35 +426,87 @@ const ViewBooking: React.FC = () => {
                 </div>
               </div>
             </div>
+
+            {/* Payment History */}
+            {(booking as any).payments && (booking as any).payments.length > 0 && (
+              <div className="mt-6 pt-6 border-t border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Payment History</h3>
+                <div className="space-y-3">
+                  {(booking as any).payments.map((payment: any, index: number) => (
+                    <div key={index} className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200">
+                      <div className="flex items-center gap-3">
+                        <div className={`p-2 ${payment.status === 'completed' ? 'bg-green-100' : 'bg-gray-100'} rounded-lg`}>
+                          <DollarSign className={`h-4 w-4 ${payment.status === 'completed' ? 'text-green-600' : 'text-gray-600'}`} />
+                        </div>
+                        <div>
+                          <p className="font-medium text-gray-900">${Number(payment.amount).toFixed(2)}</p>
+                          <p className="text-sm text-gray-600">
+                            {payment.method ? payment.method.replace('_', ' ').charAt(0).toUpperCase() + payment.method.slice(1).replace('_', ' ') : 'N/A'}
+                            {' • '}
+                            {new Date(payment.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                          </p>
+                          {payment.notes && (
+                            <p className="text-xs text-gray-500 mt-1">{payment.notes}</p>
+                          )}
+                        </div>
+                      </div>
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        payment.status === 'completed' ? 'bg-green-100 text-green-800' : 
+                        payment.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : 
+                        'bg-gray-100 text-gray-800'
+                      }`}>
+                        {payment.status.charAt(0).toUpperCase() + payment.status.slice(1)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Attractions & Add-ons */}
-          {((booking.attractions && booking.attractions.length > 0) || (booking.addOns && booking.addOns.length > 0)) && (
+          {((booking.attractions && booking.attractions.length > 0) || ((booking as any).add_ons && (booking as any).add_ons.length > 0)) && (
             <div className="p-6 border-b border-gray-100">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">Additional Services</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {booking.attractions && booking.attractions.length > 0 && (
                   <div>
-                    <h3 className="font-medium text-gray-900 mb-2">Attractions</h3>
+                    <h3 className="font-medium text-gray-900 mb-2">Attractions ({booking.attractions.length})</h3>
                     <ul className="space-y-2">
                       {booking.attractions.map((attraction: any, index: number) => (
-                        <li key={index} className="flex items-center text-gray-700">
-                          <span className="w-2 h-2 bg-gray-400 rounded-full mr-2"></span>
-                          {attraction.name} - ${Number(attraction.price).toFixed(2)}
+                        <li key={index} className="flex items-start justify-between text-gray-700">
+                          <div className="flex items-start">
+                            <span className="w-2 h-2 bg-gray-400 rounded-full mr-2 mt-2"></span>
+                            <div>
+                              <p className="font-medium">{attraction.name}</p>
+                              {attraction.pivot?.quantity > 1 && (
+                                <p className="text-sm text-gray-500">Quantity: {attraction.pivot.quantity}</p>
+                              )}
+                            </div>
+                          </div>
+                          <span className="font-medium">${Number(attraction.price).toFixed(2)}</span>
                         </li>
                       ))}
                     </ul>
                   </div>
                 )}
 
-                {booking.addOns && booking.addOns.length > 0 && (
+                {((booking as any).add_ons && (booking as any).add_ons.length > 0) && (
                   <div>
-                    <h3 className="font-medium text-gray-900 mb-2">Add-Ons</h3>
+                    <h3 className="font-medium text-gray-900 mb-2">Add-Ons ({(booking as any).add_ons.length})</h3>
                     <ul className="space-y-2">
-                      {booking.addOns.map((addon: any, index: number) => (
-                        <li key={index} className="flex items-center text-gray-700">
-                          <span className="w-2 h-2 bg-gray-400 rounded-full mr-2"></span>
-                          {addon.name} - ${Number(addon.price).toFixed(2)}
+                      {(booking as any).add_ons.map((addon: any, index: number) => (
+                        <li key={index} className="flex items-start justify-between text-gray-700">
+                          <div className="flex items-start">
+                            <span className="w-2 h-2 bg-gray-400 rounded-full mr-2 mt-2"></span>
+                            <div>
+                              <p className="font-medium">{addon.name}</p>
+                              {addon.pivot?.quantity > 1 && (
+                                <p className="text-sm text-gray-500">Quantity: {addon.pivot.quantity}</p>
+                              )}
+                            </div>
+                          </div>
+                          <span className="font-medium">${Number(addon.price).toFixed(2)}</span>
                         </li>
                       ))}
                     </ul>

@@ -1163,53 +1163,39 @@ const CheckIn: React.FC = () => {
                   Cancel
                 </button>
                 
-                {verifiedBooking.status === 'confirmed' && (
-                  <>
-                    {/* Show payment button if not fully paid */}
-                    {verifiedBooking.payment_status !== 'paid' && (
-                      <button
-                        onClick={() => handleOpenPaymentModal(verifiedBooking)}
-                        disabled={processing || processingPayment}
-                        className={`flex-1 px-3 sm:px-6 py-2 sm:py-3 text-sm sm:text-base bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors font-medium flex items-center justify-center gap-1 sm:gap-2 disabled:opacity-50 disabled:cursor-not-allowed`}
-                      >
-                        <DollarSign className="h-4 w-4 sm:h-5 sm:w-5" />
-                        <span className="hidden sm:inline">Add Payment</span>
-                        <span className="sm:hidden">Pay</span>
-                      </button>
-                    )}
-                    
-                    {/* Check-in button - only show if paid */}
-                    {verifiedBooking.payment_status === 'paid' && (
-                      <button
-                        onClick={handleConfirmCheckIn}
-                        disabled={processing}
-                        className={`flex-1 px-3 sm:px-6 py-2 sm:py-3 text-sm sm:text-base bg-${themeColor}-600 text-white rounded-lg hover:bg-${themeColor}-700 transition-colors font-medium flex items-center justify-center gap-1 sm:gap-2 disabled:opacity-50 disabled:cursor-not-allowed`}
-                      >
-                        {processing ? (
-                          <>
-                            <RefreshCw className="h-4 w-4 sm:h-5 sm:w-5 animate-spin" />
-                            <span className="hidden sm:inline">Checking In...</span>
-                            <span className="sm:hidden">Wait...</span>
-                          </>
-                        ) : (
-                          <>
-                            <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5" />
-                            <span className="hidden sm:inline">Confirm Check-In</span>
-                            <span className="sm:hidden">Check-In</span>
-                          </>
-                        )}
-                      </button>
-                    )}
-                  </>
+                {/* Show payment button if not fully paid */}
+                {verifiedBooking.payment_status !== 'paid' && (
+                  <button
+                    onClick={() => handleOpenPaymentModal(verifiedBooking)}
+                    disabled={processing || processingPayment}
+                    className={`flex-1 px-3 sm:px-6 py-2 sm:py-3 text-sm sm:text-base bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors font-medium flex items-center justify-center gap-1 sm:gap-2 disabled:opacity-50 disabled:cursor-not-allowed`}
+                  >
+                    <DollarSign className="h-4 w-4 sm:h-5 sm:w-5" />
+                    <span className="hidden sm:inline">Add Payment</span>
+                    <span className="sm:hidden">Pay</span>
+                  </button>
                 )}
                 
-                {verifiedBooking.status !== 'confirmed' && (
+                {/* Check-in button - only show if paid */}
+                {verifiedBooking.payment_status === 'paid' && (
                   <button
-                    onClick={handleCancelCheckIn}
-                    className={`flex-1 px-3 sm:px-6 py-2 sm:py-3 text-sm sm:text-base bg-${themeColor}-600 text-white rounded-lg hover:bg-${themeColor}-700 transition-colors font-medium`}
+                    onClick={handleConfirmCheckIn}
+                    disabled={processing}
+                    className={`flex-1 px-3 sm:px-6 py-2 sm:py-3 text-sm sm:text-base bg-${themeColor}-600 text-white rounded-lg hover:bg-${themeColor}-700 transition-colors font-medium flex items-center justify-center gap-1 sm:gap-2 disabled:opacity-50 disabled:cursor-not-allowed`}
                   >
-                    <span className="hidden sm:inline">Close & Scan Next</span>
-                    <span className="sm:hidden">Close</span>
+                    {processing ? (
+                      <>
+                        <RefreshCw className="h-4 w-4 sm:h-5 sm:w-5 animate-spin" />
+                        <span className="hidden sm:inline">Checking In...</span>
+                        <span className="sm:hidden">Wait...</span>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5" />
+                        <span className="hidden sm:inline">Confirm Check-In</span>
+                        <span className="sm:hidden">Check-In</span>
+                      </>
+                    )}
                   </button>
                 )}
               </div>
@@ -1630,50 +1616,46 @@ const CheckIn: React.FC = () => {
                   Close
                 </button>
                 
-                {selectedBooking.status === 'confirmed' && (
-                  <>
-                    {/* Payment button - shown if not fully paid */}
-                    {selectedBooking.payment_status !== 'paid' && (
-                      <button
-                        onClick={() => {
-                          handleOpenPaymentModal(selectedBooking);
-                          closeModal();
-                        }}
-                        disabled={processing || processingPayment}
-                        className={`flex-1 px-3 sm:px-6 py-2 sm:py-3 text-sm sm:text-base bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors font-medium flex items-center justify-center gap-1 sm:gap-2 disabled:opacity-50 disabled:cursor-not-allowed`}
-                      >
-                        <DollarSign className="h-4 w-4 sm:h-5 sm:w-5" />
-                        <span className="hidden sm:inline">Add Payment</span>
-                        <span className="sm:hidden">Pay</span>
-                      </button>
+                {/* Payment button - shown if not fully paid */}
+                {selectedBooking.payment_status !== 'paid' && (
+                  <button
+                    onClick={() => {
+                      handleOpenPaymentModal(selectedBooking);
+                      closeModal();
+                    }}
+                    disabled={processing || processingPayment}
+                    className={`flex-1 px-3 sm:px-6 py-2 sm:py-3 text-sm sm:text-base bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors font-medium flex items-center justify-center gap-1 sm:gap-2 disabled:opacity-50 disabled:cursor-not-allowed`}
+                  >
+                    <DollarSign className="h-4 w-4 sm:h-5 sm:w-5" />
+                    <span className="hidden sm:inline">Add Payment</span>
+                    <span className="sm:hidden">Pay</span>
+                  </button>
+                )}
+                
+                {/* Check-in button - only show if paid */}
+                {selectedBooking.payment_status === 'paid' && (
+                  <button
+                    onClick={() => {
+                      handleCheckIn(selectedBooking);
+                      closeModal();
+                    }}
+                    disabled={processing}
+                    className={`flex-1 px-3 sm:px-6 py-2 sm:py-3 text-sm sm:text-base bg-${themeColor}-600 text-white rounded-lg hover:bg-${themeColor}-700 transition-colors font-medium flex items-center justify-center gap-1 sm:gap-2 disabled:opacity-50 disabled:cursor-not-allowed`}
+                  >
+                    {processing ? (
+                      <>
+                        <RefreshCw className="h-4 w-4 sm:h-5 sm:w-5 animate-spin" />
+                        <span className="hidden sm:inline">Checking In...</span>
+                        <span className="sm:hidden">Wait...</span>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5" />
+                        <span className="hidden sm:inline">Check In Now</span>
+                        <span className="sm:hidden">Check-In</span>
+                      </>
                     )}
-                    
-                    {/* Check-in button - only show if paid */}
-                    {selectedBooking.payment_status === 'paid' && (
-                      <button
-                        onClick={() => {
-                          handleCheckIn(selectedBooking);
-                          closeModal();
-                        }}
-                        disabled={processing}
-                        className={`flex-1 px-3 sm:px-6 py-2 sm:py-3 text-sm sm:text-base bg-${themeColor}-600 text-white rounded-lg hover:bg-${themeColor}-700 transition-colors font-medium flex items-center justify-center gap-1 sm:gap-2 disabled:opacity-50 disabled:cursor-not-allowed`}
-                      >
-                        {processing ? (
-                          <>
-                            <RefreshCw className="h-4 w-4 sm:h-5 sm:w-5 animate-spin" />
-                            <span className="hidden sm:inline">Checking In...</span>
-                            <span className="sm:hidden">Wait...</span>
-                          </>
-                        ) : (
-                          <>
-                            <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5" />
-                            <span className="hidden sm:inline">Check In Now</span>
-                            <span className="sm:hidden">Check-In</span>
-                          </>
-                        )}
-                      </button>
-                    )}
-                  </>
+                  </button>
                 )}
               </div>
             </div>
