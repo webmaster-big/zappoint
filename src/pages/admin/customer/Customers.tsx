@@ -12,8 +12,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Download,
-  Plus,
   Tag,
+  X,
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import type { CustomersCustomer } from '../../../types/Customers.types';
@@ -33,6 +33,17 @@ const CustomerListing: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [totalCustomers, setTotalCustomers] = useState(0);
   const currentUser = getStoredUser();
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [exportFilters, setExportFilters] = useState({
+    statuses: [] as string[],
+    startDate: '',
+    endDate: '',
+    minSpent: '',
+    maxSpent: '',
+    minBookings: '',
+    maxBookings: ''
+  });
 
   // Debounce search term
   useEffect(() => {
@@ -123,6 +134,124 @@ const CustomerListing: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage, itemsPerPage, debouncedSearchTerm, statusFilter, sortBy, sortOrder]);
 
+  // Export functionality
+  const handleExport = async () => {
+    try {
+      setExporting(true);
+      
+      const filters: any = {
+        sort_by: sortMapping[sortBy] || 'first_name',
+        sort_order: sortOrder
+      };
+
+      if (exportFilters.statuses.length > 0) {
+        filters.status = exportFilters.statuses;
+      }
+
+      if (exportFilters.startDate) {
+        filters.created_after = exportFilters.startDate;
+      }
+
+      if (exportFilters.endDate) {
+        filters.created_before = exportFilters.endDate;
+      }
+
+      if (exportFilters.minSpent) {
+        filters.min_spent = parseFloat(exportFilters.minSpent);
+      }
+
+      if (exportFilters.maxSpent) {
+        filters.max_spent = parseFloat(exportFilters.maxSpent);
+      }
+
+      if (exportFilters.minBookings) {
+        filters.min_bookings = parseInt(exportFilters.minBookings);
+      }
+
+      if (exportFilters.maxBookings) {
+        filters.max_bookings = parseInt(exportFilters.maxBookings);
+      }
+
+      // Fetch all customers matching filters (without pagination)
+      const response = await customerService.fetchCustomerList(currentUser!.id, { ...filters, per_page: 10000 });
+      
+      if (response.success && response.data) {
+        // Convert to CSV
+        const csvData = convertToCSV(response.data.customers);
+        
+        // Download CSV
+        const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `customers-export-${new Date().toISOString().split('T')[0]}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        setShowExportModal(false);
+        setExportFilters({
+          statuses: [],
+          startDate: '',
+          endDate: '',
+          minSpent: '',
+          maxSpent: '',
+          minBookings: '',
+          maxBookings: ''
+        });
+      }
+    } catch (error) {
+      console.error('Error exporting customers:', error);
+      alert('Failed to export customers. Please try again.');
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const sortMapping: { [key: string]: string } = {
+    'name': 'first_name',
+    'joinDate': 'created_at',
+    'totalSpent': 'total_spent',
+    'bookings': 'total_bookings',
+    'ticketsPurchased': 'total_ticket_quantity'
+  };
+
+  const convertToCSV = (customers: CustomerListItem[]): string => {
+    const headers = [
+      'Name',
+      'Email',
+      'Phone',
+      'Join Date',
+      'Last Activity',
+      'Total Spent',
+      'Total Bookings',
+      'Tickets Purchased',
+      'Status',
+      'Tags'
+    ];
+    
+    const rows = customers.map(customer => [
+      `${customer.first_name || ''} ${customer.last_name || ''}`.trim() || 'Unknown',
+      customer.email || 'No email',
+      customer.phone || 'N/A',
+      customer.created_at ? new Date(customer.created_at).toLocaleDateString() : 'N/A',
+      customer.last_visit ? new Date(customer.last_visit).toLocaleDateString() : new Date(customer.created_at).toLocaleDateString(),
+      customer.total_spent?.toFixed(2) || '0.00',
+      customer.total_bookings || '0',
+      customer.total_ticket_quantity || '0',
+      determineStatus(customer),
+      customer.tags?.join('; ') || ''
+    ]);
+    
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+    ].join('\n');
+    
+    return csvContent;
+  };
+
   // Note: Filtering and sorting is now handled by the backend API
 
   // Pagination calculations (backend handles pagination)
@@ -179,16 +308,13 @@ const CustomerListing: React.FC = () => {
             <h2 className="text-2xl font-semibold text-gray-900">Customers</h2>
             <p className="text-gray-500 mt-1">Manage and view all customer information</p>
           </div>
-          <div className="flex gap-2">
-            <button className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-semibold whitespace-nowrap flex items-center gap-2">
-              <Download className="w-4 h-4" />
-              Export
-            </button>
-            <button className={`bg-${fullColor} hover:bg-${themeColor}-900 text-white px-6 py-2 rounded-lg font-semibold whitespace-nowrap inline-flex items-center gap-2`}>
-              <Plus className="h-5 w-5" />
-              Add Customer
-            </button>
-          </div>
+          <button 
+            onClick={() => setShowExportModal(true)}
+            className={`bg-${fullColor} hover:bg-${themeColor}-700 text-white px-4 py-2 rounded-lg font-medium whitespace-nowrap flex items-center gap-2`}
+          >
+            <Download className="w-4 h-4" />
+            Export
+          </button>
         </div>
 
         {/* Filters and Search */}
@@ -497,6 +623,218 @@ const CustomerListing: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Export Modal */}
+      {showExportModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+            <div className={`p-6 border-b border-gray-100 bg-${themeColor}-50 sticky top-0`}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">Export Customers</h2>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Configure filters to export customer data
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowExportModal(false);
+                    setExportFilters({
+                      statuses: [],
+                      startDate: '',
+                      endDate: '',
+                      minSpent: '',
+                      maxSpent: '',
+                      minBookings: '',
+                      maxBookings: ''
+                    });
+                  }}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <X className="h-5 w-5 text-gray-500" />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* Date Range */}
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900 mb-3">Registration Date Range</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Start Date
+                    </label>
+                    <input
+                      type="date"
+                      value={exportFilters.startDate}
+                      onChange={(e) => setExportFilters(prev => ({ ...prev, startDate: e.target.value }))}
+                      className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      End Date
+                    </label>
+                    <input
+                      type="date"
+                      value={exportFilters.endDate}
+                      onChange={(e) => setExportFilters(prev => ({ ...prev, endDate: e.target.value }))}
+                      className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Status Filter */}
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900 mb-3">Customer Status</h3>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {['active', 'inactive', 'new', 'guest'].map(status => (
+                    <label key={status} className="flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={exportFilters.statuses.includes(status)}
+                        onChange={(e) => {
+                          setExportFilters(prev => ({
+                            ...prev,
+                            statuses: e.target.checked
+                              ? [...prev.statuses, status]
+                              : prev.statuses.filter(s => s !== status)
+                          }));
+                        }}
+                        className={`rounded border-gray-300 text-${fullColor} focus:ring-${themeColor}-500 mr-2`}
+                      />
+                      <span className="text-sm text-gray-700 capitalize">{status}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Total Spent Range */}
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900 mb-3">Total Spent Range</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Min Amount ($)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={exportFilters.minSpent}
+                      onChange={(e) => setExportFilters(prev => ({ ...prev, minSpent: e.target.value }))}
+                      className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
+                      placeholder="0.00"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Max Amount ($)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={exportFilters.maxSpent}
+                      onChange={(e) => setExportFilters(prev => ({ ...prev, maxSpent: e.target.value }))}
+                      className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
+                      placeholder="0.00"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Bookings Range */}
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900 mb-3">Booking Count Range</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Min Bookings
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={exportFilters.minBookings}
+                      onChange={(e) => setExportFilters(prev => ({ ...prev, minBookings: e.target.value }))}
+                      className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
+                      placeholder="0"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Max Bookings
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={exportFilters.maxBookings}
+                      onChange={(e) => setExportFilters(prev => ({ ...prev, maxBookings: e.target.value }))}
+                      className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
+                      placeholder="0"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Export Info */}
+              <div className={`bg-${themeColor}-50 border-2 border-${themeColor}-200 rounded-lg p-4`}>
+                <div className="flex items-start gap-3">
+                  <Download className={`h-5 w-5 text-${fullColor} flex-shrink-0 mt-0.5`} />
+                  <div>
+                    <p className={`text-sm font-medium text-${fullColor}`}>
+                      CSV Export Format
+                    </p>
+                    <p className="text-xs text-gray-700 mt-1">
+                      Your data will be exported in CSV format including customer name, contact information, registration date, activity, spending, bookings, tickets, status, and tags.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-gray-100 flex gap-3 justify-end sticky bottom-0 bg-white">
+              <button
+                onClick={() => {
+                  setShowExportModal(false);
+                  setExportFilters({
+                    statuses: [],
+                    startDate: '',
+                    endDate: '',
+                    minSpent: '',
+                    maxSpent: '',
+                    minBookings: '',
+                    maxBookings: ''
+                  });
+                }}
+                disabled={exporting}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleExport}
+                disabled={exporting}
+                className={`px-6 py-2 bg-${fullColor} text-white rounded-lg hover:bg-${themeColor}-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2`}
+              >
+                {exporting ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                    Exporting...
+                  </>
+                ) : (
+                  <>
+                    <Download className="h-4 w-4" />
+                    Export to CSV
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
