@@ -24,7 +24,6 @@ const ManualBooking: React.FC = () => {
     bookingDate: '',
     bookingTime: '',
     participants: 1,
-    additionalParticipants: 0,
     paymentMethod: 'cash' as const,
     paymentStatus: 'paid' as const,
     status: 'completed' as const,
@@ -158,16 +157,15 @@ const ManualBooking: React.FC = () => {
     if (!pkg) return 0;
 
     let total = 0;
-    const totalParticipants = form.participants + (form.additionalParticipants || 0);
 
     if (pkg.pricing_type === 'per_person') {
-      total += Number(pkg.price) * totalParticipants;
+      total += Number(pkg.price) * form.participants;
     } else {
       // Fixed pricing: base price + additional charge for extra participants
       total += Number(pkg.price);
-      const additionalCount = form.additionalParticipants || 0;
-      if (additionalCount > 0 && pkg.additional_participant_price) {
-        total += Number(pkg.additional_participant_price) * additionalCount;
+      const extraParticipants = Math.max(0, form.participants - (pkg.max_participants || 0));
+      if (extraParticipants > 0 && pkg.additional_participant_price) {
+        total += Number(pkg.additional_participant_price) * extraParticipants;
       }
     }
 
@@ -175,7 +173,7 @@ const ManualBooking: React.FC = () => {
       const addOn = pkg.add_ons?.find((a: any) => a.id === parseInt(id));
       if (addOn) {
         if (addOn.pricing_type === 'per_person') {
-          total += Number(addOn.price) * quantity * totalParticipants;
+          total += Number(addOn.price) * quantity * form.participants;
         } else {
           total += Number(addOn.price) * quantity;
         }
@@ -186,7 +184,7 @@ const ManualBooking: React.FC = () => {
       const attraction = pkg.attractions?.find((a: any) => a.id === parseInt(id));
       if (attraction) {
         if (attraction.pricing_type === 'per_person') {
-          total += Number(attraction.price) * quantity * totalParticipants;
+          total += Number(attraction.price) * quantity * form.participants;
         } else {
           total += Number(attraction.price) * quantity;
         }
@@ -218,8 +216,6 @@ const ManualBooking: React.FC = () => {
       const finalAmountPaid = form.amountPaid ? Number(form.amountPaid) : 
         (form.paymentStatus === 'paid' ? finalTotalAmount : (form.paymentStatus === 'partial' ? finalTotalAmount / 2 : 0));
       
-      const totalParticipants = form.participants + (form.additionalParticipants || 0);
-      
       // Prepare add-ons with price_at_booking
       const additionalAddons = Object.entries(selectedAddOns).map(([id, quantity]) => {
         const addOn = pkg.add_ons?.find((a: any) => a.id === parseInt(id));
@@ -249,7 +245,7 @@ const ManualBooking: React.FC = () => {
         type: 'package' as const,
         booking_date: form.bookingDate,
         booking_time: form.bookingTime,
-        participants: totalParticipants,
+        participants: form.participants,
         duration: pkg.duration,
         duration_unit: pkg.duration_unit,
         total_amount: finalTotalAmount,
@@ -469,29 +465,19 @@ const ManualBooking: React.FC = () => {
                             value={form.participants}
                             onChange={handleInputChange}
                             min="1"
-                            max={pkg.max_participants}
                             required
                             className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring--500 focus:border-transparent transition-all"
                           />
-                          <p className="text-xs text-gray-500 mt-1">Maximum: {pkg.max_participants} participants</p>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">Additional Participants</label>
-                          <input
-                            type="number"
-                            name="additionalParticipants"
-                            value={form.additionalParticipants || 0}
-                            onChange={handleInputChange}
-                            min="0"
-                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring--500 focus:border-transparent transition-all"
-                          />
-                          {pkg.additional_participant_price && form.additionalParticipants > 0 && (
-                            <p className="text-xs text-green-600 mt-1.5 flex items-center gap-1">
+                          {pkg && form.participants > (pkg.max_participants || 0) && pkg.additional_participant_price && (
+                            <p className="text-xs text-amber-600 mt-1.5 flex items-center gap-1">
                               <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clipRule="evenodd" />
+                                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                               </svg>
-                              +{form.additionalParticipants} @ ${pkg.additional_participant_price} each
+                              {form.participants - pkg.max_participants} additional participant{form.participants - pkg.max_participants > 1 ? 's' : ''} @ ${pkg.additional_participant_price} each
                             </p>
+                          )}
+                          {pkg && (
+                            <p className="text-xs text-gray-500 mt-1">Max: {pkg.max_participants} participants</p>
                           )}
                         </div>
                         <div>
@@ -738,61 +724,57 @@ const ManualBooking: React.FC = () => {
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">Payment Details</h3>
                   <div className="space-y-4">
                     {/* Price Breakdown */}
-                    <div className="bg-gray-50 rounded-lg p-4 space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">Base Participants ({form.participants})</span>
-                        <span className="font-medium text-gray-900">
-                          ${pkg.pricing_type === 'per_person' 
-                            ? (Number(pkg.price) * form.participants).toFixed(2)
-                            : Number(pkg.price).toFixed(2)}
-                        </span>
-                      </div>
-                      {form.additionalParticipants > 0 && pkg.additional_participant_price && (
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-600">Additional Participants ({form.additionalParticipants})</span>
-                          <span className="font-medium text-gray-900">
-                            ${(Number(pkg.additional_participant_price) * form.additionalParticipants).toFixed(2)}
-                          </span>
+                    <div className="space-y-2 text-sm">
+                      {/* Package Price */}
+                      {pkg.pricing_type === 'per_person' ? (
+                        <div className="flex justify-between text-gray-700">
+                          <span>Package ({form.participants} × ${pkg.price})</span>
+                          <span className="font-medium">${(Number(pkg.price) * form.participants).toFixed(2)}</span>
                         </div>
+                      ) : (
+                        <>
+                          <div className="flex justify-between text-gray-700">
+                            <span>Package (base price)</span>
+                            <span className="font-medium">${Number(pkg.price).toFixed(2)}</span>
+                          </div>
+                          {form.participants > (pkg.max_participants || 0) && pkg.additional_participant_price && (
+                            <div className="flex justify-between text-amber-700">
+                              <span>Additional participants ({form.participants - pkg.max_participants} × ${pkg.additional_participant_price})</span>
+                              <span className="font-medium">${(Number(pkg.additional_participant_price) * (form.participants - pkg.max_participants)).toFixed(2)}</span>
+                            </div>
+                          )}
+                        </>
                       )}
-                      {Object.entries(selectedAddOns).length > 0 && (
-                        <div className="pt-2 border-t border-gray-200">
-                          <p className="text-xs font-semibold text-gray-700 mb-1">Add-ons</p>
-                          {Object.entries(selectedAddOns).map(([id, quantity]) => {
-                            const addOn = pkg.add_ons?.find((a: any) => a.id === parseInt(id));
-                            if (!addOn) return null;
-                            const totalParticipants = form.participants + (form.additionalParticipants || 0);
-                            const price = addOn.pricing_type === 'per_person' 
-                              ? Number(addOn.price) * quantity * totalParticipants
-                              : Number(addOn.price) * quantity;
-                            return (
-                              <div key={id} className="flex justify-between text-xs">
-                                <span className="text-gray-600">{addOn.name} (x{quantity})</span>
-                                <span className="text-gray-900">${price.toFixed(2)}</span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                      {Object.entries(selectedAttractions).length > 0 && (
-                        <div className="pt-2 border-t border-gray-200">
-                          <p className="text-xs font-semibold text-gray-700 mb-1">Attractions</p>
-                          {Object.entries(selectedAttractions).map(([id, quantity]) => {
-                            const attraction = pkg.attractions?.find((a: any) => a.id === parseInt(id));
-                            if (!attraction) return null;
-                            const totalParticipants = form.participants + (form.additionalParticipants || 0);
-                            const price = attraction.pricing_type === 'per_person' 
-                              ? Number(attraction.price) * quantity * totalParticipants
-                              : Number(attraction.price) * quantity;
-                            return (
-                              <div key={id} className="flex justify-between text-xs">
-                                <span className="text-gray-600">{attraction.name} (x{quantity})</span>
-                                <span className="text-gray-900">${price.toFixed(2)}</span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
+
+                      {/* Add-ons */}
+                      {Object.entries(selectedAddOns).map(([id, quantity]) => {
+                        const addOn = pkg.add_ons?.find((a: any) => a.id === parseInt(id));
+                        if (!addOn) return null;
+                        const price = addOn.pricing_type === 'per_person' 
+                          ? Number(addOn.price) * quantity * form.participants
+                          : Number(addOn.price) * quantity;
+                        return (
+                          <div key={id} className="flex justify-between text-gray-600 text-xs">
+                            <span>{addOn.name} ({quantity}{addOn.pricing_type === 'per_person' ? ` × ${form.participants} people` : ''})</span>
+                            <span className="font-medium">${price.toFixed(2)}</span>
+                          </div>
+                        );
+                      })}
+
+                      {/* Attractions */}
+                      {Object.entries(selectedAttractions).map(([id, quantity]) => {
+                        const attraction = pkg.attractions?.find((a: any) => a.id === parseInt(id));
+                        if (!attraction) return null;
+                        const price = attraction.pricing_type === 'per_person'
+                          ? Number(attraction.price) * quantity * form.participants
+                          : Number(attraction.price) * quantity;
+                        return (
+                          <div key={id} className="flex justify-between text-gray-600 text-xs">
+                            <span>{attraction.name} ({quantity}{attraction.pricing_type === 'per_person' ? ` × ${form.participants} people` : ''})</span>
+                            <span className="font-medium">${price.toFixed(2)}</span>
+                          </div>
+                        );
+                      })}
                     </div>
 
                     {/* Calculated Total */}
@@ -801,11 +783,6 @@ const ManualBooking: React.FC = () => {
                         <span className="text-sm font-medium text-gray-700">Calculated Total</span>
                         <span className={`text-2xl font-bold text-${fullColor}`}>${Number(calculateTotal() || 0).toFixed(2)}</span>
                       </div>
-                      {form.participants + (form.additionalParticipants || 0) > 0 && (
-                        <p className="text-xs text-gray-600 mt-1">
-                          Total: {form.participants + (form.additionalParticipants || 0)} participants
-                        </p>
-                      )}
                     </div>
 
                     {/* Manual Inputs */}
