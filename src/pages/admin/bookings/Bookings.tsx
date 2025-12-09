@@ -20,6 +20,7 @@ import { useThemeColor } from '../../../hooks/useThemeColor';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
 import type { BookingsPageBooking, BookingsPageFilterOptions } from '../../../types/Bookings.types';
 import bookingService from '../../../services/bookingService';
+import { createPayment } from '../../../services/PaymentService';
 import { getStoredUser, API_BASE_URL } from '../../../utils/storage';
 import { MapPin } from 'lucide-react';
 
@@ -470,8 +471,9 @@ const Bookings: React.FC = () => {
 
   const handleOpenPaymentModal = (booking: BookingsPageBooking) => {
     setSelectedBookingForPayment(booking);
-    const remainingAmount = booking.totalAmount - booking.amountPaid;
-    setPaymentAmount(remainingAmount.toFixed(2));
+    const remainingAmount = Math.max(0, booking.totalAmount - booking.amountPaid);
+    // Use Math.floor to ensure we don't exceed the remaining balance due to rounding
+    setPaymentAmount((Math.floor(remainingAmount * 100) / 100).toFixed(2));
     setPaymentMethod('cash');
     setPaymentNotes('');
     setShowPaymentModal(true);
@@ -731,35 +733,20 @@ const Bookings: React.FC = () => {
         throw new Error('Location ID not found for this booking');
       }
 
-      // Get auth token
-      const user = getStoredUser();
-      if (!user?.token) {
-        throw new Error('Authentication token not found');
-      }
-
-      // Create payment record
-      const paymentResponse = await fetch(`${API_BASE_URL}/payments`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${user.token}`,
-        },
-        body: JSON.stringify({
-          booking_id: Number(selectedBookingForPayment.id),
-          customer_id: customerId,
-          location_id: locationId,
-          amount: amount,
-          currency: 'USD',
-          method: paymentMethod,
-          status: 'completed',
-          notes: paymentNotes || `Partial payment for booking ${selectedBookingForPayment.referenceNumber}`,
-        }),
+      // Create payment record using PaymentService
+      const paymentResponse = await createPayment({
+        booking_id: Number(selectedBookingForPayment.id),
+        customer_id: customerId,
+        location_id: locationId,
+        amount: amount,
+        currency: 'USD',
+        method: paymentMethod,
+        status: 'completed',
+        notes: paymentNotes || `Partial payment for booking ${selectedBookingForPayment.referenceNumber}`,
       });
 
-      if (!paymentResponse.ok) {
-        const errorData = await paymentResponse.json().catch(() => ({}));
-        throw new Error(errorData.message || 'Failed to create payment');
+      if (!paymentResponse.success) {
+        throw new Error(paymentResponse.message || 'Failed to create payment');
       }
 
       // Update booking's amount_paid
