@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Save, Plus, Minus } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import bookingService from '../../../services/bookingService';
+import roomService from '../../../services/RoomService';
 import { getStoredUser, getImageUrl } from '../../../utils/storage';
 
 const ManualBooking: React.FC = () => {
@@ -13,6 +14,7 @@ const ManualBooking: React.FC = () => {
   const [packages, setPackages] = useState<any[]>([]);
   const [selectedAddOns, setSelectedAddOns] = useState<{ [id: number]: number }>({});
   const [selectedAttractions, setSelectedAttractions] = useState<{ [id: number]: number }>({});
+  const [creatingRoom, setCreatingRoom] = useState(false);
   const [form, setForm] = useState({
     customerName: '',
     email: '',
@@ -105,6 +107,50 @@ const ManualBooking: React.FC = () => {
       }
       return { ...prev, [attractionId]: newValue };
     });
+  };
+
+  const handleCreateRoom = async (roomName: string) => {
+    if (!roomName.trim()) return;
+    
+    try {
+      setCreatingRoom(true);
+      const user = getStoredUser();
+      
+      if (!user?.location_id) {
+        alert('User location not found');
+        return;
+      }
+
+      const response = await roomService.createRoom({
+        location_id: user.location_id,
+        name: roomName.trim(),
+        is_available: true
+      });
+
+      if (response.success && response.data) {
+        // Update the package's rooms list
+        setPkg((prev: any) => ({
+          ...prev,
+          rooms: [...(prev.rooms || []), response.data]
+        }));
+
+        // Set the newly created room as selected
+        setForm(prev => ({
+          ...prev,
+          roomId: response.data.id.toString()
+        }));
+
+        // Reload package details to get updated rooms
+        if (form.packageId) {
+          await loadPackageDetails(parseInt(form.packageId));
+        }
+      }
+    } catch (error: any) {
+      console.error('Error creating room:', error);
+      alert('Failed to create room: ' + (error.response?.data?.message || error.message));
+    } finally {
+      setCreatingRoom(false);
+    }
   };
 
   const calculateTotal = () => {
@@ -480,15 +526,37 @@ const ManualBooking: React.FC = () => {
                             ))}
                             <input
                               type="text"
-                              placeholder="Or type room name"
+                              placeholder="Type new room name"
+                              id="new-room-name"
                               className="rounded-lg border border-gray-300 px-4 py-2 text-sm bg-white transition-all placeholder:text-gray-400 focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent"
-                              onChange={(e) => {
-                                const event = {
-                                  target: { name: 'roomId', value: e.target.value }
-                                } as any;
-                                handleInputChange(event);
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  const input = e.target as HTMLInputElement;
+                                  handleCreateRoom(input.value);
+                                  input.value = '';
+                                }
                               }}
                             />
+                            <button
+                              type="button"
+                              className={`p-2 rounded-lg transition-colors ${creatingRoom ? 'opacity-50 cursor-not-allowed' : 'hover:bg-${themeColor}-50'}`}
+                              title="Add new room"
+                              disabled={creatingRoom}
+                              onClick={() => {
+                                const input = document.getElementById('new-room-name') as HTMLInputElement;
+                                if (input?.value) {
+                                  handleCreateRoom(input.value);
+                                  input.value = '';
+                                }
+                              }}
+                            >
+                              {creatingRoom ? (
+                                <div className="animate-spin rounded-full h-4 w-4 border-2 border-gray-400 border-t-transparent"></div>
+                              ) : (
+                                <Plus className={`w-4 h-4 text-${themeColor}-600`} />
+                              )}
+                            </button>
                           </div>
                         </div>
                       </>
