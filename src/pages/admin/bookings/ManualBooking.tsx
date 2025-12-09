@@ -159,13 +159,26 @@ const ManualBooking: React.FC = () => {
     let total = 0;
 
     if (pkg.pricing_type === 'per_person') {
-      total += Number(pkg.price) * form.participants;
+      // Per-person pricing: calculate base participants and additional participants separately
+      const baseParticipants = Math.min(form.participants, pkg.max_participants || form.participants);
+      const extraParticipants = Math.max(0, form.participants - (pkg.max_participants || 0));
+      
+      // Base participants at regular price
+      total += Number(pkg.price) * baseParticipants;
+      
+      // Additional participants at additional price (if set)
+      if (extraParticipants > 0 && pkg.price_per_additional) {
+        total += Number(pkg.price_per_additional) * extraParticipants;
+      } else if (extraParticipants > 0) {
+        // If no additional price set, use regular price for extra participants
+        total += Number(pkg.price) * extraParticipants;
+      }
     } else {
       // Fixed pricing: base price + additional charge for extra participants
       total += Number(pkg.price);
       const extraParticipants = Math.max(0, form.participants - (pkg.max_participants || 0));
-      if (extraParticipants > 0 && pkg.additional_participant_price) {
-        total += Number(pkg.additional_participant_price) * extraParticipants;
+      if (extraParticipants > 0 && pkg.price_per_additional) {
+        total += Number(pkg.price_per_additional) * extraParticipants;
       }
     }
 
@@ -468,12 +481,12 @@ const ManualBooking: React.FC = () => {
                             required
                             className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring--500 focus:border-transparent transition-all"
                           />
-                          {pkg && form.participants > (pkg.max_participants || 0) && pkg.additional_participant_price && (
+                          {pkg && form.participants > (pkg.max_participants || 0) && pkg.price_per_additional && (
                             <p className="text-xs text-amber-600 mt-1.5 flex items-center gap-1">
                               <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
                                 <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                               </svg>
-                              {form.participants - pkg.max_participants} additional participant{form.participants - pkg.max_participants > 1 ? 's' : ''} @ ${pkg.additional_participant_price} each
+                              {form.participants - pkg.max_participants} additional participant{form.participants - pkg.max_participants > 1 ? 's' : ''} @ ${pkg.price_per_additional} each
                             </p>
                           )}
                           {pkg && (
@@ -727,20 +740,43 @@ const ManualBooking: React.FC = () => {
                     <div className="space-y-2 text-sm">
                       {/* Package Price */}
                       {pkg.pricing_type === 'per_person' ? (
-                        <div className="flex justify-between text-gray-700">
-                          <span>Package ({form.participants} × ${pkg.price})</span>
-                          <span className="font-medium">${(Number(pkg.price) * form.participants).toFixed(2)}</span>
-                        </div>
+                        <>
+                          {(() => {
+                            const baseParticipants = Math.min(form.participants, pkg.max_participants || form.participants);
+                            const extraParticipants = Math.max(0, form.participants - (pkg.max_participants || 0));
+                            
+                            return (
+                              <>
+                                <div className="flex justify-between text-gray-700">
+                                  <span>Package ({baseParticipants} × ${pkg.price})</span>
+                                  <span className="font-medium">${(Number(pkg.price) * baseParticipants).toFixed(2)}</span>
+                                </div>
+                                {extraParticipants > 0 && pkg.price_per_additional && (
+                                  <div className="flex justify-between text-amber-700">
+                                    <span>Additional participants ({extraParticipants} × ${pkg.price_per_additional})</span>
+                                    <span className="font-medium">${(Number(pkg.price_per_additional) * extraParticipants).toFixed(2)}</span>
+                                  </div>
+                                )}
+                                {extraParticipants > 0 && !pkg.price_per_additional && (
+                                  <div className="flex justify-between text-gray-700">
+                                    <span>Additional participants ({extraParticipants} × ${pkg.price})</span>
+                                    <span className="font-medium">${(Number(pkg.price) * extraParticipants).toFixed(2)}</span>
+                                  </div>
+                                )}
+                              </>
+                            );
+                          })()}
+                        </>
                       ) : (
                         <>
                           <div className="flex justify-between text-gray-700">
                             <span>Package (base price)</span>
                             <span className="font-medium">${Number(pkg.price).toFixed(2)}</span>
                           </div>
-                          {form.participants > (pkg.max_participants || 0) && pkg.additional_participant_price && (
+                          {form.participants > (pkg.max_participants || 0) && pkg.price_per_additional && (
                             <div className="flex justify-between text-amber-700">
-                              <span>Additional participants ({form.participants - pkg.max_participants} × ${pkg.additional_participant_price})</span>
-                              <span className="font-medium">${(Number(pkg.additional_participant_price) * (form.participants - pkg.max_participants)).toFixed(2)}</span>
+                              <span>Additional participants ({form.participants - pkg.max_participants} × ${pkg.price_per_additional})</span>
+                              <span className="font-medium">${(Number(pkg.price_per_additional) * (form.participants - pkg.max_participants)).toFixed(2)}</span>
                             </div>
                           )}
                         </>
