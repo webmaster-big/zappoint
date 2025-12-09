@@ -454,6 +454,21 @@ const bookingService = {
     const response = await api.post('/bookings/bulk-delete', { ids });
     return response.data;
   },
+
+  /**
+   * Create package room association
+   */
+  async createPackageRoom(data: {
+    package_id: number;
+    room_id: number;
+  }): Promise<{
+    success: boolean;
+    message: string;
+    data: any;
+  }> {
+    const response = await api.post('/packages/room/create', data);
+    return response.data;
+  },
 };
 
 export default bookingService;

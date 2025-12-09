@@ -128,6 +128,19 @@ const ManualBooking: React.FC = () => {
       });
 
       if (response.success && response.data) {
+        // Add room to package_room table
+        if (form.packageId) {
+          try {
+            await bookingService.createPackageRoom({
+              package_id: parseInt(form.packageId),
+              room_id: response.data.id
+            });
+          } catch (error) {
+            console.error('Error linking room to package:', error);
+            // Continue even if linking fails - room is still created
+          }
+        }
+
         // Update the package's rooms list
         setPkg((prev: any) => ({
           ...prev,
