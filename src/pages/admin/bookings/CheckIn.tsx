@@ -477,13 +477,14 @@ const CheckIn: React.FC = () => {
         throw new Error(paymentResponse.message || 'Failed to create payment');
       }
 
-      // Update booking's amount_paid
+      // Update booking's amount_paid and status
       const newAmountPaid = Number(selectedBookingForPayment.amount_paid || 0) + amount;
       const newPaymentStatus = newAmountPaid >= Number(selectedBookingForPayment.total_amount) ? 'paid' : 'partial';
 
       await bookingService.updateBooking(selectedBookingForPayment.id, {
         amount_paid: newAmountPaid,
         payment_status: newPaymentStatus,
+        status: 'confirmed', // Set status to confirmed when payment is made
       });
 
       setToast({ message: 'Payment processed successfully!', type: 'success' });

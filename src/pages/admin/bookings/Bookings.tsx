@@ -764,19 +764,20 @@ const Bookings: React.FC = () => {
         throw new Error(paymentResponse.message || 'Failed to create payment');
       }
 
-      // Update booking's amount_paid
+      // Update booking's amount_paid and status
       const newAmountPaid = selectedBookingForPayment.amountPaid + amount;
       const newPaymentStatus: BookingsPageBooking['paymentStatus'] = newAmountPaid >= selectedBookingForPayment.totalAmount ? 'paid' : 'partial';
 
       await bookingService.updateBooking(Number(selectedBookingForPayment.id), {
         amount_paid: newAmountPaid,
         payment_status: newPaymentStatus,
+        status: 'confirmed', // Set status to confirmed when payment is made
       });
 
       // Update local state
       const updatedBookings = bookings.map(booking =>
         booking.id === selectedBookingForPayment.id
-          ? { ...booking, amountPaid: newAmountPaid, paymentStatus: newPaymentStatus }
+          ? { ...booking, amountPaid: newAmountPaid, paymentStatus: newPaymentStatus, status: 'confirmed' as BookingsPageBooking['status'] }
           : booking
       );
       setBookings(updatedBookings);
