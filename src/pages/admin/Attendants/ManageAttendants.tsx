@@ -21,6 +21,7 @@ import {
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
 import { API_BASE_URL } from '../../../utils/storage';
+import { userService } from '../../../services/UserService';
 import type {
   ManageAttendantsAttendant,
   ManageAttendantsFilterOptions,
@@ -545,29 +546,22 @@ const ManageAttendants = () => {
     }
 
     try {
-      const userData = localStorage.getItem('zapzone_user');
-      const authToken = userData ? JSON.parse(userData).token : null;
+      // Convert string IDs to numbers for the API
+      const ids = selectedAttendants.map(id => parseInt(id));
+      
+      // Use the bulk delete API endpoint
+      const response = await userService.bulkDelete(ids);
 
-      if (!authToken) {
-        alert('Authentication required. Please log in again.');
-        return;
+      if (!response.success) {
+        throw new Error(response.message || 'Failed to delete attendants');
       }
-
-      // Delete all selected attendants
-      await Promise.all(selectedAttendants.map(id => 
-        fetch(`${API_BASE_URL}/users/${id}`, {
-          method: 'DELETE',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${authToken}`,
-          },
-        })
-      ));
 
       // Update local state
       const updatedAttendants = attendants.filter(attendant => !selectedAttendants.includes(attendant.id));
       setAttendants(updatedAttendants);
       setSelectedAttendants([]);
+      
+      alert(`Successfully deleted ${selectedAttendants.length} attendant(s)`);
     } catch (error) {
       console.error('Error deleting attendants:', error);
       alert('Failed to delete some attendants. Please try again.');

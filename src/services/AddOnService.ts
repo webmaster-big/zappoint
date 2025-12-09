@@ -150,6 +150,14 @@ class AddOnService {
     const response = await api.delete(`/addons/${id}`);
     return response.data;
   }
+
+  /**
+   * Bulk delete add-ons
+   */
+  async bulkDelete(ids: number[]): Promise<ApiResponse<null>> {
+    const response = await api.post('/addons/bulk-delete', { ids });
+    return response.data;
+  }
 }
 
 // Export a singleton instance

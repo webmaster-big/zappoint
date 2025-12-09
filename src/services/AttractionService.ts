@@ -156,6 +156,14 @@ class AttractionService {
     const response = await api.patch(`/attractions/${id}/deactivate`);
     return response.data;
   }
+
+  /**
+   * Bulk delete attractions
+   */
+  async bulkDelete(ids: number[]): Promise<ApiResponse<null>> {
+    const response = await api.post('/attractions/bulk-delete', { ids });
+    return response.data;
+  }
 }
 
 // Export a singleton instance

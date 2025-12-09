@@ -248,6 +248,14 @@ class AttractionPurchaseService {
     const response = await api.get(`/attraction-purchases/${purchaseId}/verify`, { params });
     return response.data;
   }
+
+  /**
+   * Bulk delete attraction purchases
+   */
+  async bulkDelete(ids: number[]): Promise<ApiResponse<null>> {
+    const response = await api.post('/attraction-purchases/bulk-delete', { ids });
+    return response.data;
+  }
 }
 
 // Export a singleton instance

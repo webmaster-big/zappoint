@@ -23,6 +23,7 @@ import { useThemeColor } from '../../../hooks/useThemeColor';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
 import { API_BASE_URL } from '../../../utils/storage';
 import { locationService } from '../../../services/LocationService';
+import { userService } from '../../../services/UserService';
 import type { 
   ManageAccountsAccount, 
   ManageAccountsFilterOptions, 
@@ -631,29 +632,22 @@ const ManageAccounts = () => {
     }
 
     try {
-      const userData = localStorage.getItem('zapzone_user');
-      const authToken = userData ? JSON.parse(userData).token : null;
+      // Convert string IDs to numbers for the API
+      const ids = selectedAccounts.map(id => parseInt(id));
+      
+      // Use the bulk delete API endpoint
+      const response = await userService.bulkDelete(ids);
 
-      if (!authToken) {
-        alert('Authentication required. Please log in again.');
-        return;
+      if (!response.success) {
+        throw new Error(response.message || 'Failed to delete accounts');
       }
-
-      // Delete all selected accounts
-      await Promise.all(selectedAccounts.map(id => 
-        fetch(`${API_BASE_URL}/users/${id}`, {
-          method: 'DELETE',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${authToken}`,
-          },
-        })
-      ));
 
       // Update local state
       const updatedAccounts = accounts.filter(account => !selectedAccounts.includes(account.id));
       setAccounts(updatedAccounts);
       setSelectedAccounts([]);
+      
+      alert(`Successfully deleted ${selectedAccounts.length} account(s)`);
     } catch (error) {
       console.error('Error deleting accounts:', error);
       alert('Failed to delete some accounts. Please try again.');

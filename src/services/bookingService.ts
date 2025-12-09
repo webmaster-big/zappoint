@@ -443,6 +443,17 @@ const bookingService = {
     const response = await api.get('/bookings/export', { params: filters });
     return response.data;
   },
+
+  /**
+   * Bulk delete bookings
+   */
+  async bulkDelete(ids: number[]): Promise<{
+    success: boolean;
+    message: string;
+  }> {
+    const response = await api.post('/bookings/bulk-delete', { ids });
+    return response.data;
+  },
 };
 
 export default bookingService;

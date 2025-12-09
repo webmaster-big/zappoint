@@ -7,6 +7,7 @@ import { giftCardService } from './GiftCardService';
 import { promoService } from './PromoService';
 import { notificationStreamService } from './NotificationStreamService';
 import { metricsService } from './MetricsService';
+import { userService } from './UserService';
 
 // Service exports for easy importing
 export { packageService } from './PackageService';
@@ -41,6 +42,9 @@ export type {
   AttendantResponse 
 } from './MetricsService';
 
+export { userService } from './UserService';
+export type { User, UserFilters } from './UserService';
+
 // Settings service exports
 export * from './SettingsService';
 
@@ -60,4 +64,5 @@ export const services = {
   promos: promoService,
   notificationStream: notificationStreamService,
   metrics: metricsService,
+  users: userService,
 } as const;
