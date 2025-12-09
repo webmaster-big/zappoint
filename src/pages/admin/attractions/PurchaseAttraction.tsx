@@ -104,6 +104,15 @@ const PurchaseAttraction = () => {
   const [countrySearch, setCountrySearch] = useState('');
   const [showCountrySuggestions, setShowCountrySuggestions] = useState(false);
   const [countryDebounceTimer, setCountryDebounceTimer] = useState<NodeJS.Timeout | null>(null);
+  const [showAccountModal, setShowAccountModal] = useState(false);
+
+  // Show account modal for non-logged-in users
+  useEffect(() => {
+    const customerData = localStorage.getItem('zapzone_customer');
+    if (!customerData) {
+      setShowAccountModal(true);
+    }
+  }, []);
 
   // Auto-fill form if customer is logged in
   useEffect(() => {
@@ -555,38 +564,64 @@ const PurchaseAttraction = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8">
-        {/* Customer Account Suggestion Banner */}
-        {!selectedCustomerId && currentStep < 4 && (
-          <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4 shadow-sm">
-            <div className="flex items-start gap-3">
-              <div className="flex-shrink-0">
+      {/* Account Modal */}
+      {showAccountModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-fade-in" onClick={() => setShowAccountModal(false)}>
+          <div 
+            className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl animate-scale-in"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="text-center mb-4">
+              <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
                 <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                 </svg>
               </div>
-              <div className="flex-1">
-                <h3 className="text-sm font-semibold text-blue-900 mb-1">Have an account?</h3>
-                <p className="text-xs text-blue-800 mb-3">Sign in to your customer account for faster checkout and to track your purchases.</p>
-                <div className="flex gap-2">
-                  <a
-                    href="/customer/login"
-                    className="inline-flex items-center px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-md hover:bg-blue-700 transition"
-                  >
-                    Sign In
-                  </a>
-                  <a
-                    href="/customer/register"
-                    className="inline-flex items-center px-3 py-1.5 bg-white text-blue-600 text-xs font-medium rounded-md border border-blue-600 hover:bg-blue-50 transition"
-                  >
-                    Create Account
-                  </a>
-                </div>
-              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Create an Account?</h3>
+              <p className="text-sm text-gray-600">Sign up for faster checkout and track your purchases.</p>
+            </div>
+            <div className="flex flex-col gap-2.5">
+              <button
+                onClick={() => navigate('/customer/register')}
+                className="w-full px-4 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-all duration-200 active:scale-95"
+              >
+                Create Account
+              </button>
+              <button
+                onClick={() => setShowAccountModal(false)}
+                className="w-full px-4 py-2.5 bg-white text-gray-700 text-sm font-medium rounded-lg border border-gray-300 hover:bg-gray-50 transition-all duration-200 active:scale-95"
+              >
+                Continue as Guest
+              </button>
             </div>
           </div>
-        )}
-        
+        </div>
+      )}
+
+      <style>{`
+        @keyframes fade-in {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes scale-in {
+          from { 
+            opacity: 0;
+            transform: scale(0.95);
+          }
+          to { 
+            opacity: 1;
+            transform: scale(1);
+          }
+        }
+        .animate-fade-in {
+          animation: fade-in 0.2s ease-out;
+        }
+        .animate-scale-in {
+          animation: scale-in 0.3s ease-out;
+        }
+      `}</style>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
           {/* Left Column - Purchase Form */}
           <div className="lg:col-span-2">

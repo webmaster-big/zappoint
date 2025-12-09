@@ -97,6 +97,15 @@ const BookPackage: React.FC = () => {
   const [showCountrySuggestions, setShowCountrySuggestions] = useState(false);
   const [customerId, setCustomerId] = useState<number | null>(null);
   const [countryDebounceTimer, setCountryDebounceTimer] = useState<NodeJS.Timeout | null>(null);
+  const [showAccountModal, setShowAccountModal] = useState(false);
+
+  // Show account modal for non-logged-in users
+  useEffect(() => {
+    const customerData = localStorage.getItem('zapzone_customer');
+    if (!customerData) {
+      setShowAccountModal(true);
+    }
+  }, []);
 
   // Load package from backend
   useEffect(() => {
@@ -922,6 +931,64 @@ const BookPackage: React.FC = () => {
   return (
     <>
       <ConfirmationModal />
+      
+      {/* Account Modal */}
+      {showAccountModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-fade-in" onClick={() => setShowAccountModal(false)}>
+          <div 
+            className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl animate-scale-in"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="text-center mb-4">
+              <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Create an Account?</h3>
+              <p className="text-sm text-gray-600">Sign up for faster checkout and track your bookings.</p>
+            </div>
+            <div className="flex flex-col gap-2.5">
+              <button
+                onClick={() => window.location.href = '/customer/register'}
+                className="w-full px-4 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-all duration-200 active:scale-95"
+              >
+                Create Account
+              </button>
+              <button
+                onClick={() => setShowAccountModal(false)}
+                className="w-full px-4 py-2.5 bg-white text-gray-700 text-sm font-medium rounded-lg border border-gray-300 hover:bg-gray-50 transition-all duration-200 active:scale-95"
+              >
+                Continue as Guest
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <style>{`
+        @keyframes fade-in {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes scale-in {
+          from { 
+            opacity: 0;
+            transform: scale(0.95);
+          }
+          to { 
+            opacity: 1;
+            transform: scale(1);
+          }
+        }
+        .animate-fade-in {
+          animation: fade-in 0.2s ease-out;
+        }
+        .animate-scale-in {
+          animation: scale-in 0.3s ease-out;
+        }
+      `}</style>
+
       <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center py-8 px-4">
         <div className="w-full max-w-6xl flex flex-col md:flex-row gap-8">
         {/* Left: Booking Form */}

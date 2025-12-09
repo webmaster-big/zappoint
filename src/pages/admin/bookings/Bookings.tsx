@@ -1,6 +1,6 @@
 // src/pages/admin/bookings/Bookings.tsx
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { 
   Eye, 
   Pencil, 
@@ -26,6 +26,7 @@ import { MapPin } from 'lucide-react';
 
 const Bookings: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
+  const navigate = useNavigate();
   const [bookings, setBookings] = useState<BookingsPageBooking[]>([]);
   const [filteredBookings, setFilteredBookings] = useState<BookingsPageBooking[]>([]);
   const [loading, setLoading] = useState(true);
@@ -819,7 +820,7 @@ const Bookings: React.FC = () => {
           </div>
           <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mt-4 sm:mt-0">
             <button
-              onClick={() => window.location.href = '/bookings/manual'}
+              onClick={() => navigate('/bookings/manual')}
               className={`flex items-center px-4 py-2 bg-${fullColor} text-white rounded-lg hover:bg-${themeColor}-700 shadow-sm transition-colors`}
             >
               <Plus className="h-4 w-4 mr-2" />

@@ -1,9 +1,11 @@
-
 import { Route, Routes } from "react-router-dom"
 import NotFound from "./pages/NotFound";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import PageTitleSetter from "./components/PageTitleSetter";
 import MainLayout from "./layouts/AdminMainLayout";
+import ProtectedRoute from "./components/auth/ProtectedRoute";
+import CustomerProtectedRoute from "./components/auth/CustomerProtectedRoute";
+import PublicRoute from "./components/auth/PublicRoute";
 import Home from "./pages/Home"
 import Login from "./pages/auth/Login"
 import CreatePackage from "./pages/admin/packages/CreatePackage"
@@ -66,23 +68,34 @@ function App() {
     <ThemeProvider>
       <PageTitleSetter />
       <Routes>
-        <Route path="/admin" element={<Login />} />
-        <Route path="/admin/register" element={<CompanyAdminRegistration />} />
+        {/* Public Routes - Restricted (redirect if authenticated) */}
+        <Route path="/admin" element={<PublicRoute restricted><Login /></PublicRoute>} />
+        <Route path="/admin/register" element={<PublicRoute restricted><CompanyAdminRegistration /></PublicRoute>} />
+        <Route path="/customer/login" element={<PublicRoute restricted><CustomerLogin /></PublicRoute>} />
+        <Route path="/customer/register" element={<PublicRoute restricted><CustomerRegister /></PublicRoute>} />
+        
+        {/* Public Routes - Unrestricted */}
         <Route path="/home" element={<Home />} />
-        <Route path="/customer/login" element={<CustomerLogin />} />
-        <Route path="/customer/register" element={<CustomerRegister />} />
-        <Route element={<CustomerLayout />}>
-          <Route path="/" element={<EntertainmentLandingPage />} />
-          <Route path="/customer/reservations" element={<CustomerReservations />} />
-          <Route path="/customer/gift-cards" element={<CustomerGiftCards />} />
-          <Route path="/customer/notifications" element={<CustomerNotifications />} />
-        </Route>
         <Route path="/book/package/:location/:id" element={<BookPackage />} />
         <Route path="/purchase/attraction/:location/:id" element={<PurchaseAttraction />} />
-        <Route element={<MainLayout />}> 
-          <Route path="/attendant/dashboard" element={<AttendantDashboard />} />
-          <Route path="/manager/dashboard" element={<LocationManagerDashboard />} />
-          <Route path="/company/dashboard" element={<CompanyDashboard />} />
+        <Route path="/embed/booking/:packageId" element={<EmbedBookingRoute />} />
+        
+        {/* Customer Routes */}
+        <Route element={<CustomerLayout />}>
+          <Route path="/" element={<EntertainmentLandingPage />} />
+          <Route path="/customer/reservations" element={<CustomerProtectedRoute><CustomerReservations /></CustomerProtectedRoute>} />
+          <Route path="/customer/gift-cards" element={<CustomerProtectedRoute><CustomerGiftCards /></CustomerProtectedRoute>} />
+          <Route path="/customer/notifications" element={<CustomerProtectedRoute><CustomerNotifications /></CustomerProtectedRoute>} />
+        </Route>
+        
+        {/* Protected Admin Routes */}
+        <Route element={<ProtectedRoute><MainLayout /></ProtectedRoute>}> 
+          {/* Dashboard Routes - Role-specific */}
+          <Route path="/attendant/dashboard" element={<ProtectedRoute allowedRoles={['attendant']}><AttendantDashboard /></ProtectedRoute>} />
+          <Route path="/manager/dashboard" element={<ProtectedRoute allowedRoles={['location_manager']}><LocationManagerDashboard /></ProtectedRoute>} />
+          <Route path="/company/dashboard" element={<ProtectedRoute allowedRoles={['company_admin']}><CompanyDashboard /></ProtectedRoute>} />
+          
+          {/* Attractions Routes - All authenticated users */}
           <Route path="/attractions/create" element={<CreateAttraction />} />
           <Route path="/edit-attraction/:id" element={<EditAttraction />} />
           <Route path="/attractions/edit/:id" element={<EditAttraction />} />
@@ -92,6 +105,8 @@ function App() {
           <Route path="/attractions/purchases/:id" element={<PurchaseDetails />} />
           <Route path="/attractions/purchases/create" element={<CreatePurchase />} />
           <Route path="/attractions/check-in" element={<AttractionCheckIn />} />
+          
+          {/* Packages Routes - All authenticated users */}
           <Route path="/packages/create" element={<CreatePackage />} />
           <Route path="/packages/edit/:id" element={<EditPackage />} />
           <Route path="/packages" element={<Packages />} />
@@ -100,6 +115,8 @@ function App() {
           <Route path="/packages/rooms" element={<Rooms />} />
           <Route path="/packages/add-ons" element={<ManageAddOns />} />
           <Route path="/packages/gift-cards" element={<GiftCard />} />
+          
+          {/* Bookings Routes - All authenticated users */}
           <Route path="/bookings" element={<Bookings />} />
           <Route path="/bookings/edit/:id" element={<EditBooking />} />
           <Route path="/bookings/:id" element={<ViewBooking />} />
@@ -107,29 +124,39 @@ function App() {
           <Route path="/bookings/create" element={<OnsiteBooking />} />
           <Route path="/bookings/manual" element={<ManualBooking />} />
           <Route path="/bookings/check-in" element={<CheckIn />} />
+          
+          {/* Customers Routes - All authenticated users */}
           <Route path="/customers/analytics" element={<CustomerAnalytics />} />
           <Route path="/customers" element={<CustomerListing />} />
-          <Route path="/admin/profile" element={<CompanyAdminProfile />} />
-          <Route path="/manager/profile" element={<LocationManagerProfile />} />
-          <Route path="/attendant/profile" element={<AttendantProfile />} />
-          <Route path="/manager/attendant/create" element={<CreateAttendant />} />
-          <Route path="/manager/attendants" element={<ManageAttendants />} />
-          <Route path="/manager/attendants/activity" element={<AttendantActivityLogs />} />
-          <Route path="/manager/attendants/performance" element={<AttendantsPerformance />} />
+          
+          {/* Profile Routes - Role-specific */}
+          <Route path="/admin/profile" element={<ProtectedRoute allowedRoles={['company_admin']}><CompanyAdminProfile /></ProtectedRoute>} />
+          <Route path="/manager/profile" element={<ProtectedRoute allowedRoles={['location_manager']}><LocationManagerProfile /></ProtectedRoute>} />
+          <Route path="/attendant/profile" element={<ProtectedRoute allowedRoles={['attendant']}><AttendantProfile /></ProtectedRoute>} />
+          
+          {/* Manager-only Routes */}
+          <Route path="/manager/attendant/create" element={<ProtectedRoute allowedRoles={['location_manager']}><CreateAttendant /></ProtectedRoute>} />
+          <Route path="/manager/attendants" element={<ProtectedRoute allowedRoles={['location_manager']}><ManageAttendants /></ProtectedRoute>} />
+          <Route path="/manager/attendants/activity" element={<ProtectedRoute allowedRoles={['location_manager']}><AttendantActivityLogs /></ProtectedRoute>} />
+          <Route path="/manager/attendants/performance" element={<ProtectedRoute allowedRoles={['location_manager']}><AttendantsPerformance /></ProtectedRoute>} />
+          <Route path="/manager/analytics" element={<ProtectedRoute allowedRoles={['location_manager']}><LocationAnalytics /></ProtectedRoute>} />
+          
+          {/* Company Admin-only Routes */}
+          <Route path="/admin/analytics" element={<ProtectedRoute allowedRoles={['company_admin']}><CompanyAnalytics /></ProtectedRoute>} />
+          <Route path="/admin/activity" element={<ProtectedRoute allowedRoles={['company_admin']}><LocationActivityLogs /></ProtectedRoute>} />
+          <Route path="/admin/attendants/performance" element={<ProtectedRoute allowedRoles={['company_admin']}><AttendantsPerformance /></ProtectedRoute>} />
+          <Route path="/admin/users" element={<ProtectedRoute allowedRoles={['company_admin']}><ManageAccounts /></ProtectedRoute>} />
+          <Route path="/admin/users/create" element={<ProtectedRoute allowedRoles={['company_admin']}><CreateAccount /></ProtectedRoute>} />
+          
+          {/* Shared Routes - All authenticated users */}
           <Route path="/notifications" element={<Notifications />} />
-          <Route path="/admin/analytics" element={<CompanyAnalytics />} />
-          <Route path="/manager/analytics" element={<LocationAnalytics />} />
-          <Route path="/admin/activity" element={<LocationActivityLogs />} />
-          <Route path="/admin/attendants/performance" element={<AttendantsPerformance />} />
-          <Route path="/admin/users" element={<ManageAccounts />} />
-          <Route path="/admin/users/create" element={<CreateAccount />} />
-          {/* Settings routes for all roles */}
-          <Route path="/attendant/settings" element={<Settings />} />
-          <Route path="/manager/settings" element={<Settings />} />
-          <Route path="/admin/settings" element={<Settings />} />
+          
+          {/* Settings Routes - Role-specific */}
+          <Route path="/attendant/settings" element={<ProtectedRoute allowedRoles={['attendant']}><Settings /></ProtectedRoute>} />
+          <Route path="/manager/settings" element={<ProtectedRoute allowedRoles={['location_manager']}><Settings /></ProtectedRoute>} />
+          <Route path="/admin/settings" element={<ProtectedRoute allowedRoles={['company_admin']}><Settings /></ProtectedRoute>} />
         </Route>
-        {/* Add embed route */}
-        <Route path="/embed/booking/:packageId" element={<EmbedBookingRoute />} />
+        
         {/* 404 Not Found Route */}
         <Route path="*" element={<NotFound />} />
       </Routes>

@@ -29,16 +29,22 @@ import { notificationStreamService, type NotificationObject } from '../../servic
 const addDescriptions = (navItems: NavItem[]): NavItem[] => {
   const descriptions: Record<string, string> = {
     'Dashboard': 'Overview of your account and recent activity',
+    'Attractions': 'Manage all attraction-related activities',
     'Manage Attractions': 'View and edit all available attractions',
     'Create Attractions': 'Add new attractions to your offerings',
+    'Manage Purchases': 'View and manage attraction purchases',
     'Create Purchase': 'Add a new purchase for attractions',
     'Check-in Scanner': 'Scan QR codes to check in attraction tickets',
     'Calendar View': 'See all bookings in a calendar format',
     'Bookings': 'Manage existing bookings and reservations',
+    'Manage Bookings': 'View and edit all bookings',
     'Create Bookings': 'Create new bookings for customers',
     'Check-in with QR Scanner': 'Scan QR codes for customer check-ins',
     'Packages': 'View and manage package offerings',
+    'Manage Packages': 'View and edit all packages',
     'Create Package': 'Create new package deals',
+    'Rooms': 'Manage package rooms and availability',
+    'Add-ons': 'Manage package add-ons and extras',
     'Promos': 'Manage promotional offers and discounts',
     'Gift Cards': 'Handle gift card sales and redemptions',
     'Customer Analytics': 'Analytics and insights about your customers',
@@ -46,12 +52,16 @@ const addDescriptions = (navItems: NavItem[]): NavItem[] => {
     'Profile': 'Update your personal profile information',
     'Settings': 'Configure application settings',
     'Attendants Management': 'Manage attendant accounts and permissions',
+    'Manage Attendants': 'View and edit attendant accounts',
+    'Create Attendant': 'Create new attendant account',
+    'Activity Log': 'View user activity history',
     'Create Account': 'Create new user accounts',
     'Account Activity Log': 'View user activity history',
     'Analytics & Reports': 'Business intelligence and reporting',
     'Activity Logs': 'System-wide activity tracking',
     'Notifications': 'Manage your notification preferences',
-    'User Management': 'Administer user accounts and permissions'
+    'User Management': 'Administer user accounts and permissions',
+    'Manage Accounts': 'View and edit user accounts'
   };
 
   return navItems.map(item => {
@@ -839,8 +849,34 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
           </div>
 
           {/* Search and Notifications */}
-          {!isMinimized && (
-            <div className="p-4" ref={searchRef}>
+          <div className="p-4" ref={searchRef}>
+            {isMinimized ? (
+              <div className="flex items-center justify-center">
+                {/* Notification Icon with Badge - Minimized */}
+                <Link
+                  to="/notifications"
+                  className={`relative p-2 rounded-md hover:bg-${themeColor}-50 transition-colors flex-shrink-0`}
+                  onClick={() => {
+                    if (window.innerWidth < 1024) {
+                      setIsOpen(false);
+                    }
+                  }}
+                >
+                  <Bell size={20} className="text-gray-700" />
+                  {unreadNotifications > 0 && (
+                    <span
+                      className="absolute -top-1 -right-1 min-w-[18px] h-[18px] flex items-center justify-center px-1 text-xs font-bold text-white rounded-full border-2 border-white"
+                      style={{
+                        backgroundColor: getThemeColorValue(),
+                        fontSize: '10px'
+                      }}
+                    >
+                      {unreadNotifications > 99 ? '99+' : unreadNotifications}
+                    </span>
+                  )}
+                </Link>
+              </div>
+            ) : (
               <div className="flex items-center gap-2">
                 <div className="relative flex-1">
                   <Search size={18} className="absolute left-3 top-2.5 text-gray-800" />
@@ -902,8 +938,8 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
                   )}
                 </Link>
               </div>
-            </div>
-          )}
+            )}
+          </div>
           {/* Navigation */}
           <nav className="flex-1 px-4 py-4 space-y-2 hidden-scrollbar" style={{ overflowY: 'auto', overflowX: 'visible' }}>
             {navigation.map((item, idx) => (
