@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Calendar, Package, Users, DollarSign, Save, Plus, Minus } from 'lucide-react';
+import { ArrowLeft, Calendar, Package, Users, Save, Plus, Minus } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import bookingService from '../../../services/bookingService';
 import { getStoredUser, getImageUrl } from '../../../utils/storage';
@@ -246,14 +246,15 @@ const ManualBooking: React.FC = () => {
         <p className="text-gray-600 mt-2">Add historical booking records without payment processing or slot validation</p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Package className={`h-5 w-5 text-${fullColor}`} />
-            <h2 className="text-xl font-semibold text-gray-900">Select Package</h2>
-          </div>
+      <form onSubmit={handleSubmit} className="space-y-5">
+        {/* Package Selection */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+          <h2 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
+            <Package className={`h-4 w-4 text-${fullColor}`} />
+            Select Package
+          </h2>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2.5">
             {Array.isArray(packages) && packages.map((p: any) => (
               <div
                 key={p.id}
@@ -274,25 +275,22 @@ const ManualBooking: React.FC = () => {
                     <img
                       src={getImageUrl(p.image)}
                       alt={p.name}
-                      className="w-full h-28 object-cover"
+                      className="w-full h-20 object-cover"
                     />
                     {form.packageId === p.id.toString() && (
-                      <div className={`absolute top-2 right-2 bg-${fullColor} text-white rounded-full p-1.5 shadow-lg`}>
-                        <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
+                      <div className={`absolute top-1 right-1 bg-${fullColor} text-white rounded-full p-1 shadow-lg`}>
+                        <svg className="h-2.5 w-2.5" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                         </svg>
                       </div>
                     )}
                   </div>
                 )}
-                <div className="p-3">
-                  <h3 className="font-semibold text-sm text-gray-900 mb-1 line-clamp-1">{p.name}</h3>
-                  {p.description && (
-                    <p className="text-xs text-gray-500 mb-2 line-clamp-1">{p.description}</p>
-                  )}
-                  <div className="flex items-baseline gap-1.5">
-                    <span className={`text-lg font-bold text-${fullColor}`}>${p.price}</span>
-                    <span className="text-[10px] text-gray-500">{p.pricing_type === 'per_person' ? '/person' : 'fixed'}</span>
+                <div className="p-2">
+                  <h3 className="font-semibold text-xs text-gray-900 mb-0.5 line-clamp-1">{p.name}</h3>
+                  <div className="flex items-baseline gap-1">
+                    <span className={`text-sm font-bold text-${fullColor}`}>${p.price}</span>
+                    <span className="text-[9px] text-gray-500">{p.pricing_type === 'per_person' ? '/p' : 'fix'}</span>
                   </div>
                 </div>
               </div>
@@ -302,465 +300,414 @@ const ManualBooking: React.FC = () => {
 
         {pkg && (
           <>
-            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-100 p-4">
-              <div className="flex items-start gap-4">
-                {pkg.image && (
-                  <img
-                    src={getImageUrl(pkg.image)}
-                    alt={pkg.name}
-                    className="w-32 h-24 object-cover rounded-lg shadow-sm"
-                  />
-                )}
-                <div className="flex-1">
-                  <h3 className="text-base font-bold text-gray-900 mb-2">{pkg.name}</h3>
-                  <div className="flex gap-4 mb-2">
-                    <div>
-                      <p className="text-xs text-gray-600">Duration</p>
-                      <p className="text-sm font-semibold text-gray-900">{pkg.duration} {pkg.duration_unit}</p>
+            {/* Combined Form Section */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+              
+              {/* Left Column - Customer & Booking Details */}
+              <div className="lg:col-span-2 space-y-5">
+                
+                {/* Customer Information */}
+                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+                  <h2 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                    <Users className={`h-4 w-4 text-${fullColor}`} />
+                    Customer Information
+                  </h2>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="col-span-2">
+                      <label className="block text-xs font-medium text-gray-700 mb-1.5">Customer Name *</label>
+                      <input
+                        type="text"
+                        name="customerName"
+                        value={form.customerName}
+                        onChange={handleInputChange}
+                        required
+                        className={`w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
+                        placeholder="John Doe"
+                      />
                     </div>
+                    
                     <div>
-                      <p className="text-xs text-gray-600">Max Participants</p>
-                      <p className="text-sm font-semibold text-gray-900">{pkg.max_participants}</p>
+                      <label className="block text-xs font-medium text-gray-700 mb-1.5">Email *</label>
+                      <input
+                        type="email"
+                        name="email"
+                        value={form.email}
+                        onChange={handleInputChange}
+                        required
+                        className={`w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
+                        placeholder="john@example.com"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1.5">Phone</label>
+                      <input
+                        type="tel"
+                        name="phone"
+                        value={form.phone}
+                        onChange={handleInputChange}
+                        className={`w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
+                        placeholder="+1 (555) 123-4567"
+                      />
                     </div>
                   </div>
-                  {pkg.description && (
-                    <p className="text-xs text-gray-600 line-clamp-2">{pkg.description}</p>
-                  )}
                 </div>
+
+                {/* Booking Details */}
+                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+                  <h2 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                    <Calendar className={`h-4 w-4 text-${fullColor}`} />
+                    Booking Details
+                  </h2>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1.5">Booking Date *</label>
+                      <input
+                        type="date"
+                        name="bookingDate"
+                        value={form.bookingDate}
+                        onChange={handleInputChange}
+                        required
+                        className={`w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1.5">Booking Time *</label>
+                      <input
+                        type="time"
+                        name="bookingTime"
+                        value={form.bookingTime}
+                        onChange={handleInputChange}
+                        required
+                        className={`w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1.5">Participants *</label>
+                      <input
+                        type="number"
+                        name="participants"
+                        value={form.participants}
+                        onChange={handleInputChange}
+                        min="1"
+                        required
+                        className={`w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
+                      />
+                      {pkg && pkg.pricing_type === 'fixed' && form.participants > (pkg.max_participants || 0) && pkg.additional_participant_price && (
+                        <p className="text-[10px] text-amber-600 mt-1">
+                          +{form.participants - pkg.max_participants} extra @ ${pkg.additional_participant_price}
+                        </p>
+                      )}
+                    </div>
+                    
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1.5">Status *</label>
+                      <select
+                        name="status"
+                        value={form.status}
+                        onChange={handleInputChange}
+                        className={`w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
+                      >
+                        <option value="completed">Completed</option>
+                        <option value="confirmed">Confirmed</option>
+                        <option value="checked-in">Checked In</option>
+                        <option value="cancelled">Cancelled</option>
+                        <option value="pending">Pending</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Room Selection */}
+                {pkg.rooms && pkg.rooms.length > 0 && (
+                  <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+                    <h3 className="text-sm font-semibold text-gray-900 mb-2.5">Select Room <span className="text-xs font-normal text-gray-500">(optional)</span></h3>
+                    <div className="grid grid-cols-3 md:grid-cols-5 gap-2">
+                      <div
+                        onClick={() => {
+                          const event = {
+                            target: { name: 'roomId', value: '' }
+                          } as any;
+                          handleInputChange(event);
+                        }}
+                        className={`cursor-pointer border-2 rounded-lg p-2 text-center transition-all hover:scale-105 ${
+                          form.roomId === ''
+                            ? `border-${themeColor}-500 bg-${themeColor}-50 shadow-md`
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        <p className="font-medium text-xs text-gray-900">Any</p>
+                      </div>
+                      {Array.isArray(pkg.rooms) && pkg.rooms.map((room: any) => (
+                        <div
+                          key={room.id}
+                          onClick={() => {
+                            const event = {
+                              target: { name: 'roomId', value: room.id.toString() }
+                            } as any;
+                            handleInputChange(event);
+                          }}
+                          className={`cursor-pointer border-2 rounded-lg p-2 transition-all hover:scale-105 ${
+                            form.roomId === room.id.toString()
+                              ? `border-${themeColor}-500 bg-${themeColor}-50 shadow-md`
+                              : 'border-gray-200 hover:border-gray-300'
+                          }`}
+                        >
+                          <h4 className="font-semibold text-xs text-gray-900 mb-0.5 truncate">{room.name}</h4>
+                          <div className="flex items-center justify-center gap-0.5 text-[10px] text-gray-600">
+                            <Users className="h-2.5 w-2.5" />
+                            <span>{room.capacity}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Add-ons & Attractions in compact grid */}
+                {(pkg.add_ons && pkg.add_ons.length > 0) || (pkg.attractions && pkg.attractions.length > 0) ? (
+                  <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+                    <h3 className="text-sm font-semibold text-gray-900 mb-2.5">Add-ons & Attractions <span className="text-xs font-normal text-gray-500">(optional)</span></h3>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                      {Array.isArray(pkg.add_ons) && pkg.add_ons.map((addOn: any) => {
+                        const isSelected = selectedAddOns[addOn.id] > 0;
+                        const quantity = selectedAddOns[addOn.id] || 0;
+                        
+                        return (
+                          <div
+                            key={addOn.id}
+                            className={`border-2 rounded-lg overflow-hidden transition-all ${
+                              isSelected 
+                                ? `border-${themeColor}-500 shadow-md ring-1 ring-${themeColor}-200` 
+                                : 'border-gray-200 hover:border-gray-300'
+                            }`}
+                          >
+                            {addOn.image && (
+                              <img 
+                                src={getImageUrl(addOn.image)} 
+                                alt={addOn.name} 
+                                className="w-full h-16 object-cover" 
+                              />
+                            )}
+                            <div className="p-2">
+                              <h4 className="font-semibold text-xs text-gray-900 line-clamp-1 mb-0.5">{addOn.name}</h4>
+                              <div className="flex items-baseline gap-1 mb-1.5">
+                                <span className={`text-xs font-bold text-${fullColor}`}>${addOn.price}</span>
+                                <span className="text-[9px] text-gray-500">{addOn.pricing_type === 'per_person' ? '/p' : '/u'}</span>
+                              </div>
+                              
+                              <div className="flex items-center justify-between gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleAddOnChange(addOn.id, -1)}
+                                  disabled={!isSelected}
+                                  className={`p-1 rounded bg-white border border-gray-300 hover:border-${themeColor}-400 disabled:opacity-40`}
+                                >
+                                  <Minus className="h-2.5 w-2.5 text-gray-600" />
+                                </button>
+                                <span className="font-bold text-xs text-gray-900 min-w-[20px] text-center">{quantity}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleAddOnChange(addOn.id, 1)}
+                                  className={`p-1 rounded bg-${fullColor} text-white hover:opacity-90`}
+                                >
+                                  <Plus className="h-2.5 w-2.5" />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                      
+                      {Array.isArray(pkg.attractions) && pkg.attractions.map((attraction: any) => {
+                        const isSelected = selectedAttractions[attraction.id] > 0;
+                        const quantity = selectedAttractions[attraction.id] || 0;
+                        
+                        return (
+                          <div
+                            key={attraction.id}
+                            className={`border-2 rounded-lg overflow-hidden transition-all ${
+                              isSelected 
+                                ? `border-${themeColor}-500 shadow-md ring-1 ring-${themeColor}-200` 
+                                : 'border-gray-200 hover:border-gray-300'
+                            }`}
+                          >
+                            {attraction.image && (
+                              <img 
+                                src={getImageUrl(attraction.image)} 
+                                alt={attraction.name} 
+                                className="w-full h-16 object-cover" 
+                              />
+                            )}
+                            <div className="p-2">
+                              <h4 className="font-semibold text-xs text-gray-900 line-clamp-1 mb-0.5">{attraction.name}</h4>
+                              <div className="flex items-baseline gap-1 mb-1.5">
+                                <span className={`text-xs font-bold text-${fullColor}`}>${attraction.price}</span>
+                                <span className="text-[9px] text-gray-500">{attraction.pricing_type === 'per_person' ? '/p' : '/u'}</span>
+                              </div>
+                              
+                              <div className="flex items-center justify-between gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleAttractionChange(attraction.id, -1)}
+                                  disabled={!isSelected}
+                                  className={`p-1 rounded bg-white border border-gray-300 hover:border-${themeColor}-400 disabled:opacity-40`}
+                                >
+                                  <Minus className="h-2.5 w-2.5 text-gray-600" />
+                                </button>
+                                <span className="font-bold text-xs text-gray-900 min-w-[20px] text-center">{quantity}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleAttractionChange(attraction.id, 1)}
+                                  className={`p-1 rounded bg-${fullColor} text-white hover:opacity-90`}
+                                >
+                                  <Plus className="h-2.5 w-2.5" />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : null}
+
+              </div>
+
+              {/* Right Column - Package Info & Payment */}
+              <div className="space-y-5">
+                
+                {/* Package Summary */}
+                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-100 p-4 sticky top-4">
+                  <div className="flex items-start gap-3 mb-3">
+                    {pkg.image && (
+                      <img
+                        src={getImageUrl(pkg.image)}
+                        alt={pkg.name}
+                        className="w-16 h-16 object-cover rounded-lg shadow-sm"
+                      />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-sm font-bold text-gray-900 mb-1 line-clamp-2">{pkg.name}</h3>
+                      <div className="flex gap-3 text-xs text-gray-600">
+                        <div>
+                          <span className="font-medium">{pkg.duration} {pkg.duration_unit}</span>
+                        </div>
+                        <div>
+                          <span className="font-medium">Max: {pkg.max_participants}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Payment Section */}
+                  <div className="space-y-3 pt-3 border-t border-blue-200">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs font-medium text-gray-700">Calculated:</span>
+                      <span className="text-lg font-bold text-blue-600">${Number(calculateTotal() || 0).toFixed(2)}</span>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Total Amount</label>
+                      <input
+                        type="number"
+                        name="totalAmount"
+                        value={form.totalAmount}
+                        onChange={handleInputChange}
+                        step="0.01"
+                        min="0"
+                        placeholder={`${Number(calculateTotal() || 0).toFixed(2)}`}
+                        className={`w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500`}
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Amount Paid</label>
+                      <input
+                        type="number"
+                        name="amountPaid"
+                        value={form.amountPaid}
+                        onChange={handleInputChange}
+                        step="0.01"
+                        min="0"
+                        placeholder="Auto"
+                        className={`w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500`}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Payment Method</label>
+                      <select
+                        name="paymentMethod"
+                        value={form.paymentMethod}
+                        onChange={handleInputChange}
+                        className={`w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500`}
+                      >
+                        <option value="cash">Cash</option>
+                        <option value="card">Card</option>
+                      </select>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Payment Status</label>
+                      <select
+                        name="paymentStatus"
+                        value={form.paymentStatus}
+                        onChange={handleInputChange}
+                        className={`w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500`}
+                      >
+                        <option value="paid">Paid</option>
+                        <option value="partial">Partial</option>
+                        <option value="pending">Pending</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Notes</label>
+                      <textarea
+                        name="notes"
+                        value={form.notes}
+                        onChange={handleInputChange}
+                        rows={3}
+                        className={`w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500`}
+                        placeholder="Additional notes..."
+                      />
+                    </div>
+                  </div>
+                </div>
+
               </div>
             </div>
-
-            {pkg.rooms && pkg.rooms.length > 0 && (
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-                <h3 className="text-base font-semibold text-gray-900 mb-3">Select Room <span className="text-xs font-normal text-gray-500">(optional)</span></h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
-                  <div
-                    onClick={() => {
-                      const event = {
-                        target: { name: 'roomId', value: '' }
-                      } as any;
-                      handleInputChange(event);
-                    }}
-                    className={`cursor-pointer border-2 rounded-lg p-3 text-center transition-all hover:scale-105 ${
-                      form.roomId === ''
-                        ? `border-${themeColor}-500 bg-${themeColor}-50 shadow-md`
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    <p className="font-medium text-sm text-gray-900">Any Room</p>
-                    <p className="text-xs text-gray-500 mt-0.5">No preference</p>
-                  </div>
-                  {Array.isArray(pkg.rooms) && pkg.rooms.map((room: any) => (
-                    <div
-                      key={room.id}
-                      onClick={() => {
-                        const event = {
-                          target: { name: 'roomId', value: room.id.toString() }
-                        } as any;
-                        handleInputChange(event);
-                      }}
-                      className={`cursor-pointer border-2 rounded-lg p-3 transition-all hover:scale-105 ${
-                        form.roomId === room.id.toString()
-                          ? `border-${themeColor}-500 bg-${themeColor}-50 shadow-md`
-                          : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                    >
-                      <h4 className="font-semibold text-sm text-gray-900 mb-1.5">{room.name}</h4>
-                      <div className="flex items-center justify-center gap-1 text-xs text-gray-600">
-                        <Users className="h-3.5 w-3.5" />
-                        <span>{room.capacity}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {pkg.add_ons && pkg.add_ons.length > 0 && (
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-                <h3 className="text-base font-semibold text-gray-900 mb-3">Package Add-ons <span className="text-xs font-normal text-gray-500">(optional)</span></h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {Array.isArray(pkg.add_ons) && pkg.add_ons.map((addOn: any) => {
-                    const isSelected = selectedAddOns[addOn.id] > 0;
-                    const quantity = selectedAddOns[addOn.id] || 0;
-                    
-                    return (
-                      <div
-                        key={addOn.id}
-                        className={`border-2 rounded-lg overflow-hidden transition-all hover:scale-105 ${
-                          isSelected 
-                            ? `border-${themeColor}-500 shadow-lg ring-2 ring-${themeColor}-200` 
-                            : 'border-gray-200 hover:border-gray-300 hover:shadow-md'
-                        }`}
-                      >
-                        {addOn.image && (
-                          <img 
-                            src={getImageUrl(addOn.image)} 
-                            alt={addOn.name} 
-                            className="w-full h-24 object-cover" 
-                          />
-                        )}
-                        <div className="p-3">
-                          <h4 className="font-semibold text-sm text-gray-900 line-clamp-1">{addOn.name}</h4>
-                          {addOn.description && (
-                            <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{addOn.description}</p>
-                          )}
-                          <div className="flex items-baseline gap-1.5 mt-1.5 mb-2">
-                            <span className={`text-base font-bold text-${fullColor}`}>${addOn.price}</span>
-                            <span className="text-[10px] text-gray-500">{addOn.pricing_type === 'per_person' ? '/person' : '/unit'}</span>
-                          </div>
-                          
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-xs font-medium text-gray-600">Qty:</span>
-                            <div className="flex items-center gap-1.5">
-                              <button
-                                type="button"
-                                onClick={() => handleAddOnChange(addOn.id, -1)}
-                                disabled={!isSelected}
-                                className={`p-1.5 rounded bg-white border border-gray-300 hover:border-${themeColor}-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed`}
-                              >
-                                <Minus className="h-3 w-3 text-gray-600" />
-                              </button>
-                              <span className="font-bold text-sm text-gray-900 w-6 text-center">{quantity}</span>
-                              <button
-                                type="button"
-                                onClick={() => handleAddOnChange(addOn.id, 1)}
-                                className={`p-1.5 rounded bg-${fullColor} text-white hover:opacity-90 transition-colors`}
-                              >
-                                <Plus className="h-3 w-3" />
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {pkg.attractions && pkg.attractions.length > 0 && (
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-                <h3 className="text-base font-semibold text-gray-900 mb-3">Additional Attractions <span className="text-xs font-normal text-gray-500">(optional)</span></h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {Array.isArray(pkg.attractions) && pkg.attractions.map((attraction: any) => {
-                    const isSelected = selectedAttractions[attraction.id] > 0;
-                    const quantity = selectedAttractions[attraction.id] || 0;
-                    
-                    return (
-                      <div
-                        key={attraction.id}
-                        className={`border-2 rounded-lg overflow-hidden transition-all hover:scale-105 ${
-                          isSelected 
-                            ? `border-${themeColor}-500 shadow-lg ring-2 ring-${themeColor}-200` 
-                            : 'border-gray-200 hover:border-gray-300 hover:shadow-md'
-                        }`}
-                      >
-                        {attraction.image && (
-                          <img 
-                            src={getImageUrl(attraction.image)} 
-                            alt={attraction.name} 
-                            className="w-full h-24 object-cover" 
-                          />
-                        )}
-                        <div className="p-3">
-                          <h4 className="font-semibold text-sm text-gray-900 line-clamp-1">{attraction.name}</h4>
-                          {attraction.description && (
-                            <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{attraction.description}</p>
-                          )}
-                          <div className="flex items-baseline gap-1.5 mt-1.5 mb-2">
-                            <span className={`text-base font-bold text-${fullColor}`}>${attraction.price}</span>
-                            <span className="text-[10px] text-gray-500">{attraction.pricing_type === 'per_person' ? '/person' : '/unit'}</span>
-                          </div>
-                          
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-xs font-medium text-gray-600">Qty:</span>
-                            <div className="flex items-center gap-1.5">
-                              <button
-                                type="button"
-                                onClick={() => handleAttractionChange(attraction.id, -1)}
-                                disabled={!isSelected}
-                                className={`p-1.5 rounded bg-white border border-gray-300 hover:border-${themeColor}-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed`}
-                              >
-                                <Minus className="h-3 w-3 text-gray-600" />
-                              </button>
-                              <span className="font-bold text-sm text-gray-900 w-6 text-center">{quantity}</span>
-                              <button
-                                type="button"
-                                onClick={() => handleAttractionChange(attraction.id, 1)}
-                                className={`p-1.5 rounded bg-${fullColor} text-white hover:opacity-90 transition-colors`}
-                              >
-                                <Plus className="h-3 w-3" />
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
           </>
         )}
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Users className={`h-5 w-5 text-${fullColor}`} />
-            <h2 className="text-xl font-semibold text-gray-900">Customer Information</h2>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Customer Name *
-              </label>
-              <input
-                type="text"
-                name="customerName"
-                value={form.customerName}
-                onChange={handleInputChange}
-                required
-                className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
-                placeholder="John Doe"
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Email *
-              </label>
-              <input
-                type="email"
-                name="email"
-                value={form.email}
-                onChange={handleInputChange}
-                required
-                className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
-                placeholder="john@example.com"
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Phone
-              </label>
-              <input
-                type="tel"
-                name="phone"
-                value={form.phone}
-                onChange={handleInputChange}
-                className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
-                placeholder="+1 (555) 123-4567"
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Calendar className={`h-5 w-5 text-${fullColor}`} />
-            <h2 className="text-xl font-semibold text-gray-900">Booking Details</h2>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Booking Date *
-              </label>
-              <input
-                type="date"
-                name="bookingDate"
-                value={form.bookingDate}
-                onChange={handleInputChange}
-                required
-                className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Booking Time *
-              </label>
-              <input
-                type="time"
-                name="bookingTime"
-                value={form.bookingTime}
-                onChange={handleInputChange}
-                required
-                className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Participants *
-              </label>
-              <input
-                type="number"
-                name="participants"
-                value={form.participants}
-                onChange={handleInputChange}
-                min="1"
-                required
-                className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
-              />
-              {pkg && pkg.pricing_type === 'fixed' && form.participants > (pkg.max_participants || 0) && pkg.additional_participant_price && (
-                <p className="text-xs text-amber-600 mt-1">
-                  ⚠️ {form.participants - pkg.max_participants} extra participant(s) @ ${pkg.additional_participant_price} each
-                </p>
-              )}
-              {pkg && pkg.max_participants && (
-                <p className="text-xs text-gray-500 mt-1">
-                  Base capacity: {pkg.max_participants} participants
-                </p>
-              )}
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Booking Status *
-              </label>
-              <select
-                name="status"
-                value={form.status}
-                onChange={handleInputChange}
-                className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
-              >
-                <option value="completed">Completed</option>
-                <option value="confirmed">Confirmed</option>
-                <option value="checked-in">Checked In</option>
-                <option value="cancelled">Cancelled</option>
-                <option value="pending">Pending</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <DollarSign className={`h-5 w-5 text-${fullColor}`} />
-            <h2 className="text-xl font-semibold text-gray-900">Payment Information</h2>
-          </div>
-          
-          <div className="mb-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-100">
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-sm font-medium text-gray-700">Calculated Total:</span>
-              <span className="text-lg font-bold text-blue-600">${Number(calculateTotal() || 0).toFixed(2)}</span>
-            </div>
-            <p className="text-xs text-gray-500">Based on selected package, add-ons, and attractions</p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Total Amount <span className="text-xs font-normal text-gray-500">(override calculated)</span>
-              </label>
-              <input
-                type="number"
-                name="totalAmount"
-                value={form.totalAmount}
-                onChange={handleInputChange}
-                step="0.01"
-                min="0"
-                placeholder={`${Number(calculateTotal() || 0).toFixed(2)}`}
-                className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
-              />
-              <p className="text-xs text-gray-500 mt-1">Leave blank to use calculated total</p>
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Amount Paid <span className="text-xs font-normal text-gray-500">(custom amount)</span>
-              </label>
-              <input
-                type="number"
-                name="amountPaid"
-                value={form.amountPaid}
-                onChange={handleInputChange}
-                step="0.01"
-                min="0"
-                placeholder="Auto-calculated based on payment status"
-                className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
-              />
-              <p className="text-xs text-gray-500 mt-1">Leave blank for auto-calculation</p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Payment Method *
-              </label>
-              <select
-                name="paymentMethod"
-                value={form.paymentMethod}
-                onChange={handleInputChange}
-                className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
-              >
-                <option value="cash">Cash</option>
-                <option value="card">Card</option>
-              </select>
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Payment Status *
-              </label>
-              <select
-                name="paymentStatus"
-                value={form.paymentStatus}
-                onChange={handleInputChange}
-                className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
-              >
-                <option value="paid">Paid</option>
-                <option value="partial">Partial</option>
-                <option value="pending">Pending</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Additional Notes</h2>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Notes
-            </label>
-            <textarea
-              name="notes"
-              value={form.notes}
-              onChange={handleInputChange}
-              rows={4}
-              className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
-              placeholder="Add any additional notes about this booking..."
-            />
-          </div>
-        </div>
-
-        <div className="flex gap-4 justify-end">
+        {/* Action Buttons */}
+        <div className="flex gap-3 justify-end">
           <button
             type="button"
             onClick={() => navigate('/bookings')}
             disabled={loading}
-            className="px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            className="px-5 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={loading || !form.packageId}
-            className={`px-6 py-3 bg-${fullColor} text-white rounded-lg hover:bg-${themeColor}-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2`}
+            className={`px-5 py-2.5 bg-${fullColor} text-white rounded-lg text-sm font-medium hover:bg-${themeColor}-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2`}
           >
             {loading ? (
               <>
-                <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
+                <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
                 Creating...
               </>
             ) : (
               <>
-                <Save className="h-5 w-5" />
+                <Save className="h-4 w-4" />
                 Record Booking
               </>
             )}
