@@ -4,7 +4,6 @@ import { ArrowLeft, Calendar, Package, Users, DollarSign, Save, Plus, Minus } fr
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import bookingService from '../../../services/bookingService';
 import { getStoredUser, getImageUrl } from '../../../utils/storage';
-import { API_BASE_URL } from '../../../utils/storage';
 
 const ManualBooking: React.FC = () => {
   const navigate = useNavigate();
@@ -47,18 +46,25 @@ const ManualBooking: React.FC = () => {
       setLoadingPackages(true);
       const user = getStoredUser();
       
-      const packagesResponse = await fetch(`${API_BASE_URL}/packages`, {
-        headers: {
-          'Authorization': `Bearer ${user?.token}`,
-          'Accept': 'application/json'
-        }
-      });
-      const packagesData = await packagesResponse.json();
-      if (packagesData.success && packagesData.data) {
-        setPackages(packagesData.data);
+      if (!user) {
+        console.error('No user found');
+        setLoadingPackages(false);
+        return;
+      }
+
+      // Use the same method as OnsiteBooking - backend will filter based on user role
+      const response = await bookingService.getPackages({user_id: user.id});
+      
+      console.log('📦 Packages response:', response);
+      
+      if (response.success && response.data && response.data.packages) {
+        setPackages(Array.isArray(response.data.packages) ? response.data.packages : []);
+      } else {
+        setPackages([]);
       }
     } catch (error) {
       console.error('Error loading packages:', error);
+      setPackages([]);
     } finally {
       setLoadingPackages(false);
     }
