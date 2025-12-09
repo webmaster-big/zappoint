@@ -86,9 +86,9 @@ const CheckIn: React.FC = () => {
 
   // Filter bookings based on search term
   useEffect(() => {
-    // Start with all bookings that match pending, confirmed or checked-in status
+    // Start with all bookings that match confirmed or checked-in status
     let result = bookings.filter(booking => 
-      booking.status === 'pending' || booking.status === 'confirmed' || booking.status === 'checked-in'
+      booking.status === 'confirmed' || booking.status === 'checked-in'
     );
 
     if (searchTerm) {
@@ -370,7 +370,6 @@ const CheckIn: React.FC = () => {
   const handleCancelCheckIn = () => {
     setShowVerificationModal(false);
     setVerifiedBooking(null);
-    startScanning();
   };
 
   const handleCheckIn = async (booking: Booking) => {
@@ -853,7 +852,7 @@ const CheckIn: React.FC = () => {
                   </div>
                 )}
 
-                {(verifiedBooking.status === 'confirmed' || verifiedBooking.status === 'pending') && (
+                {verifiedBooking.status === 'confirmed' && (
                   <div className="mb-3 sm:mb-6 p-2 sm:p-4 bg-green-50 border border-green-200 rounded-lg flex items-start gap-2 sm:gap-3">
                     <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 flex-shrink-0 mt-0.5" />
                     <div>
@@ -1164,10 +1163,10 @@ const CheckIn: React.FC = () => {
                   Cancel
                 </button>
                 
-                {(verifiedBooking.status === 'confirmed' || verifiedBooking.status === 'pending') && (
+                {verifiedBooking.status === 'confirmed' && (
                   <>
                     {/* Show payment button if not fully paid */}
-                    {(verifiedBooking.payment_status !== 'paid') && (
+                    {verifiedBooking.payment_status !== 'paid' && (
                       <button
                         onClick={() => handleOpenPaymentModal(verifiedBooking)}
                         disabled={processing || processingPayment}
@@ -1179,31 +1178,32 @@ const CheckIn: React.FC = () => {
                       </button>
                     )}
                     
-                    {/* Check-in button - disabled if not paid */}
-                    <button
-                      onClick={handleConfirmCheckIn}
-                      disabled={processing || verifiedBooking.payment_status !== 'paid'}
-                      className={`flex-1 px-3 sm:px-6 py-2 sm:py-3 text-sm sm:text-base bg-${themeColor}-600 text-white rounded-lg hover:bg-${themeColor}-700 transition-colors font-medium flex items-center justify-center gap-1 sm:gap-2 disabled:opacity-50 disabled:cursor-not-allowed`}
-                      title={verifiedBooking.payment_status !== 'paid' ? 'Payment required before check-in' : ''}
-                    >
-                      {processing ? (
-                        <>
-                          <RefreshCw className="h-4 w-4 sm:h-5 sm:w-5 animate-spin" />
-                          <span className="hidden sm:inline">Checking In...</span>
-                          <span className="sm:hidden">Wait...</span>
-                        </>
-                      ) : (
-                        <>
-                          <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5" />
-                          <span className="hidden sm:inline">{verifiedBooking.payment_status !== 'paid' ? 'Payment Required' : 'Confirm Check-In'}</span>
-                          <span className="sm:hidden">{verifiedBooking.payment_status !== 'paid' ? 'Need Pay' : 'Check-In'}</span>
-                        </>
-                      )}
-                    </button>
+                    {/* Check-in button - only show if paid */}
+                    {verifiedBooking.payment_status === 'paid' && (
+                      <button
+                        onClick={handleConfirmCheckIn}
+                        disabled={processing}
+                        className={`flex-1 px-3 sm:px-6 py-2 sm:py-3 text-sm sm:text-base bg-${themeColor}-600 text-white rounded-lg hover:bg-${themeColor}-700 transition-colors font-medium flex items-center justify-center gap-1 sm:gap-2 disabled:opacity-50 disabled:cursor-not-allowed`}
+                      >
+                        {processing ? (
+                          <>
+                            <RefreshCw className="h-4 w-4 sm:h-5 sm:w-5 animate-spin" />
+                            <span className="hidden sm:inline">Checking In...</span>
+                            <span className="sm:hidden">Wait...</span>
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5" />
+                            <span className="hidden sm:inline">Confirm Check-In</span>
+                            <span className="sm:hidden">Check-In</span>
+                          </>
+                        )}
+                      </button>
+                    )}
                   </>
                 )}
                 
-                {(verifiedBooking.status !== 'confirmed' && verifiedBooking.status !== 'pending') && (
+                {verifiedBooking.status !== 'confirmed' && (
                   <button
                     onClick={handleCancelCheckIn}
                     className={`flex-1 px-3 sm:px-6 py-2 sm:py-3 text-sm sm:text-base bg-${themeColor}-600 text-white rounded-lg hover:bg-${themeColor}-700 transition-colors font-medium`}
@@ -1630,10 +1630,10 @@ const CheckIn: React.FC = () => {
                   Close
                 </button>
                 
-                {(selectedBooking.status === 'confirmed' || selectedBooking.status === 'pending') && (
+                {selectedBooking.status === 'confirmed' && (
                   <>
                     {/* Payment button - shown if not fully paid */}
-                    {(selectedBooking.payment_status !== 'paid') && (
+                    {selectedBooking.payment_status !== 'paid' && (
                       <button
                         onClick={() => {
                           handleOpenPaymentModal(selectedBooking);
@@ -1648,30 +1648,31 @@ const CheckIn: React.FC = () => {
                       </button>
                     )}
                     
-                    {/* Check-in button - disabled if not paid */}
-                    <button
-                      onClick={() => {
-                        handleCheckIn(selectedBooking);
-                        closeModal();
-                      }}
-                      disabled={processing || selectedBooking.payment_status !== 'paid'}
-                      className={`flex-1 px-3 sm:px-6 py-2 sm:py-3 text-sm sm:text-base bg-${themeColor}-600 text-white rounded-lg hover:bg-${themeColor}-700 transition-colors font-medium flex items-center justify-center gap-1 sm:gap-2 disabled:opacity-50 disabled:cursor-not-allowed`}
-                      title={selectedBooking.payment_status !== 'paid' ? 'Payment required before check-in' : ''}
-                    >
-                      {processing ? (
-                        <>
-                          <RefreshCw className="h-4 w-4 sm:h-5 sm:w-5 animate-spin" />
-                          <span className="hidden sm:inline">Checking In...</span>
-                          <span className="sm:hidden">Wait...</span>
-                        </>
-                      ) : (
-                        <>
-                          <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5" />
-                          <span className="hidden sm:inline">{selectedBooking.payment_status !== 'paid' ? 'Payment Required' : 'Check In Now'}</span>
-                          <span className="sm:hidden">{selectedBooking.payment_status !== 'paid' ? 'Need Pay' : 'Check-In'}</span>
-                        </>
-                      )}
-                    </button>
+                    {/* Check-in button - only show if paid */}
+                    {selectedBooking.payment_status === 'paid' && (
+                      <button
+                        onClick={() => {
+                          handleCheckIn(selectedBooking);
+                          closeModal();
+                        }}
+                        disabled={processing}
+                        className={`flex-1 px-3 sm:px-6 py-2 sm:py-3 text-sm sm:text-base bg-${themeColor}-600 text-white rounded-lg hover:bg-${themeColor}-700 transition-colors font-medium flex items-center justify-center gap-1 sm:gap-2 disabled:opacity-50 disabled:cursor-not-allowed`}
+                      >
+                        {processing ? (
+                          <>
+                            <RefreshCw className="h-4 w-4 sm:h-5 sm:w-5 animate-spin" />
+                            <span className="hidden sm:inline">Checking In...</span>
+                            <span className="sm:hidden">Wait...</span>
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5" />
+                            <span className="hidden sm:inline">Check In Now</span>
+                            <span className="sm:hidden">Check-In</span>
+                          </>
+                        )}
+                      </button>
+                    )}
                   </>
                 )}
               </div>
