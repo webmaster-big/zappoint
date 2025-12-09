@@ -535,7 +535,7 @@ const ManualBooking: React.FC = () => {
           <div className="mb-4 p-4 bg-blue-50 rounded-lg">
             <div className="flex justify-between items-center">
               <span className="text-lg font-semibold text-gray-900">Total Amount:</span>
-              <span className="text-2xl font-bold text-blue-600">${calculateTotal().toFixed(2)}</span>
+              <span className="text-2xl font-bold text-blue-600">${(calculateTotal() || 0).toFixed(2)}</span>
             </div>
           </div>
 
