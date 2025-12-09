@@ -7,14 +7,11 @@ import {
   Calendar, 
   Users, 
   Tag, 
-  Gift, 
   MapPin, 
   Clock,
   DollarSign,
   CheckCircle,
-  XCircle,
-  Copy,
-  FileText
+  XCircle
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { packageService, type Package } from '../../../services';
@@ -30,6 +27,7 @@ const PackageDetails = () => {
 
   useEffect(() => {
     loadPackageDetails();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const loadPackageDetails = async () => {
@@ -59,11 +57,6 @@ const PackageDetails = () => {
     }
   };
 
-  const copyToClipboard = (text: string, label: string) => {
-    navigator.clipboard.writeText(text);
-    setToast({ message: `${label} copied to clipboard!`, type: 'success' });
-  };
-
   const formatAvailability = (pkg: Package) => {
     if (!pkg.availability_type) return "Not specified";
     
@@ -85,8 +78,6 @@ const PackageDetails = () => {
     }
     return "Not specified";
   };
-
-  const bookingDomain = window.location.origin;
 
   if (loading) {
     return (
@@ -115,22 +106,7 @@ const PackageDetails = () => {
   const daysOfWeek = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 
   return (
-    <div className="min-h-screen px-6 py-8 animate-fade-in-up">
-      <style>{`
-        @keyframes fade-in-up {
-          from {
-            opacity: 0;
-            transform: translateY(20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        .animate-fade-in-up {
-          animation: fade-in-up 0.4s ease-out;
-        }
-      `}</style>
+    <div className="min-h-screen bg-gray-50 px-6 py-8">
       {toast && (
         <Toast
           message={toast.message}
@@ -141,13 +117,14 @@ const PackageDetails = () => {
 
       {/* Header */}
       <div className="mb-8">
-        <button
-          onClick={() => navigate('/packages')}
-          className={`flex items-center text-gray-600 hover:text-${fullColor} mb-4 transition-colors`}
-        >
-          <ArrowLeft className="h-5 w-5 mr-2" />
-          Back to Packages
-        </button>
+        <div className="flex items-center gap-3 mb-4">
+          <button
+            onClick={() => navigate('/packages')}
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            <ArrowLeft className="h-5 w-5 text-gray-600" />
+          </button>
+        </div>
         <div className="flex justify-between items-start">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">{packageData.name}</h1>
@@ -179,14 +156,11 @@ const PackageDetails = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
+      <div className="max-w-5xl mx-auto">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100">
           {/* Description */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <h2 className={`text-xl font-bold text-${fullColor} mb-4 flex items-center`}>
-              <FileText className="h-5 w-5 mr-2" />
-              Description
-            </h2>
+          <div className="p-6 border-b border-gray-100">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Description</h2>
             <p className="text-gray-700 leading-relaxed">
               {packageData.description || "No description provided"}
             </p>
@@ -194,83 +168,91 @@ const PackageDetails = () => {
 
           {/* Features */}
           {packageData.features && (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-              <h2 className={`text-xl font-bold text-${fullColor} mb-4 flex items-center`}>
-                <Tag className="h-5 w-5 mr-2" />
-                Features
-              </h2>
+            <div className="p-6 border-b border-gray-100">
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">Features</h2>
               <p className="text-gray-700 leading-relaxed">{packageData.features}</p>
             </div>
           )}
 
           {/* Package Details */}
-          <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 hover:shadow-xl transition-shadow">
-            <h2 className={`text-2xl font-bold text-${fullColor} mb-6 flex items-center gap-2 pb-3 border-b-2 border-${themeColor}-200`}>
-              <Tag className="h-6 w-6" />
-              Package Details
-            </h2>
+          <div className="p-6 border-b border-gray-100">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Package Details</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="text-sm text-gray-600 flex items-center">
-                  <Tag className="h-4 w-4 mr-1" />
-                  Category
-                </label>
-                <p className="text-gray-900 font-medium">{packageData.category || "No category"}</p>
+              <div className="flex items-start gap-3">
+                <div className={`p-2 bg-${fullColor.replace('-600', '')}-100 rounded-lg`}>
+                  <Tag className={`h-5 w-5 text-${fullColor}`} />
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Category</p>
+                  <p className="font-medium text-gray-900">{packageData.category || "No category"}</p>
+                </div>
               </div>
-              <div>
-                <label className="text-sm text-gray-600 flex items-center">
-                  <DollarSign className="h-4 w-4 mr-1" />
-                  Base Price
-                </label>
-                <p className="text-gray-900 font-medium">${Number(packageData.price).toFixed(2)}</p>
+              <div className="flex items-start gap-3">
+                <div className={`p-2 bg-${fullColor.replace('-600', '')}-100 rounded-lg`}>
+                  <DollarSign className={`h-5 w-5 text-${fullColor}`} />
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Base Price</p>
+                  <p className="font-medium text-gray-900">${Number(packageData.price).toFixed(2)}</p>
+                </div>
               </div>
               {packageData.price_per_additional && (
-                <div>
-                  <label className="text-sm text-gray-600 flex items-center">
-                    <DollarSign className="h-4 w-4 mr-1" />
-                    Price Per Additional
-                  </label>
-                  <p className="text-gray-900 font-medium">${Number(packageData.price_per_additional).toFixed(2)}</p>
+                <div className="flex items-start gap-3">
+                  <div className={`p-2 bg-${fullColor.replace('-600', '')}-100 rounded-lg`}>
+                    <DollarSign className={`h-5 w-5 text-${fullColor}`} />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Price Per Additional</p>
+                    <p className="font-medium text-gray-900">${Number(packageData.price_per_additional).toFixed(2)}</p>
+                  </div>
                 </div>
               )}
               {packageData.max_participants && (
-                <div>
-                  <label className="text-sm text-gray-600 flex items-center">
-                    <Users className="h-4 w-4 mr-1" />
-                    Max Participants
-                  </label>
-                  <p className="text-gray-900 font-medium">{packageData.max_participants} people</p>
+                <div className="flex items-start gap-3">
+                  <div className={`p-2 bg-${fullColor.replace('-600', '')}-100 rounded-lg`}>
+                    <Users className={`h-5 w-5 text-${fullColor}`} />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Max Participants</p>
+                    <p className="font-medium text-gray-900">{packageData.max_participants} people</p>
+                  </div>
                 </div>
               )}
               {packageData.duration && (
-                <div>
-                  <label className="text-sm text-gray-600 flex items-center">
-                    <Clock className="h-4 w-4 mr-1" />
-                    Duration
-                  </label>
-                  <p className="text-gray-900 font-medium">
-                    {packageData.duration} {packageData.duration_unit || 'hours'}
-                  </p>
+                <div className="flex items-start gap-3">
+                  <div className={`p-2 bg-${fullColor.replace('-600', '')}-100 rounded-lg`}>
+                    <Clock className={`h-5 w-5 text-${fullColor}`} />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Duration</p>
+                    <p className="font-medium text-gray-900">
+                      {packageData.duration} {packageData.duration_unit || 'hours'}
+                    </p>
+                  </div>
                 </div>
               )}
               {packageData.location && (
-                <div>
-                  <label className="text-sm text-gray-600 flex items-center">
-                    <MapPin className="h-4 w-4 mr-1" />
-                    Location
-                  </label>
-                  <p className="text-gray-900 font-medium">{packageData.location.name}</p>
+                <div className="flex items-start gap-3">
+                  <div className={`p-2 bg-${fullColor.replace('-600', '')}-100 rounded-lg`}>
+                    <MapPin className={`h-5 w-5 text-${fullColor}`} />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Location</p>
+                    <p className="font-medium text-gray-900">{packageData.location.name}</p>
+                  </div>
                 </div>
               )}
               {packageData.created_at && (
-                <div>
-                  <label className="text-sm text-gray-600 flex items-center">
-                    <Calendar className="h-4 w-4 mr-1" />
-                    Created
-                  </label>
-                  <p className="text-gray-900 font-medium">
-                    {new Date(packageData.created_at).toLocaleDateString()}
-                  </p>
+                <div className="flex items-start gap-3">
+                  <div className={`p-2 bg-${fullColor.replace('-600', '')}-100 rounded-lg`}>
+                    <Calendar className={`h-5 w-5 text-${fullColor}`} />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Created</p>
+                    <p className="font-medium text-gray-900">
+                      {new Date(packageData.created_at).toLocaleDateString()}
+                    </p>
+                  </div>
                 </div>
               )}
             </div>
@@ -278,8 +260,8 @@ const PackageDetails = () => {
 
           {/* Availability */}
           {packageData.availability_type === 'daily' && packageData.available_days && (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">Weekly Availability</h2>
+            <div className="p-6 border-b border-gray-100">
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">Weekly Availability</h2>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {daysOfWeek.map((day) => {
                   const isAvailable = packageData.available_days?.includes(day as never);
@@ -307,19 +289,16 @@ const PackageDetails = () => {
 
           {/* Other Availability Types */}
           {packageData.availability_type !== 'daily' && (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
-                <Calendar className="h-5 w-5 mr-2" />
-                Availability
-              </h2>
+            <div className="p-6 border-b border-gray-100">
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">Availability</h2>
               <p className="text-gray-700">{formatAvailability(packageData)}</p>
             </div>
           )}
 
           {/* Rooms */}
           {packageData.rooms && packageData.rooms.length > 0 && (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">Available Rooms</h2>
+            <div className="p-6 border-b border-gray-100">
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">Available Rooms</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {packageData.rooms.map((room: string | { name?: string; capacity?: number }, idx: number) => {
                   const roomObj = typeof room === 'string' ? { name: room } : room;
@@ -343,8 +322,8 @@ const PackageDetails = () => {
 
           {/* Attractions */}
           {packageData.attractions && packageData.attractions.length > 0 && (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">Included Attractions</h2>
+            <div className="p-6 border-b border-gray-100">
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">Included Attractions</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {packageData.attractions.map((attraction: string | { name?: string; price?: number }, idx: number) => {
                   const attractionObj = typeof attraction === 'string' ? { name: attraction } : attraction;
@@ -367,8 +346,8 @@ const PackageDetails = () => {
 
           {/* Add-ons */}
           {packageData.add_ons && packageData.add_ons.length > 0 && (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">Available Add-ons</h2>
+            <div className="p-6 border-b border-gray-100">
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">Available Add-ons</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {packageData.add_ons.map((addon: string | { name?: string; price?: number }, idx: number) => {
                   const addonObj = typeof addon === 'string' ? { name: addon } : addon;
@@ -389,11 +368,8 @@ const PackageDetails = () => {
 
           {/* Promos */}
           {packageData.promos && packageData.promos.length > 0 && (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
-                <Tag className="h-5 w-5 mr-2" />
-                Active Promotions
-              </h2>
+            <div className="p-6 border-b border-gray-100">
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">Active Promotions</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {packageData.promos.map((promo: string | { name?: string; code?: string }, idx: number) => {
                   const promoObj = typeof promo === 'string' ? { name: promo } : promo;
@@ -409,11 +385,8 @@ const PackageDetails = () => {
 
           {/* Gift Cards */}
           {packageData.gift_cards && packageData.gift_cards.length > 0 && (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
-                <Gift className="h-5 w-5 mr-2" />
-                Applicable Gift Cards
-              </h2>
+            <div className="p-6">
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">Applicable Gift Cards</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {packageData.gift_cards.map((giftCard: string | { code?: string }, idx: number) => {
                   const cardObj = typeof giftCard === 'string' ? { code: giftCard } : giftCard;
@@ -426,116 +399,6 @@ const PackageDetails = () => {
               </div>
             </div>
           )}
-        </div>
-
-        {/* Sidebar */}
-        <div className="space-y-6">
-          {/* Quick Actions */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <h2 className={`text-xl font-bold text-${fullColor} mb-4`}>Quick Actions</h2>
-            <div className="space-y-3">
-              <button
-                onClick={() => navigate(`/packages/edit/${id}`)}
-                className={`w-full flex items-center justify-center px-4 py-2 bg-${themeColor}-600 text-white rounded-lg hover:bg-${themeColor}-700 transition-colors`}
-              >
-                <Edit className="h-4 w-4 mr-2" />
-                Edit Package
-              </button>
-              <button
-                onClick={handleDelete}
-                className="w-full flex items-center justify-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Delete Package
-              </button>
-            </div>
-          </div>
-
-          {/* Quick Stats */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Stats</h2>
-            <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Base Price</span>
-                <span className="font-semibold text-gray-900">${Number(packageData.price).toFixed(2)}</span>
-              </div>
-              {packageData.max_participants && (
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Max Participants</span>
-                  <span className="font-semibold text-gray-900">{packageData.max_participants}</span>
-                </div>
-              )}
-              {packageData.duration && (
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Duration</span>
-                  <span className="font-semibold text-gray-900">
-                    {packageData.duration} {packageData.duration_unit || 'hrs'}
-                  </span>
-                </div>
-              )}
-              <div className="flex justify-between items-center pt-3 border-t">
-                <span className="text-sm text-gray-600">Status</span>
-                <span className={`font-semibold ${packageData.is_active ? 'text-green-600' : 'text-red-600'}`}>
-                  {packageData.is_active ? 'Active' : 'Inactive'}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Booking Link */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Booking Link</h2>
-            <div className="space-y-3">
-              <div className={`text-xs break-all bg-gray-50 rounded-lg px-3 py-2 border border-gray-200 text-gray-700`}>
-                {`${bookingDomain}/book/package/${packageData.location?.name ? packageData.location.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') : `location-${packageData.location_id}`}/${packageData.id}`}
-              </div>
-              <button
-                onClick={() => {
-                  const link = `${bookingDomain}/book/package/${packageData.location?.name ? packageData.location.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') : `location-${packageData.location_id}`}/${packageData.id}`;
-                  copyToClipboard(link, 'Booking link');
-                }}
-                className={`w-full flex items-center justify-center px-4 py-2 border border-${themeColor}-600 text-${fullColor} rounded-lg hover:bg-${themeColor}-50`}
-              >
-                <Copy className="h-4 w-4 mr-2" />
-                Copy Link
-              </button>
-            </div>
-          </div>
-
-          {/* Package Info */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Package Information</h2>
-            <div className="space-y-3 text-sm">
-              <div>
-                <span className="text-gray-600 block mb-1">Package ID</span>
-                <p className="font-mono text-gray-900">{packageData.id}</p>
-              </div>
-              {packageData.created_at && (
-                <div>
-                  <span className="text-gray-600 block mb-1">Created</span>
-                  <p className="text-gray-900">
-                    {new Date(packageData.created_at).toLocaleDateString('en-US', {
-                      year: 'numeric',
-                      month: 'short',
-                      day: 'numeric'
-                    })}
-                  </p>
-                </div>
-              )}
-              {packageData.updated_at && (
-                <div>
-                  <span className="text-gray-600 block mb-1">Last Updated</span>
-                  <p className="text-gray-900">
-                    {new Date(packageData.updated_at).toLocaleDateString('en-US', {
-                      year: 'numeric',
-                      month: 'short',
-                      day: 'numeric'
-                    })}
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
         </div>
       </div>
     </div>
