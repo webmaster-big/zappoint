@@ -247,7 +247,7 @@ const ManualBooking: React.FC = () => {
             <h2 className="text-xl font-semibold text-gray-900">Select Package</h2>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-3">
             {Array.isArray(packages) && packages.map((p: any) => (
               <div
                 key={p.id}
@@ -257,33 +257,37 @@ const ManualBooking: React.FC = () => {
                   } as any;
                   handleInputChange(event);
                 }}
-                className={`cursor-pointer border-2 rounded-lg overflow-hidden transition-all ${
+                className={`cursor-pointer border-2 rounded-lg overflow-hidden transition-all hover:scale-105 ${
                   form.packageId === p.id.toString()
-                    ? `border-${themeColor}-500 bg-${themeColor}-50 shadow-md`
-                    : 'border-gray-200 hover:border-gray-300 hover:shadow-sm'
+                    ? `border-${themeColor}-500 shadow-lg ring-2 ring-${themeColor}-200`
+                    : 'border-gray-200 hover:border-gray-300 hover:shadow-md'
                 }`}
               >
                 {p.image && (
-                  <img
-                    src={getImageUrl(p.image)}
-                    alt={p.name}
-                    className="w-full h-40 object-cover"
-                  />
-                )}
-                <div className="p-4">
-                  <h3 className="font-semibold text-gray-900 mb-1">{p.name}</h3>
-                  {p.description && (
-                    <p className="text-xs text-gray-600 mb-2 line-clamp-2">{p.description}</p>
-                  )}
-                  <div className="flex items-baseline gap-2 mt-2">
-                    <span className={`text-xl font-bold text-${fullColor}`}>${p.price}</span>
-                    <span className="text-xs text-gray-500">{p.pricing_type === 'per_person' ? 'per person' : 'fixed'}</span>
+                  <div className="relative">
+                    <img
+                      src={getImageUrl(p.image)}
+                      alt={p.name}
+                      className="w-full h-28 object-cover"
+                    />
+                    {form.packageId === p.id.toString() && (
+                      <div className={`absolute top-2 right-2 bg-${fullColor} text-white rounded-full p-1.5 shadow-lg`}>
+                        <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                    )}
                   </div>
-                  {form.packageId === p.id.toString() && (
-                    <div className={`mt-3 pt-3 border-t border-${themeColor}-200 text-center`}>
-                      <span className={`text-xs font-medium text-${fullColor}`}>✓ Selected</span>
-                    </div>
+                )}
+                <div className="p-3">
+                  <h3 className="font-semibold text-sm text-gray-900 mb-1 line-clamp-1">{p.name}</h3>
+                  {p.description && (
+                    <p className="text-xs text-gray-500 mb-2 line-clamp-1">{p.description}</p>
                   )}
+                  <div className="flex items-baseline gap-1.5">
+                    <span className={`text-lg font-bold text-${fullColor}`}>${p.price}</span>
+                    <span className="text-[10px] text-gray-500">{p.pricing_type === 'per_person' ? '/person' : 'fixed'}</span>
+                  </div>
                 </div>
               </div>
             ))}
@@ -292,38 +296,38 @@ const ManualBooking: React.FC = () => {
 
         {pkg && (
           <>
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Package Details</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-100 p-4">
+              <div className="flex items-start gap-4">
                 {pkg.image && (
-                  <div className="md:col-span-2">
-                    <img
-                      src={getImageUrl(pkg.image)}
-                      alt={pkg.name}
-                      className="w-full h-48 object-cover rounded-lg"
-                    />
-                  </div>
+                  <img
+                    src={getImageUrl(pkg.image)}
+                    alt={pkg.name}
+                    className="w-32 h-24 object-cover rounded-lg shadow-sm"
+                  />
                 )}
-                <div>
-                  <p className="text-sm text-gray-600">Duration</p>
-                  <p className="font-medium">{pkg.duration} {pkg.duration_unit}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Max Participants</p>
-                  <p className="font-medium">{pkg.max_participants}</p>
-                </div>
-                <div className="md:col-span-2">
-                  <p className="text-sm text-gray-600">Description</p>
-                  <p className="text-gray-700">{pkg.description}</p>
+                <div className="flex-1">
+                  <h3 className="text-base font-bold text-gray-900 mb-2">{pkg.name}</h3>
+                  <div className="flex gap-4 mb-2">
+                    <div>
+                      <p className="text-xs text-gray-600">Duration</p>
+                      <p className="text-sm font-semibold text-gray-900">{pkg.duration} {pkg.duration_unit}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-600">Max Participants</p>
+                      <p className="text-sm font-semibold text-gray-900">{pkg.max_participants}</p>
+                    </div>
+                  </div>
+                  {pkg.description && (
+                    <p className="text-xs text-gray-600 line-clamp-2">{pkg.description}</p>
+                  )}
                 </div>
               </div>
             </div>
 
             {pkg.rooms && pkg.rooms.length > 0 && (
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Select Room</h3>
-                <p className="text-sm text-gray-600 mb-4">Choose a preferred room (optional)</p>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+                <h3 className="text-base font-semibold text-gray-900 mb-3">Select Room <span className="text-xs font-normal text-gray-500">(optional)</span></h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
                   <div
                     onClick={() => {
                       const event = {
@@ -331,14 +335,14 @@ const ManualBooking: React.FC = () => {
                       } as any;
                       handleInputChange(event);
                     }}
-                    className={`cursor-pointer border-2 rounded-lg p-4 text-center transition-all ${
+                    className={`cursor-pointer border-2 rounded-lg p-3 text-center transition-all hover:scale-105 ${
                       form.roomId === ''
-                        ? `border-${themeColor}-500 bg-${themeColor}-50`
+                        ? `border-${themeColor}-500 bg-${themeColor}-50 shadow-md`
                         : 'border-gray-200 hover:border-gray-300'
                     }`}
                   >
-                    <p className="font-medium text-gray-900">No room preference</p>
-                    <p className="text-xs text-gray-500 mt-1">Any available room</p>
+                    <p className="font-medium text-sm text-gray-900">Any Room</p>
+                    <p className="text-xs text-gray-500 mt-0.5">No preference</p>
                   </div>
                   {Array.isArray(pkg.rooms) && pkg.rooms.map((room: any) => (
                     <div
@@ -349,22 +353,17 @@ const ManualBooking: React.FC = () => {
                         } as any;
                         handleInputChange(event);
                       }}
-                      className={`cursor-pointer border-2 rounded-lg p-4 transition-all ${
+                      className={`cursor-pointer border-2 rounded-lg p-3 transition-all hover:scale-105 ${
                         form.roomId === room.id.toString()
-                          ? `border-${themeColor}-500 bg-${themeColor}-50`
+                          ? `border-${themeColor}-500 bg-${themeColor}-50 shadow-md`
                           : 'border-gray-200 hover:border-gray-300'
                       }`}
                     >
-                      <h4 className="font-semibold text-gray-900 mb-2">{room.name}</h4>
-                      <div className="flex items-center justify-center gap-1 text-sm text-gray-600">
-                        <Users className="h-4 w-4" />
-                        <span>Capacity: {room.capacity}</span>
+                      <h4 className="font-semibold text-sm text-gray-900 mb-1.5">{room.name}</h4>
+                      <div className="flex items-center justify-center gap-1 text-xs text-gray-600">
+                        <Users className="h-3.5 w-3.5" />
+                        <span>{room.capacity}</span>
                       </div>
-                      {form.roomId === room.id.toString() && (
-                        <div className={`mt-2 pt-2 border-t border-${themeColor}-200 text-center`}>
-                          <span className={`text-xs font-medium text-${fullColor}`}>✓ Selected</span>
-                        </div>
-                      )}
                     </div>
                   ))}
                 </div>
@@ -372,10 +371,9 @@ const ManualBooking: React.FC = () => {
             )}
 
             {pkg.add_ons && pkg.add_ons.length > 0 && (
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Package Add-ons</h3>
-                <p className="text-sm text-gray-600 mb-4">Enhance your package with additional items</p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+                <h3 className="text-base font-semibold text-gray-900 mb-3">Package Add-ons <span className="text-xs font-normal text-gray-500">(optional)</span></h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                   {Array.isArray(pkg.add_ons) && pkg.add_ons.map((addOn: any) => {
                     const isSelected = selectedAddOns[addOn.id] > 0;
                     const quantity = selectedAddOns[addOn.id] || 0;
@@ -383,53 +381,49 @@ const ManualBooking: React.FC = () => {
                     return (
                       <div
                         key={addOn.id}
-                        className={`border-2 rounded-lg p-4 transition-all ${
+                        className={`border-2 rounded-lg overflow-hidden transition-all hover:scale-105 ${
                           isSelected 
-                            ? `border-${themeColor}-500 bg-${themeColor}-50 shadow-sm` 
-                            : 'border-gray-200 hover:border-gray-300'
+                            ? `border-${themeColor}-500 shadow-lg ring-2 ring-${themeColor}-200` 
+                            : 'border-gray-200 hover:border-gray-300 hover:shadow-md'
                         }`}
                       >
                         {addOn.image && (
-                          <div className="mb-3 -mx-4 -mt-4">
-                            <img 
-                              src={getImageUrl(addOn.image)} 
-                              alt={addOn.name} 
-                              className="w-full h-32 object-cover rounded-t-lg" 
-                            />
-                          </div>
+                          <img 
+                            src={getImageUrl(addOn.image)} 
+                            alt={addOn.name} 
+                            className="w-full h-24 object-cover" 
+                          />
                         )}
-                        <div className="flex justify-between items-start mb-2">
-                          <div className="flex-1">
-                            <h4 className="font-semibold text-gray-900">{addOn.name}</h4>
-                            {addOn.description && (
-                              <p className="text-xs text-gray-600 mt-1 line-clamp-2">{addOn.description}</p>
-                            )}
-                            <div className="flex items-baseline gap-2 mt-2">
-                              <span className={`text-lg font-bold text-${fullColor}`}>${addOn.price}</span>
-                              <span className="text-xs text-gray-500">{addOn.pricing_type === 'per_person' ? 'per person' : 'per unit'}</span>
-                            </div>
+                        <div className="p-3">
+                          <h4 className="font-semibold text-sm text-gray-900 line-clamp-1">{addOn.name}</h4>
+                          {addOn.description && (
+                            <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{addOn.description}</p>
+                          )}
+                          <div className="flex items-baseline gap-1.5 mt-1.5 mb-2">
+                            <span className={`text-base font-bold text-${fullColor}`}>${addOn.price}</span>
+                            <span className="text-[10px] text-gray-500">{addOn.pricing_type === 'per_person' ? '/person' : '/unit'}</span>
                           </div>
-                        </div>
-                        
-                        <div className={`mt-3 pt-3 border-t ${isSelected ? `border-${themeColor}-200` : 'border-gray-200'} flex items-center justify-between`}>
-                          <span className="text-sm font-medium text-gray-700">Quantity:</span>
-                          <div className="flex items-center gap-3">
-                            <button
-                              type="button"
-                              onClick={() => handleAddOnChange(addOn.id, -1)}
-                              disabled={!isSelected}
-                              className={`p-2 rounded-lg bg-white border-2 border-gray-300 hover:border-${themeColor}-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed`}
-                            >
-                              <Minus className="h-4 w-4 text-gray-600" />
-                            </button>
-                            <span className="font-bold text-lg text-gray-900 w-8 text-center">{quantity}</span>
-                            <button
-                              type="button"
-                              onClick={() => handleAddOnChange(addOn.id, 1)}
-                              className={`p-2 rounded-lg bg-white border-2 border-gray-300 hover:border-${themeColor}-400 transition-colors`}
-                            >
-                              <Plus className="h-4 w-4 text-gray-600" />
-                            </button>
+                          
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs font-medium text-gray-600">Qty:</span>
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => handleAddOnChange(addOn.id, -1)}
+                                disabled={!isSelected}
+                                className={`p-1.5 rounded bg-white border border-gray-300 hover:border-${themeColor}-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed`}
+                              >
+                                <Minus className="h-3 w-3 text-gray-600" />
+                              </button>
+                              <span className="font-bold text-sm text-gray-900 w-6 text-center">{quantity}</span>
+                              <button
+                                type="button"
+                                onClick={() => handleAddOnChange(addOn.id, 1)}
+                                className={`p-1.5 rounded bg-${fullColor} text-white hover:opacity-90 transition-colors`}
+                              >
+                                <Plus className="h-3 w-3" />
+                              </button>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -440,10 +434,9 @@ const ManualBooking: React.FC = () => {
             )}
 
             {pkg.attractions && pkg.attractions.length > 0 && (
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Additional Attractions</h3>
-                <p className="text-sm text-gray-600 mb-4">Add exciting attractions to your booking</p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+                <h3 className="text-base font-semibold text-gray-900 mb-3">Additional Attractions <span className="text-xs font-normal text-gray-500">(optional)</span></h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                   {Array.isArray(pkg.attractions) && pkg.attractions.map((attraction: any) => {
                     const isSelected = selectedAttractions[attraction.id] > 0;
                     const quantity = selectedAttractions[attraction.id] || 0;
@@ -451,53 +444,49 @@ const ManualBooking: React.FC = () => {
                     return (
                       <div
                         key={attraction.id}
-                        className={`border-2 rounded-lg p-4 transition-all ${
+                        className={`border-2 rounded-lg overflow-hidden transition-all hover:scale-105 ${
                           isSelected 
-                            ? `border-${themeColor}-500 bg-${themeColor}-50 shadow-sm` 
-                            : 'border-gray-200 hover:border-gray-300'
+                            ? `border-${themeColor}-500 shadow-lg ring-2 ring-${themeColor}-200` 
+                            : 'border-gray-200 hover:border-gray-300 hover:shadow-md'
                         }`}
                       >
                         {attraction.image && (
-                          <div className="mb-3 -mx-4 -mt-4">
-                            <img 
-                              src={getImageUrl(attraction.image)} 
-                              alt={attraction.name} 
-                              className="w-full h-32 object-cover rounded-t-lg" 
-                            />
-                          </div>
+                          <img 
+                            src={getImageUrl(attraction.image)} 
+                            alt={attraction.name} 
+                            className="w-full h-24 object-cover" 
+                          />
                         )}
-                        <div className="flex justify-between items-start mb-2">
-                          <div className="flex-1">
-                            <h4 className="font-semibold text-gray-900">{attraction.name}</h4>
-                            {attraction.description && (
-                              <p className="text-xs text-gray-600 mt-1 line-clamp-2">{attraction.description}</p>
-                            )}
-                            <div className="flex items-baseline gap-2 mt-2">
-                              <span className={`text-lg font-bold text-${fullColor}`}>${attraction.price}</span>
-                              <span className="text-xs text-gray-500">{attraction.pricing_type === 'per_person' ? 'per person' : 'per unit'}</span>
-                            </div>
+                        <div className="p-3">
+                          <h4 className="font-semibold text-sm text-gray-900 line-clamp-1">{attraction.name}</h4>
+                          {attraction.description && (
+                            <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{attraction.description}</p>
+                          )}
+                          <div className="flex items-baseline gap-1.5 mt-1.5 mb-2">
+                            <span className={`text-base font-bold text-${fullColor}`}>${attraction.price}</span>
+                            <span className="text-[10px] text-gray-500">{attraction.pricing_type === 'per_person' ? '/person' : '/unit'}</span>
                           </div>
-                        </div>
-                        
-                        <div className={`mt-3 pt-3 border-t ${isSelected ? `border-${themeColor}-200` : 'border-gray-200'} flex items-center justify-between`}>
-                          <span className="text-sm font-medium text-gray-700">Quantity:</span>
-                          <div className="flex items-center gap-3">
-                            <button
-                              type="button"
-                              onClick={() => handleAttractionChange(attraction.id, -1)}
-                              disabled={!isSelected}
-                              className={`p-2 rounded-lg bg-white border-2 border-gray-300 hover:border-${themeColor}-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed`}
-                            >
-                              <Minus className="h-4 w-4 text-gray-600" />
-                            </button>
-                            <span className="font-bold text-lg text-gray-900 w-8 text-center">{quantity}</span>
-                            <button
-                              type="button"
-                              onClick={() => handleAttractionChange(attraction.id, 1)}
-                              className={`p-2 rounded-lg bg-white border-2 border-gray-300 hover:border-${themeColor}-400 transition-colors`}
-                            >
-                              <Plus className="h-4 w-4 text-gray-600" />
-                            </button>
+                          
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs font-medium text-gray-600">Qty:</span>
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => handleAttractionChange(attraction.id, -1)}
+                                disabled={!isSelected}
+                                className={`p-1.5 rounded bg-white border border-gray-300 hover:border-${themeColor}-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed`}
+                              >
+                                <Minus className="h-3 w-3 text-gray-600" />
+                              </button>
+                              <span className="font-bold text-sm text-gray-900 w-6 text-center">{quantity}</span>
+                              <button
+                                type="button"
+                                onClick={() => handleAttractionChange(attraction.id, 1)}
+                                className={`p-1.5 rounded bg-${fullColor} text-white hover:opacity-90 transition-colors`}
+                              >
+                                <Plus className="h-3 w-3" />
+                              </button>
+                            </div>
                           </div>
                         </div>
                       </div>
