@@ -726,12 +726,8 @@ const Bookings: React.FC = () => {
       }
 
       const booking = bookingResponse.data;
-      const customerId = booking.customer_id;
+      const customerId = booking.customer_id || null; // Allow null for guest bookings
       const locationId = booking.location_id;
-      
-      if (!customerId) {
-        throw new Error('Customer ID not found for this booking');
-      }
 
       if (!locationId) {
         throw new Error('Location ID not found for this booking');
