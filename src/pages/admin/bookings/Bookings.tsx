@@ -1135,22 +1135,22 @@ const Bookings: React.FC = () => {
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm font-medium">
                         <div className="flex items-center gap-2">
-                          {booking.status !== 'checked-in' && booking.status !== 'completed' && (
+                          {booking.paymentStatus !== 'paid' && (
+                            <button
+                              onClick={() => handleOpenPaymentModal(booking)}
+                              className={`p-1 text-${fullColor} hover:text-${themeColor}-800`}
+                              title="Add Payment"
+                            >
+                              <DollarSign className="h-4 w-4" />
+                            </button>
+                          )}
+                          {booking.status !== 'checked-in' && booking.status !== 'completed' && booking.paymentStatus === 'paid' && (
                             <button
                               onClick={() => handleCheckIn(booking.referenceNumber, 'checked-in')}
                               className="p-1 text-green-800 hover:text-green-800"
                               title="Check-in"
                             >
                               <CheckCircle2 className="h-4 w-4" />
-                            </button>
-                          )}
-                          {booking.amountPaid < booking.totalAmount && (
-                            <button
-                              onClick={() => handleOpenPaymentModal(booking)}
-                              className={`p-1 text-${fullColor} hover:text-${themeColor}-800`}
-                              title="Make Payment"
-                            >
-                              <DollarSign className="h-4 w-4" />
                             </button>
                           )}
                           <Link
