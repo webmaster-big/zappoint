@@ -259,7 +259,7 @@ const ManualBooking: React.FC = () => {
               className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
             >
               <option value="">Select a package</option>
-              {packages.map(p => (
+              {Array.isArray(packages) && packages.map((p: any) => (
                 <option key={p.id} value={p.id}>
                   {p.name} - ${p.price} {p.pricing_type === 'per_person' ? '(per person)' : ''}
                 </option>
@@ -307,7 +307,7 @@ const ManualBooking: React.FC = () => {
                   className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
                 >
                   <option value="">No room preference</option>
-                  {pkg.rooms.map((room: any) => (
+                  {Array.isArray(pkg.rooms) && pkg.rooms.map((room: any) => (
                     <option key={room.id} value={room.id}>
                       {room.name} - Capacity: {room.capacity}
                     </option>
@@ -320,7 +320,7 @@ const ManualBooking: React.FC = () => {
               <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Add-ons (Optional)</h3>
                 <div className="space-y-4">
-                  {pkg.add_ons.map((addOn: any) => (
+                  {Array.isArray(pkg.add_ons) && pkg.add_ons.map((addOn: any) => (
                     <div key={addOn.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
                       <div className="flex-1">
                         <h4 className="font-medium text-gray-900">{addOn.name}</h4>
@@ -359,7 +359,7 @@ const ManualBooking: React.FC = () => {
               <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Attractions (Optional)</h3>
                 <div className="space-y-4">
-                  {pkg.attractions.map((attraction: any) => (
+                  {Array.isArray(pkg.attractions) && pkg.attractions.map((attraction: any) => (
                     <div key={attraction.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
                       <div className="flex-1">
                         <h4 className="font-medium text-gray-900">{attraction.name}</h4>
