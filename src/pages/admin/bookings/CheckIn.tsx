@@ -800,11 +800,11 @@ const CheckIn: React.FC = () => {
 
         {/* Verification Modal (before check-in) */}
         {showVerificationModal && verifiedBooking && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-2 sm:p-4 z-50">
             <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
               {/* Modal Header */}
-              <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex items-center justify-between">
-                <h2 className="text-xl font-bold text-gray-800">Verify Booking Details</h2>
+              <div className="sticky top-0 bg-white border-b border-gray-200 p-3 sm:p-6 flex items-center justify-between">
+                <h2 className="text-base sm:text-xl font-bold text-gray-800">Verify Booking Details</h2>
                 <button
                   onClick={handleCancelCheckIn}
                   className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
@@ -816,22 +816,29 @@ const CheckIn: React.FC = () => {
               {/* Modal Body */}
               <div className="p-6">
                 {/* Status Alerts */}
+                {(() => {
+                  console.log('Verified Booking Status:', verifiedBooking.status);
+                  console.log('Verified Booking Payment Status:', verifiedBooking.payment_status);
+                  console.log('Verified Booking Add-ons:', verifiedBooking.addOns || (verifiedBooking as any).add_ons);
+                  return null;
+                })()}
+                
                 {verifiedBooking.status === 'checked-in' && (
-                  <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
-                    <XCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                  <div className="mb-3 sm:mb-6 p-2 sm:p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2 sm:gap-3">
+                    <XCircle className="h-4 w-4 sm:h-5 sm:w-5 text-red-600 flex-shrink-0 mt-0.5" />
                     <div>
-                      <p className="font-semibold text-red-800">Already Checked In</p>
-                      <p className="text-sm text-red-600">This booking has already been checked in.</p>
+                      <p className="text-sm sm:text-base font-semibold text-red-800">Already Checked In</p>
+                      <p className="text-xs sm:text-sm text-red-600">This booking has already been checked in.</p>
                     </div>
                   </div>
                 )}
 
                 {verifiedBooking.status === 'completed' && (
-                  <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
-                    <XCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                  <div className="mb-3 sm:mb-6 p-2 sm:p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2 sm:gap-3">
+                    <XCircle className="h-4 w-4 sm:h-5 sm:w-5 text-red-600 flex-shrink-0 mt-0.5" />
                     <div>
-                      <p className="font-semibold text-red-800">Booking Completed</p>
-                      <p className="text-sm text-red-600">This booking has been completed.</p>
+                      <p className="text-sm sm:text-base font-semibold text-red-800">Booking Completed</p>
+                      <p className="text-xs sm:text-sm text-red-600">This booking has been completed.</p>
                     </div>
                   </div>
                 )}
@@ -847,11 +854,11 @@ const CheckIn: React.FC = () => {
                 )}
 
                 {verifiedBooking.status === 'confirmed' && (
-                  <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg flex items-start gap-3">
-                    <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
+                  <div className="mb-3 sm:mb-6 p-2 sm:p-4 bg-green-50 border border-green-200 rounded-lg flex items-start gap-2 sm:gap-3">
+                    <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 flex-shrink-0 mt-0.5" />
                     <div>
-                      <p className="font-semibold text-green-800">Valid Booking</p>
-                      <p className="text-sm text-green-600">This booking is ready to be checked in.</p>
+                      <p className="text-sm sm:text-base font-semibold text-green-800">Valid Booking</p>
+                      <p className="text-xs sm:text-sm text-green-600">This booking is ready to be checked in.</p>
                     </div>
                   </div>
                 )}
@@ -1102,17 +1109,18 @@ const CheckIn: React.FC = () => {
                       </div>
                     )}
 
-                    {verifiedBooking.addOns && Array.isArray(verifiedBooking.addOns) && verifiedBooking.addOns.length > 0 && (
+                    {((verifiedBooking.addOns || (verifiedBooking as any).add_ons) && Array.isArray(verifiedBooking.addOns || (verifiedBooking as any).add_ons) && (verifiedBooking.addOns || (verifiedBooking as any).add_ons).length > 0) && (
                       <div className="flex items-start gap-3 col-span-full">
                         <div className={`p-2 bg-${themeColor}-100 rounded-lg`}>
                           <PackageIcon className={`h-5 w-5 text-${fullColor}`} />
                         </div>
                         <div>
-                          <p className="text-xs text-gray-500">Add-Ons ({verifiedBooking.addOns.length})</p>
+                          <p className="text-xs text-gray-500">Add-Ons ({(verifiedBooking.addOns || (verifiedBooking as any).add_ons).length})</p>
                           <div className="space-y-1 mt-1">
-                            {(verifiedBooking.addOns as Record<string, unknown>[]).map((addon, index: number) => (
+                            {((verifiedBooking.addOns || (verifiedBooking as any).add_ons) as Record<string, unknown>[]).map((addon, index: number) => (
                               <p key={index} className="font-medium text-gray-800">
                                 • {addon.name as string} - ${Number(addon.price).toFixed(2)}
+                                {(addon.pivot as any)?.quantity && (addon.pivot as any).quantity > 1 && ` (x${(addon.pivot as any).quantity})`}
                               </p>
                             ))}
                           </div>
@@ -1195,9 +1203,10 @@ const CheckIn: React.FC = () => {
                 {verifiedBooking.status !== 'confirmed' && (
                   <button
                     onClick={handleCancelCheckIn}
-                    className={`flex-1 px-6 py-3 bg-${themeColor}-600 text-white rounded-lg hover:bg-${themeColor}-700 transition-colors font-medium`}
+                    className={`flex-1 px-3 sm:px-6 py-2 sm:py-3 text-sm sm:text-base bg-${themeColor}-600 text-white rounded-lg hover:bg-${themeColor}-700 transition-colors font-medium`}
                   >
-                    Close & Scan Next
+                    <span className="hidden sm:inline">Close & Scan Next</span>
+                    <span className="sm:hidden">Close</span>
                   </button>
                 )}
               </div>
@@ -1261,8 +1270,8 @@ const CheckIn: React.FC = () => {
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
             <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
               {/* Modal Header */}
-              <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex items-center justify-between">
-                <h2 className="text-xl font-bold text-gray-800">Booking Details</h2>
+              <div className="sticky top-0 bg-white border-b border-gray-200 p-3 sm:p-6 flex items-center justify-between">
+                <h2 className="text-base sm:text-xl font-bold text-gray-800">Booking Details</h2>
                 <button
                   onClick={closeModal}
                   className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
@@ -1272,14 +1281,14 @@ const CheckIn: React.FC = () => {
               </div>
 
               {/* Modal Body */}
-              <div className="p-6">
+              <div className="p-3 sm:p-6">
                 {/* Status Alerts */}
                 {selectedBooking.status === 'checked-in' && (
-                  <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg flex items-start gap-3">
-                    <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
+                  <div className="mb-3 sm:mb-6 p-2 sm:p-4 bg-green-50 border border-green-200 rounded-lg flex items-start gap-2 sm:gap-3">
+                    <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 flex-shrink-0 mt-0.5" />
                     <div>
-                      <p className="font-semibold text-green-800">Checked In</p>
-                      <p className="text-sm text-green-600">This booking has been checked in.</p>
+                      <p className="text-sm sm:text-base font-semibold text-green-800">Checked In</p>
+                      <p className="text-xs sm:text-sm text-green-600">This booking has been checked in.</p>
                       {selectedBooking.checked_in_at && (
                         <p className="text-xs text-green-600 mt-1">
                           Check-in time: {new Date(selectedBooking.checked_in_at).toLocaleString()}
@@ -1290,11 +1299,11 @@ const CheckIn: React.FC = () => {
                 )}
 
                 {selectedBooking.status === 'completed' && (
-                  <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-start gap-3">
-                    <CheckCircle className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                  <div className="mb-3 sm:mb-6 p-2 sm:p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-start gap-2 sm:gap-3">
+                    <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 flex-shrink-0 mt-0.5" />
                     <div>
-                      <p className="font-semibold text-blue-800">Booking Completed</p>
-                      <p className="text-sm text-blue-600">This booking has been completed.</p>
+                      <p className="text-sm sm:text-base font-semibold text-blue-800">Booking Completed</p>
+                      <p className="text-xs sm:text-sm text-blue-600">This booking has been completed.</p>
                     </div>
                   </div>
                 )}
@@ -1563,17 +1572,18 @@ const CheckIn: React.FC = () => {
                       </div>
                     )}
 
-                    {selectedBooking.addOns && Array.isArray(selectedBooking.addOns) && selectedBooking.addOns.length > 0 && (
+                    {((selectedBooking.addOns || (selectedBooking as any).add_ons) && Array.isArray(selectedBooking.addOns || (selectedBooking as any).add_ons) && (selectedBooking.addOns || (selectedBooking as any).add_ons).length > 0) && (
                       <div className="flex items-start gap-3 col-span-full">
                         <div className={`p-2 bg-${themeColor}-100 rounded-lg`}>
                           <PackageIcon className={`h-5 w-5 text-${fullColor}`} />
                         </div>
                         <div>
-                          <p className="text-xs text-gray-500">Add-Ons ({selectedBooking.addOns.length})</p>
+                          <p className="text-xs text-gray-500">Add-Ons ({(selectedBooking.addOns || (selectedBooking as any).add_ons).length})</p>
                           <div className="space-y-1 mt-1">
-                            {(selectedBooking.addOns as Record<string, unknown>[]).map((addon, index: number) => (
+                            {((selectedBooking.addOns || (selectedBooking as any).add_ons) as Record<string, unknown>[]).map((addon, index: number) => (
                               <p key={index} className="font-medium text-gray-800">
                                 • {addon.name as string} - ${Number(addon.price).toFixed(2)}
+                                {(addon.pivot as any)?.quantity && (addon.pivot as any).quantity > 1 && ` (x${(addon.pivot as any).quantity})`}
                               </p>
                             ))}
                           </div>
@@ -1609,10 +1619,10 @@ const CheckIn: React.FC = () => {
               </div>
 
               {/* Modal Footer */}
-              <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 p-6 flex gap-4">
+              <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 p-3 sm:p-6 flex gap-2 sm:gap-4">
                 <button
                   onClick={closeModal}
-                  className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors font-medium"
+                  className="flex-1 px-3 sm:px-6 py-2 sm:py-3 text-sm sm:text-base border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors font-medium"
                 >
                   Close
                 </button>
