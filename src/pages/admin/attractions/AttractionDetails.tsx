@@ -12,7 +12,8 @@ import {
   CheckCircle,
   XCircle,
   Tag,
-  Image as ImageIcon
+  Image as ImageIcon,
+  FileText
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { attractionService } from '../../../services/AttractionService';
@@ -104,7 +105,7 @@ const AttractionDetails = () => {
       <div className="mb-8">
         <button
           onClick={() => navigate('/attractions')}
-          className="flex items-center text-gray-600 hover:text-gray-900 mb-4"
+          className={`flex items-center text-gray-600 hover:text-${fullColor} mb-4 transition-colors`}
         >
           <ArrowLeft className="h-5 w-5 mr-2" />
           Back to Attractions
@@ -117,21 +118,21 @@ const AttractionDetails = () => {
           <div className="flex items-center gap-3">
             <span className={`px-4 py-2 rounded-full text-sm font-medium ${
               attraction.is_active 
-                ? `bg-${themeColor}-100 text-${fullColor}` 
+                ? 'bg-green-100 text-green-800' 
                 : 'bg-gray-100 text-gray-800'
             }`}>
               {attraction.is_active ? 'Active' : 'Inactive'}
             </span>
             <button
               onClick={() => navigate(`/attractions/edit/${id}`)}
-              className={`flex items-center px-4 py-2 bg-${themeColor}-600 text-white rounded-lg hover:bg-${themeColor}-700`}
+              className={`flex items-center px-4 py-2 bg-${themeColor}-600 text-white rounded-lg hover:bg-${themeColor}-700 transition-colors`}
             >
               <Edit className="h-4 w-4 mr-2" />
               Edit
             </button>
             <button
               onClick={handleDelete}
-              className="flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+              className="flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
             >
               <Trash2 className="h-4 w-4 mr-2" />
               Delete
@@ -146,7 +147,7 @@ const AttractionDetails = () => {
           {/* Images */}
           {attraction.image && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
+              <h2 className={`text-xl font-bold text-${fullColor} mb-4 flex items-center`}>
                 <ImageIcon className="h-5 w-5 mr-2" />
                 Images
               </h2>
@@ -173,13 +174,19 @@ const AttractionDetails = () => {
 
           {/* Description */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Description</h2>
+            <h2 className={`text-xl font-bold text-${fullColor} mb-4 flex items-center`}>
+              <FileText className="h-5 w-5 mr-2" />
+              Description
+            </h2>
             <p className="text-gray-700 leading-relaxed">{attraction.description}</p>
           </div>
 
           {/* Details */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Attraction Details</h2>
+            <h2 className={`text-xl font-bold text-${fullColor} mb-4 flex items-center`}>
+              <Tag className="h-5 w-5 mr-2" />
+              Attraction Details
+            </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="text-sm text-gray-600 flex items-center">
@@ -237,7 +244,10 @@ const AttractionDetails = () => {
 
           {/* Availability */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Weekly Availability</h2>
+            <h2 className={`text-xl font-bold text-${fullColor} mb-4 flex items-center`}>
+              <Calendar className="h-5 w-5 mr-2" />
+              Weekly Availability
+            </h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {daysOfWeek.map((day) => {
                 const isAvailable = attraction.availability?.[day] !== false;
@@ -267,7 +277,7 @@ const AttractionDetails = () => {
         <div className="space-y-6">
           {/* Quick Actions */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <h2 className="text-lg font-bold text-gray-900 mb-4">Quick Actions</h2>
+            <h2 className={`text-lg font-bold text-${fullColor} mb-4`}>Quick Actions</h2>
             <div className="space-y-3">
               <button
                 onClick={handleStatusToggle}
@@ -281,13 +291,13 @@ const AttractionDetails = () => {
               </button>
               <button
                 onClick={() => navigate(`/attractions/edit/${id}`)}
-                className={`w-full py-2 px-4 rounded-lg font-medium bg-${themeColor}-600 text-white hover:bg-${themeColor}-700`}
+                className={`w-full py-2 px-4 rounded-lg font-medium bg-${themeColor}-600 text-white hover:bg-${themeColor}-700 transition-colors`}
               >
                 Edit Attraction
               </button>
               <button
                 onClick={handleDelete}
-                className="w-full py-2 px-4 rounded-lg font-medium bg-red-600 text-white hover:bg-red-700"
+                className="w-full py-2 px-4 rounded-lg font-medium bg-red-600 text-white hover:bg-red-700 transition-colors"
               >
                 Delete Attraction
               </button>
@@ -296,7 +306,7 @@ const AttractionDetails = () => {
 
           {/* Stats */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <h2 className="text-lg font-bold text-gray-900 mb-4">Statistics</h2>
+            <h2 className={`text-lg font-bold text-${fullColor} mb-4`}>Statistics</h2>
             <div className="space-y-3">
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Price</span>
@@ -314,7 +324,9 @@ const AttractionDetails = () => {
               </div>
               <div className="flex justify-between items-center pt-3 border-t border-gray-200">
                 <span className="text-sm font-semibold text-gray-900">Status</span>
-                <span className={`font-medium ${attraction.is_active ? `text-${fullColor}` : 'text-gray-500'}`}>
+                <span className={`font-medium ${
+                  attraction.is_active ? `text-${fullColor}` : 'text-gray-500'
+                }`}>
                   {attraction.is_active ? 'Active' : 'Inactive'}
                 </span>
               </div>

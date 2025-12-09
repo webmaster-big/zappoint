@@ -43,7 +43,7 @@ const PurchaseDetails = () => {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
   const statusConfig = {
-    completed: { color: `bg-${themeColor}-100 text-${fullColor}`, icon: CheckCircle, label: 'Confirmed' },
+    completed: { color: `bg-green-100 text-green-800`, icon: CheckCircle, label: 'Confirmed' },
     pending: { color: 'bg-yellow-100 text-yellow-800', icon: Clock, label: 'Pending' },
     cancelled: { color: 'bg-red-100 text-red-800', icon: XCircle, label: 'Cancelled' },
     refunded: { color: 'bg-purple-100 text-purple-800', icon: CheckCircle, label: 'Refunded' }
@@ -136,7 +136,7 @@ const PurchaseDetails = () => {
       <div className="mb-8">
         <button
           onClick={() => navigate('/attractions/purchases')}
-          className="flex items-center text-gray-600 hover:text-gray-900 mb-4"
+          className={`flex items-center text-gray-600 hover:text-${fullColor} mb-4 transition-colors`}
         >
           <ArrowLeft className="h-5 w-5 mr-2" />
           Back to Purchases
@@ -159,7 +159,7 @@ const PurchaseDetails = () => {
         <div className="lg:col-span-2 space-y-6">
           {/* Customer Information */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
+            <h2 className={`text-xl font-bold text-${fullColor} mb-4 flex items-center`}>
               <User className="h-5 w-5 mr-2" />
               Customer Information
             </h2>
@@ -202,7 +202,7 @@ const PurchaseDetails = () => {
 
           {/* Attraction Details */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
+            <h2 className={`text-xl font-bold text-${fullColor} mb-4 flex items-center`}>
               <MapPin className="h-5 w-5 mr-2" />
               Attraction Details
             </h2>
@@ -235,7 +235,7 @@ const PurchaseDetails = () => {
 
           {/* Payment Information */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
+            <h2 className={`text-xl font-bold text-${fullColor} mb-4 flex items-center`}>
               <CreditCard className="h-5 w-5 mr-2" />
               Payment Information
             </h2>
@@ -277,7 +277,7 @@ const PurchaseDetails = () => {
           {/* Notes */}
           {purchase.notes && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
+              <h2 className={`text-xl font-bold text-${fullColor} mb-4 flex items-center`}>
                 <FileText className="h-5 w-5 mr-2" />
                 Notes
               </h2>
@@ -290,39 +290,42 @@ const PurchaseDetails = () => {
         <div className="space-y-6">
           {/* Status Management */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <h2 className="text-lg font-bold text-gray-900 mb-4">Status Management</h2>
+            <h2 className={`text-lg font-bold text-${fullColor} mb-4`}>Status Management</h2>
             <div className="space-y-3">
               <button
                 onClick={() => handleStatusChange('completed')}
                 disabled={status === 'completed'}
-                className={`w-full py-2 px-4 rounded-lg font-medium transition-colors ${
+                className={`w-full py-2 px-4 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${
                   status === 'completed'
                     ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                    : `bg-${themeColor}-100 text-${fullColor} hover:bg-${themeColor}-200`
+                    : 'bg-green-600 text-white hover:bg-green-700'
                 }`}
               >
+                <CheckCircle className="h-4 w-4" />
                 Mark as Confirmed
               </button>
               <button
                 onClick={() => handleStatusChange('pending')}
                 disabled={status === 'pending'}
-                className={`w-full py-2 px-4 rounded-lg font-medium transition-colors ${
+                className={`w-full py-2 px-4 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${
                   status === 'pending'
                     ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                    : 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200'
+                    : 'bg-yellow-600 text-white hover:bg-yellow-700'
                 }`}
               >
+                <Clock className="h-4 w-4" />
                 Mark as Pending
               </button>
               <button
                 onClick={() => handleStatusChange('cancelled')}
                 disabled={status === 'cancelled'}
-                className={`w-full py-2 px-4 rounded-lg font-medium transition-colors ${
+                className={`w-full py-2 px-4 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${
                   status === 'cancelled'
                     ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                    : 'bg-red-100 text-red-800 hover:bg-red-200'
+                    : 'bg-red-600 text-white hover:bg-red-700'
                 }`}
               >
+                <XCircle className="h-4 w-4" />
                 Mark as Cancelled
               </button>
             </div>
@@ -330,7 +333,7 @@ const PurchaseDetails = () => {
 
           {/* Quick Stats */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <h2 className="text-lg font-bold text-gray-900 mb-4">Quick Stats</h2>
+            <h2 className={`text-lg font-bold text-${fullColor} mb-4`}>Quick Stats</h2>
             <div className="space-y-3">
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Price per Ticket</span>
@@ -344,9 +347,9 @@ const PurchaseDetails = () => {
                 <span className="text-sm text-gray-600">Quantity</span>
                 <span className="font-medium text-gray-900">{purchase.quantity}</span>
               </div>
-              <div className="flex justify-between items-center pt-3 border-t border-gray-200">
+              <div className={`flex justify-between items-center pt-3 border-t border-${themeColor}-200`}>
                 <span className="text-sm font-semibold text-gray-900">Total</span>
-                <span className="font-bold text-gray-900 text-lg">
+                <span className={`font-bold text-${fullColor} text-lg`}>
                   ${Number(purchase.total_amount || 0).toFixed(2)}
                 </span>
               </div>

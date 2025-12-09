@@ -13,7 +13,8 @@ import {
   DollarSign,
   CheckCircle,
   XCircle,
-  Copy
+  Copy,
+  FileText
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { packageService, type Package } from '../../../services';
@@ -142,7 +143,7 @@ const PackageDetails = () => {
       <div className="mb-8">
         <button
           onClick={() => navigate('/packages')}
-          className="flex items-center text-gray-600 hover:text-gray-900 mb-4"
+          className={`flex items-center text-gray-600 hover:text-${fullColor} mb-4 transition-colors`}
         >
           <ArrowLeft className="h-5 w-5 mr-2" />
           Back to Packages
@@ -155,21 +156,21 @@ const PackageDetails = () => {
           <div className="flex items-center gap-3">
             <span className={`px-4 py-2 rounded-full text-sm font-medium ${
               packageData.is_active 
-                ? `bg-${themeColor}-100 text-${fullColor}` 
+                ? 'bg-green-100 text-green-800' 
                 : 'bg-gray-100 text-gray-800'
             }`}>
               {packageData.is_active ? 'Active' : 'Inactive'}
             </span>
             <button
               onClick={() => navigate(`/packages/edit/${id}`)}
-              className={`flex items-center px-4 py-2 bg-${themeColor}-600 text-white rounded-lg hover:bg-${themeColor}-700`}
+              className={`flex items-center px-4 py-2 bg-${themeColor}-600 text-white rounded-lg hover:bg-${themeColor}-700 transition-colors`}
             >
               <Edit className="h-4 w-4 mr-2" />
               Edit
             </button>
             <button
               onClick={handleDelete}
-              className="flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+              className="flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
             >
               <Trash2 className="h-4 w-4 mr-2" />
               Delete
@@ -182,7 +183,10 @@ const PackageDetails = () => {
         <div className="lg:col-span-2 space-y-6">
           {/* Description */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Description</h2>
+            <h2 className={`text-xl font-bold text-${fullColor} mb-4 flex items-center`}>
+              <FileText className="h-5 w-5 mr-2" />
+              Description
+            </h2>
             <p className="text-gray-700 leading-relaxed">
               {packageData.description || "No description provided"}
             </p>
@@ -191,7 +195,7 @@ const PackageDetails = () => {
           {/* Features */}
           {packageData.features && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
+              <h2 className={`text-xl font-bold text-${fullColor} mb-4 flex items-center`}>
                 <Tag className="h-5 w-5 mr-2" />
                 Features
               </h2>
@@ -200,9 +204,12 @@ const PackageDetails = () => {
           )}
 
           {/* Package Details */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Package Details</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 hover:shadow-xl transition-shadow">
+            <h2 className={`text-2xl font-bold text-${fullColor} mb-6 flex items-center gap-2 pb-3 border-b-2 border-${themeColor}-200`}>
+              <Tag className="h-6 w-6" />
+              Package Details
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="text-sm text-gray-600 flex items-center">
                   <Tag className="h-4 w-4 mr-1" />
@@ -425,18 +432,18 @@ const PackageDetails = () => {
         <div className="space-y-6">
           {/* Quick Actions */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Quick Actions</h2>
+            <h2 className={`text-xl font-bold text-${fullColor} mb-4`}>Quick Actions</h2>
             <div className="space-y-3">
               <button
                 onClick={() => navigate(`/packages/edit/${id}`)}
-                className={`w-full flex items-center justify-center px-4 py-2 bg-${themeColor}-600 text-white rounded-lg hover:bg-${themeColor}-700`}
+                className={`w-full flex items-center justify-center px-4 py-2 bg-${themeColor}-600 text-white rounded-lg hover:bg-${themeColor}-700 transition-colors`}
               >
                 <Edit className="h-4 w-4 mr-2" />
                 Edit Package
               </button>
               <button
                 onClick={handleDelete}
-                className="w-full flex items-center justify-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                className="w-full flex items-center justify-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
               >
                 <Trash2 className="h-4 w-4 mr-2" />
                 Delete Package
