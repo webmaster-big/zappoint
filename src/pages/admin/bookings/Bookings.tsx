@@ -713,27 +713,42 @@ const Bookings: React.FC = () => {
     try {
       setProcessingPayment(true);
 
-      // Get booking details to find customer_id
+      // Get booking details to find customer_id and location_id
       const bookingResponse = await bookingService.getBookingById(Number(selectedBookingForPayment.id));
       if (!bookingResponse.success || !bookingResponse.data) {
         throw new Error('Failed to get booking details');
       }
 
-      const customerId = bookingResponse.data.customer_id;
+      const booking = bookingResponse.data;
+      const customerId = booking.customer_id;
+      const locationId = booking.location_id;
+      
       if (!customerId) {
         throw new Error('Customer ID not found for this booking');
       }
 
+      if (!locationId) {
+        throw new Error('Location ID not found for this booking');
+      }
+
+      // Get auth token
+      const user = getStoredUser();
+      if (!user?.token) {
+        throw new Error('Authentication token not found');
+      }
+
       // Create payment record
-      const paymentResponse = await fetch('/api/payments', {
+      const paymentResponse = await fetch(`${API_BASE_URL}/payments`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${user.token}`,
         },
         body: JSON.stringify({
           booking_id: Number(selectedBookingForPayment.id),
           customer_id: customerId,
+          location_id: locationId,
           amount: amount,
           currency: 'USD',
           method: paymentMethod,
@@ -743,7 +758,8 @@ const Bookings: React.FC = () => {
       });
 
       if (!paymentResponse.ok) {
-        throw new Error('Failed to create payment');
+        const errorData = await paymentResponse.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to create payment');
       }
 
       // Update booking's amount_paid
