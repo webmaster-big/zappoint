@@ -892,6 +892,60 @@ const LocationManagerDashboard: React.FC = () => {
                 </div>
               )}
 
+              {/* Attractions */}
+              {selectedBooking.attractions && Array.isArray(selectedBooking.attractions) && selectedBooking.attractions.length > 0 && (
+                <div className="mb-6">
+                  <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Additional Attractions</h4>
+                  <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+                    {selectedBooking.attractions.map((attraction: any, index: number) => (
+                      <div key={index} className="flex items-center justify-between py-2 border-b border-gray-200 last:border-0">
+                        <div className="flex-1">
+                          <span className="text-sm font-medium text-gray-900">{attraction.name || 'Unknown Attraction'}</span>
+                          {attraction.description && (
+                            <p className="text-xs text-gray-500 mt-1">{attraction.description}</p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-4 ml-4">
+                          {attraction.quantity && (
+                            <span className="text-sm text-gray-600">Qty: {attraction.quantity}</span>
+                          )}
+                          {attraction.price && (
+                            <span className="text-sm font-medium text-gray-900">${Number(attraction.price).toFixed(2)}</span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Add-Ons */}
+              {selectedBooking.addOns && Array.isArray(selectedBooking.addOns) && selectedBooking.addOns.length > 0 && (
+                <div className="mb-6">
+                  <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Add-Ons</h4>
+                  <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+                    {selectedBooking.addOns.map((addon: any, index: number) => (
+                      <div key={index} className="flex items-center justify-between py-2 border-b border-gray-200 last:border-0">
+                        <div className="flex-1">
+                          <span className="text-sm font-medium text-gray-900">{addon.name || 'Unknown Add-On'}</span>
+                          {addon.description && (
+                            <p className="text-xs text-gray-500 mt-1">{addon.description}</p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-4 ml-4">
+                          {addon.quantity && (
+                            <span className="text-sm text-gray-600">Qty: {addon.quantity}</span>
+                          )}
+                          {addon.price && (
+                            <span className="text-sm font-medium text-gray-900">${Number(addon.price).toFixed(2)}</span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Payment Information */}
               <div className="mb-6">
                 <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Payment</h4>
