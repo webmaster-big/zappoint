@@ -120,18 +120,18 @@ const ManualBooking: React.FC = () => {
     let total = 0;
 
     if (pkg.pricing_type === 'per_person') {
-      total += pkg.price * form.participants;
+      total += Number(pkg.price) * form.participants;
     } else {
-      total += pkg.price;
+      total += Number(pkg.price);
     }
 
     Object.entries(selectedAddOns).forEach(([id, quantity]) => {
       const addOn = pkg.add_ons?.find((a: any) => a.id === parseInt(id));
       if (addOn) {
         if (addOn.pricing_type === 'per_person') {
-          total += addOn.price * quantity * form.participants;
+          total += Number(addOn.price) * quantity * form.participants;
         } else {
-          total += addOn.price * quantity;
+          total += Number(addOn.price) * quantity;
         }
       }
     });
@@ -140,9 +140,9 @@ const ManualBooking: React.FC = () => {
       const attraction = pkg.attractions?.find((a: any) => a.id === parseInt(id));
       if (attraction) {
         if (attraction.pricing_type === 'per_person') {
-          total += attraction.price * quantity * form.participants;
+          total += Number(attraction.price) * quantity * form.participants;
         } else {
-          total += attraction.price * quantity;
+          total += Number(attraction.price) * quantity;
         }
       }
     });
@@ -535,7 +535,7 @@ const ManualBooking: React.FC = () => {
           <div className="mb-4 p-4 bg-blue-50 rounded-lg">
             <div className="flex justify-between items-center">
               <span className="text-lg font-semibold text-gray-900">Total Amount:</span>
-              <span className="text-2xl font-bold text-blue-600">${(calculateTotal() || 0).toFixed(2)}</span>
+              <span className="text-2xl font-bold text-blue-600">${Number(calculateTotal() || 0).toFixed(2)}</span>
             </div>
           </div>
 
