@@ -157,7 +157,6 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
           { label: 'Activity Log', href: '/manager/attendants/activity', icon: Dot },
         ]},
         { label: 'Analytics & Reports', icon: BarChart3, href: '/manager/analytics' },
-        { label: 'Notifications', icon: Bell, href: '/notifications' },
         { label: 'Profile', icon: User, href: '/manager/profile' },
         { label: 'Settings', icon: Settings, href: '/manager/settings' }
       ];
@@ -196,7 +195,6 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
           { label: 'Activity Log', href: '/admin/activity', icon: Dot },
         ]},
         { label: 'Analytics & Reports', icon: BarChart3, href: '/admin/analytics' },
-        { label: 'Notifications', icon: Bell, href: '/notifications' },
         { label: 'Profile', icon: User, href: '/admin/profile' },
         { label: 'Settings', icon: Settings, href: '/admin/settings' }
       ];

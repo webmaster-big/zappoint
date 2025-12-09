@@ -13,7 +13,8 @@ import {
   Package,
   DollarSign,
   Users,
-  Download
+  Download,
+  Plus
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
@@ -797,13 +798,22 @@ const Bookings: React.FC = () => {
             <h1 className="text-3xl font-bold text-gray-900">Bookings</h1>
             <p className="text-gray-800 mt-2">Manage all bookings</p>
           </div>
-          <button
-            onClick={() => setShowExportModal(true)}
-            className={`mt-4 sm:mt-0 flex items-center px-4 py-2 bg-${fullColor} text-white rounded-lg hover:bg-${themeColor}-700 shadow-sm transition-colors`}
-          >
-            <Download className="h-4 w-4 mr-2" />
-            Export Bookings
-          </button>
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mt-4 sm:mt-0">
+            <button
+              onClick={() => window.location.href = '/bookings/manual'}
+              className={`flex items-center px-4 py-2 bg-white border-2 border-${fullColor} text-${fullColor} rounded-lg hover:bg-${themeColor}-50 shadow-sm transition-colors`}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Record Past Booking
+            </button>
+            <button
+              onClick={() => setShowExportModal(true)}
+              className={`flex items-center px-4 py-2 bg-${fullColor} text-white rounded-lg hover:bg-${themeColor}-700 shadow-sm transition-colors`}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Export Bookings
+            </button>
+          </div>
         </div>
 
         {/* Metrics Grid */}

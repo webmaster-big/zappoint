@@ -17,6 +17,7 @@ import Bookings from "./pages/admin/bookings/Bookings"
 import EditBooking from "./pages/admin/bookings/EditBooking"
 import CalendarView from "./pages/admin/bookings/CalendarView"
 import OnsiteBooking from "./pages/admin/bookings/OnsiteBooking"
+import ManualBooking from "./pages/admin/bookings/ManualBooking"
 import CheckIn from "./pages/admin/bookings/CheckIn"
 import CreateAttraction from "./pages/admin/attractions/CreateAttractions";
 import EditAttraction from "./pages/admin/attractions/EditAttraction";
@@ -104,6 +105,7 @@ function App() {
           <Route path="/bookings/:id" element={<ViewBooking />} />
           <Route path="/bookings/calendar" element={<CalendarView />} />
           <Route path="/bookings/create" element={<OnsiteBooking />} />
+          <Route path="/bookings/manual" element={<ManualBooking />} />
           <Route path="/bookings/check-in" element={<CheckIn />} />
           <Route path="/customers/analytics" element={<CustomerAnalytics />} />
           <Route path="/customers" element={<CustomerListing />} />
