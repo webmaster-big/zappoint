@@ -438,6 +438,21 @@ const Bookings: React.FC = () => {
     }
   };
 
+  const handleDeleteBooking = async (id: string, referenceNumber: string) => {
+    if (window.confirm(`Are you sure you want to delete booking #${referenceNumber}?`)) {
+      try {
+        await bookingService.deleteBooking(Number(id));
+        
+        // Update local state
+        const updatedBookings = bookings.filter(booking => booking.id !== id);
+        setBookings(updatedBookings);
+      } catch (error) {
+        console.error('Error deleting booking:', error);
+        alert('Failed to delete booking. Please try again.');
+      }
+    }
+  };
+
   const handleBulkStatusChange = async (newStatus: BookingsPageBooking['status']) => {
     if (selectedBookings.length === 0) return;
     
@@ -1152,6 +1167,13 @@ const Bookings: React.FC = () => {
                           >
                             <Pencil className="h-4 w-4" />
                           </Link>
+                          <button
+                            onClick={() => handleDeleteBooking(booking.id, booking.referenceNumber)}
+                            className="p-1 text-red-600 hover:text-red-800"
+                            title="Delete"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
                         </div>
                       </td>
                     </tr>

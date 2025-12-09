@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, useSearchParams, Link } from 'react-router-dom';
+import QRCode from 'qrcode';
 import { 
   Calendar, 
   Users, 
@@ -12,7 +13,9 @@ import {
   CheckCircle,
   AlertCircle,
   ArrowLeft,
-  Pencil
+  Pencil,
+  Download,
+  QrCode
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import bookingService, { type Booking } from '../../../services/bookingService';
@@ -26,6 +29,8 @@ const ViewBooking: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [booking, setBooking] = useState<Booking | null>(null);
+  const [qrCodeData, setQrCodeData] = useState<string | null>(null);
+  const [showQRModal, setShowQRModal] = useState(false);
 
   // Load booking data from backend
   useEffect(() => {
@@ -55,6 +60,15 @@ const ViewBooking: React.FC = () => {
 
         if (bookingData) {
           setBooking(bookingData);
+          // Generate QR code
+          if (bookingData.reference_number) {
+            const qrCode = await QRCode.toDataURL(bookingData.reference_number, {
+              width: 300,
+              margin: 2,
+              errorCorrectionLevel: 'M',
+            });
+            setQrCodeData(qrCode);
+          }
         } else {
           setNotFound(true);
         }
@@ -105,6 +119,15 @@ const ViewBooking: React.FC = () => {
     'checked-in': `bg-${themeColor}-100 text-${fullColor}`
   };
 
+  const handleDownloadQRCode = () => {
+    if (!qrCodeData || !booking) return;
+    
+    const link = document.createElement('a');
+    link.download = `booking-qrcode-${booking.reference_number}.png`;
+    link.href = qrCodeData;
+    link.click();
+  };
+
   const paymentStatusColors = {
     paid: 'bg-green-100 text-green-800',
     partial: 'bg-yellow-100 text-yellow-800',
@@ -143,13 +166,23 @@ const ViewBooking: React.FC = () => {
               <p className="text-gray-600 mt-1">Reference: #{booking.reference_number}</p>
             </div>
           </div>
-          <Link
-            to={`/bookings/edit/${booking.id}?ref=${booking.reference_number}`}
-            className={`flex items-center gap-2 px-4 py-2 bg-${themeColor}-600 text-white rounded-lg hover:bg-${themeColor}-700`}
-          >
-            <Pencil className="h-4 w-4" />
-            Edit Booking
-          </Link>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowQRModal(true)}
+              className={`flex items-center gap-2 px-4 py-2 bg-${themeColor}-600 text-white rounded-lg hover:bg-${themeColor}-700`}
+              disabled={!qrCodeData}
+            >
+              <QrCode className="h-4 w-4" />
+              View QR Code
+            </button>
+            <Link
+              to={`/bookings/edit/${booking.id}?ref=${booking.reference_number}`}
+              className={`flex items-center gap-2 px-4 py-2 bg-${themeColor}-600 text-white rounded-lg hover:bg-${themeColor}-700`}
+            >
+              <Pencil className="h-4 w-4" />
+              Edit Booking
+            </Link>
+          </div>
         </div>
 
         {/* Status Alerts */}
@@ -409,6 +442,41 @@ const ViewBooking: React.FC = () => {
             </div>
           )}
         </div>
+
+        {/* QR Code Modal */}
+        {showQRModal && qrCodeData && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-bold text-gray-900">Booking QR Code</h3>
+                <button
+                  onClick={() => setShowQRModal(false)}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <AlertCircle className="h-5 w-5 text-gray-600" />
+                </button>
+              </div>
+              
+              <div className="flex flex-col items-center">
+                <img 
+                  src={qrCodeData} 
+                  alt="Booking QR Code" 
+                  className="w-64 h-64 mb-4 border-2 border-gray-200 rounded-lg"
+                />
+                <p className="text-sm text-gray-600 mb-4 text-center">
+                  Reference: <span className="font-semibold">#{booking.reference_number}</span>
+                </p>
+                <button
+                  onClick={handleDownloadQRCode}
+                  className={`flex items-center gap-2 px-4 py-2 bg-${themeColor}-600 text-white rounded-lg hover:bg-${themeColor}-700 w-full justify-center`}
+                >
+                  <Download className="h-4 w-4" />
+                  Download QR Code
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
