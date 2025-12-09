@@ -11,7 +11,6 @@ const ManualBooking: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [pkg, setPkg] = useState<any>(null);
   const [packages, setPackages] = useState<any[]>([]);
-  const [loadingPackages, setLoadingPackages] = useState(true);
   const [selectedAddOns, setSelectedAddOns] = useState<{ [id: number]: number }>({});
   const [selectedAttractions, setSelectedAttractions] = useState<{ [id: number]: number }>({});
   const [form, setForm] = useState({
@@ -43,12 +42,10 @@ const ManualBooking: React.FC = () => {
 
   const loadPackages = async () => {
     try {
-      setLoadingPackages(true);
       const user = getStoredUser();
       
       if (!user) {
         console.error('No user found');
-        setLoadingPackages(false);
         return;
       }
 
@@ -65,8 +62,6 @@ const ManualBooking: React.FC = () => {
     } catch (error) {
       console.error('Error loading packages:', error);
       setPackages([]);
-    } finally {
-      setLoadingPackages(false);
     }
   };
 
@@ -252,25 +247,46 @@ const ManualBooking: React.FC = () => {
             <h2 className="text-xl font-semibold text-gray-900">Select Package</h2>
           </div>
           
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Package *
-            </label>
-            <select
-              name="packageId"
-              value={form.packageId}
-              onChange={handleInputChange}
-              required
-              disabled={loadingPackages}
-              className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
-            >
-              <option value="">Select a package</option>
-              {Array.isArray(packages) && packages.map((p: any) => (
-                <option key={p.id} value={p.id}>
-                  {p.name} - ${p.price} {p.pricing_type === 'per_person' ? '(per person)' : ''}
-                </option>
-              ))}
-            </select>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {Array.isArray(packages) && packages.map((p: any) => (
+              <div
+                key={p.id}
+                onClick={() => {
+                  const event = {
+                    target: { name: 'packageId', value: p.id.toString() }
+                  } as any;
+                  handleInputChange(event);
+                }}
+                className={`cursor-pointer border-2 rounded-lg overflow-hidden transition-all ${
+                  form.packageId === p.id.toString()
+                    ? `border-${themeColor}-500 bg-${themeColor}-50 shadow-md`
+                    : 'border-gray-200 hover:border-gray-300 hover:shadow-sm'
+                }`}
+              >
+                {p.image && (
+                  <img
+                    src={getImageUrl(p.image)}
+                    alt={p.name}
+                    className="w-full h-40 object-cover"
+                  />
+                )}
+                <div className="p-4">
+                  <h3 className="font-semibold text-gray-900 mb-1">{p.name}</h3>
+                  {p.description && (
+                    <p className="text-xs text-gray-600 mb-2 line-clamp-2">{p.description}</p>
+                  )}
+                  <div className="flex items-baseline gap-2 mt-2">
+                    <span className={`text-xl font-bold text-${fullColor}`}>${p.price}</span>
+                    <span className="text-xs text-gray-500">{p.pricing_type === 'per_person' ? 'per person' : 'fixed'}</span>
+                  </div>
+                  {form.packageId === p.id.toString() && (
+                    <div className={`mt-3 pt-3 border-t border-${themeColor}-200 text-center`}>
+                      <span className={`text-xs font-medium text-${fullColor}`}>✓ Selected</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 
@@ -305,97 +321,188 @@ const ManualBooking: React.FC = () => {
 
             {pkg.rooms && pkg.rooms.length > 0 && (
               <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Select Room</h3>
-                <select
-                  name="roomId"
-                  value={form.roomId}
-                  onChange={handleInputChange}
-                  className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
-                >
-                  <option value="">No room preference</option>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Select Room</h3>
+                <p className="text-sm text-gray-600 mb-4">Choose a preferred room (optional)</p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div
+                    onClick={() => {
+                      const event = {
+                        target: { name: 'roomId', value: '' }
+                      } as any;
+                      handleInputChange(event);
+                    }}
+                    className={`cursor-pointer border-2 rounded-lg p-4 text-center transition-all ${
+                      form.roomId === ''
+                        ? `border-${themeColor}-500 bg-${themeColor}-50`
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <p className="font-medium text-gray-900">No room preference</p>
+                    <p className="text-xs text-gray-500 mt-1">Any available room</p>
+                  </div>
                   {Array.isArray(pkg.rooms) && pkg.rooms.map((room: any) => (
-                    <option key={room.id} value={room.id}>
-                      {room.name} - Capacity: {room.capacity}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            {pkg.add_ons && pkg.add_ons.length > 0 && (
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Add-ons (Optional)</h3>
-                <div className="space-y-4">
-                  {Array.isArray(pkg.add_ons) && pkg.add_ons.map((addOn: any) => (
-                    <div key={addOn.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                      <div className="flex-1">
-                        <h4 className="font-medium text-gray-900">{addOn.name}</h4>
-                        <p className="text-sm text-gray-600">{addOn.description}</p>
-                        <p className="text-sm font-semibold text-gray-900 mt-1">
-                          ${addOn.price} {addOn.pricing_type === 'per_person' ? '(per person)' : ''}
-                        </p>
+                    <div
+                      key={room.id}
+                      onClick={() => {
+                        const event = {
+                          target: { name: 'roomId', value: room.id.toString() }
+                        } as any;
+                        handleInputChange(event);
+                      }}
+                      className={`cursor-pointer border-2 rounded-lg p-4 transition-all ${
+                        form.roomId === room.id.toString()
+                          ? `border-${themeColor}-500 bg-${themeColor}-50`
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <h4 className="font-semibold text-gray-900 mb-2">{room.name}</h4>
+                      <div className="flex items-center justify-center gap-1 text-sm text-gray-600">
+                        <Users className="h-4 w-4" />
+                        <span>Capacity: {room.capacity}</span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => handleAddOnChange(addOn.id, -1)}
-                          disabled={!selectedAddOns[addOn.id]}
-                          className={`p-2 rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-50`}
-                        >
-                          <Minus className="h-4 w-4" />
-                        </button>
-                        <span className="w-12 text-center font-medium">
-                          {selectedAddOns[addOn.id] || 0}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => handleAddOnChange(addOn.id, 1)}
-                          className={`p-2 rounded-lg border border-${themeColor}-500 bg-${themeColor}-500 text-white hover:bg-${themeColor}-600`}
-                        >
-                          <Plus className="h-4 w-4" />
-                        </button>
-                      </div>
+                      {form.roomId === room.id.toString() && (
+                        <div className={`mt-2 pt-2 border-t border-${themeColor}-200 text-center`}>
+                          <span className={`text-xs font-medium text-${fullColor}`}>✓ Selected</span>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
               </div>
             )}
 
+            {pkg.add_ons && pkg.add_ons.length > 0 && (
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Package Add-ons</h3>
+                <p className="text-sm text-gray-600 mb-4">Enhance your package with additional items</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {Array.isArray(pkg.add_ons) && pkg.add_ons.map((addOn: any) => {
+                    const isSelected = selectedAddOns[addOn.id] > 0;
+                    const quantity = selectedAddOns[addOn.id] || 0;
+                    
+                    return (
+                      <div
+                        key={addOn.id}
+                        className={`border-2 rounded-lg p-4 transition-all ${
+                          isSelected 
+                            ? `border-${themeColor}-500 bg-${themeColor}-50 shadow-sm` 
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        {addOn.image && (
+                          <div className="mb-3 -mx-4 -mt-4">
+                            <img 
+                              src={getImageUrl(addOn.image)} 
+                              alt={addOn.name} 
+                              className="w-full h-32 object-cover rounded-t-lg" 
+                            />
+                          </div>
+                        )}
+                        <div className="flex justify-between items-start mb-2">
+                          <div className="flex-1">
+                            <h4 className="font-semibold text-gray-900">{addOn.name}</h4>
+                            {addOn.description && (
+                              <p className="text-xs text-gray-600 mt-1 line-clamp-2">{addOn.description}</p>
+                            )}
+                            <div className="flex items-baseline gap-2 mt-2">
+                              <span className={`text-lg font-bold text-${fullColor}`}>${addOn.price}</span>
+                              <span className="text-xs text-gray-500">{addOn.pricing_type === 'per_person' ? 'per person' : 'per unit'}</span>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div className={`mt-3 pt-3 border-t ${isSelected ? `border-${themeColor}-200` : 'border-gray-200'} flex items-center justify-between`}>
+                          <span className="text-sm font-medium text-gray-700">Quantity:</span>
+                          <div className="flex items-center gap-3">
+                            <button
+                              type="button"
+                              onClick={() => handleAddOnChange(addOn.id, -1)}
+                              disabled={!isSelected}
+                              className={`p-2 rounded-lg bg-white border-2 border-gray-300 hover:border-${themeColor}-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed`}
+                            >
+                              <Minus className="h-4 w-4 text-gray-600" />
+                            </button>
+                            <span className="font-bold text-lg text-gray-900 w-8 text-center">{quantity}</span>
+                            <button
+                              type="button"
+                              onClick={() => handleAddOnChange(addOn.id, 1)}
+                              className={`p-2 rounded-lg bg-white border-2 border-gray-300 hover:border-${themeColor}-400 transition-colors`}
+                            >
+                              <Plus className="h-4 w-4 text-gray-600" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {pkg.attractions && pkg.attractions.length > 0 && (
               <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Attractions (Optional)</h3>
-                <div className="space-y-4">
-                  {Array.isArray(pkg.attractions) && pkg.attractions.map((attraction: any) => (
-                    <div key={attraction.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                      <div className="flex-1">
-                        <h4 className="font-medium text-gray-900">{attraction.name}</h4>
-                        <p className="text-sm text-gray-600">{attraction.description}</p>
-                        <p className="text-sm font-semibold text-gray-900 mt-1">
-                          ${attraction.price} {attraction.pricing_type === 'per_person' ? '(per person)' : ''}
-                        </p>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Additional Attractions</h3>
+                <p className="text-sm text-gray-600 mb-4">Add exciting attractions to your booking</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {Array.isArray(pkg.attractions) && pkg.attractions.map((attraction: any) => {
+                    const isSelected = selectedAttractions[attraction.id] > 0;
+                    const quantity = selectedAttractions[attraction.id] || 0;
+                    
+                    return (
+                      <div
+                        key={attraction.id}
+                        className={`border-2 rounded-lg p-4 transition-all ${
+                          isSelected 
+                            ? `border-${themeColor}-500 bg-${themeColor}-50 shadow-sm` 
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        {attraction.image && (
+                          <div className="mb-3 -mx-4 -mt-4">
+                            <img 
+                              src={getImageUrl(attraction.image)} 
+                              alt={attraction.name} 
+                              className="w-full h-32 object-cover rounded-t-lg" 
+                            />
+                          </div>
+                        )}
+                        <div className="flex justify-between items-start mb-2">
+                          <div className="flex-1">
+                            <h4 className="font-semibold text-gray-900">{attraction.name}</h4>
+                            {attraction.description && (
+                              <p className="text-xs text-gray-600 mt-1 line-clamp-2">{attraction.description}</p>
+                            )}
+                            <div className="flex items-baseline gap-2 mt-2">
+                              <span className={`text-lg font-bold text-${fullColor}`}>${attraction.price}</span>
+                              <span className="text-xs text-gray-500">{attraction.pricing_type === 'per_person' ? 'per person' : 'per unit'}</span>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div className={`mt-3 pt-3 border-t ${isSelected ? `border-${themeColor}-200` : 'border-gray-200'} flex items-center justify-between`}>
+                          <span className="text-sm font-medium text-gray-700">Quantity:</span>
+                          <div className="flex items-center gap-3">
+                            <button
+                              type="button"
+                              onClick={() => handleAttractionChange(attraction.id, -1)}
+                              disabled={!isSelected}
+                              className={`p-2 rounded-lg bg-white border-2 border-gray-300 hover:border-${themeColor}-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed`}
+                            >
+                              <Minus className="h-4 w-4 text-gray-600" />
+                            </button>
+                            <span className="font-bold text-lg text-gray-900 w-8 text-center">{quantity}</span>
+                            <button
+                              type="button"
+                              onClick={() => handleAttractionChange(attraction.id, 1)}
+                              className={`p-2 rounded-lg bg-white border-2 border-gray-300 hover:border-${themeColor}-400 transition-colors`}
+                            >
+                              <Plus className="h-4 w-4 text-gray-600" />
+                            </button>
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => handleAttractionChange(attraction.id, -1)}
-                          disabled={!selectedAttractions[attraction.id]}
-                          className={`p-2 rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-50`}
-                        >
-                          <Minus className="h-4 w-4" />
-                        </button>
-                        <span className="w-12 text-center font-medium">
-                          {selectedAttractions[attraction.id] || 0}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => handleAttractionChange(attraction.id, 1)}
-                          className={`p-2 rounded-lg border border-${themeColor}-500 bg-${themeColor}-500 text-white hover:bg-${themeColor}-600`}
-                        >
-                          <Plus className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
