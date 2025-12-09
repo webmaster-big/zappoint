@@ -254,17 +254,23 @@ const ManualBooking: React.FC = () => {
       </div>
 
       <form onSubmit={handleSubmit} className="max-w-7xl mx-auto px-6 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className={`grid gap-6 transition-all duration-500 ${
+          form.packageId 
+            ? 'grid-cols-1 lg:grid-cols-3' 
+            : 'grid-cols-1'
+        }`}>
           
           {/* Main Content - Left Side */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className={`space-y-6 transition-all duration-500 ${
+            form.packageId ? 'lg:col-span-2' : 'col-span-1'
+          }`}>
             
             {/* Step 1: Package Selection */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-              <div className="px-6 py-4" style={{ background: `linear-gradient(to right, ${fullColor}, ${fullColor}dd)` }}>
+              <div className={`px-6 py-4 bg-gradient-to-r from-${themeColor}-600 to-${themeColor}-700`}>
                 <div className="flex items-center gap-3">
                   <div className="bg-white rounded-full p-2">
-                    <Package className="h-5 w-5" style={{ color: fullColor }} />
+                    <Package className={`h-5 w-5 text-${themeColor}-600`} />
                   </div>
                   <div>
                     <h2 className="text-lg font-semibold text-white">Step 1: Select Package</h2>
@@ -273,115 +279,139 @@ const ManualBooking: React.FC = () => {
                 </div>
               </div>
               <div className="p-6">
-                {/* Selected Package - Large Display */}
-                {form.packageId && (
-                  <div className="mb-6">
-                    <p className="text-xs font-medium text-gray-500 mb-3 uppercase tracking-wide">Selected Package</p>
-                    {Array.isArray(packages) && packages
-                      .filter((p: any) => form.packageId === p.id.toString())
-                      .map((p: any) => (
-                        <div
-                          key={p.id}
-                          className="relative rounded-2xl overflow-hidden border-4 shadow-2xl transition-all duration-500 ease-out animate-in"
-                          style={{ borderColor: fullColor }}
-                        >
-                          {p.image && (
-                            <div className="relative h-48">
-                              <img
-                                src={getImageUrl(p.image)}
-                                alt={p.name}
-                                className="w-full h-full object-cover"
-                              />
-                              <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
-                              <div className="absolute top-4 right-4">
-                                <div className="text-white rounded-full p-3 shadow-lg transition-transform duration-300 hover:scale-110" style={{ backgroundColor: fullColor }}>
-                                  <svg className="h-6 w-6" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                  </svg>
-                                </div>
+                {/* Available Packages Grid - Large when not selected */}
+                {!form.packageId && (
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                    {Array.isArray(packages) && packages.map((p: any) => (
+                      <div
+                        key={p.id}
+                        onClick={() => {
+                          const event = {
+                            target: { name: 'packageId', value: p.id.toString() }
+                          } as any;
+                          handleInputChange(event);
+                        }}
+                        className={`group relative cursor-pointer rounded-2xl overflow-hidden border-2 bg-white hover:shadow-2xl transition-all duration-300 ease-out hover:scale-105 active:scale-95 border-gray-200 hover:border-${themeColor}-300`}
+                      >
+                        {p.image && (
+                          <div className="relative h-48">
+                            <img
+                              src={getImageUrl(p.image)}
+                              alt={p.name}
+                              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                          </div>
+                        )}
+                        <div className="p-4 bg-white">
+                          <h3 className="font-bold text-lg text-gray-900 mb-2 line-clamp-2">{p.name}</h3>
+                          <p className="text-xs text-gray-600 mb-3 line-clamp-2">{p.description}</p>
+                          <div className="flex items-center justify-between">
+                            <span className={`text-xs px-2 py-1 rounded-md bg-${themeColor}-50 text-${themeColor}-700 font-medium`}>
+                              {p.category || 'Package'}
+                            </span>
+                            <div className="text-right">
+                              <div className="flex items-baseline gap-1">
+                                <span className="text-sm text-gray-500">$</span>
+                                <span className={`text-2xl font-bold text-${themeColor}-600`}>{p.price}</span>
                               </div>
-                            </div>
-                          )}
-                          <div className="p-6 bg-white">
-                            <h3 className="font-bold text-2xl text-gray-900 mb-3">{p.name}</h3>
-                            <p className="text-sm text-gray-600 mb-4 line-clamp-2">{p.description}</p>
-                            <div className="flex items-center justify-between">
-                              <div className="flex flex-wrap gap-2">
-                                <span className={`inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-${themeColor}-50 border border-${themeColor}-200`} style={{ color: fullColor }}>
-                                  {p.category || 'Package'}
-                                </span>
-                                <span className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 text-gray-700">
-                                  {p.duration} {p.duration_unit}
-                                </span>
-                              </div>
-                              <div className="text-right">
-                                <div className="flex items-baseline gap-1">
-                                  <span className="text-sm text-gray-500">$</span>
-                                  <span className="text-4xl font-bold" style={{ color: fullColor }}>{p.price}</span>
-                                </div>
-                                <span className="text-xs text-gray-500">{p.pricing_type === 'per_person' ? 'per person' : 'fixed'}</span>
-                              </div>
+                              <span className="text-xs text-gray-500">{p.pricing_type === 'per_person' ? '/person' : 'fixed'}</span>
                             </div>
                           </div>
                         </div>
-                      ))}
+                      </div>
+                    ))}
                   </div>
                 )}
 
-                {/* Available Packages Grid */}
-                <div>
-                  {form.packageId && (
-                    <p className="text-xs font-medium text-gray-500 mb-3 uppercase tracking-wide">
-                      Change Package
-                    </p>
-                  )}
-                  <div className={`grid gap-4 transition-all duration-500 ${
-                    form.packageId 
-                      ? 'grid-cols-3 md:grid-cols-4 lg:grid-cols-5' 
-                      : 'grid-cols-2 md:grid-cols-3'
-                  }`}>
-                    {Array.isArray(packages) && packages
-                      .filter((p: any) => !form.packageId || form.packageId !== p.id.toString())
-                      .map((p: any) => (
-                        <div
-                          key={p.id}
-                          onClick={() => {
-                            const event = {
-                              target: { name: 'packageId', value: p.id.toString() }
-                            } as any;
-                            handleInputChange(event);
-                          }}
-                          className="group relative cursor-pointer rounded-xl overflow-hidden border-2 border-gray-200 hover:border-gray-300 hover:shadow-lg transition-all duration-300 ease-out hover:scale-105 active:scale-95"
-                        >
-                          {p.image && (
-                            <div className={`relative transition-all duration-500 ${
-                              form.packageId ? 'h-20' : 'h-32'
-                            }`}>
-                              <img
-                                src={getImageUrl(p.image)}
-                                alt={p.name}
-                                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                              />
-                              <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                            </div>
-                          )}
-                          <div className={`p-3 bg-white transition-all duration-500 ${
-                            form.packageId ? 'p-2' : 'p-3'
-                          }`}>
-                            <h3 className={`font-semibold text-gray-900 line-clamp-1 mb-1 transition-all duration-300 ${
-                              form.packageId ? 'text-xs' : 'text-sm'
-                            }`}>{p.name}</h3>
-                            <div className="flex items-baseline gap-1">
-                              <span className={`font-bold transition-all duration-300 ${
-                                form.packageId ? 'text-sm' : 'text-lg'
-                              }`} style={{ color: fullColor }}>${p.price}</span>
-                              <span className="text-xs text-gray-500 truncate">{p.pricing_type === 'per_person' ? '/person' : 'fixed'}</span>
+                {/* Selected Package - Small Display with Other Options */}
+                {form.packageId && (
+                  <div className="space-y-4">
+                    <div>
+                      <p className="text-xs font-medium text-gray-500 mb-3 uppercase tracking-wide">Selected Package</p>
+                      {Array.isArray(packages) && packages
+                        .filter((p: any) => form.packageId === p.id.toString())
+                        .map((p: any) => (
+                          <div
+                            key={p.id}
+                            className={`relative rounded-xl overflow-hidden border-3 shadow-lg transition-all duration-500 ease-out bg-white border-${themeColor}-500`}
+                          >
+                            <div className="flex items-center gap-4 p-4">
+                              {p.image && (
+                                <div className="relative w-24 h-24 flex-shrink-0">
+                                  <img
+                                    src={getImageUrl(p.image)}
+                                    alt={p.name}
+                                    className="w-full h-full object-cover rounded-lg"
+                                  />
+                                  <div className={`absolute -top-2 -right-2 text-white rounded-full p-1.5 shadow-md bg-${themeColor}-600`}>
+                                    <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                    </svg>
+                                  </div>
+                                </div>
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <h3 className="font-bold text-base text-gray-900 mb-1 truncate">{p.name}</h3>
+                                <div className="flex items-center gap-2 mb-2">
+                                  <span className={`text-xs px-2 py-0.5 rounded bg-${themeColor}-50 text-${themeColor}-700 font-medium`}>
+                                    {p.category || 'Package'}
+                                  </span>
+                                  <span className="text-xs text-gray-500">{p.duration} {p.duration_unit}</span>
+                                </div>
+                                <div className="flex items-baseline gap-1">
+                                  <span className="text-sm text-gray-500">$</span>
+                                  <span className={`text-xl font-bold text-${themeColor}-600`}>{p.price}</span>
+                                  <span className="text-xs text-gray-500 ml-1">{p.pricing_type === 'per_person' ? '/person' : 'fixed'}</span>
+                                </div>
+                              </div>
                             </div>
                           </div>
+                        ))}
+                    </div>
+
+                    {/* Other Packages - Compact Grid */}
+                    {packages.filter((p: any) => form.packageId !== p.id.toString()).length > 0 && (
+                      <div>
+                        <p className="text-xs font-medium text-gray-500 mb-3 uppercase tracking-wide">
+                          Change Package
+                        </p>
+                        <div className="grid grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
+                          {Array.isArray(packages) && packages
+                            .filter((p: any) => form.packageId !== p.id.toString())
+                            .map((p: any) => (
+                              <div
+                                key={p.id}
+                                onClick={() => {
+                                  const event = {
+                                    target: { name: 'packageId', value: p.id.toString() }
+                                  } as any;
+                                  handleInputChange(event);
+                                }}
+                                className="group relative cursor-pointer rounded-lg overflow-hidden border-2 border-gray-200 hover:border-gray-300 hover:shadow-md transition-all duration-200 ease-out hover:scale-105 active:scale-95 bg-white"
+                              >
+                                {p.image && (
+                                  <div className="relative h-16">
+                                    <img
+                                      src={getImageUrl(p.image)}
+                                      alt={p.name}
+                                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
+                                    />
+                                  </div>
+                                )}
+                                <div className="p-2">
+                                  <h3 className="font-semibold text-xs text-gray-900 line-clamp-1 mb-1">{p.name}</h3>
+                                  <div className="flex items-baseline gap-0.5">
+                                    <span className={`text-sm font-bold text-${themeColor}-600`}>${p.price}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
                         </div>
-                      ))}
+                      </div>
+                    )}
                   </div>
-                </div>
+                )}
               </div>
             </div>
 
@@ -389,10 +419,10 @@ const ManualBooking: React.FC = () => {
               <>
                 {/* Step 2: Customer & Booking Info */}
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-                  <div className="px-6 py-4" style={{ background: `linear-gradient(to right, ${fullColor}dd, ${fullColor}bb)` }}>
+                  <div className={`px-6 py-4 bg-gradient-to-r from-${themeColor}-600 to-${themeColor}-700`}>
                     <div className="flex items-center gap-3">
                       <div className="bg-white rounded-full p-2">
-                        <Users className="h-5 w-5" style={{ color: fullColor }} />
+                        <Users className={`h-5 w-5 text-${themeColor}-600`} />
                       </div>
                       <div>
                         <h2 className="text-lg font-semibold text-white">Step 2: Customer & Booking Details</h2>
@@ -404,7 +434,7 @@ const ManualBooking: React.FC = () => {
                     {/* Customer Info */}
                     <div>
                       <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                        <div className="h-1 w-1 rounded-full" style={{ backgroundColor: fullColor }}></div>
+                        <div className={`h-1 w-1 rounded-full bg-${themeColor}-600`}></div>
                         Customer Information
                       </h3>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -416,8 +446,7 @@ const ManualBooking: React.FC = () => {
                             value={form.customerName}
                             onChange={handleInputChange}
                             required
-                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent transition-all"
-                            style={{ '--tw-ring-color': fullColor } as any}
+                            className={`w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent transition-all`}
                             placeholder="John Doe"
                           />
                         </div>
@@ -429,8 +458,7 @@ const ManualBooking: React.FC = () => {
                             value={form.email}
                             onChange={handleInputChange}
                             required
-                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent transition-all"
-                            style={{ '--tw-ring-color': fullColor } as any}
+                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring--500 focus:border-transparent transition-all"
                             placeholder="john@example.com"
                           />
                         </div>
@@ -441,8 +469,7 @@ const ManualBooking: React.FC = () => {
                             name="phone"
                             value={form.phone}
                             onChange={handleInputChange}
-                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent transition-all"
-                            style={{ '--tw-ring-color': fullColor } as any}
+                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring--500 focus:border-transparent transition-all"
                             placeholder="+1 (555) 123-4567"
                           />
                         </div>
@@ -454,7 +481,7 @@ const ManualBooking: React.FC = () => {
                     {/* Booking Details */}
                     <div>
                       <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                        <div className="h-1 w-1 rounded-full" style={{ backgroundColor: fullColor }}></div>
+                        <div className={`h-1 w-1 rounded-full bg-${themeColor}-600`}></div>
                         Booking Schedule
                       </h3>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -466,7 +493,7 @@ const ManualBooking: React.FC = () => {
                             value={form.bookingDate}
                             onChange={handleInputChange}
                             required
-                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent transition-all"
+                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring--500 focus:border-transparent transition-all"
                           />
                         </div>
                         <div>
@@ -477,7 +504,7 @@ const ManualBooking: React.FC = () => {
                             value={form.bookingTime}
                             onChange={handleInputChange}
                             required
-                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent transition-all"
+                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring--500 focus:border-transparent transition-all"
                           />
                         </div>
                         <div>
@@ -489,8 +516,7 @@ const ManualBooking: React.FC = () => {
                             onChange={handleInputChange}
                             min="1"
                             required
-                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent transition-all"
-                            style={{ '--tw-ring-color': fullColor } as any}
+                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring--500 focus:border-transparent transition-all"
                           />
                           {pkg && pkg.pricing_type === 'fixed' && form.participants > (pkg.max_participants || 0) && pkg.additional_participant_price && (
                             <p className="text-xs text-amber-600 mt-1.5 flex items-center gap-1">
@@ -507,8 +533,7 @@ const ManualBooking: React.FC = () => {
                             name="status"
                             value={form.status}
                             onChange={handleInputChange}
-                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent transition-all"
-                            style={{ '--tw-ring-color': fullColor } as any}
+                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring--500 focus:border-transparent transition-all"
                           >
                             <option value="completed">Completed</option>
                             <option value="confirmed">Confirmed</option>
@@ -526,7 +551,7 @@ const ManualBooking: React.FC = () => {
                         <div className="border-t border-gray-200"></div>
                         <div>
                           <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                            <div className="h-1 w-1 rounded-full" style={{ backgroundColor: fullColor }}></div>
+                            <div className={`h-1 w-1 rounded-full bg-${themeColor}-600`}></div>
                             Room Selection
                             <span className="text-xs font-normal text-gray-500">(Optional)</span>
                           </h3>
@@ -540,10 +565,9 @@ const ManualBooking: React.FC = () => {
                               }}
                               className={`cursor-pointer p-3 rounded-lg border-2 text-center transition-all ${
                                 form.roomId === ''
-                                  ? 'shadow-md'
+                                  ? `shadow-md border-${themeColor}-500 bg-${themeColor}-50`
                                   : 'border-gray-200 hover:bg-gray-50'
                               }`}
-                              style={form.roomId === '' ? { borderColor: fullColor, backgroundColor: `${fullColor}15` } : {}}
                             >
                               <p className="font-medium text-sm text-gray-900">Any Room</p>
                             </div>
@@ -558,10 +582,9 @@ const ManualBooking: React.FC = () => {
                                 }}
                                 className={`cursor-pointer p-3 rounded-lg border-2 transition-all ${
                                   form.roomId === room.id.toString()
-                                    ? 'shadow-md'
+                                    ? `shadow-md border-${themeColor}-500 bg-${themeColor}-50`
                                     : 'border-gray-200 hover:bg-gray-50'
                                 }`}
-                                style={form.roomId === room.id.toString() ? { borderColor: fullColor, backgroundColor: `${fullColor}15` } : {}}
                               >
                                 <h4 className="font-semibold text-sm text-gray-900 mb-1 truncate">{room.name}</h4>
                                 <div className="flex items-center justify-center gap-1 text-xs text-gray-600">
@@ -580,10 +603,10 @@ const ManualBooking: React.FC = () => {
                 {/* Step 3: Add-ons & Attractions */}
                 {((pkg.add_ons && pkg.add_ons.length > 0) || (pkg.attractions && pkg.attractions.length > 0)) && (
                   <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-                    <div className="px-6 py-4" style={{ background: `linear-gradient(to right, ${fullColor}bb, ${fullColor}99)` }}>
+                    <div className={`px-6 py-4 bg-gradient-to-r from-${themeColor}-500 to-${themeColor}-600`}>
                       <div className="flex items-center gap-3">
                         <div className="bg-white rounded-full p-2">
-                          <Plus className="h-5 w-5" style={{ color: fullColor }} />
+                          <Plus className={`h-5 w-5 text-${themeColor}-600`} />
                         </div>
                         <div>
                           <h2 className="text-lg font-semibold text-white">Step 3: Add-ons & Attractions</h2>
@@ -600,11 +623,11 @@ const ManualBooking: React.FC = () => {
                           return (
                             <div
                               key={addOn.id}
-                              className="rounded-xl overflow-hidden border-2 transition-all"
-                              style={isSelected 
-                                ? { borderColor: fullColor, boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)' }
-                                : { borderColor: '#e5e7eb' }
-                              }
+                              className={`rounded-xl overflow-hidden border-2 transition-all ${
+                                isSelected 
+                                  ? `border-${themeColor}-500 shadow-lg` 
+                                  : 'border-gray-200'
+                              }`}
                             >
                               {addOn.image && (
                                 <img 
@@ -616,7 +639,7 @@ const ManualBooking: React.FC = () => {
                               <div className="p-3">
                                 <h4 className="font-semibold text-sm text-gray-900 line-clamp-1 mb-1">{addOn.name}</h4>
                                 <div className="flex items-baseline gap-2 mb-3">
-                                  <span className="text-base font-bold" style={{ color: fullColor }}>${addOn.price}</span>
+                                  <span className={`text-base font-bold text-${themeColor}-600`}>${addOn.price}</span>
                                   <span className="text-xs text-gray-500">{addOn.pricing_type === 'per_person' ? 'per person' : 'per unit'}</span>
                                 </div>
                                 
@@ -633,10 +656,7 @@ const ManualBooking: React.FC = () => {
                                   <button
                                     type="button"
                                     onClick={() => handleAddOnChange(addOn.id, 1)}
-                                    className="p-1.5 rounded-lg text-white transition-colors"
-                                    style={{ backgroundColor: fullColor }}
-                                    onMouseEnter={(e) => e.currentTarget.style.opacity = '0.9'}
-                                    onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
+                                    className={`p-1.5 rounded-lg text-white transition-colors bg-${themeColor}-600 hover:bg-${themeColor}-700`}
                                   >
                                     <Plus className="h-3.5 w-3.5" />
                                   </button>
@@ -653,11 +673,11 @@ const ManualBooking: React.FC = () => {
                           return (
                             <div
                               key={attraction.id}
-                              className="rounded-xl overflow-hidden border-2 transition-all"
-                              style={isSelected 
-                                ? { borderColor: fullColor, boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)' }
-                                : { borderColor: '#e5e7eb' }
-                              }
+                              className={`rounded-xl overflow-hidden border-2 transition-all ${
+                                isSelected 
+                                  ? `border-${themeColor}-500 shadow-lg` 
+                                  : 'border-gray-200'
+                              }`}
                             >
                               {attraction.image && (
                                 <img 
@@ -669,7 +689,7 @@ const ManualBooking: React.FC = () => {
                               <div className="p-3">
                                 <h4 className="font-semibold text-sm text-gray-900 line-clamp-1 mb-1">{attraction.name}</h4>
                                 <div className="flex items-baseline gap-2 mb-3">
-                                  <span className="text-base font-bold" style={{ color: fullColor }}>${attraction.price}</span>
+                                  <span className={`text-base font-bold text-${themeColor}-600`}>${attraction.price}</span>
                                   <span className="text-xs text-gray-500">{attraction.pricing_type === 'per_person' ? 'per person' : 'per unit'}</span>
                                 </div>
                                 
@@ -686,10 +706,7 @@ const ManualBooking: React.FC = () => {
                                   <button
                                     type="button"
                                     onClick={() => handleAttractionChange(attraction.id, 1)}
-                                    className="p-1.5 rounded-lg text-white transition-colors"
-                                    style={{ backgroundColor: fullColor }}
-                                    onMouseEnter={(e) => e.currentTarget.style.opacity = '0.9'}
-                                    onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
+                                    className={`p-1.5 rounded-lg text-white transition-colors bg-${themeColor}-600 hover:bg-${themeColor}-700`}
                                   >
                                     <Plus className="h-3.5 w-3.5" />
                                   </button>
@@ -706,14 +723,15 @@ const ManualBooking: React.FC = () => {
             )}
           </div>
 
-          {/* Sidebar - Right Side */}
-          <div className="lg:col-span-1">
-            <div className="sticky top-6 space-y-6">
+          {/* Sidebar - Right Side - Only shows when package is selected */}
+          {form.packageId && (
+            <div className="lg:col-span-1 transition-all duration-500">
+              <div className="sticky top-6 space-y-6">
               
               {/* Package Summary */}
               {pkg && (
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-                  <div className="px-5 py-4" style={{ background: `linear-gradient(to right, ${fullColor}, ${fullColor}dd)` }}>
+                  <div className={`px-5 py-4 bg-gradient-to-r from-${themeColor}-600 to-${themeColor}-700`}>
                     <h3 className="text-base font-semibold text-white">Selected Package</h3>
                   </div>
                   <div className="p-5">
@@ -745,7 +763,7 @@ const ManualBooking: React.FC = () => {
               {/* Payment Summary */}
               {pkg && (
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-                  <div className="px-5 py-4" style={{ background: `linear-gradient(to right, ${fullColor}, ${fullColor}cc)` }}>
+                  <div className={`px-5 py-4 bg-gradient-to-r from-${themeColor}-600 to-${themeColor}-700`}>
                     <h3 className="text-base font-semibold text-white">Payment Details</h3>
                   </div>
                   <div className="p-5 space-y-4">
@@ -769,7 +787,6 @@ const ManualBooking: React.FC = () => {
                         min="0"
                         placeholder={`${Number(calculateTotal() || 0).toFixed(2)}`}
                         className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
-                        style={{ '--tw-ring-color': fullColor } as any}
                       />
                       <p className="text-xs text-gray-500 mt-1">Leave blank to use calculated total</p>
                     </div>
@@ -785,7 +802,6 @@ const ManualBooking: React.FC = () => {
                         min="0"
                         placeholder="Auto-calculated"
                         className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
-                        style={{ '--tw-ring-color': fullColor } as any}
                       />
                       <p className="text-xs text-gray-500 mt-1">Leave blank for auto-calculation</p>
                     </div>
@@ -797,7 +813,6 @@ const ManualBooking: React.FC = () => {
                         value={form.paymentMethod}
                         onChange={handleInputChange}
                         className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
-                        style={{ '--tw-ring-color': fullColor } as any}
                       >
                         <option value="cash">Cash</option>
                         <option value="card">Card</option>
@@ -811,7 +826,6 @@ const ManualBooking: React.FC = () => {
                         value={form.paymentStatus}
                         onChange={handleInputChange}
                         className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
-                        style={{ '--tw-ring-color': fullColor } as any}
                       >
                         <option value="paid">Paid</option>
                         <option value="partial">Partial</option>
@@ -827,7 +841,6 @@ const ManualBooking: React.FC = () => {
                         onChange={handleInputChange}
                         rows={4}
                         className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
-                        style={{ '--tw-ring-color': fullColor } as any}
                         placeholder="Add any additional notes..."
                       />
                     </div>
@@ -842,8 +855,7 @@ const ManualBooking: React.FC = () => {
                     <button
                       type="submit"
                       disabled={loading || !form.packageId}
-                      className="w-full px-6 py-3 text-white font-semibold rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all shadow-lg hover:opacity-90"
-                      style={{ backgroundColor: fullColor }}
+                      className={`w-full px-6 py-3 text-white font-semibold rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all shadow-lg bg-${themeColor}-600 hover:bg-${themeColor}-700`}
                     >
                       {loading ? (
                         <>
@@ -868,8 +880,9 @@ const ManualBooking: React.FC = () => {
                   </div>
                 </div>
               )}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </form>
     </div>
