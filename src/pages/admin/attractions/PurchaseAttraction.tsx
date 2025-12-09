@@ -573,7 +573,7 @@ const PurchaseAttraction = () => {
           >
             <div className="text-center mb-4">
               <div className="w-12 h-12 bg-blue-100 flex items-center justify-center mx-auto mb-3">
-                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-6 h-6 text-blue-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                 </svg>
               </div>
@@ -583,7 +583,7 @@ const PurchaseAttraction = () => {
             <div className="flex flex-col gap-2.5">
               <button
                 onClick={() => navigate('/customer/register')}
-                className="w-full px-4 py-2.5 bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-all duration-200 active:scale-95"
+                className="w-full px-4 py-2.5 bg-blue-800 text-white text-sm font-medium hover:bg-blue-900 transition-all duration-200 active:scale-95"
               >
                 Create Account
               </button>
