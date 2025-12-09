@@ -55,7 +55,7 @@ const EditAttraction = () => {
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [customCategory, setCustomCategory] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
   // Load attraction data
@@ -337,6 +337,14 @@ const EditAttraction = () => {
       </div>
     );
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className={`animate-spin rounded-full h-12 w-12 border-b-2 border-${fullColor}`}></div>
+      </div>
+    );
+  }
 
   if (notFound) {
     return (

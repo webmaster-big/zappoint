@@ -86,48 +86,47 @@ const AttractionDetails = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 px-6 py-8">
-      {/* Header */}
-      <div className="mb-8">
-        <div className="flex items-center gap-3 mb-4">
-          <button
-            onClick={() => navigate('/attractions')}
-            className={`p-2 hover:bg-gray-100 rounded-lg transition-colors`}
-          >
-            <ArrowLeft className="h-5 w-5 text-gray-600" />
-          </button>
-        </div>
-        <div className="flex justify-between items-start">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">{attraction.name}</h1>
-            <p className="text-gray-600 mt-2">{attraction.category}</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className={`px-4 py-2 rounded-full text-sm font-medium ${
-              attraction.is_active 
-                ? 'bg-green-100 text-green-800' 
-                : 'bg-gray-100 text-gray-800'
-            }`}>
-              {attraction.is_active ? 'Active' : 'Inactive'}
-            </span>
-            <button
-              onClick={() => navigate(`/attractions/edit/${id}`)}
-              className={`flex items-center px-4 py-2 bg-${themeColor}-600 text-white rounded-lg hover:bg-${themeColor}-700 transition-colors`}
-            >
-              <Edit className="h-4 w-4 mr-2" />
-              Edit
-            </button>
-            <button
-              onClick={handleDelete}
-              className="flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Delete
-            </button>
-          </div>
-        </div>
-      </div>
-
       <div className="max-w-5xl mx-auto">
+        {/* Header */}
+        <div className="mb-8">
+          <div className="flex items-center gap-3 mb-4">
+            <button
+              onClick={() => navigate('/attractions')}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              <ArrowLeft className="h-5 w-5 text-gray-600" />
+            </button>
+          </div>
+          <div className="flex justify-between items-start">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">{attraction.name}</h1>
+              <p className="text-gray-600 mt-2">{attraction.category}</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className={`px-4 py-2 rounded-full text-sm font-medium ${
+                attraction.is_active 
+                  ? 'bg-green-100 text-green-800' 
+                  : 'bg-gray-100 text-gray-800'
+              }`}>
+                {attraction.is_active ? 'Active' : 'Inactive'}
+              </span>
+              <button
+                onClick={() => navigate(`/attractions/edit/${id}`)}
+                className={`flex items-center px-4 py-2 bg-${themeColor}-600 text-white rounded-lg hover:bg-${themeColor}-700 transition-colors`}
+              >
+                <Edit className="h-4 w-4 mr-2" />
+                Edit
+              </button>
+              <button
+                onClick={handleDelete}
+                className="flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
         <div className="bg-white rounded-xl shadow-sm border border-gray-100">
           {/* Images */}
           {attraction.image && (

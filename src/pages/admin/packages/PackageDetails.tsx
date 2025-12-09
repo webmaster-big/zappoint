@@ -115,48 +115,47 @@ const PackageDetails = () => {
         />
       )}
 
-      {/* Header */}
-      <div className="mb-8">
-        <div className="flex items-center gap-3 mb-4">
-          <button
-            onClick={() => navigate('/packages')}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-          >
-            <ArrowLeft className="h-5 w-5 text-gray-600" />
-          </button>
-        </div>
-        <div className="flex justify-between items-start">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">{packageData.name}</h1>
-            <p className="text-gray-600 mt-2">{packageData.category || "No category"}</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className={`px-4 py-2 rounded-full text-sm font-medium ${
-              packageData.is_active 
-                ? 'bg-green-100 text-green-800' 
-                : 'bg-gray-100 text-gray-800'
-            }`}>
-              {packageData.is_active ? 'Active' : 'Inactive'}
-            </span>
-            <button
-              onClick={() => navigate(`/packages/edit/${id}`)}
-              className={`flex items-center px-4 py-2 bg-${themeColor}-600 text-white rounded-lg hover:bg-${themeColor}-700 transition-colors`}
-            >
-              <Edit className="h-4 w-4 mr-2" />
-              Edit
-            </button>
-            <button
-              onClick={handleDelete}
-              className="flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Delete
-            </button>
-          </div>
-        </div>
-      </div>
-
       <div className="max-w-5xl mx-auto">
+        {/* Header */}
+        <div className="mb-8">
+          <div className="flex items-center gap-3 mb-4">
+            <button
+              onClick={() => navigate('/packages')}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              <ArrowLeft className="h-5 w-5 text-gray-600" />
+            </button>
+          </div>
+          <div className="flex justify-between items-start">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">{packageData.name}</h1>
+              <p className="text-gray-600 mt-2">{packageData.category || "No category"}</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className={`px-4 py-2 rounded-full text-sm font-medium ${
+                packageData.is_active 
+                  ? 'bg-green-100 text-green-800' 
+                  : 'bg-gray-100 text-gray-800'
+              }`}>
+                {packageData.is_active ? 'Active' : 'Inactive'}
+              </span>
+              <button
+                onClick={() => navigate(`/packages/edit/${id}`)}
+                className={`flex items-center px-4 py-2 bg-${themeColor}-600 text-white rounded-lg hover:bg-${themeColor}-700 transition-colors`}
+              >
+                <Edit className="h-4 w-4 mr-2" />
+                Edit
+              </button>
+              <button
+                onClick={handleDelete}
+                className="flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
         <div className="bg-white rounded-xl shadow-sm border border-gray-100">
           {/* Description */}
           <div className="p-6 border-b border-gray-100">
@@ -273,10 +272,14 @@ const PackageDetails = () => {
                           ? `border-${themeColor}-200 bg-${themeColor}-50`
                           : 'border-gray-200 bg-gray-50'
                       }`}
+                      style={isAvailable ? {
+                        borderColor: `var(--color-${themeColor}-200)`,
+                        backgroundColor: `var(--color-${themeColor}-50)`
+                      } : undefined}
                     >
                       <span className="text-sm font-medium capitalize">{day.substring(0, 3)}</span>
                       {isAvailable ? (
-                        <CheckCircle className={`h-4 w-4 text-${fullColor}`} />
+                        <CheckCircle className="h-4 w-4" style={{ color: fullColor }} />
                       ) : (
                         <XCircle className="h-4 w-4 text-gray-400" />
                       )}
@@ -352,11 +355,14 @@ const PackageDetails = () => {
                 {packageData.add_ons.map((addon: string | { name?: string; price?: number }, idx: number) => {
                   const addonObj = typeof addon === 'string' ? { name: addon } : addon;
                   return (
-                    <div key={idx} className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                    <div 
+                      key={idx} 
+                      className={`rounded-lg p-4 border border-${themeColor}-200 bg-${themeColor}-50`}
+                    >
                       <div className="flex justify-between items-start">
                         <p className="text-gray-900 font-medium">{addonObj.name || String(addon)}</p>
                         {addonObj.price && (
-                          <span className="text-blue-700 font-semibold">${addonObj.price}</span>
+                          <span className={`font-semibold text-${fullColor}`}>${addonObj.price}</span>
                         )}
                       </div>
                     </div>
