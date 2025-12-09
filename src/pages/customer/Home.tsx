@@ -492,16 +492,14 @@ const EntertainmentLandingPage = () => {
       {/* Attraction Details Modal */}
       {showAttractionModal && selectedAttraction && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-3 md:p-4 z-50 animate-backdrop-fade" onClick={() => setShowAttractionModal(false)}>
-          <div className="bg-white max-w-2xl w-full max-h-[85vh] md:max-h-[90vh] overflow-y-auto rounded-xl md:rounded-2xl shadow-2xl animate-scale-in" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white max-w-2xl w-full max-h-[85vh] md:max-h-[90vh] overflow-y-auto shadow-2xl animate-scale-in" onClick={(e) => e.stopPropagation()}>
             {/* Modal Header */}
             <div className="sticky top-0 z-10">
               <div className="relative h-40 md:h-56 bg-gradient-to-br from-violet-500 to-blue-800">
                 <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowAttractionModal(false);
-                  }}
-                  className="absolute top-3 right-3 md:top-4 md:right-4 p-2 bg-white/90 backdrop-blur-sm rounded-full text-gray-900 hover:bg-white transition-all shadow-lg"
+                  type="button"
+                  onClick={() => setShowAttractionModal(false)}
+                  className="absolute top-3 right-3 md:top-4 md:right-4 p-2 md:p-2.5 bg-white hover:bg-gray-100 text-gray-900 transition-all shadow-lg z-20 rounded-full cursor-pointer"
                 >
                   <X size={20} className="md:w-6 md:h-6" />
                 </button>
@@ -543,7 +541,7 @@ const EntertainmentLandingPage = () => {
 
               {/* Details Grid */}
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 md:gap-4 mb-4 md:mb-6">
-                <div className="bg-gray-50 p-3 md:p-4 rounded-lg">
+                <div className="bg-gray-50 p-3 md:p-4">
                   <div className="flex items-center gap-1.5 md:gap-2 text-gray-600 mb-1">
                     <Users size={16} className="md:w-[18px] md:h-[18px]" />
                     <span className="text-xs font-medium">Capacity</span>
@@ -552,7 +550,7 @@ const EntertainmentLandingPage = () => {
                   <div className="text-xs text-gray-500">people</div>
                 </div>
                
-                <div className="bg-gray-50 p-3 md:p-4 rounded-lg col-span-2 sm:col-span-1">
+                <div className="bg-gray-50 p-3 md:p-4 col-span-2 sm:col-span-1">
                   <div className="flex items-center gap-1.5 md:gap-2 text-gray-600 mb-1">
                     <Clock size={16} className="md:w-[18px] md:h-[18px]" />
                     <span className="text-xs font-medium">Duration</span>
@@ -566,27 +564,27 @@ const EntertainmentLandingPage = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 mb-4 md:mb-6">
                 <div>
                   <h3 className="text-xs md:text-sm font-medium text-gray-600 mb-2">Category</h3>
-                  <span className="inline-block px-3 py-1.5 md:px-4 md:py-2 bg-violet-100 text-violet-800 rounded-full capitalize font-medium text-xs md:text-sm">
+                  <span className="inline-block px-3 py-1.5 md:px-4 md:py-2 bg-violet-100 text-violet-800 capitalize font-medium text-xs md:text-sm">
                     {selectedAttraction.category}
                   </span>
                 </div>
                 <div>
                   <h3 className="text-xs md:text-sm font-medium text-gray-600 mb-2">Pricing Type</h3>
-                  <span className="inline-block px-3 py-1.5 md:px-4 md:py-2 bg-green-100 text-green-800 rounded-full font-medium text-xs md:text-sm">
+                  <span className="inline-block px-3 py-1.5 md:px-4 md:py-2 bg-green-100 text-green-800 font-medium text-xs md:text-sm">
                     Per Person
                   </span>
                 </div>
               </div>
 
               {/* Availability Schedule */}
-              <div className="mb-4 md:mb-6 bg-blue-50 p-3 md:p-4 rounded-lg">
+              <div className="mb-4 md:mb-6 bg-blue-50 p-3 md:p-4">
                 <h3 className="text-xs md:text-sm font-bold text-gray-900 mb-2 md:mb-3 flex items-center gap-2">
                   <Calendar size={16} className="text-blue-800 md:w-[18px] md:h-[18px]" />
                   Available Days
                 </h3>
                 <div className="flex flex-wrap gap-1.5 md:gap-2">
                   {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
-                    <span key={day} className="px-2 py-1 md:px-3 md:py-1 bg-blue-800 text-white rounded-full text-xs md:text-sm font-medium">
+                    <span key={day} className="px-2 py-1 md:px-3 md:py-1 bg-blue-800 text-white text-xs md:text-sm font-medium">
                       {day}
                     </span>
                   ))}
@@ -599,7 +597,7 @@ const EntertainmentLandingPage = () => {
                 <h3 className="text-base md:text-lg font-bold text-gray-900 mb-2 md:mb-3">Available Locations</h3>
                 <div className="flex flex-wrap gap-2">
                   {selectedAttraction.availableLocations.map((location) => (
-                    <div key={location} className="flex items-center gap-2 px-3 py-2 bg-blue-50 text-blue-800 rounded-lg border border-blue-200">
+                    <div key={location} className="flex items-center gap-2 px-3 py-2 bg-blue-50 text-blue-800 border border-blue-200">
                       <MapPin size={16} />
                       <span className="font-medium">{location}</span>
                     </div>
@@ -613,7 +611,7 @@ const EntertainmentLandingPage = () => {
                   e.stopPropagation();
                   handleBuyTickets(selectedAttraction);
                 }}
-                className="w-full py-4 bg-blue-800 text-white rounded-lg font-bold text-lg hover:bg-blue-900 transition flex items-center justify-center gap-2"
+                className="w-full py-4 bg-blue-800 text-white font-bold text-lg hover:bg-blue-900 transition flex items-center justify-center gap-2"
               >
                 <Ticket size={24} />
                 Buy Tickets
@@ -626,16 +624,14 @@ const EntertainmentLandingPage = () => {
       {/* Package Details Modal */}
       {showPackageModal && selectedPackage && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-3 md:p-4 z-50 animate-backdrop-fade" onClick={() => setShowPackageModal(false)}>
-          <div className="bg-white max-w-2xl w-full max-h-[85vh] md:max-h-[90vh] overflow-y-auto rounded-xl md:rounded-2xl shadow-2xl animate-scale-in" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white max-w-2xl w-full max-h-[85vh] md:max-h-[90vh] overflow-y-auto shadow-2xl animate-scale-in" onClick={(e) => e.stopPropagation()}>
             {/* Modal Header */}
             <div className="sticky top-0 z-10">
               <div className="relative h-40 md:h-56 bg-gradient-to-br from-blue-800 to-violet-500">
                 <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowPackageModal(false);
-                  }}
-                  className="absolute top-3 right-3 md:top-4 md:right-4 p-2 bg-white/90 backdrop-blur-sm rounded-full text-gray-900 hover:bg-white transition-all shadow-lg"
+                  type="button"
+                  onClick={() => setShowPackageModal(false)}
+                  className="absolute top-3 right-3 md:top-4 md:right-4 p-2 md:p-2.5 bg-white hover:bg-gray-100 text-gray-900 transition-all shadow-lg z-20 rounded-full cursor-pointer"
                 >
                   <X size={20} className="md:w-6 md:h-6" />
                 </button>
@@ -675,7 +671,7 @@ const EntertainmentLandingPage = () => {
 
               {/* Participants & Pricing Details */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 mb-4 md:mb-6">
-                <div className="bg-gray-50 p-3 md:p-4 rounded-lg">
+                <div className="bg-gray-50 p-3 md:p-4">
                   <div className="flex items-center gap-1.5 md:gap-2 text-gray-600 mb-1">
                     <Users size={18} />
                     <span className="text-xs md:text-sm font-medium">Group Size</span>
@@ -683,7 +679,7 @@ const EntertainmentLandingPage = () => {
                   <div className="text-base md:text-lg font-bold text-gray-900">{selectedPackage.participants}</div>
                   <div className="text-xs text-gray-500 mt-1">Max capacity</div>
                 </div>
-                <div className="bg-green-50 p-3 md:p-4 rounded-lg border border-green-200">
+                <div className="bg-green-50 p-3 md:p-4 border border-green-200">
                   <div className="flex items-center gap-1.5 md:gap-2 text-green-700 mb-1">
                     <DollarSign size={18} />
                     <span className="text-xs md:text-sm font-medium">Per Person</span>
@@ -700,7 +696,7 @@ const EntertainmentLandingPage = () => {
                 <h3 className="text-base md:text-lg font-bold text-gray-900 mb-2 md:mb-3">What's Included</h3>
                 <div className="grid grid-cols-1 gap-2 md:gap-3">
                   {selectedPackage.includes.map((item, index) => (
-                    <div key={index} className="flex items-start gap-2 md:gap-3 bg-gray-50 p-2.5 md:p-3 rounded-lg">
+                    <div key={index} className="flex items-start gap-2 md:gap-3 bg-gray-50 p-2.5 md:p-3">
                       <CheckCircle className="text-green-600 flex-shrink-0 mt-0.5" size={16} />
                       <span className="text-gray-700 text-xs md:text-sm">{item}</span>
                     </div>
@@ -712,13 +708,13 @@ const EntertainmentLandingPage = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 mb-4 md:mb-6">
                 <div>
                   <h3 className="text-xs md:text-sm font-medium text-gray-600 mb-2">Category</h3>
-                  <span className="inline-block px-3 py-1.5 md:px-4 md:py-2 bg-blue-100 text-blue-800 rounded-full capitalize font-medium text-xs md:text-sm">
+                  <span className="inline-block px-3 py-1.5 md:px-4 md:py-2 bg-blue-100 text-blue-800 capitalize font-medium text-xs md:text-sm">
                     {selectedPackage.category}
                   </span>
                 </div>
                 <div>
                   <h3 className="text-xs md:text-sm font-medium text-gray-600 mb-2">Package Type</h3>
-                  <span className="inline-block px-3 py-1.5 md:px-4 md:py-2 bg-purple-100 text-purple-800 rounded-full font-medium text-xs md:text-sm">
+                  <span className="inline-block px-3 py-1.5 md:px-4 md:py-2 bg-purple-100 text-purple-800 font-medium text-xs md:text-sm">
                     All-Inclusive
                   </span>
                 </div>
@@ -729,7 +725,7 @@ const EntertainmentLandingPage = () => {
                 <h3 className="text-base md:text-lg font-bold text-gray-900 mb-2 md:mb-3">Available Locations</h3>
                 <div className="flex flex-wrap gap-2">
                   {selectedPackage.availableLocations.map((location) => (
-                    <div key={location} className="flex items-center gap-2 px-3 py-2 bg-blue-50 text-blue-800 rounded-lg border border-blue-200">
+                    <div key={location} className="flex items-center gap-2 px-3 py-2 bg-blue-50 text-blue-800 border border-blue-200">
                       <MapPin size={16} />
                       <span className="font-medium">{location}</span>
                     </div>
@@ -743,7 +739,7 @@ const EntertainmentLandingPage = () => {
                   e.stopPropagation();
                   handleBookPackage(selectedPackage);
                 }}
-                className="w-full py-4 bg-blue-800 text-white rounded-lg font-bold text-lg hover:bg-blue-900 transition flex items-center justify-center gap-2"
+                className="w-full py-4 bg-blue-800 text-white font-bold text-lg hover:bg-blue-900 transition flex items-center justify-center gap-2"
               >
                 <Package size={24} />
                 Book This Package
@@ -756,7 +752,7 @@ const EntertainmentLandingPage = () => {
       {/* Location Selection Modal */}
       {showLocationModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-3 md:p-4 z-50 animate-backdrop-fade" onClick={() => setShowLocationModal(false)}>
-          <div className="bg-white max-w-md w-full rounded-xl md:rounded-2xl shadow-2xl animate-scale-in max-h-[85vh] md:max-h-[90vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white max-w-md w-full shadow-2xl animate-scale-in max-h-[85vh] md:max-h-[90vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
             <div className="p-4 md:p-6 border-b">
               <h3 className="text-xl md:text-2xl font-bold text-gray-900 mb-2">
                 Select Location
@@ -779,7 +775,7 @@ const EntertainmentLandingPage = () => {
                     key={location}
                     onClick={() => isAvailable && handleLocationSelect(location)}
                     disabled={!isAvailable}
-                    className={`w-full p-3 md:p-4 text-left border rounded-lg transition ${
+                    className={`w-full p-3 md:p-4 text-left border transition ${
                       isAvailable 
                         ? 'border-gray-300 hover:border-blue-800 hover:bg-blue-50 cursor-pointer' 
                         : 'border-gray-200 bg-gray-100 cursor-not-allowed'
@@ -809,7 +805,7 @@ const EntertainmentLandingPage = () => {
                   e.stopPropagation();
                   setShowLocationModal(false);
                 }}
-                className="w-full px-4 py-2.5 md:py-3 border border-gray-300 text-gray-700 hover:bg-gray-50 transition font-semibold rounded-lg text-sm md:text-base"
+                className="w-full px-4 py-2.5 md:py-3 border border-gray-300 text-gray-700 hover:bg-gray-50 transition font-semibold text-sm md:text-base"
               >
                 Cancel
               </button>

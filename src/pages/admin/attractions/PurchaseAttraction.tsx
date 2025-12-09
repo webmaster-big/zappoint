@@ -568,11 +568,11 @@ const PurchaseAttraction = () => {
       {showAccountModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-fade-in" onClick={() => setShowAccountModal(false)}>
           <div 
-            className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl animate-scale-in"
+            className="bg-white max-w-sm w-full p-6 shadow-2xl animate-scale-in"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="text-center mb-4">
-              <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
+              <div className="w-12 h-12 bg-blue-100 flex items-center justify-center mx-auto mb-3">
                 <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                 </svg>
@@ -583,13 +583,13 @@ const PurchaseAttraction = () => {
             <div className="flex flex-col gap-2.5">
               <button
                 onClick={() => navigate('/customer/register')}
-                className="w-full px-4 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-all duration-200 active:scale-95"
+                className="w-full px-4 py-2.5 bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-all duration-200 active:scale-95"
               >
                 Create Account
               </button>
               <button
                 onClick={() => setShowAccountModal(false)}
-                className="w-full px-4 py-2.5 bg-white text-gray-700 text-sm font-medium rounded-lg border border-gray-300 hover:bg-gray-50 transition-all duration-200 active:scale-95"
+                className="w-full px-4 py-2.5 bg-white text-gray-700 text-sm font-medium border border-gray-300 hover:bg-gray-50 transition-all duration-200 active:scale-95"
               >
                 Continue as Guest
               </button>
