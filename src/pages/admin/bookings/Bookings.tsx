@@ -706,8 +706,12 @@ const Bookings: React.FC = () => {
       return;
     }
 
-    const remainingAmount = selectedBookingForPayment.totalAmount - selectedBookingForPayment.amountPaid;
-    if (amount > remainingAmount) {
+    // Calculate remaining amount with proper rounding to avoid floating-point precision issues
+    const remainingAmount = Math.round((selectedBookingForPayment.totalAmount - selectedBookingForPayment.amountPaid) * 100) / 100;
+    const roundedAmount = Math.round(amount * 100) / 100;
+    
+    // Allow a small tolerance (0.01) for floating-point comparison
+    if (roundedAmount > remainingAmount + 0.01) {
       alert(`Payment amount cannot exceed remaining balance of $${remainingAmount.toFixed(2)}`);
       return;
     }
