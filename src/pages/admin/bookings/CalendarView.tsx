@@ -901,7 +901,7 @@ const CalendarView: React.FC = () => {
                           ) : null}
                         </div>
 
-                        {(booking.attractions?.length || booking.addOns?.length) && (
+                        {(booking.attractions?.length || (booking.addOns || (booking as any).add_ons)?.length) && (
                           <div className="mt-3 pt-3 border-t border-gray-100">
                             <div className="flex flex-wrap gap-2 text-xs">
                               {booking.attractions && booking.attractions.length > 0 && (
@@ -909,9 +909,9 @@ const CalendarView: React.FC = () => {
                                   {booking.attractions.length} attraction{booking.attractions.length !== 1 ? 's' : ''}
                                 </span>
                               )}
-                              {booking.addOns && booking.addOns.length > 0 && (
+                              {(booking.addOns || (booking as any).add_ons) && (booking.addOns || (booking as any).add_ons).length > 0 && (
                                 <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded">
-                                  {booking.addOns.length} add-on{booking.addOns.length !== 1 ? 's' : ''}
+                                  {(booking.addOns || (booking as any).add_ons).length} add-on{(booking.addOns || (booking as any).add_ons).length !== 1 ? 's' : ''}
                                 </span>
                               )}
                             </div>
@@ -1082,7 +1082,7 @@ const CalendarView: React.FC = () => {
                   <div className="mb-6">
                     <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Additional Attractions</h4>
                     <div className="bg-gray-50 rounded-lg p-4 space-y-2">
-                      {(selectedBooking.attractions as Array<{ name?: string; description?: string; quantity?: number; price?: string | number }>).map((attraction, index: number) => (
+                      {(selectedBooking.attractions as Array<{ name?: string; description?: string; quantity?: number; price?: string | number; pivot?: { quantity?: number } }>).map((attraction, index: number) => (
                         <div key={index} className="flex items-center justify-between py-2 border-b border-gray-200 last:border-0">
                           <div className="flex-1">
                             <span className="text-sm font-medium text-gray-900">{attraction.name || 'Unknown Attraction'}</span>
@@ -1091,8 +1091,8 @@ const CalendarView: React.FC = () => {
                             )}
                           </div>
                           <div className="flex items-center gap-4 ml-4">
-                            {attraction.quantity && (
-                              <span className="text-sm text-gray-600">Qty: {attraction.quantity}</span>
+                            {(attraction.quantity || attraction.pivot?.quantity) && (
+                              <span className="text-sm text-gray-600">Qty: {attraction.quantity || attraction.pivot?.quantity}</span>
                             )}
                             {attraction.price && (
                               <span className="text-sm font-medium text-gray-900">${Number(attraction.price).toFixed(2)}</span>
@@ -1105,11 +1105,11 @@ const CalendarView: React.FC = () => {
                 )}
 
                 {/* Add-Ons */}
-                {selectedBooking.addOns && Array.isArray(selectedBooking.addOns) && selectedBooking.addOns.length > 0 && (
+                {((selectedBooking.addOns || (selectedBooking as any).add_ons) && Array.isArray(selectedBooking.addOns || (selectedBooking as any).add_ons) && (selectedBooking.addOns || (selectedBooking as any).add_ons).length > 0) && (
                   <div className="mb-6">
                     <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Add-Ons</h4>
                     <div className="bg-gray-50 rounded-lg p-4 space-y-2">
-                      {(selectedBooking.addOns as Array<{ name?: string; description?: string; quantity?: number; price?: string | number }>).map((addon, index: number) => (
+                      {((selectedBooking.addOns || (selectedBooking as any).add_ons) as Array<{ name?: string; description?: string; quantity?: number; price?: string | number; pivot?: { quantity?: number } }>).map((addon, index: number) => (
                         <div key={index} className="flex items-center justify-between py-2 border-b border-gray-200 last:border-0">
                           <div className="flex-1">
                             <span className="text-sm font-medium text-gray-900">{addon.name || 'Unknown Add-On'}</span>
@@ -1118,8 +1118,8 @@ const CalendarView: React.FC = () => {
                             )}
                           </div>
                           <div className="flex items-center gap-4 ml-4">
-                            {addon.quantity && (
-                              <span className="text-sm text-gray-600">Qty: {addon.quantity}</span>
+                            {(addon.quantity || addon.pivot?.quantity) && (
+                              <span className="text-sm text-gray-600">Qty: {addon.quantity || addon.pivot?.quantity}</span>
                             )}
                             {addon.price && (
                               <span className="text-sm font-medium text-gray-900">${Number(addon.price).toFixed(2)}</span>
