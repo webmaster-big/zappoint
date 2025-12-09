@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Package, Users, Save, Plus, Minus } from 'lucide-react';
+import { ArrowLeft, Users, Save, Plus, Minus } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import bookingService from '../../../services/bookingService';
 import { getStoredUser, getImageUrl } from '../../../utils/storage';
@@ -266,171 +266,75 @@ const ManualBooking: React.FC = () => {
           }`}>
             
             {/* Step 1: Package Selection */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-              <div className={`px-6 py-4 bg-gradient-to-r from-${themeColor}-600 to-${themeColor}-700`}>
-                <div className="flex items-center gap-3">
-                  <div className="bg-white rounded-full p-2">
-                    <Package className={`h-5 w-5 text-${themeColor}-600`} />
-                  </div>
-                  <div>
-                    <h2 className="text-lg font-semibold text-white">Step 1: Select Package</h2>
-                    <p className="text-xs text-white opacity-90">Choose the package for this booking</p>
-                  </div>
-                </div>
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <div className="mb-6">
+                <h2 className="text-2xl font-bold text-gray-900 mb-1">Select Package</h2>
+                <p className="text-sm text-gray-600">Choose the package for this booking</p>
               </div>
-              <div className="p-6">
-                {/* Available Packages Grid - Large when not selected */}
-                {!form.packageId && (
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                    {Array.isArray(packages) && packages.map((p: any) => (
-                      <div
-                        key={p.id}
-                        onClick={() => {
-                          const event = {
-                            target: { name: 'packageId', value: p.id.toString() }
-                          } as any;
-                          handleInputChange(event);
-                        }}
-                        className={`group relative cursor-pointer rounded-2xl overflow-hidden border-2 bg-white hover:shadow-2xl transition-all duration-300 ease-out hover:scale-105 active:scale-95 border-gray-200 hover:border-${themeColor}-300`}
-                      >
-                        {p.image && (
-                          <div className="relative h-48">
-                            <img
-                              src={getImageUrl(p.image)}
-                              alt={p.name}
-                              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                            />
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                          </div>
-                        )}
-                        <div className="p-4 bg-white">
-                          <h3 className="font-bold text-lg text-gray-900 mb-2 line-clamp-2">{p.name}</h3>
-                          <p className="text-xs text-gray-600 mb-3 line-clamp-2">{p.description}</p>
-                          <div className="flex items-center justify-between">
-                            <span className={`text-xs px-2 py-1 rounded-md bg-${themeColor}-50 text-${themeColor}-700 font-medium`}>
-                              {p.category || 'Package'}
+              <div className="grid grid-cols-1 gap-4">
+                {Array.isArray(packages) && packages.map((p: any) => (
+                  <div
+                    key={p.id}
+                    onClick={() => {
+                      const event = {
+                        target: { name: 'packageId', value: form.packageId === p.id.toString() ? '' : p.id.toString() }
+                      } as any;
+                      handleInputChange(event);
+                    }}
+                    className={`border-2 rounded-lg p-5 cursor-pointer transition-all ${
+                      form.packageId === p.id.toString()
+                        ? `border-${themeColor}-500 bg-${themeColor}-50 shadow-sm`
+                        : `border-gray-200 hover:border-${themeColor}-300 hover:bg-gray-50`
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <h3 className="text-lg font-bold text-gray-900">{p.name}</h3>
+                          {form.packageId === p.id.toString() && (
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-${themeColor}-100 text-${themeColor}-700`}>
+                              <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"></path>
+                              </svg>
+                              Selected
                             </span>
-                            <div className="text-right">
-                              <div className="flex items-baseline gap-1">
-                                <span className="text-sm text-gray-500">$</span>
-                                <span className={`text-2xl font-bold text-${themeColor}-600`}>{p.price}</span>
-                              </div>
-                              <span className="text-xs text-gray-500">{p.pricing_type === 'per_person' ? '/person' : 'fixed'}</span>
-                            </div>
-                          </div>
+                          )}
+                        </div>
+                        <p className="text-sm text-gray-600 mb-3">{p.description}</p>
+                        <div className="flex flex-wrap gap-2">
+                          <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-${themeColor}-50 text-${themeColor}-700 border border-${themeColor}-200`}>
+                            {p.category || 'Package'}
+                          </span>
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-700">
+                            {p.duration} {p.duration_unit}
+                          </span>
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-700">
+                            Up to {p.max_participants} people
+                          </span>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Selected Package - Small Display with Other Options */}
-                {form.packageId && (
-                  <div className="space-y-4">
-                    <div>
-                      <p className="text-xs font-medium text-gray-500 mb-3 uppercase tracking-wide">Selected Package</p>
-                      {Array.isArray(packages) && packages
-                        .filter((p: any) => form.packageId === p.id.toString())
-                        .map((p: any) => (
-                          <div
-                            key={p.id}
-                            className={`relative rounded-xl overflow-hidden border-3 shadow-lg transition-all duration-500 ease-out bg-white border-${themeColor}-500`}
-                          >
-                            <div className="flex items-center gap-4 p-4">
-                              {p.image && (
-                                <div className="relative w-24 h-24 flex-shrink-0">
-                                  <img
-                                    src={getImageUrl(p.image)}
-                                    alt={p.name}
-                                    className="w-full h-full object-cover rounded-lg"
-                                  />
-                                  <div className={`absolute -top-2 -right-2 text-white rounded-full p-1.5 shadow-md bg-${themeColor}-600`}>
-                                    <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-                                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                    </svg>
-                                  </div>
-                                </div>
-                              )}
-                              <div className="flex-1 min-w-0">
-                                <h3 className="font-bold text-base text-gray-900 mb-1 truncate">{p.name}</h3>
-                                <div className="flex items-center gap-2 mb-2">
-                                  <span className={`text-xs px-2 py-0.5 rounded bg-${themeColor}-50 text-${themeColor}-700 font-medium`}>
-                                    {p.category || 'Package'}
-                                  </span>
-                                  <span className="text-xs text-gray-500">{p.duration} {p.duration_unit}</span>
-                                </div>
-                                <div className="flex items-baseline gap-1">
-                                  <span className="text-sm text-gray-500">$</span>
-                                  <span className={`text-xl font-bold text-${themeColor}-600`}>{p.price}</span>
-                                  <span className="text-xs text-gray-500 ml-1">{p.pricing_type === 'per_person' ? '/person' : 'fixed'}</span>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
+                      <div className="text-right flex-shrink-0">
+                        <div className="flex items-baseline gap-1 justify-end">
+                          <span className="text-sm text-gray-500">$</span>
+                          <span className={`text-3xl font-bold text-${themeColor}-600`}>{p.price}</span>
+                        </div>
+                        <span className="text-xs text-gray-500 mt-1 block">{p.pricing_type === 'per_person' ? 'per person' : 'per booking'}</span>
+                      </div>
                     </div>
-
-                    {/* Other Packages - Compact Grid */}
-                    {packages.filter((p: any) => form.packageId !== p.id.toString()).length > 0 && (
-                      <div>
-                        <p className="text-xs font-medium text-gray-500 mb-3 uppercase tracking-wide">
-                          Change Package
-                        </p>
-                        <div className="grid grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
-                          {Array.isArray(packages) && packages
-                            .filter((p: any) => form.packageId !== p.id.toString())
-                            .map((p: any) => (
-                              <div
-                                key={p.id}
-                                onClick={() => {
-                                  const event = {
-                                    target: { name: 'packageId', value: p.id.toString() }
-                                  } as any;
-                                  handleInputChange(event);
-                                }}
-                                className="group relative cursor-pointer rounded-lg overflow-hidden border-2 border-gray-200 hover:border-gray-300 hover:shadow-md transition-all duration-200 ease-out hover:scale-105 active:scale-95 bg-white"
-                              >
-                                {p.image && (
-                                  <div className="relative h-16">
-                                    <img
-                                      src={getImageUrl(p.image)}
-                                      alt={p.name}
-                                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
-                                    />
-                                  </div>
-                                )}
-                                <div className="p-2">
-                                  <h3 className="font-semibold text-xs text-gray-900 line-clamp-1 mb-1">{p.name}</h3>
-                                  <div className="flex items-baseline gap-0.5">
-                                    <span className={`text-sm font-bold text-${themeColor}-600`}>${p.price}</span>
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                        </div>
-                      </div>
-                    )}
                   </div>
-                )}
+                ))}
               </div>
             </div>
 
             {pkg && (
               <>
                 {/* Step 2: Customer & Booking Info */}
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-                  <div className={`px-6 py-4 bg-gradient-to-r from-${themeColor}-600 to-${themeColor}-700`}>
-                    <div className="flex items-center gap-3">
-                      <div className="bg-white rounded-full p-2">
-                        <Users className={`h-5 w-5 text-${themeColor}-600`} />
-                      </div>
-                      <div>
-                        <h2 className="text-lg font-semibold text-white">Step 2: Customer & Booking Details</h2>
-                        <p className="text-xs text-white opacity-90">Enter customer information and booking schedule</p>
-                      </div>
-                    </div>
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                  <div className="mb-6">
+                    <h2 className="text-2xl font-bold text-gray-900 mb-1">Customer & Booking Details</h2>
+                    <p className="text-sm text-gray-600">Enter customer information and booking schedule</p>
                   </div>
-                  <div className="p-6 space-y-6">
+                  <div className="space-y-6">
                     {/* Customer Info */}
                     <div>
                       <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
@@ -552,8 +456,7 @@ const ManualBooking: React.FC = () => {
                         <div>
                           <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
                             <div className={`h-1 w-1 rounded-full bg-${themeColor}-600`}></div>
-                            Room Selection
-                            <span className="text-xs font-normal text-gray-500">(Optional)</span>
+                            Room Selection *
                           </h3>
                           <div className="grid grid-cols-3 md:grid-cols-4 gap-3">
                             <div
@@ -602,19 +505,12 @@ const ManualBooking: React.FC = () => {
 
                 {/* Step 3: Add-ons & Attractions */}
                 {((pkg.add_ons && pkg.add_ons.length > 0) || (pkg.attractions && pkg.attractions.length > 0)) && (
-                  <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-                    <div className={`px-6 py-4 bg-gradient-to-r from-${themeColor}-500 to-${themeColor}-600`}>
-                      <div className="flex items-center gap-3">
-                        <div className="bg-white rounded-full p-2">
-                          <Plus className={`h-5 w-5 text-${themeColor}-600`} />
-                        </div>
-                        <div>
-                          <h2 className="text-lg font-semibold text-white">Step 3: Add-ons & Attractions</h2>
-                          <p className="text-xs text-white opacity-90">Optional extras to enhance the experience</p>
-                        </div>
-                      </div>
+                  <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                    <div className="mb-6">
+                      <h2 className="text-2xl font-bold text-gray-900 mb-1">Add-ons & Attractions</h2>
+                      <p className="text-sm text-gray-600">Optional extras to enhance the experience</p>
                     </div>
-                    <div className="p-6">
+                    <div>
                       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                         {Array.isArray(pkg.add_ons) && pkg.add_ons.map((addOn: any) => {
                           const isSelected = selectedAddOns[addOn.id] > 0;
@@ -730,10 +626,8 @@ const ManualBooking: React.FC = () => {
               
               {/* Package Summary */}
               {pkg && (
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-                  <div className={`px-5 py-4 bg-gradient-to-r from-${themeColor}-600 to-${themeColor}-700`}>
-                    <h3 className="text-base font-semibold text-white">Selected Package</h3>
-                  </div>
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-5">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Selected Package</h3>
                   <div className="p-5">
                     {pkg.image && (
                       <img
@@ -762,11 +656,9 @@ const ManualBooking: React.FC = () => {
 
               {/* Payment Summary */}
               {pkg && (
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-                  <div className={`px-5 py-4 bg-gradient-to-r from-${themeColor}-600 to-${themeColor}-700`}>
-                    <h3 className="text-base font-semibold text-white">Payment Details</h3>
-                  </div>
-                  <div className="p-5 space-y-4">
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-5">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Payment Details</h3>
+                  <div className="space-y-4">
                     {/* Calculated Total */}
                     <div className={`bg-${themeColor}-50 border border-${themeColor}-200 rounded-lg p-4`}>
                       <div className="flex justify-between items-center">
@@ -850,7 +742,7 @@ const ManualBooking: React.FC = () => {
 
               {/* Action Buttons */}
               {pkg && (
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5">
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-5">
                   <div className="flex flex-col gap-3">
                     <button
                       type="submit"
