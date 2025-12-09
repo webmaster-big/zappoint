@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Users, Save, Plus, Minus } from 'lucide-react';
+import { ArrowLeft, Save, Plus, Minus } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import bookingService from '../../../services/bookingService';
 import { getStoredUser, getImageUrl } from '../../../utils/storage';
@@ -458,24 +458,10 @@ const ManualBooking: React.FC = () => {
                             <div className={`h-1 w-1 rounded-full bg-${themeColor}-600`}></div>
                             Room Selection *
                           </h3>
-                          <div className="grid grid-cols-3 md:grid-cols-4 gap-3">
-                            <div
-                              onClick={() => {
-                                const event = {
-                                  target: { name: 'roomId', value: '' }
-                                } as any;
-                                handleInputChange(event);
-                              }}
-                              className={`cursor-pointer p-3 rounded-lg border-2 text-center transition-all ${
-                                form.roomId === ''
-                                  ? `shadow-md border-${themeColor}-500 bg-${themeColor}-50`
-                                  : 'border-gray-200 hover:bg-gray-50'
-                              }`}
-                            >
-                              <p className="font-medium text-sm text-gray-900">Any Room</p>
-                            </div>
+                          <div className="flex flex-wrap gap-2">
                             {Array.isArray(pkg.rooms) && pkg.rooms.map((room: any) => (
-                              <div
+                              <button
+                                type="button"
                                 key={room.id}
                                 onClick={() => {
                                   const event = {
@@ -483,19 +469,26 @@ const ManualBooking: React.FC = () => {
                                   } as any;
                                   handleInputChange(event);
                                 }}
-                                className={`cursor-pointer p-3 rounded-lg border-2 transition-all ${
+                                className={`px-4 py-2 rounded-lg border-2 text-sm font-medium transition-all ${
                                   form.roomId === room.id.toString()
-                                    ? `shadow-md border-${themeColor}-500 bg-${themeColor}-50`
-                                    : 'border-gray-200 hover:bg-gray-50'
+                                    ? `border-${themeColor}-500 bg-${themeColor}-50 text-${fullColor}`
+                                    : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-300'
                                 }`}
                               >
-                                <h4 className="font-semibold text-sm text-gray-900 mb-1 truncate">{room.name}</h4>
-                                <div className="flex items-center justify-center gap-1 text-xs text-gray-600">
-                                  <Users className="h-3 w-3" />
-                                  <span>{room.capacity}</span>
-                                </div>
-                              </div>
+                                {room.name}
+                              </button>
                             ))}
+                            <input
+                              type="text"
+                              placeholder="Or type room name"
+                              className="rounded-lg border border-gray-300 px-4 py-2 text-sm bg-white transition-all placeholder:text-gray-400 focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent"
+                              onChange={(e) => {
+                                const event = {
+                                  target: { name: 'roomId', value: e.target.value }
+                                } as any;
+                                handleInputChange(event);
+                              }}
+                            />
                           </div>
                         </div>
                       </>
