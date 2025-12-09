@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import bookingService, { type Booking } from '../../../services/bookingService';
+import { createPayment } from '../../../services/PaymentService';
 import Toast from '../../../components/ui/Toast';
 import { getStoredUser } from '../../../utils/storage';
 
@@ -49,6 +50,12 @@ const CheckIn: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [showVerificationModal, setShowVerificationModal] = useState(false);
   const [verifiedBooking, setVerifiedBooking] = useState<Booking | null>(null);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [selectedBookingForPayment, setSelectedBookingForPayment] = useState<Booking | null>(null);
+  const [paymentAmount, setPaymentAmount] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<'card' | 'cash'>('cash');
+  const [paymentNotes, setPaymentNotes] = useState('');
+  const [processingPayment, setProcessingPayment] = useState(false);
   const scannerRef = useRef<Html5Qrcode | null>(null);
 
   // Load bookings function
@@ -399,6 +406,106 @@ const CheckIn: React.FC = () => {
   const resetScan = () => {
     setScanResult(null);
     setError(null);
+  };
+
+  // Payment modal handlers
+  const handleOpenPaymentModal = (booking: Booking) => {
+    setSelectedBookingForPayment(booking);
+    const remainingAmount = Math.max(0, Number(booking.total_amount) - Number(booking.amount_paid || 0));
+    setPaymentAmount((Math.floor(remainingAmount * 100) / 100).toFixed(2));
+    setPaymentMethod('cash');
+    setPaymentNotes('');
+    setShowPaymentModal(true);
+    setShowVerificationModal(false); // Close verification modal
+  };
+
+  const handleClosePaymentModal = () => {
+    setShowPaymentModal(false);
+    setSelectedBookingForPayment(null);
+    setPaymentAmount('');
+    setPaymentMethod('cash');
+    setPaymentNotes('');
+  };
+
+  const handleSubmitPayment = async () => {
+    if (!selectedBookingForPayment) return;
+    
+    const amount = parseFloat(paymentAmount);
+    if (isNaN(amount) || amount <= 0) {
+      setToast({ message: 'Please enter a valid payment amount', type: 'error' });
+      return;
+    }
+
+    const remainingAmount = Math.round((Number(selectedBookingForPayment.total_amount) - Number(selectedBookingForPayment.amount_paid || 0)) * 100) / 100;
+    const roundedAmount = Math.round(amount * 100) / 100;
+    
+    if (roundedAmount > remainingAmount + 0.01) {
+      setToast({ message: `Payment amount cannot exceed remaining balance of $${remainingAmount.toFixed(2)}`, type: 'error' });
+      return;
+    }
+
+    try {
+      setProcessingPayment(true);
+
+      // Get booking details to find customer_id and location_id
+      const bookingResponse = await bookingService.getBookingById(selectedBookingForPayment.id);
+      if (!bookingResponse.success || !bookingResponse.data) {
+        throw new Error('Failed to get booking details');
+      }
+
+      const booking = bookingResponse.data;
+      const customerId = booking.customer_id || null;
+      const locationId = booking.location_id;
+
+      if (!locationId) {
+        throw new Error('Location ID not found for this booking');
+      }
+
+      // Create payment record using PaymentService
+      const paymentResponse = await createPayment({
+        booking_id: selectedBookingForPayment.id,
+        customer_id: customerId,
+        location_id: locationId,
+        amount: amount,
+        currency: 'USD',
+        method: paymentMethod,
+        status: 'completed',
+        notes: paymentNotes || `Payment for booking ${selectedBookingForPayment.reference_number}`,
+      });
+
+      if (!paymentResponse.success) {
+        throw new Error(paymentResponse.message || 'Failed to create payment');
+      }
+
+      // Update booking's amount_paid
+      const newAmountPaid = Number(selectedBookingForPayment.amount_paid || 0) + amount;
+      const newPaymentStatus = newAmountPaid >= Number(selectedBookingForPayment.total_amount) ? 'paid' : 'partial';
+
+      await bookingService.updateBooking(selectedBookingForPayment.id, {
+        amount_paid: newAmountPaid,
+        payment_status: newPaymentStatus,
+      });
+
+      setToast({ message: 'Payment processed successfully!', type: 'success' });
+      handleClosePaymentModal();
+      
+      // Reload bookings
+      await loadBookings();
+      
+      // Reopen verification modal with updated booking if it was from there
+      if (verifiedBooking && verifiedBooking.id === selectedBookingForPayment.id) {
+        const updatedBookingResponse = await bookingService.getBookingById(selectedBookingForPayment.id);
+        if (updatedBookingResponse.success) {
+          setVerifiedBooking(updatedBookingResponse.data);
+          setShowVerificationModal(true);
+        }
+      }
+    } catch (error) {
+      console.error('Error processing payment:', error);
+      setToast({ message: 'Failed to process payment. Please try again.', type: 'error' });
+    } finally {
+      setProcessingPayment(false);
+    }
   };
 
   // Cleanup on unmount
@@ -1049,23 +1156,39 @@ const CheckIn: React.FC = () => {
                 </button>
                 
                 {verifiedBooking.status === 'confirmed' && (
-                  <button
-                    onClick={handleConfirmCheckIn}
-                    disabled={processing}
-                    className={`flex-1 px-6 py-3 bg-${themeColor}-600 text-white rounded-lg hover:bg-${themeColor}-700 transition-colors font-medium flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed`}
-                  >
-                    {processing ? (
-                      <>
-                        <RefreshCw className="h-5 w-5 animate-spin" />
-                        Checking In...
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle className="h-5 w-5" />
-                        Confirm Check-In
-                      </>
+                  <>
+                    {/* Show payment button if not fully paid */}
+                    {verifiedBooking.payment_status !== 'paid' && (
+                      <button
+                        onClick={() => handleOpenPaymentModal(verifiedBooking)}
+                        disabled={processing || processingPayment}
+                        className={`flex-1 px-6 py-3 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors font-medium flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed`}
+                      >
+                        <DollarSign className="h-5 w-5" />
+                        Add Payment
+                      </button>
                     )}
-                  </button>
+                    
+                    {/* Check-in button - disabled if not paid */}
+                    <button
+                      onClick={handleConfirmCheckIn}
+                      disabled={processing || verifiedBooking.payment_status !== 'paid'}
+                      className={`flex-1 px-6 py-3 bg-${themeColor}-600 text-white rounded-lg hover:bg-${themeColor}-700 transition-colors font-medium flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed`}
+                      title={verifiedBooking.payment_status !== 'paid' ? 'Payment required before check-in' : ''}
+                    >
+                      {processing ? (
+                        <>
+                          <RefreshCw className="h-5 w-5 animate-spin" />
+                          Checking In...
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle className="h-5 w-5" />
+                          {verifiedBooking.payment_status !== 'paid' ? 'Payment Required' : 'Confirm Check-In'}
+                        </>
+                      )}
+                    </button>
+                  </>
                 )}
                 
                 {verifiedBooking.status !== 'confirmed' && (
@@ -1494,26 +1617,45 @@ const CheckIn: React.FC = () => {
                 </button>
                 
                 {selectedBooking.status === 'confirmed' && (
-                  <button
-                    onClick={() => {
-                      handleCheckIn(selectedBooking);
-                      closeModal();
-                    }}
-                    disabled={processing}
-                    className={`flex-1 px-6 py-3 bg-${themeColor}-600 text-white rounded-lg hover:bg-${themeColor}-700 transition-colors font-medium flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed`}
-                  >
-                    {processing ? (
-                      <>
-                        <RefreshCw className="h-5 w-5 animate-spin" />
-                        Checking In...
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle className="h-5 w-5" />
-                        Check In Now
-                      </>
+                  <>
+                    {/* Payment button - shown if not fully paid */}
+                    {selectedBooking.payment_status !== 'paid' && (
+                      <button
+                        onClick={() => {
+                          handleOpenPaymentModal(selectedBooking);
+                          closeModal();
+                        }}
+                        disabled={processing || processingPayment}
+                        className={`flex-1 px-6 py-3 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors font-medium flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed`}
+                      >
+                        <DollarSign className="h-5 w-5" />
+                        Add Payment
+                      </button>
                     )}
-                  </button>
+                    
+                    {/* Check-in button - disabled if not paid */}
+                    <button
+                      onClick={() => {
+                        handleCheckIn(selectedBooking);
+                        closeModal();
+                      }}
+                      disabled={processing || selectedBooking.payment_status !== 'paid'}
+                      className={`flex-1 px-6 py-3 bg-${themeColor}-600 text-white rounded-lg hover:bg-${themeColor}-700 transition-colors font-medium flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed`}
+                      title={selectedBooking.payment_status !== 'paid' ? 'Payment required before check-in' : ''}
+                    >
+                      {processing ? (
+                        <>
+                          <RefreshCw className="h-5 w-5 animate-spin" />
+                          Checking In...
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle className="h-5 w-5" />
+                          {selectedBooking.payment_status !== 'paid' ? 'Payment Required' : 'Check In Now'}
+                        </>
+                      )}
+                    </button>
+                  </>
                 )}
               </div>
             </div>
@@ -1549,6 +1691,113 @@ const CheckIn: React.FC = () => {
             </li>
           </ul>
         </div>
+
+        {/* Payment Modal */}
+        {showPaymentModal && selectedBookingForPayment && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-backdrop-fade">
+            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4">
+              <div className={`p-6 border-b border-gray-100 bg-${themeColor}-50`}>
+                <h2 className="text-2xl font-bold text-gray-900">Process Payment</h2>
+                <p className="text-sm text-gray-600 mt-1">
+                  Booking: {selectedBookingForPayment.reference_number}
+                </p>
+              </div>
+
+              <div className="p-6 space-y-4">
+                {/* Payment Summary */}
+                <div className="bg-gray-50 p-4 rounded-lg space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Total Amount:</span>
+                    <span className="font-semibold">${Number(selectedBookingForPayment.total_amount).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Already Paid:</span>
+                    <span className="font-semibold text-green-600">${Number(selectedBookingForPayment.amount_paid || 0).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm pt-2 border-t border-gray-200">
+                    <span className="text-gray-900 font-medium">Remaining Balance:</span>
+                    <span className="font-bold text-red-600">
+                      ${(Number(selectedBookingForPayment.total_amount) - Number(selectedBookingForPayment.amount_paid || 0)).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Payment Amount */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Payment Amount *
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0.01"
+                      max={(Number(selectedBookingForPayment.total_amount) - Number(selectedBookingForPayment.amount_paid || 0)).toFixed(2)}
+                      value={paymentAmount}
+                      onChange={(e) => setPaymentAmount(e.target.value)}
+                      className={`w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
+                      placeholder="0.00"
+                    />
+                  </div>
+                </div>
+
+                {/* Payment Method */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Payment Method *
+                  </label>
+                  <select
+                    value={paymentMethod}
+                    onChange={(e) => setPaymentMethod(e.target.value as 'card' | 'cash')}
+                    className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
+                  >
+                    <option value="cash">Cash</option>
+                    <option value="card">Card</option>
+                  </select>
+                </div>
+
+                {/* Notes */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Notes (Optional)
+                  </label>
+                  <textarea
+                    value={paymentNotes}
+                    onChange={(e) => setPaymentNotes(e.target.value)}
+                    rows={3}
+                    className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
+                    placeholder="Add any notes about this payment..."
+                  />
+                </div>
+              </div>
+
+              <div className="p-6 border-t border-gray-100 flex gap-3 justify-end">
+                <button
+                  onClick={handleClosePaymentModal}
+                  disabled={processingPayment}
+                  className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSubmitPayment}
+                  disabled={processingPayment || !paymentAmount || parseFloat(paymentAmount) <= 0}
+                  className={`px-4 py-2 bg-${fullColor} text-white rounded-lg hover:bg-${themeColor}-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2`}
+                >
+                  {processingPayment ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                      Processing...
+                    </>
+                  ) : (
+                    'Process Payment'
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Toast Notification */}
