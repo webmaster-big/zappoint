@@ -103,9 +103,10 @@ const CheckIn: React.FC = () => {
     }
 
     console.log('Filtered bookings:', result);
+    console.log('Selected date:', selectedDate);
 
     setFilteredBookings(result);
-  }, [bookings, searchTerm]);
+  }, [bookings, searchTerm, selectedDate]);
 
   // Start scanning
   const startScanning = async () => {
@@ -1158,7 +1159,7 @@ const CheckIn: React.FC = () => {
                 {verifiedBooking.status === 'confirmed' && (
                   <>
                     {/* Show payment button if not fully paid */}
-                    {verifiedBooking.payment_status !== 'paid' && (
+                    {(verifiedBooking.payment_status !== 'paid') && (
                       <button
                         onClick={() => handleOpenPaymentModal(verifiedBooking)}
                         disabled={processing || processingPayment}
@@ -1619,7 +1620,7 @@ const CheckIn: React.FC = () => {
                 {selectedBooking.status === 'confirmed' && (
                   <>
                     {/* Payment button - shown if not fully paid */}
-                    {selectedBooking.payment_status !== 'paid' && (
+                    {(selectedBooking.payment_status !== 'paid') && (
                       <button
                         onClick={() => {
                           handleOpenPaymentModal(selectedBooking);
