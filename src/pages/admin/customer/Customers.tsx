@@ -14,6 +14,7 @@ import {
   Download,
   Tag,
   X,
+  RefreshCcw,
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import type { CustomersCustomer } from '../../../types/Customers.types';
@@ -271,17 +272,6 @@ const CustomerListing: React.FC = () => {
     // Fetch will trigger automatically via useEffect
   };
 
-  // Handle sort
-  const handleSort = (column: string) => {
-    if (sortBy === column) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortBy(column);
-      setSortOrder('asc');
-    }
-    setCurrentPage(1); // Reset to first page when sorting changes
-  };
-
   // Status badge component
   const StatusBadge = ({ status }: { status: string }) => {
     const statusConfig = {
@@ -299,64 +289,69 @@ const CustomerListing: React.FC = () => {
     );
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className={`animate-spin rounded-full h-12 w-12 border-b-2 border-${fullColor}`}></div>
+      </div>
+    );
+  }
+
   return (
-    <div className="w-full mx-auto px-4 pb-6 flex flex-col items-center">
-      <div className="bg-white rounded-xl p-6 w-full shadow-sm border border-gray-100 mt-8 animate-fade-in">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-          <div>
-            <h2 className="text-2xl font-semibold text-gray-900">Customers</h2>
-            <p className="text-gray-500 mt-1">Manage and view all customer information</p>
-          </div>
+    <div className="min-h-screen bg-gray-50 px-6 py-8">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Customers</h1>
+          <p className="text-gray-600 mt-2">Manage and view all customer information</p>
+        </div>
+        <div className="flex gap-2 mt-4 sm:mt-0">
           <button 
             onClick={() => setShowExportModal(true)}
-            className={`bg-${fullColor} hover:bg-${themeColor}-700 text-white px-4 py-2 rounded-lg font-medium whitespace-nowrap flex items-center gap-2`}
+            className={`inline-flex items-center px-4 py-2 bg-${fullColor} text-white rounded-lg hover:bg-${themeColor}-900 transition-colors`}
           >
-            <Download className="w-4 h-4" />
+            <Download className="h-5 w-5 mr-2" />
             Export
           </button>
         </div>
+      </div>
 
-        {/* Filters and Search */}
-        <div className="mb-6">
-          <div className="flex flex-col sm:flex-row gap-3 mb-4">
-            {/* Search */}
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search customers..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className={`w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 outline-none`}
-              />
+      {/* Filters and Search */}
+      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-6">
+        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between mb-4">
+          <div className="relative flex-1 max-w-lg">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Search className="h-4 w-4 text-gray-400" />
             </div>
-
-            {/* Status Filter */}
+            <input
+              type="text"
+              placeholder="Search customers..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className={`pl-9 pr-3 py-2 border border-gray-200 rounded-lg w-full focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
+            />
+          </div>
+          <div className="flex gap-2">
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className={`px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 outline-none min-w-[150px]`}
+              className={`px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 min-w-[150px]`}
             >
               <option value="all">All Statuses</option>
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
               <option value="new">New</option>
             </select>
-
-            {/* Items Per Page */}
             <select
               value={itemsPerPage}
               onChange={(e) => handleItemsPerPageChange(Number(e.target.value))}
-              className={`px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 outline-none min-w-[130px]`}
+              className={`px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 min-w-[130px]`}
             >
               <option value="5">5 per page</option>
               <option value="10">10 per page</option>
               <option value="20">20 per page</option>
               <option value="50">50 per page</option>
             </select>
-
-            {/* Sort Dropdown */}
             <select
               value={`${sortBy}-${sortOrder}`}
               onChange={(e) => {
@@ -364,7 +359,7 @@ const CustomerListing: React.FC = () => {
                 setSortBy(column);
                 setSortOrder(order as 'asc' | 'desc');
               }}
-              className={`px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 outline-none min-w-[180px]`}
+              className={`px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 min-w-[180px]`}
             >
               <option value="name-asc">Name (A-Z)</option>
               <option value="name-desc">Name (Z-A)</option>
@@ -374,106 +369,59 @@ const CustomerListing: React.FC = () => {
               <option value="totalSpent-asc">Lowest Spent</option>
               <option value="bookings-desc">Most Bookings</option>
               <option value="bookings-asc">Fewest Bookings</option>
-              <option value="ticketsPurchased-desc">Most Tickets</option>
-              <option value="ticketsPurchased-asc">Fewest Tickets</option>
             </select>
-          </div>
-          
-          {/* Results count */}
-          <div className="text-sm text-gray-500">
-            {loading ? 'Loading...' : `Showing ${totalCustomers > 0 ? startIndex + 1 : 0}-${Math.min(startIndex + itemsPerPage, totalCustomers)} of ${totalCustomers} customer${totalCustomers !== 1 ? 's' : ''}`}
+            <button
+              onClick={fetchCustomers}
+              className="flex items-center px-3 py-2 border border-gray-200 rounded-lg hover:bg-gray-50"
+            >
+              <RefreshCcw className="h-4 w-4" />
+            </button>
           </div>
         </div>
+        
+        {/* Results count */}
+        <div className="text-sm text-gray-500">
+          Showing {totalCustomers > 0 ? startIndex + 1 : 0}-{Math.min(startIndex + itemsPerPage, totalCustomers)} of {totalCustomers} customer{totalCustomers !== 1 ? 's' : ''}
+        </div>
+      </div>
 
-        {/* Customers Table */}
-        <div className="overflow-x-auto mb-6">
-          <table className="min-w-full w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
+      {/* Customers Table */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm text-left">
+            <thead className="text-xs text-gray-800 uppercase bg-gray-50 border-b">
               <tr>
-                <th 
-                  className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
-                  onClick={() => handleSort('name')}
-                >
-                  <div className="flex items-center gap-1">
-                    Customer
-                    {sortBy === 'name' && (
-                      <span className={`text-${themeColor}-600`}>{sortOrder === 'asc' ? '↑' : '↓'}</span>
-                    )}
-                  </div>
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Contact
-                </th>
-                <th 
-                  className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
-                  onClick={() => handleSort('joinDate')}
-                >
-                  <div className="flex items-center gap-1">
-                    Join Date
-                    {sortBy === 'joinDate' && (
-                      <span className={`text-${themeColor}-600`}>{sortOrder === 'asc' ? '↑' : '↓'}</span>
-                    )}
-                  </div>
-                </th>
-                <th 
-                  className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
-                  onClick={() => handleSort('totalSpent')}
-                >
-                  <div className="flex items-center gap-1">
-                    Total Spent
-                    {sortBy === 'totalSpent' && (
-                      <span className={`text-${themeColor}-600`}>{sortOrder === 'asc' ? '↑' : '↓'}</span>
-                    )}
-                  </div>
-                </th>
-                <th 
-                  className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
-                  onClick={() => handleSort('bookings')}
-                >
-                  <div className="flex items-center gap-1">
-                    Bookings
-                    {sortBy === 'bookings' && (
-                      <span className={`text-${themeColor}-600`}>{sortOrder === 'asc' ? '↑' : '↓'}</span>
-                    )}
-                  </div>
-                </th>
-                <th 
-                  className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
-                  onClick={() => handleSort('ticketsPurchased')}
-                >
-                  <div className="flex items-center gap-1">
-                    Tickets
-                    {sortBy === 'ticketsPurchased' && (
-                      <span className={`text-${themeColor}-600`}>{sortOrder === 'asc' ? '↑' : '↓'}</span>
-                    )}
-                  </div>
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
+                <th scope="col" className="px-6 py-4 font-medium">Customer</th>
+                <th scope="col" className="px-6 py-4 font-medium">Contact</th>
+                <th scope="col" className="px-6 py-4 font-medium">Join Date</th>
+                <th scope="col" className="px-6 py-4 font-medium">Total Spent</th>
+                <th scope="col" className="px-6 py-4 font-medium">Bookings</th>
+                <th scope="col" className="px-6 py-4 font-medium">Tickets</th>
+                <th scope="col" className="px-6 py-4 font-medium">Status</th>
+                <th scope="col" className="px-6 py-4 font-medium">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200 bg-white">
-              {loading ? (
+            <tbody className="divide-y divide-gray-100">
+              {currentCustomers.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-12 text-center">
-                    <div className="flex flex-col items-center justify-center gap-3">
-                      <div className={`animate-spin rounded-full h-10 w-10 border-b-2 border-${themeColor}-600`}></div>
-                      <span className="text-gray-500 text-sm">Loading customers...</span>
+                  <td colSpan={8} className="px-6 py-12 text-center">
+                    <div className="flex flex-col items-center justify-center">
+                      <div className={`inline-flex p-4 rounded-full bg-${themeColor}-50 mb-4`}>
+                        <Users className={`h-12 w-12 text-${themeColor}-400`} />
+                      </div>
+                      <h3 className="text-lg font-medium text-gray-900 mb-2">No customers found</h3>
+                      <p className="text-gray-500">
+                        {searchTerm || statusFilter !== 'all' 
+                          ? 'Try adjusting your search or filters' 
+                          : 'No customers have been created yet'}
+                      </p>
                     </div>
                   </td>
                 </tr>
-              ) : currentCustomers.length > 0 ? (
-                currentCustomers.map((customer, index) => (
-                  <tr 
-                    key={customer.id} 
-                    className="hover:bg-gray-50 transition-colors animate-fade-in-up"
-                    style={{ animationDelay: `${index * 0.02}s` }}
-                  >
-                    <td className="px-4 py-4">
+              ) : (
+                currentCustomers.map((customer) => (
+                  <tr key={customer.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4">
                       <div>
                         <div className="font-medium text-gray-900">{customer.name}</div>
                         {customer.tags.length > 0 && (
@@ -491,7 +439,7 @@ const CustomerListing: React.FC = () => {
                         )}
                       </div>
                     </td>
-                    <td className="px-4 py-4">
+                    <td className="px-6 py-4">
                       <div className="space-y-1">
                         <div className="flex items-center gap-2 text-sm text-gray-600">
                           <Mail className="w-3.5 h-3.5 text-gray-400" />
@@ -503,28 +451,28 @@ const CustomerListing: React.FC = () => {
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 py-4 text-sm text-gray-600">
-                      <div className="flex items-center gap-2">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2 text-sm text-gray-600">
                         <Calendar className="w-3.5 h-3.5 text-gray-400" />
                         {new Date(customer.joinDate).toLocaleDateString()}
                       </div>
                     </td>
-                    <td className="px-4 py-4">
+                    <td className="px-6 py-4">
                       <div className="flex items-center gap-1.5 font-semibold text-gray-900">
                         <DollarSign className={`w-4 h-4 text-${themeColor}-600`} />
                         ${customer.totalSpent.toLocaleString()}
                       </div>
                     </td>
-                    <td className="px-4 py-4 text-sm text-gray-600 font-medium">
+                    <td className="px-6 py-4 text-sm text-gray-600 font-medium">
                       {customer.bookings}
                     </td>
-                    <td className="px-4 py-4 text-sm text-gray-600 font-medium text-center">
+                    <td className="px-6 py-4 text-sm text-gray-600 font-medium text-center">
                       {customer.ticketsPurchased}
                     </td>
-                    <td className="px-4 py-4">
+                    <td className="px-6 py-4">
                       <StatusBadge status={customer.status} />
                     </td>
-                    <td className="px-4 py-4">
+                    <td className="px-6 py-4">
                       <div className="flex items-center gap-1">
                         <button 
                           className={`p-2 text-${themeColor}-600 hover:bg-${themeColor}-50 rounded-lg transition-colors`} 
@@ -548,30 +496,14 @@ const CustomerListing: React.FC = () => {
                     </td>
                   </tr>
                 ))
-              ) : (
-                <tr>
-                  <td colSpan={8} className="px-4 py-12 text-center">
-                    <div className="flex flex-col items-center justify-center">
-                      <div className={`inline-flex p-4 rounded-full bg-${themeColor}-50 mb-4`}>
-                        <Users className={`h-12 w-12 text-${themeColor}-400`} />
-                      </div>
-                      <h3 className="text-lg font-medium text-gray-900 mb-2">No customers found</h3>
-                      <p className="text-gray-500">
-                        {searchTerm || statusFilter !== 'all' 
-                          ? 'Try adjusting your search or filters' 
-                          : 'No customers have been created yet'}
-                      </p>
-                    </div>
-                  </td>
-                </tr>
               )}
             </tbody>
           </table>
         </div>
 
         {/* Pagination */}
-        {!loading && totalCustomers > 0 && (
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-gray-100">
+        {totalCustomers > 0 && (
+          <div className="px-6 py-4 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="text-sm text-gray-700">
               Page <span className="font-medium">{currentPage}</span> of <span className="font-medium">{totalPages}</span>
             </div>
