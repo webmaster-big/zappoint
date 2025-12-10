@@ -611,9 +611,9 @@ const EntertainmentLandingPage = () => {
                   e.stopPropagation();
                   handleBuyTickets(selectedAttraction);
                 }}
-                className="w-full py-4 bg-blue-800 text-white font-bold text-lg hover:bg-blue-900 transition flex items-center justify-center gap-2"
+                className="w-full py-3 bg-blue-800 text-white font-semibold text-base hover:bg-blue-900 transition flex items-center justify-center gap-2"
               >
-                <Ticket size={24} />
+                <Ticket size={20} />
                 Buy Tickets
               </button>
             </div>
@@ -739,9 +739,9 @@ const EntertainmentLandingPage = () => {
                   e.stopPropagation();
                   handleBookPackage(selectedPackage);
                 }}
-                className="w-full py-4 bg-blue-800 text-white font-bold text-lg hover:bg-blue-900 transition flex items-center justify-center gap-2"
+                className="w-full py-3 bg-blue-800 text-white font-semibold text-base hover:bg-blue-900 transition flex items-center justify-center gap-2"
               >
-                <Package size={24} />
+                <Package size={20} />
                 Book This Package
               </button>
             </div>
