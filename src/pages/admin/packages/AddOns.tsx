@@ -398,7 +398,7 @@ const ManageAddons = () => {
       <div className="w-full mx-auto px-4 pb-6 flex flex-col items-center">
         <div className="p-6 w-full mt-8">
           <div className="flex flex-col items-center justify-center py-20">
-            <div className={`animate-spin rounded-full h-12 w-12 border-b-4 border-${fullColor} mb-4`}></div>
+          <div className={`animate-spin rounded-full h-12 w-12 border-b-2 border-${fullColor} mx-auto mb-4`}></div>
           </div>
         </div>
       </div>

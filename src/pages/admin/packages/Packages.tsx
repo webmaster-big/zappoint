@@ -335,7 +335,7 @@ const Packages: React.FC = () => {
     return (
       <div className="w-full mx-auto px-4 pb-6 flex flex-col items-center justify-center min-h-96">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto mb-4"></div>
+          <div className={`animate-spin rounded-full h-12 w-12 border-b-2 border-${fullColor} mx-auto mb-4`}></div>
         </div>
       </div>
     );
