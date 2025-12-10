@@ -190,7 +190,7 @@ const PurchaseAttraction = () => {
   useEffect(() => {
     const loadAttraction = async () => {
       if (!id) {
-        navigate('/');
+        setLoading(false);
         return;
       }
 
@@ -227,7 +227,6 @@ const PurchaseAttraction = () => {
       } catch (error) {
         console.error('Error loading attraction:', error);
         setToast({ message: 'Failed to load attraction', type: 'error' });
-        navigate('/');
       } finally {
         setLoading(false);
       }
