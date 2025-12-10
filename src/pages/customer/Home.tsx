@@ -215,7 +215,7 @@ const EntertainmentLandingPage = () => {
         }
       `}</style>
       {/* Hero Section */}
-      <section className="relative text-white py-12 md:py-24 lg:py-38 overflow-hidden" style={{marginTop: '-4rem'}}>
+      <section className="relative text-white py-12 md:py-24 lg:py-38 overflow-hidden pt-20 md:pt-24" style={{marginTop: '-4rem'}}>
         {/* Video Background (hidden on mobile) */}
         <div className="hidden md:block absolute inset-0 z-0">
           <div style={{ position: 'relative', paddingTop: '56.25%' }}>
@@ -492,10 +492,10 @@ const EntertainmentLandingPage = () => {
       {/* Attraction Details Modal */}
       {showAttractionModal && selectedAttraction && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-3 md:p-4 z-50 animate-backdrop-fade" onClick={() => setShowAttractionModal(false)}>
-          <div className="bg-white max-w-2xl w-full max-h-[85vh] md:max-h-[90vh] overflow-y-auto shadow-2xl animate-scale-in" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white max-w-md md:max-w-lg w-full max-h-[85vh] md:max-h-[80vh] overflow-y-auto shadow-2xl animate-scale-in" onClick={(e) => e.stopPropagation()}>
             {/* Modal Header */}
             <div className="sticky top-0 z-10">
-              <div className="relative h-40 md:h-56 bg-gradient-to-br from-violet-500 to-blue-800">
+              <div className="relative h-32 md:h-40 bg-gradient-to-br from-violet-500 to-blue-800">
                 <button
                   type="button"
                   onClick={() => setShowAttractionModal(false)}
@@ -512,7 +512,7 @@ const EntertainmentLandingPage = () => {
             </div>
 
             {/* Modal Body */}
-            <div className="p-4 md:p-6 lg:p-8">
+            <div className="p-4 md:p-5">
               {/* Price & Duration */}
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4 md:mb-6 pb-4 md:pb-6 border-b">
                 <div className="flex items-center gap-2">
@@ -624,10 +624,10 @@ const EntertainmentLandingPage = () => {
       {/* Package Details Modal */}
       {showPackageModal && selectedPackage && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-3 md:p-4 z-50 animate-backdrop-fade" onClick={() => setShowPackageModal(false)}>
-          <div className="bg-white max-w-2xl w-full max-h-[85vh] md:max-h-[90vh] overflow-y-auto shadow-2xl animate-scale-in" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white max-w-md md:max-w-lg w-full max-h-[85vh] md:max-h-[80vh] overflow-y-auto shadow-2xl animate-scale-in" onClick={(e) => e.stopPropagation()}>
             {/* Modal Header */}
             <div className="sticky top-0 z-10">
-              <div className="relative h-40 md:h-56 bg-gradient-to-br from-blue-800 to-violet-500">
+              <div className="relative h-32 md:h-40 bg-gradient-to-br from-blue-800 to-violet-500">
                 <button
                   type="button"
                   onClick={() => setShowPackageModal(false)}
@@ -644,7 +644,7 @@ const EntertainmentLandingPage = () => {
             </div>
 
             {/* Modal Body */}
-            <div className="p-4 md:p-6 lg:p-8">
+            <div className="p-4 md:p-5">
               {/* Price & Duration */}
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4 md:mb-6 pb-4 md:pb-6 border-b">
                 <div className="flex items-center gap-2">
@@ -752,7 +752,7 @@ const EntertainmentLandingPage = () => {
       {/* Location Selection Modal */}
       {showLocationModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-3 md:p-4 z-50 animate-backdrop-fade" onClick={() => setShowLocationModal(false)}>
-          <div className="bg-white max-w-md w-full shadow-2xl animate-scale-in max-h-[85vh] md:max-h-[90vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white max-w-sm md:max-w-md w-full shadow-2xl animate-scale-in max-h-[85vh] md:max-h-[80vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
             <div className="p-4 md:p-6 border-b">
               <h3 className="text-xl md:text-2xl font-bold text-gray-900 mb-2">
                 Select Location
