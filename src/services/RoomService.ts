@@ -116,6 +116,14 @@ class RoomService {
     const response = await api.delete(`/rooms/${id}`);
     return response.data;
   }
+
+  /**
+   * Bulk delete rooms
+   */
+  async bulkDeleteRooms(ids: number[]): Promise<ApiResponse<{ deleted_count: number }>> {
+    const response = await api.post('/rooms/bulk-delete', { ids });
+    return response.data;
+  }
 }
 
 // Export a singleton instance

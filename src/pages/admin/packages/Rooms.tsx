@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Edit2, Trash2, Users, MapPin } from 'lucide-react';
+import { Search, Edit2, Trash2, Users, MapPin, CheckSquare, Square } from 'lucide-react';
 import Toast from '../../../components/ui/Toast';
 import { roomService } from '../../../services';
 import type { Room, RoomFilters } from '../../../services/RoomService';
@@ -26,6 +26,10 @@ const Rooms: React.FC = () => {
     const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
+    
+    // Bulk selection state
+    const [selectionMode, setSelectionMode] = useState(false);
+    const [selectedRoomIds, setSelectedRoomIds] = useState<Set<number>>(new Set());
     
     // Location filtering for company_admin
     const currentUser = getStoredUser();
@@ -192,6 +196,55 @@ const Rooms: React.FC = () => {
         }
     };
 
+    // Toggle selection mode
+    const toggleSelectionMode = () => {
+        setSelectionMode(!selectionMode);
+        setSelectedRoomIds(new Set());
+    };
+
+    // Toggle room selection
+    const toggleRoomSelection = (roomId: number) => {
+        const newSelected = new Set(selectedRoomIds);
+        if (newSelected.has(roomId)) {
+            newSelected.delete(roomId);
+        } else {
+            newSelected.add(roomId);
+        }
+        setSelectedRoomIds(newSelected);
+    };
+
+    // Select all rooms
+    const selectAllRooms = () => {
+        if (selectedRoomIds.size === rooms.length) {
+            setSelectedRoomIds(new Set());
+        } else {
+            setSelectedRoomIds(new Set(rooms.map(room => room.id)));
+        }
+    };
+
+    // Handle bulk delete
+    const handleBulkDelete = async () => {
+        if (selectedRoomIds.size === 0) {
+            showToast('Please select rooms to delete', 'info');
+            return;
+        }
+
+        if (!window.confirm(`Are you sure you want to delete ${selectedRoomIds.size} room(s)?`)) {
+            return;
+        }
+
+        try {
+            await roomService.bulkDeleteRooms(Array.from(selectedRoomIds));
+            showToast(`${selectedRoomIds.size} room(s) deleted successfully!`, 'success');
+            setSelectedRoomIds(new Set());
+            setSelectionMode(false);
+            fetchRooms();
+        } catch (error) {
+            console.error('Error deleting rooms:', error);
+            showToast('Error deleting rooms', 'error');
+        }
+    };
+
     // Handle edit click
     const handleEditClick = (room: Room) => {
         setSelectedRoom(room);
@@ -228,15 +281,29 @@ const Rooms: React.FC = () => {
                         <h2 className="text-2xl font-semibold text-gray-900">Rooms</h2>
                         <p className="text-gray-500 mt-1">Manage your facility rooms and their availability</p>
                     </div>
-                    <button
-                        onClick={() => {
-                            resetForm();
-                            setShowCreateModal(true);
-                        }}
-                        className={`bg-${fullColor} hover:bg-${themeColor}-900 text-white px-6 py-2 rounded-lg font-semibold whitespace-nowrap`}
-                    >
-                        Create Room
-                    </button>
+                    <div className="flex gap-2">
+                        {rooms.length > 0 && (
+                            <button
+                                onClick={toggleSelectionMode}
+                                className={`${
+                                    selectionMode 
+                                        ? 'bg-gray-500 hover:bg-gray-600' 
+                                        : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+                                } text-white px-4 py-2 rounded-lg font-semibold whitespace-nowrap transition-colors`}
+                            >
+                                {selectionMode ? 'Cancel' : 'Select'}
+                            </button>
+                        )}
+                        <button
+                            onClick={() => {
+                                resetForm();
+                                setShowCreateModal(true);
+                            }}
+                            className={`bg-${fullColor} hover:bg-${themeColor}-900 text-white px-6 py-2 rounded-lg font-semibold whitespace-nowrap`}
+                        >
+                            Create Room
+                        </button>
+                    </div>
                 </div>
 
                 {/* Show create button if no rooms */}
@@ -257,6 +324,37 @@ const Rooms: React.FC = () => {
                     </div>
                 ) : (
                     <>
+                        {/* Bulk Actions Bar */}
+                        {selectionMode && (
+                            <div className={`mb-4 p-4 bg-${themeColor}-50 border border-${themeColor}-200 rounded-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3`}>
+                                <div className="flex items-center gap-3">
+                                    <button
+                                        onClick={selectAllRooms}
+                                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                                            selectedRoomIds.size === rooms.length
+                                                ? `bg-${fullColor} text-white`
+                                                : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+                                        }`}
+                                    >
+                                        {selectedRoomIds.size === rooms.length ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
+                                        {selectedRoomIds.size === rooms.length ? 'Deselect All' : 'Select All'}
+                                    </button>
+                                    <span className="text-sm text-gray-700 font-medium">
+                                        {selectedRoomIds.size} room{selectedRoomIds.size !== 1 ? 's' : ''} selected
+                                    </span>
+                                </div>
+                                {selectedRoomIds.size > 0 && (
+                                    <button
+                                        onClick={handleBulkDelete}
+                                        className="flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                        Delete Selected
+                                    </button>
+                                )}
+                            </div>
+                        )}
+
                         {/* Search and Filter Section */}
                         <div className="mb-6 space-y-4">
                             {/* Search Bar and Location Filter */}
@@ -367,9 +465,32 @@ const Rooms: React.FC = () => {
                         ) : rooms.length > 0 ? (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                 {rooms.map((room) => (
-                                    <div key={room.id} className="border border-gray-200 rounded-xl p-5 hover:shadow-md transition-shadow">
+                                    <div 
+                                        key={room.id} 
+                                        className={`relative border rounded-xl p-5 transition-all ${
+                                            selectionMode 
+                                                ? 'cursor-pointer hover:shadow-lg' 
+                                                : 'hover:shadow-md'
+                                        } ${
+                                            selectedRoomIds.has(room.id)
+                                                ? `border-${fullColor} bg-${themeColor}-50 shadow-md`
+                                                : 'border-gray-200'
+                                        }`}
+                                        onClick={() => selectionMode && toggleRoomSelection(room.id)}
+                                    >
+                                        {/* Selection Checkbox */}
+                                        {selectionMode && (
+                                            <div className="absolute top-3 right-3">
+                                                {selectedRoomIds.has(room.id) ? (
+                                                    <CheckSquare className={`w-6 h-6 text-${fullColor}`} />
+                                                ) : (
+                                                    <Square className="w-6 h-6 text-gray-400" />
+                                                )}
+                                            </div>
+                                        )}
+
                                         <div className="flex justify-between items-start mb-4">
-                                            <div className="flex-1 min-w-0">
+                                            <div className="flex-1 min-w-0 pr-8">
                                                 <h3 className="font-semibold text-lg text-gray-900 truncate">{room.name}</h3>
                                                 <div className="flex items-center gap-2 mt-1">
                                                     <span
@@ -383,22 +504,24 @@ const Rooms: React.FC = () => {
                                                     </span>
                                                 </div>
                                             </div>
-                                            <div className="flex gap-2 ml-2">
-                                                <button
-                                                    onClick={() => handleEditClick(room)}
-                                                    className={`p-2 text-${fullColor} hover:bg-${themeColor}-50 rounded-lg transition-colors`}
-                                                    title="Edit room"
-                                                >
-                                                    <Edit2 className="w-4 h-4" />
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDeleteRoom(room.id, room.name)}
-                                                    className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                                                    title="Delete room"
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </button>
-                                            </div>
+                                            {!selectionMode && (
+                                                <div className="flex gap-2 ml-2">
+                                                    <button
+                                                        onClick={() => handleEditClick(room)}
+                                                        className={`p-2 text-${fullColor} hover:bg-${themeColor}-50 rounded-lg transition-colors`}
+                                                        title="Edit room"
+                                                    >
+                                                        <Edit2 className="w-4 h-4" />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDeleteRoom(room.id, room.name)}
+                                                        className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                                        title="Delete room"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                            )}
                                         </div>
 
                                         <div className="space-y-3">
