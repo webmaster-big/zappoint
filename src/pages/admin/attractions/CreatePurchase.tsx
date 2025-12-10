@@ -14,6 +14,7 @@ import { attractionService, type Attraction } from '../../../services/Attraction
 import { attractionPurchaseService } from '../../../services/AttractionPurchaseService';
 import { customerService, type Customer } from '../../../services/CustomerService';
 import Toast from '../../../components/ui/Toast';
+import EmptyStateModal from '../../../components/ui/EmptyStateModal';
 import { ASSET_URL, getStoredUser } from '../../../utils/storage';
 import { loadAcceptJS, processCardPayment, validateCardNumber, formatCardNumber, getCardType } from '../../../services/PaymentService';
 import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
@@ -69,6 +70,7 @@ const CreatePurchase = () => {
   const [authorizeApiLoginId, setAuthorizeApiLoginId] = useState('');
   const [authorizeEnvironment] = useState<'sandbox' | 'production'>('sandbox');
   const [showNoAuthAccountModal, setShowNoAuthAccountModal] = useState(false);
+  const [showEmptyModal, setShowEmptyModal] = useState(false);
 
   // Load attractions from backend
   useEffect(() => {
@@ -104,9 +106,15 @@ const CreatePurchase = () => {
         
         setAttractions(convertedAttractions);
         setFilteredAttractions(convertedAttractions);
+        
+        // Show modal if no attractions available
+        if (convertedAttractions.length === 0) {
+          setShowEmptyModal(true);
+        }
       } catch (error) {
         console.error('Error loading attractions:', error);
         setToast({ message: 'Failed to load attractions', type: 'error' });
+        setShowEmptyModal(true);
       } finally {
         setLoading(false);
       }
@@ -886,6 +894,13 @@ const CreatePurchase = () => {
           />
         </div>
       )}
+
+      {/* Empty State Modal */}
+      <EmptyStateModal
+        type="attractions"
+        isOpen={showEmptyModal}
+        onClose={() => setShowEmptyModal(false)}
+      />
     </div>
   );
 };

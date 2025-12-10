@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Save, Plus, Minus } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import bookingService from '../../../services/bookingService';
+import EmptyStateModal from '../../../components/ui/EmptyStateModal';
 import roomService from '../../../services/RoomService';
 import { getStoredUser, getImageUrl } from '../../../utils/storage';
 
@@ -12,6 +13,7 @@ const ManualBooking: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [pkg, setPkg] = useState<any>(null);
   const [packages, setPackages] = useState<any[]>([]);
+  const [showEmptyModal, setShowEmptyModal] = useState(false);
   const [selectedAddOns, setSelectedAddOns] = useState<{ [id: number]: number }>({});
   const [selectedAttractions, setSelectedAttractions] = useState<{ [id: number]: number }>({});
   const [creatingRoom, setCreatingRoom] = useState(false);
@@ -59,13 +61,21 @@ const ManualBooking: React.FC = () => {
       console.log('📦 Packages response:', response);
       
       if (response.success && response.data && response.data.packages) {
-        setPackages(Array.isArray(response.data.packages) ? response.data.packages : []);
+        const pkgs = Array.isArray(response.data.packages) ? response.data.packages : [];
+        setPackages(pkgs);
+        
+        // Show modal if no packages available
+        if (pkgs.length === 0) {
+          setShowEmptyModal(true);
+        }
       } else {
         setPackages([]);
+        setShowEmptyModal(true);
       }
     } catch (error) {
       console.error('Error loading packages:', error);
       setPackages([]);
+      setShowEmptyModal(true);
     }
   };
 
@@ -944,6 +954,13 @@ const ManualBooking: React.FC = () => {
           )}
         </div>
       </form>
+
+      {/* Empty State Modal */}
+      <EmptyStateModal
+        type="packages"
+        isOpen={showEmptyModal}
+        onClose={() => setShowEmptyModal(false)}
+      />
     </div>
   );
 };

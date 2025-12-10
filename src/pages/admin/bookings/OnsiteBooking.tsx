@@ -4,6 +4,7 @@ import { Calendar, Clock, Users, CreditCard, Gift, Tag, Plus, Minus, DollarSign 
 import QRCode from 'qrcode';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import Toast from '../../../components/ui/Toast';
+import EmptyStateModal from '../../../components/ui/EmptyStateModal';
 import DatePicker from '../../../components/ui/DatePicker';
 import type { 
   OnsiteBookingRoom, 
@@ -14,7 +15,6 @@ import bookingService, { type CreateBookingData } from '../../../services/bookin
 import timeSlotService, { type TimeSlot } from '../../../services/timeSlotService';
 import customerService from '../../../services/CustomerService';
 import { getImageUrl, getStoredUser, formatTimeTo12Hour } from '../../../utils/storage';
-import { Link } from 'react-router-dom';
 import { loadAcceptJS, processCardPayment, validateCardNumber, formatCardNumber, getCardType } from '../../../services/PaymentService';
 import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
 
@@ -74,6 +74,7 @@ const OnsiteBooking: React.FC = () => {
   const [showNoAuthAccountModal, setShowNoAuthAccountModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const [showEmptyModal, setShowEmptyModal] = useState(false);
   const [bookingData, setBookingData] = useState<BookingData>({
     packageId: null,
     selectedAttractions: [],
@@ -203,11 +204,17 @@ const OnsiteBooking: React.FC = () => {
           }));
           
           setPackages(transformedPackages);
+          
+          // Show modal if no packages available
+          if (transformedPackages.length === 0) {
+            setShowEmptyModal(true);
+          }
         }
       } catch (error) {
         console.error('❌ Error fetching packages:', error);
         // Set empty array on error
         setPackages([]);
+        setShowEmptyModal(true);
       } finally {
         setLoadingPackages(false);
       }
@@ -1247,16 +1254,7 @@ const OnsiteBooking: React.FC = () => {
               </div>
             )}
             
-            {!loadingPackages && packages.length === 0 && !searchQuery && (
-              <div className="text-center text-gray-500 py-12">
-                <p className="mb-4 text-lg">No packages available. Please create packages.</p>
-                <Link to="/packages/create"
-                  className={`inline-flex items-center bg-${fullColor} hover:bg-${themeColor}-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors`}
-                >
-                  Create Package
-                </Link>
-              </div>
-            )}
+
           </div>
         </div>
         </div>
@@ -2326,6 +2324,13 @@ const OnsiteBooking: React.FC = () => {
         {step === 5 && renderStep5()}
       </form>
       </div>
+
+      {/* Empty State Modal */}
+      <EmptyStateModal
+        type="packages"
+        isOpen={showEmptyModal}
+        onClose={() => setShowEmptyModal(false)}
+      />
     </>
   );
 };

@@ -44,6 +44,37 @@ const Rooms: React.FC = () => {
         is_available: true
     });
 
+    // Bulk creation state
+    const [creationMode, setCreationMode] = useState<'single' | 'multiple'>('single');
+    const [bulkFormData, setBulkFormData] = useState({
+        baseName: '',
+        suffixType: 'number' as 'number' | 'letter',
+        count: 1,
+        startNumber: 1,
+        startLetter: 'A',
+        capacity: '',
+        is_available: true
+    });
+
+    // Generate preview of rooms to be created
+    const generateRoomPreview = (): string[] => {
+        const { baseName, suffixType, count, startNumber, startLetter } = bulkFormData;
+        if (!baseName || count < 1) return [];
+
+        const rooms: string[] = [];
+        for (let i = 0; i < count; i++) {
+            if (suffixType === 'number') {
+                rooms.push(`${baseName} ${startNumber + i}`);
+            } else {
+                const charCode = startLetter.charCodeAt(0) + i;
+                if (charCode <= 90) { // Limit to A-Z
+                    rooms.push(`${baseName} ${String.fromCharCode(charCode)}`);
+                }
+            }
+        }
+        return rooms;
+    };
+
     // Toast state
     const [toast, setToast] = useState<{ message: string; type?: "success" | "error" | "info" } | null>(null);
     const showToast = (message: string, type?: "success" | "error" | "info") => {
@@ -131,30 +162,59 @@ const Rooms: React.FC = () => {
             capacity: '',
             is_available: true
         });
+        setBulkFormData({
+            baseName: '',
+            suffixType: 'number',
+            count: 1,
+            startNumber: 1,
+            startLetter: 'A',
+            capacity: '',
+            is_available: true
+        });
+        setCreationMode('single');
         setSelectedRoom(null);
     };
 
-    // Handle create room
+    // Handle create room (single or bulk)
     const handleCreateRoom = async (e: React.FormEvent) => {
         e.preventDefault();
+        
         try {
             // Use selected location for company_admin, default to 1 otherwise
             const locationId = isCompanyAdmin && selectedLocationId ? selectedLocationId : 1;
             
-            await roomService.createRoom({
-                location_id: locationId,
-                name: formData.name,
-                capacity: formData.capacity ? parseInt(formData.capacity) : undefined,
-                is_available: formData.is_available
-            });
+            if (creationMode === 'single') {
+                await roomService.createRoom({
+                    location_id: locationId,
+                    name: formData.name,
+                    capacity: formData.capacity ? parseInt(formData.capacity) : undefined,
+                    is_available: formData.is_available
+                });
+                showToast('Room created successfully!', 'success');
+            } else {
+                // Bulk creation
+                const roomsToCreate = generateRoomPreview();
+                const capacity = bulkFormData.capacity ? parseInt(bulkFormData.capacity) : undefined;
+                
+                // Create rooms sequentially
+                for (const roomName of roomsToCreate) {
+                    await roomService.createRoom({
+                        location_id: locationId,
+                        name: roomName,
+                        capacity: capacity,
+                        is_available: bulkFormData.is_available
+                    });
+                }
+                
+                showToast(`${roomsToCreate.length} rooms created successfully!`, 'success');
+            }
             
-            showToast('Room created successfully!', 'success');
             setShowCreateModal(false);
             resetForm();
             fetchRooms();
         } catch (error) {
             console.error('Error creating room:', error);
-            showToast('Error creating room', 'error');
+            showToast('Error creating room(s)', 'error');
         }
     };
 
@@ -274,13 +334,16 @@ const Rooms: React.FC = () => {
     };
 
     return (
-        <div className="w-full mx-auto px-4 pb-6 flex flex-col items-center">
-            <div className="bg-white rounded-xl p-6 w-full shadow-sm border border-gray-100 mt-8">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-                    <div>
-                        <h2 className="text-2xl font-semibold text-gray-900">Rooms</h2>
-                        <p className="text-gray-500 mt-1">Manage your facility rooms and their availability</p>
-                    </div>
+        <div className="w-full mx-auto px-4 sm:px-6 pb-6">
+            {/* Page Header */}
+            <div className="mb-6">
+                <h1 className="text-2xl font-bold text-gray-900">Rooms</h1>
+                <p className="text-gray-600 mt-1">Manage your facility rooms and their availability</p>
+            </div>
+
+            {/* Action Bar */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                     <div className="flex gap-2">
                         {rooms.length > 0 && (
                             <button
@@ -299,25 +362,30 @@ const Rooms: React.FC = () => {
                                 resetForm();
                                 setShowCreateModal(true);
                             }}
-                            className={`bg-${fullColor} hover:bg-${themeColor}-900 text-white px-6 py-2 rounded-lg font-semibold whitespace-nowrap`}
+                            className={`bg-${fullColor} hover:bg-${themeColor}-900 text-white px-5 py-2 rounded-lg font-semibold whitespace-nowrap transition-colors`}
                         >
                             Create Room
                         </button>
                     </div>
                 </div>
+            </div>
 
+            {/* Main Content */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
                 {/* Show create button if no rooms */}
                 {(rooms == null || rooms.length === 0) && !loading ? (
-                    <div className="flex flex-col items-center py-12">
-                        <MapPin className="w-12 h-12 text-gray-400 mb-4" />
-                        <div className="text-gray-400 mb-2">No rooms found</div>
-                        <p className="text-gray-500 text-sm mb-4">Create your first room to get started</p>
+                    <div className="flex flex-col items-center py-16">
+                        <div className={`w-16 h-16 rounded-full bg-${themeColor}-100 flex items-center justify-center mb-4`}>
+                            <MapPin className={`w-8 h-8 text-${fullColor}`} />
+                        </div>
+                        <h3 className="text-lg font-semibold text-gray-900 mb-2">No rooms found</h3>
+                        <p className="text-gray-600 text-sm mb-6 text-center max-w-sm">Get started by creating your first room for package bookings</p>
                         <button
                             onClick={() => {
                                 resetForm();
                                 setShowCreateModal(true);
                             }}
-                            className={`bg-${fullColor} hover:bg-${themeColor}-900 text-white px-6 py-2 rounded-lg font-semibold`}
+                            className={`bg-${fullColor} hover:bg-${themeColor}-700 text-white px-6 py-2.5 rounded-lg font-semibold transition-colors`}
                         >
                             Create Room
                         </button>
@@ -463,18 +531,18 @@ const Rooms: React.FC = () => {
                                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-300"></div>
                             </div>
                         ) : rooms.length > 0 ? (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                                 {rooms.map((room) => (
                                     <div 
                                         key={room.id} 
-                                        className={`relative border rounded-xl p-5 transition-all ${
+                                        className={`relative border-2 rounded-lg p-4 transition-all ${
                                             selectionMode 
-                                                ? 'cursor-pointer hover:shadow-lg' 
-                                                : 'hover:shadow-md'
+                                                ? 'cursor-pointer hover:shadow-lg hover:scale-105' 
+                                                : 'hover:shadow-md hover:border-gray-300'
                                         } ${
                                             selectedRoomIds.has(room.id)
-                                                ? `border-${fullColor} bg-${themeColor}-50 shadow-md`
-                                                : 'border-gray-200'
+                                                ? `border-${fullColor} bg-${themeColor}-50 shadow-lg scale-105`
+                                                : 'border-gray-200 bg-white'
                                         }`}
                                         onClick={() => selectionMode && toggleRoomSelection(room.id)}
                                     >
@@ -489,33 +557,31 @@ const Rooms: React.FC = () => {
                                             </div>
                                         )}
 
-                                        <div className="flex justify-between items-start mb-4">
+                                        <div className="flex justify-between items-start mb-3">
                                             <div className="flex-1 min-w-0 pr-8">
-                                                <h3 className="font-semibold text-lg text-gray-900 truncate">{room.name}</h3>
-                                                <div className="flex items-center gap-2 mt-1">
-                                                    <span
-                                                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                                                            room.is_available
-                                                                ? 'bg-green-100 text-green-800'
-                                                                : 'bg-red-100 text-red-800'
-                                                        }`}
-                                                    >
-                                                        {room.is_available ? 'Available' : 'Unavailable'}
-                                                    </span>
-                                                </div>
+                                                <h3 className="font-semibold text-base text-gray-900 truncate mb-1">{room.name}</h3>
+                                                <span
+                                                    className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                                                        room.is_available
+                                                            ? 'bg-green-100 text-green-700'
+                                                            : 'bg-red-100 text-red-700'
+                                                    }`}
+                                                >
+                                                    {room.is_available ? 'Available' : 'Unavailable'}
+                                                </span>
                                             </div>
                                             {!selectionMode && (
-                                                <div className="flex gap-2 ml-2">
+                                                <div className="flex gap-1 ml-2">
                                                     <button
                                                         onClick={() => handleEditClick(room)}
-                                                        className={`p-2 text-${fullColor} hover:bg-${themeColor}-50 rounded-lg transition-colors`}
+                                                        className={`p-1.5 text-${fullColor} hover:bg-${themeColor}-100 rounded transition-colors`}
                                                         title="Edit room"
                                                     >
                                                         <Edit2 className="w-4 h-4" />
                                                     </button>
                                                     <button
                                                         onClick={() => handleDeleteRoom(room.id, room.name)}
-                                                        className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                                        className="p-1.5 text-red-500 hover:bg-red-50 rounded transition-colors"
                                                         title="Delete room"
                                                     >
                                                         <Trash2 className="w-4 h-4" />
@@ -524,16 +590,17 @@ const Rooms: React.FC = () => {
                                             )}
                                         </div>
 
-                                        <div className="space-y-3">
+                                        <div className="space-y-2 mt-3 pt-3 border-t border-gray-100">
                                             {room.capacity && (
-                                                <div className="flex items-center gap-2 text-sm text-gray-600">
-                                                    <Users className="w-4 h-4" />
-                                                    <span>Capacity: {room.capacity} people</span>
+                                                <div className="flex items-center gap-2 text-sm text-gray-700">
+                                                    <Users className="w-4 h-4 text-gray-400" />
+                                                    <span className="font-medium">{room.capacity}</span>
+                                                    <span className="text-gray-500">people</span>
                                                 </div>
                                             )}
 
-                                            <div className="text-xs text-gray-500 pt-2 border-t">
-                                                Created: {new Date(room.created_at).toLocaleDateString()}
+                                            <div className="text-xs text-gray-500">
+                                                {new Date(room.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                                             </div>
                                         </div>
                                     </div>
@@ -589,59 +656,220 @@ const Rooms: React.FC = () => {
             {/* Create Modal */}
             {showCreateModal && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-                    <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+                    <div className="bg-white rounded-lg shadow-xl w-full max-w-lg">
                         <div className="p-6">
                             <h2 className="text-xl font-semibold text-gray-900 mb-4">Add New Room</h2>
+                            
+                            {/* Creation Mode Toggle */}
+                            <div className="flex gap-2 mb-6 bg-gray-100 p-1 rounded-lg">
+                                <button
+                                    type="button"
+                                    onClick={() => setCreationMode('single')}
+                                    className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all ${
+                                        creationMode === 'single'
+                                            ? `bg-${fullColor} text-white shadow-sm`
+                                            : 'text-gray-600 hover:text-gray-900'
+                                    }`}
+                                >
+                                    Single Room
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setCreationMode('multiple')}
+                                    className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all ${
+                                        creationMode === 'multiple'
+                                            ? `bg-${fullColor} text-white shadow-sm`
+                                            : 'text-gray-600 hover:text-gray-900'
+                                    }`}
+                                >
+                                    Multiple Rooms
+                                </button>
+                            </div>
+
                             <form onSubmit={handleCreateRoom} className="space-y-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Room Name *
-                                    </label>
-                                    <input
-                                        type="text"
-                                        name="name"
-                                        value={formData.name}
-                                        onChange={handleInputChange}
-                                        required
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                        placeholder="Enter room name"
-                                    />
-                                </div>
+                                {creationMode === 'single' ? (
+                                    <>
+                                        {/* Single Room Form */}
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                Room Name *
+                                            </label>
+                                            <input
+                                                type="text"
+                                                name="name"
+                                                value={formData.name}
+                                                onChange={handleInputChange}
+                                                required
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                placeholder="Enter room name"
+                                            />
+                                        </div>
 
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Capacity (people)
-                                    </label>
-                                    <input
-                                        type="number"
-                                        name="capacity"
-                                        value={formData.capacity}
-                                        onChange={handleInputChange}
-                                        min="1"
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                        placeholder="Enter capacity"
-                                    />
-                                </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                Capacity (people)
+                                            </label>
+                                            <input
+                                                type="number"
+                                                name="capacity"
+                                                value={formData.capacity}
+                                                onChange={handleInputChange}
+                                                min="1"
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                placeholder="Enter capacity"
+                                            />
+                                        </div>
 
-                                <div className="flex items-center">
-                                    <input
-                                        type="checkbox"
-                                        name="is_available"
-                                        checked={formData.is_available}
-                                        onChange={handleInputChange}
-                                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                                    />
-                                    <label className="ml-2 block text-sm text-gray-900">
-                                        Available for booking
-                                    </label>
-                                </div>
+                                        <div className="flex items-center">
+                                            <input
+                                                type="checkbox"
+                                                name="is_available"
+                                                checked={formData.is_available}
+                                                onChange={handleInputChange}
+                                                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                            />
+                                            <label className="ml-2 block text-sm text-gray-900">
+                                                Available for booking
+                                            </label>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <>
+                                        {/* Multiple Rooms Form */}
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                Base Name *
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={bulkFormData.baseName}
+                                                onChange={(e) => setBulkFormData({ ...bulkFormData, baseName: e.target.value })}
+                                                required
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                placeholder="e.g., Table"
+                                            />
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                    Suffix Type *
+                                                </label>
+                                                <select
+                                                    value={bulkFormData.suffixType}
+                                                    onChange={(e) => setBulkFormData({ ...bulkFormData, suffixType: e.target.value as 'number' | 'letter' })}
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                >
+                                                    <option value="number">Number</option>
+                                                    <option value="letter">Letter</option>
+                                                </select>
+                                            </div>
+
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                    Count *
+                                                </label>
+                                                <input
+                                                    type="number"
+                                                    value={bulkFormData.count}
+                                                    onChange={(e) => setBulkFormData({ ...bulkFormData, count: parseInt(e.target.value) || 1 })}
+                                                    min="1"
+                                                    max="50"
+                                                    required
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                Start {bulkFormData.suffixType === 'number' ? 'Number' : 'Letter'} *
+                                            </label>
+                                            {bulkFormData.suffixType === 'number' ? (
+                                                <input
+                                                    type="number"
+                                                    value={bulkFormData.startNumber}
+                                                    onChange={(e) => setBulkFormData({ ...bulkFormData, startNumber: parseInt(e.target.value) || 1 })}
+                                                    min="1"
+                                                    required
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                />
+                                            ) : (
+                                                <input
+                                                    type="text"
+                                                    value={bulkFormData.startLetter}
+                                                    onChange={(e) => {
+                                                        const val = e.target.value.toUpperCase();
+                                                        if (val.length <= 1 && /^[A-Z]?$/.test(val)) {
+                                                            setBulkFormData({ ...bulkFormData, startLetter: val || 'A' });
+                                                        }
+                                                    }}
+                                                    maxLength={1}
+                                                    required
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                    placeholder="A"
+                                                />
+                                            )}
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                Capacity (people)
+                                            </label>
+                                            <input
+                                                type="number"
+                                                value={bulkFormData.capacity}
+                                                onChange={(e) => setBulkFormData({ ...bulkFormData, capacity: e.target.value })}
+                                                min="1"
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                placeholder="Enter capacity for all rooms"
+                                            />
+                                        </div>
+
+                                        <div className="flex items-center">
+                                            <input
+                                                type="checkbox"
+                                                checked={bulkFormData.is_available}
+                                                onChange={(e) => setBulkFormData({ ...bulkFormData, is_available: e.target.checked })}
+                                                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                            />
+                                            <label className="ml-2 block text-sm text-gray-900">
+                                                Available for booking
+                                            </label>
+                                        </div>
+
+                                        {/* Preview */}
+                                        {bulkFormData.baseName && generateRoomPreview().length > 0 && (
+                                            <div className={`bg-${themeColor}-50 border border-${fullColor} rounded-lg p-4`}>
+                                                <p className="text-sm font-medium text-gray-700 mb-2">
+                                                    Preview ({generateRoomPreview().length} rooms):
+                                                </p>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {generateRoomPreview().slice(0, 10).map((name, idx) => (
+                                                        <span
+                                                            key={idx}
+                                                            className={`px-2 py-1 bg-${fullColor} text-white text-xs rounded-lg`}
+                                                        >
+                                                            {name}
+                                                        </span>
+                                                    ))}
+                                                    {generateRoomPreview().length > 10 && (
+                                                        <span className="px-2 py-1 bg-gray-200 text-gray-600 text-xs rounded-lg">
+                                                            +{generateRoomPreview().length - 10} more
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </>
+                                )}
 
                                 <div className="flex gap-3 pt-4">
                                     <button
                                         type="submit"
                                         className={`flex-1 bg-${fullColor} hover:bg-${themeColor}-700 text-white py-2 px-4 rounded-lg transition-colors`}
                                     >
-                                        Create Room
+                                        {creationMode === 'single' ? 'Create Room' : `Create ${generateRoomPreview().length} Rooms`}
                                     </button>
                                     <button
                                         type="button"
