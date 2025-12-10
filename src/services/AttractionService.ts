@@ -114,6 +114,7 @@ class AttractionService {
    */
   async getAttraction(id: number): Promise<ApiResponse<Attraction>> {
     const response = await api.get(`/attractions/${id}`);
+    console.log('Attraction response data:', response.data);
     return response.data;
   }
 
