@@ -76,8 +76,8 @@ function App() {
         
         {/* Public Routes - Unrestricted */}
         <Route path="/home" element={<Home />} />
-        <Route path="/book/package/:location/:id" element={<BookPackage />} />
-        <Route path="/purchase/attraction/:location/:id" element={<PurchaseAttraction />} />
+        <Route path="/book/package/:location/:slug" element={<BookPackage />} />
+        <Route path="/purchase/attraction/:location/:slug" element={<PurchaseAttraction />} />
         <Route path="/embed/booking/:packageId" element={<EmbedBookingRoute />} />
         
         {/* Customer Routes */}

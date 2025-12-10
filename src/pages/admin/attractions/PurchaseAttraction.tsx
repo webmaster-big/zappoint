@@ -18,6 +18,7 @@ import Toast from '../../../components/ui/Toast';
 import { ASSET_URL } from '../../../utils/storage';
 import { loadAcceptJS, processCardPayment, validateCardNumber, formatCardNumber, getCardType } from '../../../services/PaymentService';
 import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
+import { extractIdFromSlug } from '../../../utils/slug';
 
 const countries = [
   'United States', 'Canada', 'United Kingdom', 'Afghanistan', 'Albania', 'Algeria', 'Andorra', 'Angola',
@@ -47,7 +48,8 @@ const countries = [
 ];
 
 const PurchaseAttraction = () => {
-  const { location, id } = useParams<{ location: string; id: string }>();
+  const { slug } = useParams<{ location: string; slug: string }>();
+  const attractionId = slug ? extractIdFromSlug(slug) : null;
   const navigate = useNavigate();
 
   // Get auth token from localStorage
@@ -189,7 +191,7 @@ const PurchaseAttraction = () => {
   // Load attraction data from backend
   useEffect(() => {
     const loadAttraction = async () => {
-      if (!id) {
+      if (!attractionId) {
         setLoading(false);
         return;
       }
@@ -201,7 +203,7 @@ const PurchaseAttraction = () => {
         
         // If location parameter exists, use it (future enhancement for location-based filtering)
         // For now, we fetch by ID directly
-        const response = await attractionService.getAttraction(Number(id));
+        const response = await attractionService.getAttraction(Number(attractionId));
         const attr = response.data as Attraction & { location?: { id: number; name: string } };
         
         // Convert API format to component format
@@ -215,7 +217,7 @@ const PurchaseAttraction = () => {
           maxCapacity: attr.max_capacity,
           duration: attr.duration?.toString() || '',
           durationUnit: attr.duration_unit || 'minutes',
-          location: attr.location?.name || location || '', // Use attraction's location or URL param
+          location: attr.location?.name || '', // Use attraction's location or URL param
           locationId: attr.location?.id || attr.location_id, // Store location_id from API
           images: attr.image ? (Array.isArray(attr.image) ? attr.image.map(img => ASSET_URL + img) : [ASSET_URL + attr.image]) : [],
           status: attr.is_active ? 'active' : 'inactive',
@@ -233,7 +235,7 @@ const PurchaseAttraction = () => {
     };
 
     loadAttraction();
-  }, [id, location, navigate]);
+  }, [attractionId]);
 
   // Initialize Authorize.Net
   useEffect(() => {
@@ -1353,29 +1355,127 @@ const PurchaseAttraction = () => {
       {/* QR Code Modal */}
       {showQRModal && qrCodeImage && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-backdrop-fade">
-          <div className="bg-white rounded-xl max-w-sm w-full p-6">
-            <div className="text-center">
+          <div className="bg-white rounded-xl max-w-2xl w-full p-4 sm:p-6 max-h-[calc(100vh-2rem)] overflow-y-auto">
+            <div className="text-center mb-4">
               <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-3" />
-              <h3 className="text-lg font-bold text-gray-900 mb-2">Purchase Complete!</h3>
-              <p className="text-sm text-gray-600 mb-4">Scan this QR code at the entrance</p>
-              
-              {/* QR Code Image */}
-              <div className="flex justify-center mb-4">
+              <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">Purchase Complete!</h3>
+              <p className="text-sm text-gray-600">Your tickets have been confirmed</p>
+            </div>
+            
+            {/* QR Code Display */}
+            <div className="bg-gray-50 rounded-xl p-4 sm:p-6 mb-4">
+              <div className="flex flex-col items-center">
                 <img 
                   src={qrCodeImage} 
                   alt="Purchase QR Code"
-                  className="w-48 h-48 border border-gray-200 rounded-lg"
+                  className="w-48 h-48 sm:w-64 sm:h-64 border border-gray-200 rounded-lg mb-3"
                 />
+                <p className="text-xs sm:text-sm text-gray-600 mb-1">Scan this QR code at the entrance</p>
               </div>
+            </div>
+            
+            {/* Purchase Details */}
+            <div className="bg-blue-50 rounded-xl p-4 sm:p-6 mb-4">
+              <h3 className="font-semibold text-base sm:text-lg mb-3 text-gray-800">Purchase Details</h3>
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm sm:text-base">
+                  <span className="text-gray-600">Attraction:</span>
+                  <span className="font-medium text-gray-900 text-right ml-2">{attraction.name}</span>
+                </div>
+                <div className="flex justify-between text-sm sm:text-base">
+                  <span className="text-gray-600">Location:</span>
+                  <span className="font-medium text-gray-900">{attraction.location}</span>
+                </div>
+                <div className="flex justify-between text-sm sm:text-base">
+                  <span className="text-gray-600">Guest Name:</span>
+                  <span className="font-medium text-gray-900">{customerInfo.firstName} {customerInfo.lastName}</span>
+                </div>
+                <div className="flex justify-between text-sm sm:text-base">
+                  <span className="text-gray-600">Email:</span>
+                  <span className="font-medium text-gray-900 text-right ml-2 break-all">{customerInfo.email}</span>
+                </div>
+                {customerInfo.phone && (
+                  <div className="flex justify-between text-sm sm:text-base">
+                    <span className="text-gray-600">Phone:</span>
+                    <span className="font-medium text-gray-900">{customerInfo.phone}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-sm sm:text-base">
+                  <span className="text-gray-600">Quantity:</span>
+                  <span className="font-medium text-gray-900">{quantity} {quantity === 1 ? 'ticket' : 'tickets'}</span>
+                </div>
+                <div className="flex justify-between text-sm sm:text-base">
+                  <span className="text-gray-600">Purchase Date:</span>
+                  <span className="font-medium text-gray-900">{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</span>
+                </div>
+                <div className="flex justify-between text-sm sm:text-base">
+                  <span className="text-gray-600">Duration:</span>
+                  <span className="font-medium text-gray-900">{attraction.duration} {attraction.durationUnit}</span>
+                </div>
+              </div>
+            </div>
+            
+            {/* Billing Address */}
+            <div className="bg-gray-50 rounded-xl p-4 sm:p-6 mb-4">
+              <h3 className="font-semibold text-base sm:text-lg mb-3 text-gray-800">Billing Address</h3>
+              <div className="text-sm text-gray-700 space-y-1">
+                <p className="font-medium">{customerInfo.firstName} {customerInfo.lastName}</p>
+                <p>{customerInfo.address}</p>
+                {customerInfo.address2 && <p>{customerInfo.address2}</p>}
+                <p>{customerInfo.city}, {customerInfo.state} {customerInfo.zip}</p>
+                <p>{customerInfo.country}</p>
+              </div>
+            </div>
+            
+            {/* Payment Summary */}
+            <div className="bg-blue-50 rounded-xl p-4 sm:p-6 mb-4">
+              <h3 className="font-semibold text-base sm:text-lg mb-3 text-gray-800">Payment Summary</h3>
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Price per {attraction.pricingType === 'per_person' ? 'person' : attraction.pricingType === 'per_group' ? 'group' : attraction.pricingType === 'per_hour' ? 'hour' : attraction.pricingType === 'per_game' ? 'game' : 'item'}:</span>
+                  <span className="font-medium text-gray-900">${Number(attraction.price).toFixed(2)}</span>
+                </div>
+                {quantity > 1 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Quantity:</span>
+                    <span className="font-medium text-gray-900">x{quantity}</span>
+                  </div>
+                )}
+                <div className="flex justify-between border-t pt-2 mt-2 text-sm sm:text-base">
+                  <span className="text-gray-600 font-semibold">Total Paid:</span>
+                  <span className="font-bold text-green-600 text-lg sm:text-xl">${calculateTotal().toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Payment Method:</span>
+                  <span className="font-medium text-gray-900">Credit/Debit Card</span>
+                </div>
+              </div>
+            </div>
+            
+            {/* Information Notice */}
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+              <div className="flex">
+                <svg className="w-5 h-5 text-yellow-600 mr-2 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd"></path>
+                </svg>
+                <div className="text-xs sm:text-sm text-yellow-800">
+                  <p className="font-semibold mb-1">Important Information</p>
+                  <ul className="list-disc list-inside space-y-1">
+                    <li>Receipt sent to {customerInfo.email}</li>
+                    <li>Please present this QR code at the entrance</li>
+                    <li>Save or screenshot this confirmation for your records</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
 
-              <p className="text-xs text-gray-500 mb-4">Receipt sent to {customerInfo.email}</p>
-
+            <div className="flex justify-center">
               <button
                 onClick={() => {
                   setShowQRModal(false);
                   navigate('/');
                 }}
-                className="w-full px-4 py-2 bg-blue-800 text-white rounded-lg hover:bg-blue-900"
+                className="w-full sm:w-auto px-6 py-2.5 bg-blue-800 text-white rounded-lg hover:bg-blue-900 font-medium transition shadow-md hover:shadow-lg"
               >
                 Done
               </button>

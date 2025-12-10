@@ -16,6 +16,7 @@ import {
 import type { Attraction, Package as PackageType, BookingType } from '../../types/customer';
 import { customerService, type GroupedAttraction, type GroupedPackage } from '../../services/CustomerService';
 import { ASSET_URL } from '../../utils/storage';
+import { generateSlug, generateLocationSlug } from '../../utils/slug';
 
 const EntertainmentLandingPage = () => {
   const [selectedLocation, setSelectedLocation] = useState('All Locations');
@@ -176,17 +177,16 @@ const EntertainmentLandingPage = () => {
     const bookingItem = activeBookingType === 'attraction' ? selectedAttraction : selectedPackage;
     if (!bookingItem) return;
 
-    // Find the appropriate link for the selected location
-    if (activeBookingType === 'attraction' && selectedAttraction?.purchaseLinks) {
-      const link = selectedAttraction.purchaseLinks.find(l => l.location === location);
-      if (link) {
-        window.open(link.url, '_blank');
-      }
-    } else if (activeBookingType === 'package' && selectedPackage?.bookingLinks) {
-      const link = selectedPackage.bookingLinks.find(l => l.location === location);
-      if (link) {
-        window.open(link.url, '_blank');
-      }
+    // Generate slug-based URL
+    const locationSlug = generateLocationSlug(location);
+    const itemSlug = generateSlug(bookingItem.name, bookingItem.id);
+    
+    if (activeBookingType === 'attraction') {
+      const url = `${window.location.origin}/purchase/attraction/${locationSlug}/${itemSlug}`;
+      window.open(url, '_blank');
+    } else if (activeBookingType === 'package') {
+      const url = `${window.location.origin}/book/package/${locationSlug}/${itemSlug}`;
+      window.open(url, '_blank');
     }
   };
 

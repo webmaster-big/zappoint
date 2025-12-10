@@ -28,6 +28,7 @@ import type {
 import { attractionService } from '../../../services/AttractionService';
 import type { Attraction } from '../../../services/AttractionService';
 import Toast from '../../../components/ui/Toast';
+import { createSlugWithId } from '../../../utils/slug';
 import { getStoredUser } from '../../../utils/storage';
 
 const ManageAttractions = () => {
@@ -397,7 +398,8 @@ const ManageAttractions = () => {
     const locationSlug = attraction.locationName 
       ? attraction.locationName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
       : `location-${attraction.locationId || '1'}`;
-    const fullPurchaseLink = `${window.location.origin}/purchase/attraction/${locationSlug}/${attraction.id}`;
+    const attractionSlug = createSlugWithId(attraction.name, attraction.id);
+    const fullPurchaseLink = `${window.location.origin}/purchase/attraction/${locationSlug}/${attractionSlug}`;
     navigator.clipboard.writeText(fullPurchaseLink);
     setCopiedLink(attraction.id);
     setTimeout(() => setCopiedLink(null), 2000);
@@ -673,7 +675,7 @@ const ManageAttractions = () => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-3">
                         <Link
-                          to={`${window.location.origin}/purchase/attraction/${attraction.locationName ? attraction.locationName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') : `location-${attraction.locationId || '1'}`}/${attraction.id}`}
+                          to={`${window.location.origin}/purchase/attraction/${attraction.locationName ? attraction.locationName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') : `location-${attraction.locationId || '1'}`}/${createSlugWithId(attraction.name, attraction.id)}`}
                           className={`text-${themeColor}-600 hover:text-${fullColor}`}
                           title="View Purchase Page"
                           target="_blank"
@@ -681,14 +683,14 @@ const ManageAttractions = () => {
                           <Link2 className="h-4 w-4" />
                         </Link>
                         <Link
-                          to={`/attractions/details/${attraction.id}`}
+                          to={`/attractions/details/${createSlugWithId(attraction.name, attraction.id)}`}
                           className={`text-${fullColor} hover:text-${themeColor}-900`}
                           title="View Details"
                         >
                           <Eye className="h-4 w-4" />
                         </Link>
                         <Link
-                          to={`/edit-attraction/${attraction.id}`}
+                          to={`/edit-attraction/${createSlugWithId(attraction.name, attraction.id)}`}
                           className="text-gray-600 hover:text-gray-800"
                           title="Edit"
                         >

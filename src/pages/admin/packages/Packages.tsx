@@ -4,6 +4,7 @@ import { Calendar, Users, Tag, Gift, Search, Filter, Download, Upload, X, CheckS
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { packageService, type Package } from '../../../services';
 import { getStoredUser } from "../../../utils/storage";
+import { createSlugWithId } from '../../../utils/slug';
 
 interface UserData {
   name: string;
@@ -547,14 +548,14 @@ const Packages: React.FC = () => {
                       </div>
                       <div className="flex gap-2 ml-2">
                         <Link
-                          to={`/packages/details/${pkg.id}`}
+                          to={`/packages/details/${createSlugWithId(pkg.name, pkg.id)}`}
                           className={`p-2 text-${fullColor} hover:bg-${themeColor}-50 rounded-lg transition-colors`}
                           title="View details"
                         >
                           <Eye size={18} />
                         </Link>
                         <Link
-                          to={`/packages/edit/${pkg.id}`}
+                          to={`/packages/edit/${createSlugWithId(pkg.name, pkg.id)}`}
                           className={`p-2 text-${fullColor} hover:bg-${themeColor}-50 rounded-lg transition-colors`}
                           title="Edit package"
                         >

@@ -9,6 +9,7 @@ import { loadAcceptJS, processCardPayment, validateCardNumber, formatCardNumber,
 import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
 import customerService from '../../../services/CustomerService';
 import DatePicker from '../../../components/ui/DatePicker';
+import { extractIdFromSlug } from '../../../utils/slug';
 
 const countries = [
   'United States', 'Canada', 'United Kingdom', 'Afghanistan', 'Albania', 'Algeria', 'Andorra', 'Angola',
@@ -38,7 +39,8 @@ const countries = [
 ];
 
 const BookPackage: React.FC = () => {
-  const { id } = useParams<{ location: string; id: string }>();
+  const { slug } = useParams<{ location: string; slug: string }>();
+  const packageId = slug ? extractIdFromSlug(slug) : null;
   const [pkg, setPkg] = useState<BookPackagePackage | null>(null);
   const [loadingPackage, setLoadingPackage] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -110,11 +112,11 @@ const BookPackage: React.FC = () => {
   // Load package from backend
   useEffect(() => {
     const fetchPackage = async () => {
-      if (!id) return;
+      if (!packageId) return;
       
       try {
         setLoadingPackage(true);
-        const response = await bookingService.getPackageById(Number(id));
+        const response = await bookingService.getPackageById(Number(packageId));
         console.log('📦 Package data received:', response.data);
         console.log('📷 Package image:', response.data.image);
         console.log('🎨 Add-ons:', response.data.add_ons);
@@ -133,7 +135,7 @@ const BookPackage: React.FC = () => {
     };
     
     fetchPackage();
-  }, [id]);
+  }, [packageId]);
   
   // Auto-fill form if customer is logged in
   useEffect(() => {
@@ -843,12 +845,98 @@ const BookPackage: React.FC = () => {
                 </div>
                 <div className="flex justify-between text-sm sm:text-base">
                   <span className="text-gray-600">Time:</span>
-                  <span className="font-medium text-gray-900">{selectedTime}</span>
+                  <span className="font-medium text-gray-900">{formatTimeTo12Hour(selectedTime)}</span>
                 </div>
                 <div className="flex justify-between text-sm sm:text-base">
                   <span className="text-gray-600">Participants:</span>
                   <span className="font-medium text-gray-900">{participants}</span>
                 </div>
+                {selectedRoomId && pkg?.rooms && (
+                  <div className="flex justify-between text-sm sm:text-base">
+                    <span className="text-gray-600">Room:</span>
+                    <span className="font-medium text-gray-900">{pkg.rooms.find(r => r.id === selectedRoomId)?.name}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-sm sm:text-base">
+                  <span className="text-gray-600">Duration:</span>
+                  <span className="font-medium text-gray-900">{formatDuration()}</span>
+                </div>
+              </div>
+            </div>
+            
+            {/* Billing Address */}
+            <div className="bg-gray-50 rounded-xl p-4 sm:p-6 mb-4 sm:mb-6">
+              <h3 className="font-semibold text-base sm:text-lg mb-3 text-gray-800">Billing Address</h3>
+              <div className="text-sm text-gray-700 space-y-1">
+                <p className="font-medium">{form.firstName} {form.lastName}</p>
+                <p>{form.address}</p>
+                {form.address2 && <p>{form.address2}</p>}
+                <p>{form.city}, {form.state} {form.zip}</p>
+                <p>{form.country}</p>
+              </div>
+            </div>
+            
+            {/* Additional Items */}
+            {(Object.entries(selectedAttractions).some(([, qty]) => qty > 0) || Object.entries(selectedAddOns).some(([, qty]) => qty > 0)) && (
+              <div className="bg-gray-50 rounded-xl p-4 sm:p-6 mb-4 sm:mb-6">
+                <h3 className="font-semibold text-base sm:text-lg mb-3 text-gray-800">Additional Items</h3>
+                <div className="space-y-2">
+                  {Object.entries(selectedAttractions).filter(([, qty]) => qty > 0).map(([idStr, qty]) => {
+                    const attraction = pkg?.attractions.find(a => a.id === Number(idStr));
+                    if (!attraction) return null;
+                    return (
+                      <div key={idStr} className="flex justify-between text-sm">
+                        <span className="text-gray-600">{attraction.name} (x{qty})</span>
+                        <span className="font-medium text-gray-900">${(Number(attraction.price) * qty).toFixed(2)}</span>
+                      </div>
+                    );
+                  })}
+                  {Object.entries(selectedAddOns).filter(([, qty]) => qty > 0).map(([idStr, qty]) => {
+                    const addOn = pkg?.add_ons.find(a => a.id === Number(idStr));
+                    if (!addOn) return null;
+                    return (
+                      <div key={idStr} className="flex justify-between text-sm">
+                        <span className="text-gray-600">{addOn.name} (x{qty})</span>
+                        <span className="font-medium text-gray-900">${(Number(addOn.price) * qty).toFixed(2)}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            
+            {/* Payment Summary */}
+            <div className="bg-blue-50 rounded-xl p-4 sm:p-6 mb-4 sm:mb-6">
+              <h3 className="font-semibold text-base sm:text-lg mb-3 text-gray-800">Payment Summary</h3>
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Base Price:</span>
+                  <span className="font-medium text-gray-900">${basePrice.toFixed(2)}</span>
+                </div>
+                {addOnsTotal > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Add-ons Total:</span>
+                    <span className="font-medium text-gray-900">${addOnsTotal.toFixed(2)}</span>
+                  </div>
+                )}
+                {attractionsTotal > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Attractions Total:</span>
+                    <span className="font-medium text-gray-900">${attractionsTotal.toFixed(2)}</span>
+                  </div>
+                )}
+                {promoDiscount > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Promo Discount:</span>
+                    <span className="font-medium text-green-600">-${promoDiscount.toFixed(2)}</span>
+                  </div>
+                )}
+                {giftCardDiscount > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Gift Card:</span>
+                    <span className="font-medium text-green-600">-${giftCardDiscount.toFixed(2)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between border-t pt-2 sm:pt-3 mt-2 sm:mt-3 text-sm sm:text-base">
                   <span className="text-gray-600 font-semibold">Total Amount:</span>
                   <span className="font-bold text-blue-800 text-lg sm:text-xl">${total.toFixed(2)}</span>
@@ -863,6 +951,10 @@ const BookPackage: React.FC = () => {
                     <span className="font-medium text-orange-600">${(total - partialAmount).toFixed(2)}</span>
                   </div>
                 )}
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Payment Method:</span>
+                  <span className="font-medium text-gray-900">Credit/Debit Card</span>
+                </div>
               </div>
             </div>
             
@@ -1788,7 +1880,7 @@ const BookPackage: React.FC = () => {
                 {selectedTime && (
                   <div className="flex justify-between items-center mb-4">
                     <span className="text-gray-600 text-sm">Time:</span>
-                    <span className="font-medium text-gray-800 text-sm">{selectedTime}</span>
+                    <span className="font-medium text-gray-800 text-sm">{formatTimeTo12Hour(selectedTime)}</span>
                   </div>
                 )}
               </div>
