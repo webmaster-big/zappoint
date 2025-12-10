@@ -692,7 +692,10 @@ const PurchaseAttraction = () => {
                   
                   <div className="flex justify-end">
                     <button
-                      onClick={() => setCurrentStep(2)}
+                      onClick={() => {
+                        setCurrentStep(2);
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
                       className="py-2.5 md:py-3 px-6 md:px-8 rounded-lg bg-blue-800 text-white font-medium hover:bg-blue-900 transition shadow-sm hover:shadow-md text-sm md:text-base"
                     >
                       Continue →
@@ -958,14 +961,20 @@ const PurchaseAttraction = () => {
                   
                   <div className="flex justify-between gap-2 pt-4">
                     <button
-                      onClick={() => setCurrentStep(1)}
+                      onClick={() => {
+                        setCurrentStep(1);
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
                       className="py-2.5 md:py-3 px-4 md:px-6 rounded-lg bg-gray-100 text-gray-700 font-medium hover:bg-gray-200 transition text-sm md:text-base"
                     >
                       <span className="sm:hidden">←</span>
                       <span className="hidden sm:inline">← Back</span>
                     </button>
                     <button
-                      onClick={() => setCurrentStep(3)}
+                      onClick={() => {
+                        setCurrentStep(3);
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
                       disabled={!customerInfo.firstName || !customerInfo.lastName || !customerInfo.email || !customerInfo.address || !customerInfo.city || !customerInfo.state || !customerInfo.zip || !customerInfo.country}
                       className="py-2.5 md:py-3 px-6 md:px-8 rounded-lg bg-blue-800 text-white font-medium hover:bg-blue-900 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md text-sm md:text-base"
                     >
@@ -1100,7 +1109,10 @@ const PurchaseAttraction = () => {
                   
                   <div className="flex justify-between gap-2 pt-2">
                     <button
-                      onClick={() => setCurrentStep(2)}
+                      onClick={() => {
+                        setCurrentStep(2);
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
                       disabled={submitting}
                       className="py-2.5 md:py-3 px-3 md:px-6 rounded-lg bg-gray-200 text-gray-800 font-medium hover:bg-gray-300 transition disabled:opacity-50 disabled:cursor-not-allowed text-xs md:text-base"
                     >

@@ -994,7 +994,7 @@ const BookPackage: React.FC = () => {
         {/* Left: Booking Form */}
         <div className="flex-1 min-w-0">
           <div className="mb-6 md:mb-8 bg-white rounded-xl p-4 md:p-6 shadow-sm border border-gray-100">
-            <h2 className="text-lg md:text-xl font-semibold mb-2 text-gray-800">{pkg.name}</h2>
+            <h2 className="text-base md:text-xl font-semibold mb-2 text-gray-800">{pkg.name}</h2>
             <p className="text-gray-600 mb-3 md:mb-4 text-xs md:text-sm">{pkg.description}</p>
             {((pkg.features && Array.isArray(pkg.features) && pkg.features.length > 0) || 
               (typeof pkg.features === 'string' && pkg.features.trim() !== '')) && (
@@ -1137,7 +1137,7 @@ const BookPackage: React.FC = () => {
                   <label className="block font-medium mb-3 text-gray-800 text-xs md:text-sm uppercase tracking-wide">Participants</label>
                   <div className="flex items-center flex-wrap gap-2">
                     <button 
-                      className="w-9 h-9 md:w-10 md:h-10 rounded-lg bg-white border border-gray-300 text-gray-800 flex items-center justify-center shadow-sm text-sm md:text-base"
+                      className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-white border border-gray-300 text-gray-800 flex items-center justify-center shadow-sm text-base md:text-lg font-semibold"
                       onClick={() => setParticipants(Math.max(Number(pkg.max_participants), participants - 1))}
                     >
                       -
@@ -1148,16 +1148,16 @@ const BookPackage: React.FC = () => {
                       max={Number(pkg.max_participants) + 10} 
                       value={participants} 
                       onChange={e => setParticipants(Math.max(Number(pkg.max_participants), Math.min(Number(pkg.max_participants) + 10, Number(e.target.value))))} 
-                      className="w-14 md:w-16 text-center rounded-lg border border-gray-300 px-2 py-2 text-sm md:text-base font-medium text-gray-800" 
+                      className="w-12 md:w-16 text-center rounded-lg border border-gray-300 px-1 md:px-2 py-1.5 md:py-2 text-sm md:text-base font-medium text-gray-800" 
                     />
                     <button 
-                      className="w-9 h-9 md:w-10 md:h-10 rounded-lg bg-white border border-gray-300 text-gray-800 flex items-center justify-center shadow-sm text-sm md:text-base"
+                      className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-white border border-gray-300 text-gray-800 flex items-center justify-center shadow-sm text-base md:text-lg font-semibold"
                       onClick={() => setParticipants(Math.min(Number(pkg.max_participants) + 10, participants + 1))}
                     >
                       +
                     </button>
-                    <span className="text-xs md:text-sm text-gray-500 w-full sm:w-auto mt-2 sm:mt-0">
-                      Min: {pkg.max_participants} included, then ${pkg.price_per_additional} per additional
+                    <span className="text-xs text-gray-500 w-full sm:w-auto mt-1 sm:mt-0">
+                      Min: {pkg.max_participants} included, +${pkg.price_per_additional} each
                     </span>
                   </div>
                 </div>
@@ -1167,23 +1167,23 @@ const BookPackage: React.FC = () => {
                     <label className="block font-medium mb-3 text-gray-800 text-xs md:text-sm uppercase tracking-wide">Additional Attractions</label>
                     <div className="space-y-4">
                       {pkg.attractions.map((attraction) => (
-                        <div key={attraction.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg gap-4">
+                        <div key={attraction.id} className="flex items-center justify-between p-2 md:p-3 bg-gray-50 rounded-lg gap-2 md:gap-4">
                           {attraction.image && (
                             <img 
                               src={getImageUrl(attraction.image)} 
                               alt={attraction.name} 
-                              className="w-16 h-16 object-cover rounded-lg border border-gray-200 flex-shrink-0" 
+                              className="w-12 h-12 md:w-16 md:h-16 object-cover rounded-lg border border-gray-200 flex-shrink-0" 
                             />
                           )}
                           <div className="flex-1 min-w-0">
-                            <span className="font-medium text-gray-800 text-sm">{attraction.name}</span>
-                            <span className="block text-xs text-gray-500 mt-1">
+                            <span className="font-medium text-gray-800 text-xs md:text-sm block truncate">{attraction.name}</span>
+                            <span className="block text-xs text-gray-500 mt-0.5">
                               ${Number(attraction.price).toFixed(2)}
                             </span>
                           </div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
                             <button 
-                              className="w-8 h-8 rounded-md bg-white border border-gray-300 text-gray-800 flex items-center justify-center text-sm shadow-sm"
+                              className="w-7 h-7 md:w-8 md:h-8 rounded-md bg-white border border-gray-300 text-gray-800 flex items-center justify-center text-sm font-semibold shadow-sm"
                               onClick={() => handleAttractionQty(attraction.id, (selectedAttractions[attraction.id] || 0) - 1)}
                             >
                               -
@@ -1193,10 +1193,10 @@ const BookPackage: React.FC = () => {
                               min={0} 
                               value={selectedAttractions[attraction.id] || 0} 
                               onChange={e => handleAttractionQty(attraction.id, Number(e.target.value))} 
-                              className="w-12 text-center rounded-md border border-gray-300 px-1 py-1 text-sm" 
+                              className="w-10 md:w-12 text-center rounded-md border border-gray-300 px-1 py-1 text-xs md:text-sm" 
                             />
                             <button 
-                              className="w-8 h-8 rounded-md bg-white border border-gray-300 text-gray-800 flex items-center justify-center text-sm shadow-sm"
+                              className="w-7 h-7 md:w-8 md:h-8 rounded-md bg-white border border-gray-300 text-gray-800 flex items-center justify-center text-sm font-semibold shadow-sm"
                               onClick={() => handleAttractionQty(attraction.id, (selectedAttractions[attraction.id] || 0) + 1)}
                             >
                               +
@@ -1213,24 +1213,24 @@ const BookPackage: React.FC = () => {
                     <label className="block font-medium mb-3 text-gray-800 text-xs md:text-sm uppercase tracking-wide">Add-ons</label>
                     <div className="space-y-4">
                       {pkg.add_ons.map((addOn) => (
-                        <div key={addOn.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg gap-4">
+                        <div key={addOn.id} className="flex items-center justify-between p-2 md:p-3 bg-gray-50 rounded-lg gap-2 md:gap-4">
                           {/* Add-on Image */}
-                          <div className="w-16 h-16 flex-shrink-0 flex items-center justify-center bg-gray-100 rounded-md border border-gray-200 overflow-hidden">
+                          <div className="w-12 h-12 md:w-16 md:h-16 flex-shrink-0 flex items-center justify-center bg-gray-100 rounded-md border border-gray-200 overflow-hidden">
                             {addOn.image ? (
                               <img src={getImageUrl(addOn.image)} alt={addOn.name} className="object-cover w-full h-full" />
                             ) : (
                               <span className="text-gray-400 text-xs">No Image</span>
                             )}
                           </div>
-                          <div className="flex-1 flex flex-col justify-between">
-                            <span className="font-medium text-gray-800 text-sm">{addOn.name}</span>
-                            <span className="block text-xs text-gray-500 mt-1">
+                          <div className="flex-1 flex flex-col justify-between min-w-0">
+                            <span className="font-medium text-gray-800 text-xs md:text-sm block truncate">{addOn.name}</span>
+                            <span className="block text-xs text-gray-500 mt-0.5">
                               ${Number(addOn.price).toFixed(2)} each
                             </span>
                           </div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
                             <button 
-                              className="w-8 h-8 rounded-md bg-white border border-gray-300 text-gray-800 flex items-center justify-center text-sm shadow-sm"
+                              className="w-7 h-7 md:w-8 md:h-8 rounded-md bg-white border border-gray-300 text-gray-800 flex items-center justify-center text-sm font-semibold shadow-sm"
                               onClick={() => handleAddOnQty(addOn.id, (selectedAddOns[addOn.id] || 0) - 1)}
                             >
                               -
@@ -1240,10 +1240,10 @@ const BookPackage: React.FC = () => {
                               min={0} 
                               value={selectedAddOns[addOn.id] || 0} 
                               onChange={e => handleAddOnQty(addOn.id, Number(e.target.value))} 
-                              className="w-12 text-center rounded-md border border-gray-300 px-1 py-1 text-sm" 
+                              className="w-10 md:w-12 text-center rounded-md border border-gray-300 px-1 py-1 text-xs md:text-sm" 
                             />
                             <button 
-                              className="w-8 h-8 rounded-md bg-white border border-gray-300 text-gray-800 flex items-center justify-center text-sm shadow-sm"
+                              className="w-7 h-7 md:w-8 md:h-8 rounded-md bg-white border border-gray-300 text-gray-800 flex items-center justify-center text-sm font-semibold shadow-sm"
                               onClick={() => handleAddOnQty(addOn.id, (selectedAddOns[addOn.id] || 0) + 1)}
                             >
                               +
@@ -1315,7 +1315,10 @@ const BookPackage: React.FC = () => {
                 <div className="flex justify-end pt-4">
                   <button 
                     className={`py-2.5 md:py-3 px-4 md:px-6 rounded-lg font-medium transition shadow-sm flex items-center text-sm md:text-base ${(!selectedRoomId || !selectedTime) ? 'bg-gray-300 text-gray-400 cursor-not-allowed' : 'bg-blue-800 text-white hover:bg-blue-800'}`}
-                    onClick={() => setCurrentStep(2)}
+                    onClick={() => {
+                      setCurrentStep(2);
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
                     disabled={!selectedRoomId || !selectedTime}
                   >
                     Continue to Personal Info
@@ -1521,7 +1524,10 @@ const BookPackage: React.FC = () => {
                 <div className="flex justify-between pt-6 gap-2">
                   <button 
                     className="py-2.5 md:py-3 px-4 md:px-6 rounded-lg bg-gray-200 text-gray-800 font-medium hover:bg-gray-300 transition flex items-center text-sm md:text-base"
-                    onClick={() => setCurrentStep(1)}
+                    onClick={() => {
+                      setCurrentStep(1);
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
                   >
                     <svg className="mr-1 md:mr-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"></path>
@@ -1530,7 +1536,10 @@ const BookPackage: React.FC = () => {
                   </button>
                   <button 
                     className={`py-2.5 md:py-3 px-4 md:px-6 rounded-lg font-medium transition shadow-sm flex items-center text-sm md:text-base ${(!form.firstName || !form.lastName || !form.email || !form.phone || !form.address || !form.city || !form.state || !form.zip || !form.country) ? 'bg-gray-300 text-gray-400 cursor-not-allowed' : 'bg-blue-800 text-white hover:bg-blue-800'}`}
-                    onClick={() => setCurrentStep(3)}
+                    onClick={() => {
+                      setCurrentStep(3);
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
                     disabled={!form.firstName || !form.lastName || !form.email || !form.phone || !form.address || !form.city || !form.state || !form.zip || !form.country}
                   >
                     Continue to Payment
@@ -1708,7 +1717,10 @@ const BookPackage: React.FC = () => {
                 <div className="flex justify-between pt-6 gap-2">
                   <button 
                     className="py-2.5 md:py-3 px-4 md:px-6 rounded-lg bg-gray-200 text-gray-800 font-medium hover:bg-gray-300 transition flex items-center text-sm md:text-base"
-                    onClick={() => setCurrentStep(2)}
+                    onClick={() => {
+                      setCurrentStep(2);
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
                   >
                     <svg className="mr-1 md:mr-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"></path>
