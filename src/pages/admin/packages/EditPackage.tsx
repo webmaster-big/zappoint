@@ -624,6 +624,18 @@ const EditPackage: React.FC = () => {
         return slots;
     };
 
+    // Loading state
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center min-h-screen">
+                <div className="text-center">
+                    <div className={`animate-spin rounded-full h-16 w-16 border-b-4 border-${fullColor} mx-auto mb-4`}></div>
+                    <p className="text-gray-600 text-lg font-medium">Loading package data...</p>
+                </div>
+            </div>
+        );
+    }
+
     // Not found state
     if (notFound) {
         return (
@@ -955,9 +967,9 @@ const EditPackage: React.FC = () => {
                                 )}
                                 
                                 {/* Time Slot Configuration */}
-                                <div className="mt-6 border-t border-gray-200 pt-6">
-                                    <h4 className="text-lg font-semibold mb-4 text-neutral-900 flex items-center gap-2">
-                                        <Clock className={`w-5 h-5 text-${themeColor}-600`} /> Time Slot Configuration
+                                <div className={`mt-6 border-t border-${themeColor}-200 pt-6`}>
+                                    <h4 className={`text-lg font-semibold mb-4 text-${fullColor} flex items-center gap-2`}>
+                                        <Clock className={`w-5 h-5 text-${fullColor}`} /> Time Slot Configuration
                                     </h4>
                                     <p className="text-sm text-gray-500 mb-4">Configure the available booking time slots for this package.</p>
                                     
@@ -1007,23 +1019,23 @@ const EditPackage: React.FC = () => {
                                     
                                     {/* Time Slot Preview */}
                                     {form.duration && (
-                                        <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                                            <h4 className="text-sm font-semibold text-blue-900 mb-3 flex items-center gap-2">
+                                        <div className={`mt-6 p-4 bg-${themeColor}-50 rounded-lg border border-${themeColor}-200`}>
+                                            <h4 className={`text-sm font-semibold text-${fullColor} mb-3 flex items-center gap-2`}>
                                                 <Clock className="w-4 h-4" />
                                                 Generated Time Slots Preview
                                             </h4>
                                             {generateTimeSlots().length > 0 ? (
                                                 <>
-                                                    <p className="text-xs text-blue-700 mb-3">
+                                                    <p className={`text-xs text-${themeColor}-700 mb-3`}>
                                                         {generateTimeSlots().length} slot(s) available based on your configuration
                                                     </p>
                                                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-60 overflow-y-auto">
                                                         {generateTimeSlots().map((slot, idx) => (
                                                             <div
                                                                 key={idx}
-                                                                className="bg-white px-3 py-2 rounded border border-blue-300 text-center"
+                                                                className={`bg-white px-3 py-2 rounded border border-${themeColor}-300 text-center`}
                                                             >
-                                                                <div className="text-sm font-semibold text-blue-900">
+                                                                <div className={`text-sm font-semibold text-${fullColor}`}>
                                                                     {formatTimeTo12Hour(slot.start_time)}
                                                                 </div>
                                                               
@@ -1032,7 +1044,7 @@ const EditPackage: React.FC = () => {
                                                     </div>
                                                 </>
                                             ) : (
-                                                <p className="text-xs text-blue-700">
+                                                <p className={`text-xs text-${themeColor}-700`}>
                                                     No available slots - check if duration fits within the time range
                                                 </p>
                                             )}
