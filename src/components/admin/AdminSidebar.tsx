@@ -231,6 +231,9 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
   const [searchSuggestions, setSearchSuggestions] = useState<{ label: string; href: string; description?: string; fragmentId?: string }[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
+  
+  // Sidebar layout preference
+  const [sidebarLayout, setSidebarLayout] = useState<'dropdown' | 'grouped'>('dropdown');
 
   // Unread notifications count from localStorage (zapzone_notifications)
   const [unreadNotifications, setUnreadNotifications] = useState<number>(0);
@@ -460,6 +463,26 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
       getUnreadCount().then(count => setUnreadNotifications(count));
     }
   }, [isOpen]);
+  
+  // Load and listen for sidebar layout changes
+  useEffect(() => {
+    const savedLayout = localStorage.getItem('zapzone_sidebar_layout');
+    if (savedLayout === 'dropdown' || savedLayout === 'grouped') {
+      setSidebarLayout(savedLayout);
+    }
+    
+    const handleLayoutChange = () => {
+      const newLayout = localStorage.getItem('zapzone_sidebar_layout');
+      if (newLayout === 'dropdown' || newLayout === 'grouped') {
+        setSidebarLayout(newLayout);
+      }
+    };
+    
+    window.addEventListener('zapzone_sidebar_layout_changed', handleLayoutChange);
+    return () => {
+      window.removeEventListener('zapzone_sidebar_layout_changed', handleLayoutChange);
+    };
+  }, []);
 
   useEffect(() => {
     // Close sidebar when clicking outside on mobile
@@ -485,7 +508,34 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
   }, [isOpen, setIsOpen, showProfileDropdown, showSuggestions]);
 
   if (!user) return null;
-  const navigation = getNavigation(user.role);
+  let navigation = getNavigation(user.role);
+  
+  // Transform navigation for grouped layout
+  if (sidebarLayout === 'grouped') {
+    const groupedNav: NavItem[] = [];
+    
+    navigation.forEach(item => {
+      if (item.items && item.items.length > 0) {
+        // Add section header
+        groupedNav.push({
+          label: item.label,
+          icon: item.icon,
+          isGroupHeader: true
+        });
+        // Add flat items
+        item.items.forEach(subItem => {
+          groupedNav.push({
+            ...subItem,
+            isGrouped: true
+          });
+        });
+      } else {
+        groupedNav.push(item);
+      }
+    });
+    
+    navigation = groupedNav;
+  }
 
   // Flatten all links for search (role-based)
   const getAllLinks = (nav: NavItem[]): { label: string; href: string; description?: string; fragmentId?: string }[] => {
@@ -531,6 +581,15 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
   };
 
   const NavItemComponent: React.FC<{ item: NavItem; depth?: number }> = ({ item, depth = 0 }) => {
+    // Handle group headers for grouped layout
+    if (item.isGroupHeader && sidebarLayout === 'grouped' && !isMinimized) {
+      return (
+        <div className="px-2 pt-4 pb-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+          {item.label}
+        </div>
+      );
+    }
+    
     const hasItems = item.items && item.items.length > 0;
     // Check if any child is active
     const isChildActive = hasItems && item.items!.some(child => child.href && location.pathname === child.href);
@@ -611,7 +670,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
         ) : item.href ? (
           <Link
             to={item.href}
-            className={`flex items-center p-2 rounded-lg transition-colors ${isActive ? `bg-${themeColor}-100 text-${fullColor} font-semibold` : 'hover:bg-gray-100 text-gray-800'} ${depth > 0 ? 'pl-5' : ''} ${isMinimized && depth === 0 ? 'justify-center' : ''}`}
+            className={`flex items-center p-2 rounded-lg transition-colors ${isActive ? `bg-${themeColor}-100 text-${fullColor} font-semibold` : 'hover:bg-gray-100 text-gray-800'} ${depth > 0 || item.isGrouped ? 'pl-5' : ''} ${isMinimized && depth === 0 ? 'justify-center' : ''}`}
             onClick={handleNavClick}
             onMouseEnter={handleMouseEnter}
             onMouseLeave={() => isMinimized && depth === 0 && setShowTooltip(false)}

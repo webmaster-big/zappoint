@@ -7,6 +7,8 @@ export interface NavItem {
   items?: NavItem[];
   section?: string;
   description?: string;
+  isGroupHeader?: boolean;
+  isGrouped?: boolean;
 }
 
 export interface UserData {
