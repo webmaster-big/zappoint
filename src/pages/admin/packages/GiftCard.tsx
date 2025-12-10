@@ -237,59 +237,75 @@ const GiftCard: React.FC = () => {
   });
 
   return (
-      <div className="w-full mx-auto px-4 pb-6 flex flex-col items-center">
-        <div className="bg-white rounded-xl p-6 w-full shadow-sm border border-gray-100 mt-8">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-            <div>
-              <h2 className="text-2xl font-semibold text-gray-900">Gift Cards</h2>
-              <p className="text-gray-500 mt-1">Create and manage gift cards for your customers</p>
-            </div>
+      <div className="w-full mx-auto px-4 sm:px-6 pb-6">
+        {/* Page Header */}
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-gray-900">Gift Cards</h1>
+          <p className="text-gray-600 mt-1">Create and manage gift cards for your customers</p>
+        </div>
+
+        {/* Action Bar */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
+          <div className="flex justify-end">
             <button
-              className={`bg-${fullColor} text-white rounded-lg px-4 py-2.5 flex items-center gap-2 hover:bg-${themeColor}-900 transition-colors shadow-sm`}
+              className={`bg-${fullColor} text-white rounded-lg px-5 py-2 flex items-center gap-2 hover:bg-${themeColor}-900 transition-colors font-semibold`}
               onClick={() => setShowModal(true)}
             >
-              <Plus className="w-5 h-5" /> New Gift Card
+              <Plus className="w-5 h-5" /> Create Gift Card
             </button>
           </div>
+        </div>
+
+        {/* Main Content */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
 
           {/* Filter Section */}
-          <div className="mb-6 flex flex-wrap gap-2">
-            <button 
-              className={`px-3 py-1.5 rounded-full text-sm ${filterStatus === "all" ? `bg-${themeColor}-100 text-${fullColor}` : "bg-gray-100 text-gray-800"}`}
-              onClick={() => setFilterStatus("all")}
-            >
-              All
-            </button>
-            <button 
-              className={`px-3 py-1.5 rounded-full text-sm ${filterStatus === "active" ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"}`}
-              onClick={() => setFilterStatus("active")}
-            >
-              Active
-            </button>
-            <button 
-              className={`px-3 py-1.5 rounded-full text-sm ${filterStatus === "inactive" ? "bg-gray-100 text-gray-800" : "bg-gray-100 text-gray-800"}`}
-              onClick={() => setFilterStatus("inactive")}
-            >
-              Inactive
-            </button>
-            <button 
-              className={`px-3 py-1.5 rounded-full text-sm ${filterStatus === "expired" ? "bg-red-100 text-red-800" : "bg-gray-100 text-gray-800"}`}
-              onClick={() => setFilterStatus("expired")}
-            >
-              Expired
-            </button>
+          <div className="mb-6 space-y-4">
+            <div className="flex flex-wrap gap-2">
+              <button 
+                className={`px-3 py-1.5 rounded-full text-sm transition-colors ${filterStatus === "all" ? `bg-${fullColor} text-white` : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+                onClick={() => setFilterStatus("all")}
+              >
+                All
+              </button>
+              <button 
+                className={`px-3 py-1.5 rounded-full text-sm transition-colors ${filterStatus === "active" ? `bg-${fullColor} text-white` : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+                onClick={() => setFilterStatus("active")}
+              >
+                Active
+              </button>
+              <button 
+                className={`px-3 py-1.5 rounded-full text-sm transition-colors ${filterStatus === "inactive" ? `bg-${fullColor} text-white` : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+                onClick={() => setFilterStatus("inactive")}
+              >
+                Inactive
+              </button>
+              <button 
+                className={`px-3 py-1.5 rounded-full text-sm transition-colors ${filterStatus === "expired" ? `bg-${fullColor} text-white` : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+                onClick={() => setFilterStatus("expired")}
+              >
+                Expired
+              </button>
+            </div>
+            <div className="text-sm text-gray-500">
+              Showing {filteredGiftCards.length} gift card{filteredGiftCards.length !== 1 ? 's' : ''}
+            </div>
           </div>
 
           {/* Gift Cards Grid */}
-          {filteredGiftCards.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {loading ? (
+            <div className="flex justify-center items-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-300"></div>
+            </div>
+          ) : filteredGiftCards.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {filteredGiftCards.map((gc, i) => {
                 const isExpired = gc.expiry_date && new Date(gc.expiry_date) < new Date();
                 const status = isExpired ? 'inactive' : gc.status;
                 const originalIndex = giftCards.findIndex(card => card.code === gc.code);
                 
                 return (
-                  <div key={i} className="border border-gray-200 rounded-xl p-5 hover:shadow-md transition-shadow">
+                  <div key={i} className="border-2 border-gray-200 rounded-lg p-4 hover:shadow-lg hover:scale-105 hover:border-gray-300 transition-all bg-white">
                     <div className="flex justify-between items-start mb-4">
                       <div className="flex items-center gap-2">
                         <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${getStatusColor(status)}`}>
@@ -385,20 +401,24 @@ const GiftCard: React.FC = () => {
               })}
             </div>
           ) : (
-            <div className="text-center py-12 border border-dashed border-gray-300 rounded-xl">
-              <div className="text-gray-400 mb-2">No gift cards found</div>
-              <p className="text-gray-500 text-sm mb-4">Create your first gift card to get started</p>
+            <div className="flex flex-col items-center py-16">
+              <div className={`w-16 h-16 rounded-full bg-${themeColor}-100 flex items-center justify-center mb-4`}>
+                <Plus className={`w-8 h-8 text-${fullColor}`} />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">No gift cards found</h3>
+              <p className="text-gray-600 text-sm mb-6 text-center max-w-sm">Create your first gift card to get started</p>
               <button
-                className={`bg-${fullColor} text-white rounded-lg px-4 py-2 flex items-center gap-2 hover:bg-${themeColor}-900 transition-colors mx-auto shadow-sm`}
+                className={`bg-${fullColor} text-white rounded-lg px-6 py-2.5 flex items-center gap-2 hover:bg-${themeColor}-700 transition-colors font-semibold`}
                 onClick={() => setShowModal(true)}
               >
-                <Plus className="w-4 h-4" /> Create Gift Card
+                <Plus className="w-5 h-5" /> Create Gift Card
               </button>
             </div>
           )}
         </div>
-        {/* Create Modal */}
-        {showModal && (
+
+      {/* Create Modal */}
+      {showModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 ">
             <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-md relative animate-fade-in-up border border-gray-200 m-4">
               <button className="absolute top-4 right-4 p-1 rounded-lg hover:bg-gray-100" onClick={() => setShowModal(false)}>

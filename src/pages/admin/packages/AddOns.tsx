@@ -406,43 +406,49 @@ const ManageAddons = () => {
   }
 
   return (
-    <div className="w-full mx-auto px-4 pb-6 flex flex-col items-center">
-      <div className="bg-white rounded-xl p-6 w-full shadow-sm border border-gray-100 mt-8 animate-fade-in">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-          <div>
-            <h2 className="text-2xl font-semibold text-gray-900">Manage Add-ons</h2>
-            <p className="text-gray-500 mt-1">Food, beverage and other items for your attractions</p>
-          </div>
+    <div className="w-full mx-auto px-4 sm:px-6 pb-6">
+      {/* Page Header */}
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">Add-ons</h1>
+        <p className="text-gray-600 mt-1">Food, beverage and other items for your attractions</p>
+      </div>
+
+      {/* Action Bar */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
           <div className="flex gap-2">
             <button
-              className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-semibold whitespace-nowrap flex items-center gap-2"
+              className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg font-semibold whitespace-nowrap flex items-center gap-2 transition-colors"
               onClick={() => setShowImportModal(true)}
             >
               <Upload size={18} />
               Import
             </button>
             <button
-              className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-semibold whitespace-nowrap flex items-center gap-2"
+              className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg font-semibold whitespace-nowrap flex items-center gap-2 transition-colors"
               onClick={handleOpenExportModal}
               disabled={addons.length === 0}
             >
               <Download size={18} />
               Export
             </button>
-            <button
-              onClick={() => setShowModal(true)}
-              className={`bg-${fullColor} hover:bg-${themeColor}-900 text-white px-6 py-2 rounded-lg font-semibold whitespace-nowrap inline-flex items-center gap-2`}
-            >
-              <Plus className="h-5 w-5" />
-              Add New Add-on
-            </button>
           </div>
+          <button
+            onClick={() => setShowModal(true)}
+            className={`bg-${fullColor} hover:bg-${themeColor}-900 text-white px-5 py-2 rounded-lg font-semibold whitespace-nowrap inline-flex items-center gap-2 transition-colors`}
+          >
+            <Plus className="h-5 w-5" />
+            Create Add-on
+          </button>
         </div>
+      </div>
 
-        {/* Search Bar and Location Filter */}
-        <div className="mb-6">
-          <div className="flex flex-col sm:flex-row gap-3 mb-4">
+      {/* Main Content */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+
+        {/* Search and Filter Section */}
+        <div className="mb-6 space-y-4">
+          <div className="flex flex-col sm:flex-row gap-3">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
               <input
@@ -484,37 +490,40 @@ const ManageAddons = () => {
         </div>
 
         {/* Add-ons Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6">
-          {currentAddons.length === 0 ? (
-            <div className="col-span-full text-center py-12 border border-dashed border-gray-300 rounded-xl bg-gray-50">
-              <div className={`inline-flex p-4 rounded-full bg-${themeColor}-50 mb-4`}>
-                <Utensils className={`h-12 w-12 text-${themeColor}-400`} />
-              </div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No add-ons found</h3>
-              <p className="text-gray-500 mb-4">
-                {searchTerm ? `No add-ons match "${searchTerm}"` : 'Get started by creating your first add-on'}
-              </p>
-              {searchTerm && (
-                <button
-                  className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-6 py-2 rounded-lg font-semibold mr-2"
-                  onClick={() => setSearchTerm("")}
-                >
-                  Clear Search
-                </button>
-              )}
-              <button
-                onClick={() => setShowModal(true)}
-                className={`bg-${themeColor}-700 hover:bg-${fullColor} text-white px-6 py-2 rounded-lg font-semibold`}
-              >
-                Create Add-on
-              </button>
+        {loading ? (
+          <div className="flex justify-center items-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-300"></div>
+          </div>
+        ) : currentAddons.length === 0 ? (
+          <div className="flex flex-col items-center py-16">
+            <div className={`w-16 h-16 rounded-full bg-${themeColor}-100 flex items-center justify-center mb-4`}>
+              <Utensils className={`w-8 h-8 text-${fullColor}`} />
             </div>
-          ) : (
-            currentAddons.map((addon, index) => (
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">No add-ons found</h3>
+            <p className="text-gray-600 text-sm mb-6 text-center max-w-sm">
+              {searchTerm ? `No add-ons match "${searchTerm}"` : 'Get started by creating your first add-on'}
+            </p>
+            {searchTerm && (
+              <button
+                className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-6 py-2.5 rounded-lg font-semibold mr-2 transition-colors"
+                onClick={() => setSearchTerm("")}
+              >
+                Clear Search
+              </button>
+            )}
+            <button
+              onClick={() => setShowModal(true)}
+              className={`bg-${fullColor} hover:bg-${themeColor}-700 text-white px-6 py-2.5 rounded-lg font-semibold transition-colors`}
+            >
+              Create Add-on
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {currentAddons.map((addon) => (
               <div 
                 key={addon.id} 
-                className="border border-gray-200 rounded-xl overflow-hidden hover:shadow-md transition-all duration-300 animate-fade-in-up"
-                style={{ animationDelay: `${index * 0.05}s` }}
+                className="border-2 border-gray-200 rounded-lg overflow-hidden hover:shadow-lg hover:scale-105 hover:border-gray-300 transition-all bg-white"
               >
                 <div className="h-40 bg-gradient-to-br from-gray-50 to-gray-100 relative">
                   {addon.image ? (
@@ -533,39 +542,41 @@ const ManageAddons = () => {
                   )}
                 </div>
                 <div className="p-4">
-                  <h3 className="font-semibold text-gray-900 text-base mb-3">{addon.name}</h3>
+                  <h3 className="font-semibold text-base text-gray-900 mb-1 truncate">{addon.name}</h3>
                   {/* Location */}
                   {addon.location && (
-                    <div className="text-sm text-gray-500 mb-2 flex items-center gap-1">
+                    <div className="text-xs text-gray-500 mb-3">
                       {addon.location.name}
                     </div>
                   )}
-                  <div className="flex justify-between items-center">
-                    <span className={`text-lg font-semibold text-${fullColor}`}>
-                      ${Number(addon.price).toFixed(2)}
-                    </span>
-                    <div className="flex gap-2">
+                  <div className="mt-3 pt-3 border-t border-gray-100">
+                    <div className="flex justify-between items-center mb-3">
+                      <span className="text-lg font-bold text-gray-900">
+                        ${Number(addon.price).toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="flex gap-1">
                       <button
                         onClick={() => handleEdit(addon)}
-                        className={`p-2 text-gray-600 hover:text-${themeColor}-700 hover:bg-${themeColor}-50 rounded-lg transition-colors`}
+                        className={`p-1.5 text-${fullColor} hover:bg-${themeColor}-100 rounded transition-colors`}
                         title="Edit add-on"
                       >
-                        <Edit className="h-4 w-4" />
+                        <Edit className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => handleDelete(addon.id)}
-                        className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        className="p-1.5 text-red-500 hover:bg-red-50 rounded transition-colors"
                         title="Delete add-on"
                       >
-                        <Trash2 className="h-4 w-4" />
+                        <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
                   </div>
                 </div>
               </div>
-            ))
-          )}
-        </div>
+            ))}
+          </div>
+        )}
 
         {/* Pagination */}
         {totalPages > 1 && (
@@ -639,8 +650,9 @@ const ManageAddons = () => {
             </div>
           </div>
         )}
+      </div>
 
-        {/* Add/Edit Modal */}
+      {/* Add/Edit Modal */}
         {showModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-backdrop-fade">
             <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-xl animate-scale-in">
@@ -939,17 +951,16 @@ const ManageAddons = () => {
           </div>
         )}
 
-        {/* Toast Notification */}
-        {toast && (
-          <div className="fixed top-4 right-4 z-50 animate-slide-in-right">
-            <Toast 
-              message={toast.message} 
-              type={toast.type} 
-              onClose={() => setToast(null)} 
-            />
-          </div>
-        )}
-      </div>
+      {/* Toast Notification */}
+      {toast && (
+        <div className="fixed top-4 right-4 z-50 animate-slide-in-right">
+          <Toast 
+            message={toast.message} 
+            type={toast.type} 
+            onClose={() => setToast(null)} 
+          />
+        </div>
+      )}
     </div>
   );
 };

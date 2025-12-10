@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Edit2, Trash2, Users, MapPin, CheckSquare, Square } from 'lucide-react';
+import { Search, Edit2, Trash2, Users, MapPin, CheckSquare, Square, Plus, X } from 'lucide-react';
 import Toast from '../../../components/ui/Toast';
 import { roomService } from '../../../services';
 import type { Room, RoomFilters } from '../../../services/RoomService';
@@ -335,71 +335,69 @@ const Rooms: React.FC = () => {
 
     return (
         <div className="w-full mx-auto px-4 sm:px-6 pb-6">
-            {/* Page Header */}
-            <div className="mb-6">
-                <h1 className="text-2xl font-bold text-gray-900">Rooms</h1>
-                <p className="text-gray-600 mt-1">Manage your facility rooms and their availability</p>
-            </div>
-
-            {/* Action Bar */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                    <div className="flex gap-2">
-                        {rooms.length > 0 && (
-                            <button
-                                onClick={toggleSelectionMode}
-                                className={`${
-                                    selectionMode 
-                                        ? 'bg-gray-500 hover:bg-gray-600' 
-                                        : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
-                                } text-white px-4 py-2 rounded-lg font-semibold whitespace-nowrap transition-colors`}
-                            >
-                                {selectionMode ? 'Cancel' : 'Select'}
-                            </button>
-                        )}
+            {/* Page Header with Action Buttons */}
+            <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                    <h1 className="text-2xl font-bold text-gray-900">Rooms</h1>
+                    <p className="text-gray-600 mt-1">Manage your facility rooms and their availability</p>
+                </div>
+                <div className="flex items-center gap-2">
+                    {rooms.length > 0 && (
                         <button
-                            onClick={() => {
-                                resetForm();
-                                setShowCreateModal(true);
-                            }}
-                            className={`bg-${fullColor} hover:bg-${themeColor}-900 text-white px-5 py-2 rounded-lg font-semibold whitespace-nowrap transition-colors`}
+                            onClick={toggleSelectionMode}
+                            className={`${
+                                selectionMode 
+                                    ? 'bg-gray-500 hover:bg-gray-600' 
+                                    : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+                            } text-white px-4 py-2 rounded-lg font-semibold whitespace-nowrap transition-colors flex items-center gap-2`}
                         >
-                            Create Room
+                            {selectionMode ? <X className="w-4 h-4" /> : <CheckSquare className="w-4 h-4" />}
+                            {selectionMode ? 'Cancel' : 'Select Rooms'}
                         </button>
-                    </div>
+                    )}
+                    <button
+                        onClick={() => {
+                            resetForm();
+                            setShowCreateModal(true);
+                        }}
+                        className={`bg-${fullColor} hover:bg-${themeColor}-900 text-white px-5 py-2 rounded-lg font-semibold whitespace-nowrap transition-colors flex items-center gap-2`}
+                    >
+                        <Plus className="w-5 h-5" />
+                        Create Room
+                    </button>
                 </div>
             </div>
 
             {/* Main Content */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                {/* Bulk Actions Bar */}
+                {/* Selection Info Bar */}
                 {selectionMode && rooms.length > 0 && (
-                    <div className={`mb-4 p-4 bg-${themeColor}-50 border border-${themeColor}-200 rounded-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3`}>
-                        <div className="flex items-center gap-3">
-                            <button
-                                onClick={selectAllRooms}
-                                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                                    selectedRoomIds.size === rooms.length
-                                        ? `bg-${fullColor} text-white`
-                                        : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
-                                }`}
-                            >
-                                {selectedRoomIds.size === rooms.length ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
-                                {selectedRoomIds.size === rooms.length ? 'Deselect All' : 'Select All'}
-                            </button>
-                            <span className="text-sm text-gray-700 font-medium">
+                    <div className={`mb-4 p-3 bg-${themeColor}-50 border border-${themeColor}-200 rounded-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3`}>
+                        <div className="flex items-center gap-3 flex-wrap">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={selectedRoomIds.size === rooms.length}
+                                    onChange={selectAllRooms}
+                                    className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                />
+                                <span className="text-sm font-medium text-gray-700">
+                                    Select All
+                                </span>
+                            </label>
+                            <span className="text-sm text-gray-600">
                                 {selectedRoomIds.size} room{selectedRoomIds.size !== 1 ? 's' : ''} selected
                             </span>
+                            {selectedRoomIds.size > 0 && (
+                                <button
+                                    onClick={handleBulkDelete}
+                                    className="text-sm text-red-600 hover:text-red-700 font-medium flex items-center gap-1"
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                    Delete {selectedRoomIds.size} room{selectedRoomIds.size !== 1 ? 's' : ''}
+                                </button>
+                            )}
                         </div>
-                        {selectedRoomIds.size > 0 && (
-                            <button
-                                onClick={handleBulkDelete}
-                                className="flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-medium transition-colors"
-                            >
-                                <Trash2 className="w-4 h-4" />
-                                Delete Selected
-                            </button>
-                        )}
                     </div>
                 )}
 

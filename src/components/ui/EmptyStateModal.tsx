@@ -10,7 +10,7 @@ interface EmptyStateModalProps {
 }
 
 const EmptyStateModal: React.FC<EmptyStateModalProps> = ({ type, isOpen, onClose }) => {
-  const { fullColor } = useThemeColor();
+  const { themeColor, fullColor } = useThemeColor();
 
   if (!isOpen) return null;
 
@@ -26,32 +26,18 @@ const EmptyStateModal: React.FC<EmptyStateModalProps> = ({ type, isOpen, onClose
   const secondaryText = isPackages ? 'View Packages' : 'View Attractions';
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[9999] animate-fadeIn">
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-[9999] animate-fadeIn">
       <div 
         className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden animate-slideUp"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header with gradient background */}
-        <div 
-          className="relative px-5 py-6 text-center"
-          style={{
-            background: `linear-gradient(135deg, ${fullColor}10 0%, ${fullColor}05 100%)`
-          }}
-        >
+        <div className={`relative px-5 py-6 text-center bg-${themeColor}-50`}>
           {/* Animated icon container */}
           <div className="relative inline-block">
-            <div 
-              className="absolute inset-0 rounded-full animate-ping opacity-20"
-              style={{ backgroundColor: fullColor }}
-            />
-            <div 
-              className="relative w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3"
-              style={{
-                background: `linear-gradient(135deg, ${fullColor}20 0%, ${fullColor}10 100%)`,
-                boxShadow: `0 8px 24px ${fullColor}30`
-              }}
-            >
-              <Icon size={28} style={{ color: fullColor }} strokeWidth={2} />
+            <div className={`absolute inset-0 rounded-full animate-ping opacity-20 bg-${fullColor}`} />
+            <div className={`relative w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3 bg-${themeColor}-100 shadow-lg`}>
+              <Icon size={28} className={`text-${fullColor}`} strokeWidth={2} />
             </div>
           </div>
 
@@ -63,17 +49,10 @@ const EmptyStateModal: React.FC<EmptyStateModalProps> = ({ type, isOpen, onClose
         {/* Body */}
         <div className="px-5 py-5">
           {/* Info alert */}
-          <div 
-            className="flex gap-2.5 p-3 rounded-lg mb-5"
-            style={{
-              background: `linear-gradient(135deg, ${fullColor}08 0%, ${fullColor}04 100%)`,
-              border: `1px solid ${fullColor}20`
-            }}
-          >
+          <div className={`flex gap-2.5 p-3 rounded-lg mb-5 bg-${themeColor}-50 border border-${themeColor}-200`}>
             <AlertCircle 
               size={20} 
-              className="flex-shrink-0 mt-0.5" 
-              style={{ color: fullColor }}
+              className={`flex-shrink-0 mt-0.5 text-${fullColor}`}
             />
             <p className="text-sm text-gray-700 leading-relaxed">
               {description}
@@ -85,10 +64,7 @@ const EmptyStateModal: React.FC<EmptyStateModalProps> = ({ type, isOpen, onClose
             <Link
               to={actionLink}
               onClick={onClose}
-              className="block w-full text-center px-5 py-2.5 text-white font-semibold rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
-              style={{
-                background: `linear-gradient(135deg, ${fullColor} 0%, ${fullColor}dd 100%)`,
-              }}
+              className={`block w-full text-center px-5 py-2.5 bg-${fullColor} hover:bg-${themeColor}-900 text-white font-semibold rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5`}
             >
               {actionText}
             </Link>
@@ -96,12 +72,7 @@ const EmptyStateModal: React.FC<EmptyStateModalProps> = ({ type, isOpen, onClose
             <Link
               to={secondaryLink}
               onClick={onClose}
-              className="block w-full text-center px-5 py-2.5 font-medium rounded-lg transition-all duration-200 border-2"
-              style={{
-                color: fullColor,
-                borderColor: `${fullColor}40`,
-                backgroundColor: 'white'
-              }}
+              className={`block w-full text-center px-5 py-2.5 text-${fullColor} border-2 border-${themeColor}-300 bg-white hover:bg-${themeColor}-50 font-medium rounded-lg transition-all duration-200`}
             >
               {secondaryText}
             </Link>
