@@ -16,7 +16,19 @@ import {
   Moon,
   Sun,
   LogOut,
-  X
+  X,
+  CalendarDays,
+  List,
+  Plus,
+  ScanLine,
+  ShoppingCart,
+  PieChart,
+  DoorOpen,
+  UtensilsCrossed,
+  Tag,
+  Gift,
+  FileText,
+  UserCog
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -103,110 +115,104 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
   switch(role) {
     case 'attendant':
       roleNavigation = [
-        { label: 'Dashboard', icon: Home, href: '/attendant/dashboard' },
-        { label: 'Attractions', icon: Ticket, items: [
-          { label: 'Manage Attractions', href: '/attractions', icon: Dot },
-          { label: 'Create Attractions', href: '/attractions/create', icon: Dot },
-          { label: 'Manage Purchases', href: '/attractions/purchases', icon: Dot },
-          { label: 'Create Purchase', href: '/attractions/purchases/create', icon: Dot },
-          { label: 'Check-in Scanner', href: '/attractions/check-in', icon: Dot }
+        { label: 'Dashboard', icon: Home, href: '/attendant/dashboard', section: 'General' },
+        { label: 'Attractions', icon: Ticket, section: 'Attractions', items: [
+          { label: 'Manage Attractions', href: '/attractions', icon: List },
+          { label: 'Create Attractions', href: '/attractions/create', icon: Plus },
+          { label: 'Manage Purchases', href: '/attractions/purchases', icon: ShoppingCart },
+          { label: 'Create Purchase', href: '/attractions/purchases/create', icon: Plus },
+          { label: 'Check-in Scanner', href: '/attractions/check-in', icon: ScanLine }
         ]},
-        { label: 'Bookings', icon: Calendar, items: [
-          { label: 'Calendar View', href: '/bookings/calendar', icon: Dot },
-          { label: 'Manage Bookings', href: '/bookings', icon: Dot },
-          { label: 'Create Bookings', href: '/bookings/create', icon: Dot },
-          { label: 'Check-in Scanner', href: '/bookings/check-in', icon: Dot }
+        { label: 'Bookings', icon: Calendar, section: 'Bookings', items: [
+          { label: 'Calendar View', href: '/bookings/calendar', icon: CalendarDays },
+          { label: 'Manage Bookings', href: '/bookings', icon: List },
+          { label: 'Create Bookings', href: '/bookings/create', icon: Plus },
+          { label: 'Check-in Scanner', href: '/bookings/check-in', icon: ScanLine }
         ]},
-        { label: 'Packages', icon: Package, items: [
-          { label: 'Manage Packages', href: '/packages', icon: Dot },
-          { label: 'Create Package', href: '/packages/create', icon: Dot },
-          { label: 'Rooms', href: '/packages/rooms', icon: Dot },
-          { label: 'Add-ons', href: '/packages/add-ons', icon: Dot },
-          { label: 'Promos', href: '/packages/promos', icon: Dot },
-          { label: 'Gift Cards', href: '/packages/gift-cards', icon: Dot }
+        { label: 'Packages', icon: Package, section: 'Packages', items: [
+          { label: 'Manage Packages', href: '/packages', icon: List },
+          { label: 'Create Package', href: '/packages/create', icon: Plus },
+          { label: 'Rooms', href: '/packages/rooms', icon: DoorOpen },
+          { label: 'Add-ons', href: '/packages/add-ons', icon: UtensilsCrossed },
+          { label: 'Promos', href: '/packages/promos', icon: Tag },
+          { label: 'Gift Cards', href: '/packages/gift-cards', icon: Gift }
         ]},
-        // { label: 'Customers', icon: Users, items: [
-        //   { label: 'Customer Analytics', href: '/customers/analytics', icon: Dot },
-        //   { label: 'Customers', href: '/customers', icon: Dot }
-        // ]},
-        { label: 'Profile', icon: User, href: '/attendant/profile' },
-        { label: 'Settings', icon: Settings, href: '/attendant/settings' }
+        { label: 'Profile', icon: User, href: '/attendant/profile', section: 'Account' },
+        { label: 'Settings', icon: Settings, href: '/attendant/settings', section: 'Account' }
       ];
       break;
     case 'location_manager':
       roleNavigation = [
-        { label: 'Dashboard', icon: Home, href: '/manager/dashboard' },
-        { label: 'Attractions', icon: Ticket, items: [
-          { label: 'Manage Attractions', href: '/attractions', icon: Dot },
-          { label: 'Create Attractions', href: '/attractions/create', icon: Dot },
-          { label: 'Manage Purchases', href: '/attractions/purchases', icon: Dot },
-          { label: 'Create Purchase', href: '/attractions/purchases/create', icon: Dot },
-          { label: 'Check-in Scanner', href: '/attractions/check-in', icon: Dot }
+        { label: 'Dashboard', icon: Home, href: '/manager/dashboard', section: 'General' },
+        { label: 'Attractions', icon: Ticket, section: 'Attractions', items: [
+          { label: 'Manage Attractions', href: '/attractions', icon: List },
+          { label: 'Create Attractions', href: '/attractions/create', icon: Plus },
+          { label: 'Manage Purchases', href: '/attractions/purchases', icon: ShoppingCart },
+          { label: 'Create Purchase', href: '/attractions/purchases/create', icon: Plus },
+          { label: 'Check-in Scanner', href: '/attractions/check-in', icon: ScanLine }
         ]},
-        { label: 'Bookings', icon: Calendar, items: [
-          { label: 'Calendar View', href: '/bookings/calendar', icon: Dot },
-          { label: 'Manage Bookings', href: '/bookings', icon: Dot },
-          { label: 'Create Bookings', href: '/bookings/create', icon: Dot },
-          { label: 'Check-in Scanner', href: '/bookings/check-in', icon: Dot }
+        { label: 'Bookings', icon: Calendar, section: 'Bookings', items: [
+          { label: 'Calendar View', href: '/bookings/calendar', icon: CalendarDays },
+          { label: 'Manage Bookings', href: '/bookings', icon: List },
+          { label: 'Create Bookings', href: '/bookings/create', icon: Plus },
+          { label: 'Check-in Scanner', href: '/bookings/check-in', icon: ScanLine }
         ]},
-        { label: 'Packages', icon: Package, items: [
-          { label: 'Manage Packages', href: '/packages', icon: Dot },
-          { label: 'Create Package', href: '/packages/create', icon: Dot },
-          { label: 'Rooms', href: '/packages/rooms', icon: Dot },
-          { label: 'Add-ons', href: '/packages/add-ons', icon: Dot },
-          { label: 'Promos', href: '/packages/promos', icon: Dot },
-          { label: 'Gift Cards', href: '/packages/gift-cards', icon: Dot }
+        { label: 'Packages', icon: Package, section: 'Packages', items: [
+          { label: 'Manage Packages', href: '/packages', icon: List },
+          { label: 'Create Package', href: '/packages/create', icon: Plus },
+          { label: 'Rooms', href: '/packages/rooms', icon: DoorOpen },
+          { label: 'Add-ons', href: '/packages/add-ons', icon: UtensilsCrossed },
+          { label: 'Promos', href: '/packages/promos', icon: Tag },
+          { label: 'Gift Cards', href: '/packages/gift-cards', icon: Gift }
         ]},
-        { label: 'Customers', icon: Users, items: [
-          { label: 'Customer Analytics', href: '/customers/analytics', icon: Dot },
-          { label: 'Customers', href: '/customers', icon: Dot }
+        { label: 'Customers', icon: Users, section: 'Customers', items: [
+          { label: 'Customer Analytics', href: '/customers/analytics', icon: PieChart },
+          { label: 'Customers', href: '/customers', icon: Users }
         ]},
-        { label: 'Attendants Management', icon: Users, items: [
-          { label: 'Manage Attendants', href: '/manager/attendants', icon: Dot },
-          // { label: 'Create Attendant', href: '/manager/attendant/create', icon: Dot },
-          { label: 'Activity Log', href: '/manager/attendants/activity', icon: Dot },
+        { label: 'Attendants Management', icon: UserCog, section: 'Team', items: [
+          { label: 'Manage Attendants', href: '/manager/attendants', icon: Users },
+          { label: 'Activity Log', href: '/manager/attendants/activity', icon: FileText },
         ]},
-        { label: 'Analytics & Reports', icon: BarChart3, href: '/manager/analytics' },
-        { label: 'Profile', icon: User, href: '/manager/profile' },
-        { label: 'Settings', icon: Settings, href: '/manager/settings' }
+        { label: 'Analytics & Reports', icon: BarChart3, href: '/manager/analytics', section: 'Reports' },
+        { label: 'Profile', icon: User, href: '/manager/profile', section: 'Account' },
+        { label: 'Settings', icon: Settings, href: '/manager/settings', section: 'Account' }
       ];
       break;
     case 'company_admin':
       roleNavigation = [
-        { label: 'Dashboard', icon: Home, href: '/company/dashboard' },
-        { label: 'Attractions', icon: Ticket, items: [
-          { label: 'Manage Attractions', href: '/attractions', icon: Dot },
-          { label: 'Create Attractions', href: '/attractions/create', icon: Dot },
-          { label: 'Manage Purchases', href: '/attractions/purchases', icon: Dot },
-          { label: 'Create Purchase', href: '/attractions/purchases/create', icon: Dot },
-          { label: 'Check-in Scanner', href: '/attractions/check-in', icon: Dot }
+        { label: 'Dashboard', icon: Home, href: '/company/dashboard', section: 'General' },
+        { label: 'Attractions', icon: Ticket, section: 'Attractions', items: [
+          { label: 'Manage Attractions', href: '/attractions', icon: List },
+          { label: 'Create Attractions', href: '/attractions/create', icon: Plus },
+          { label: 'Manage Purchases', href: '/attractions/purchases', icon: ShoppingCart },
+          { label: 'Create Purchase', href: '/attractions/purchases/create', icon: Plus },
+          { label: 'Check-in Scanner', href: '/attractions/check-in', icon: ScanLine }
         ]},
-        { label: 'Bookings', icon: Calendar, items: [
-          { label: 'Calendar View', href: '/bookings/calendar', icon: Dot },
-          { label: 'Manage Bookings', href: '/bookings', icon: Dot },
-          { label: 'Create Bookings', href: '/bookings/create', icon: Dot },
-          { label: 'Check-in Scanner', href: '/bookings/check-in', icon: Dot }
+        { label: 'Bookings', icon: Calendar, section: 'Bookings', items: [
+          { label: 'Calendar View', href: '/bookings/calendar', icon: CalendarDays },
+          { label: 'Manage Bookings', href: '/bookings', icon: List },
+          { label: 'Create Bookings', href: '/bookings/create', icon: Plus },
+          { label: 'Check-in Scanner', href: '/bookings/check-in', icon: ScanLine }
         ]},
-        { label: 'Packages', icon: Package, items: [
-          { label: 'Manage Packages', href: '/packages', icon: Dot },
-          { label: 'Create Package', href: '/packages/create', icon: Dot },
-          { label: 'Rooms', href: '/packages/rooms', icon: Dot },
-          { label: 'Add-ons', href: '/packages/add-ons', icon: Dot },
-          { label: 'Promos', href: '/packages/promos', icon: Dot },
-          { label: 'Gift Cards', href: '/packages/gift-cards', icon: Dot }
+        { label: 'Packages', icon: Package, section: 'Packages', items: [
+          { label: 'Manage Packages', href: '/packages', icon: List },
+          { label: 'Create Package', href: '/packages/create', icon: Plus },
+          { label: 'Rooms', href: '/packages/rooms', icon: DoorOpen },
+          { label: 'Add-ons', href: '/packages/add-ons', icon: UtensilsCrossed },
+          { label: 'Promos', href: '/packages/promos', icon: Tag },
+          { label: 'Gift Cards', href: '/packages/gift-cards', icon: Gift }
         ]},
-        { label: 'Customers', icon: Users, items: [
-          { label: 'Customer Analytics', href: '/customers/analytics', icon: Dot },
-          { label: 'Customers', href: '/customers', icon: Dot }
+        { label: 'Customers', icon: Users, section: 'Customers', items: [
+          { label: 'Customer Analytics', href: '/customers/analytics', icon: PieChart },
+          { label: 'Customers', href: '/customers', icon: Users }
         ]},
-        { label: 'User Management', icon: Users, items: [
-          { label: 'Manage Accounts', href: '/admin/users', icon: Dot },
-          // { label: 'Create Accounts', href: '/admin/users/create', icon: Dot },
-          { label: 'Activity Log', href: '/admin/activity', icon: Dot },
+        { label: 'User Management', icon: UserCog, section: 'Administration', items: [
+          { label: 'Manage Accounts', href: '/admin/users', icon: Users },
+          { label: 'Activity Log', href: '/admin/activity', icon: FileText },
         ]},
-        { label: 'Analytics & Reports', icon: BarChart3, href: '/admin/analytics' },
-        { label: 'Profile', icon: User, href: '/admin/profile' },
-        { label: 'Settings', icon: Settings, href: '/admin/settings' }
+        { label: 'Analytics & Reports', icon: BarChart3, href: '/admin/analytics', section: 'Reports' },
+        { label: 'Profile', icon: User, href: '/admin/profile', section: 'Account' },
+        { label: 'Settings', icon: Settings, href: '/admin/settings', section: 'Account' }
       ];
       break;
     default:
@@ -513,16 +519,21 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
   // Transform navigation for grouped layout
   if (sidebarLayout === 'grouped') {
     const groupedNav: NavItem[] = [];
+    const seenSections = new Set<string>();
     
     navigation.forEach(item => {
-      if (item.items && item.items.length > 0) {
-        // Add section header
+      // Add section header if this is a new section
+      if (item.section && !seenSections.has(item.section)) {
+        seenSections.add(item.section);
         groupedNav.push({
-          label: item.label,
+          label: item.section,
           icon: item.icon,
           isGroupHeader: true
         });
-        // Add flat items
+      }
+      
+      if (item.items && item.items.length > 0) {
+        // Add flat items from dropdown
         item.items.forEach(subItem => {
           groupedNav.push({
             ...subItem,
@@ -530,7 +541,11 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
           });
         });
       } else {
-        groupedNav.push(item);
+        // Add standalone items
+        groupedNav.push({
+          ...item,
+          isGrouped: true
+        });
       }
     });
     
@@ -584,8 +599,11 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
     // Handle group headers for grouped layout
     if (item.isGroupHeader && sidebarLayout === 'grouped' && !isMinimized) {
       return (
-        <div className="px-2 pt-4 pb-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">
-          {item.label}
+        <div className="mt-4 first:mt-0">
+          <div className="border-t border-gray-200 mb-3 first:border-0"></div>
+          <div className="px-2 pb-2 text-xs font-bold text-gray-500 uppercase tracking-wider">
+            {item.label}
+          </div>
         </div>
       );
     }
@@ -616,8 +634,9 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
       <>
         {(() => {
           const Icon = item.icon;
+          const iconSize = item.isGrouped ? 16 : 18;
           // @ts-expect-error lucide-react icons accept 'size' prop
-          return <Icon size={18} className={`transition-all duration-200 ${isActive ? `text-${fullColor}` : 'stroke-1'}`} />;
+          return <Icon size={iconSize} className={`transition-all duration-200 ${isActive ? `text-${fullColor}` : 'stroke-1'}`} />;
         })()}
         {!isMinimized && (
           <span className="ml-3 text-sm flex-1 relative transition-all duration-300 opacity-100">
@@ -670,7 +689,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
         ) : item.href ? (
           <Link
             to={item.href}
-            className={`flex items-center p-2 rounded-lg transition-colors ${isActive ? `bg-${themeColor}-100 text-${fullColor} font-semibold` : 'hover:bg-gray-100 text-gray-800'} ${depth > 0 || item.isGrouped ? 'pl-5' : ''} ${isMinimized && depth === 0 ? 'justify-center' : ''}`}
+            className={`flex items-center p-2 rounded-lg transition-colors ${isActive ? `bg-${themeColor}-100 text-${fullColor} font-semibold` : 'hover:bg-gray-100 text-gray-800'} ${!isMinimized && (depth > 0 || item.isGrouped) ? 'pl-5' : ''} ${isMinimized && depth === 0 ? 'justify-center' : ''}`}
             onClick={handleNavClick}
             onMouseEnter={handleMouseEnter}
             onMouseLeave={() => isMinimized && depth === 0 && setShowTooltip(false)}

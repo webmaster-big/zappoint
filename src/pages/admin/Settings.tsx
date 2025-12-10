@@ -691,99 +691,99 @@ const Settings = () => {
                 ))}
               </div>
             </div>
+          </div>
+        </div>
 
-            {/* Sidebar Layout Section */}
-            <div className="pt-6 border-t border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900 mb-3">Sidebar Layout</h3>
-              <p className="text-sm text-gray-600 mb-4">Choose how navigation items are displayed in the sidebar</p>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Dropdown Layout */}
-                <button
-                  onClick={() => {
-                    setSidebarLayout('dropdown');
-                    localStorage.setItem('zapzone_sidebar_layout', 'dropdown');
-                    window.dispatchEvent(new Event('zapzone_sidebar_layout_changed'));
-                    setSuccessMessage('Sidebar layout updated to Dropdown');
-                    setShowSuccess(true);
-                    setTimeout(() => setShowSuccess(false), 3000);
-                  }}
-                  className={`relative p-4 rounded-lg border-2 transition-all text-left ${
-                    sidebarLayout === 'dropdown'
-                      ? 'border-gray-900 bg-gray-50 shadow-md'
-                      : 'border-gray-200 hover:border-gray-400'
-                  }`}
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <div>
-                      <h4 className="text-sm font-semibold text-gray-900">Dropdown</h4>
-                      <p className="text-xs text-gray-600 mt-1">Collapsible sections with nested items</p>
-                    </div>
-                    {sidebarLayout === 'dropdown' && (
-                      <div className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center">
-                        <CheckCircle size={14} className="text-white" />
-                      </div>
-                    )}
+        {/* Sidebar Layout Card */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6 mt-6">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">Sidebar Layout</h2>
+          <p className="text-sm text-gray-600 mb-6">Choose how navigation items are displayed in the sidebar</p>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Dropdown Layout */}
+            <button
+              onClick={() => {
+                setSidebarLayout('dropdown');
+                localStorage.setItem('zapzone_sidebar_layout', 'dropdown');
+                window.dispatchEvent(new Event('zapzone_sidebar_layout_changed'));
+                setSuccessMessage('Sidebar layout updated to Dropdown');
+                setShowSuccess(true);
+                setTimeout(() => setShowSuccess(false), 3000);
+              }}
+              className={`relative p-5 rounded-xl border-2 transition-all text-left hover:scale-[1.02] ${
+                sidebarLayout === 'dropdown'
+                  ? `border-${themeColor}-600 bg-${themeColor}-50 shadow-md`
+                  : 'border-gray-200 hover:border-gray-300 hover:shadow-sm'
+              }`}
+            >
+              <div className="flex items-start justify-between mb-3">
+                <div>
+                  <h4 className="text-base font-semibold text-gray-900">Dropdown</h4>
+                  <p className="text-xs text-gray-600 mt-1">Collapsible sections with nested items</p>
+                </div>
+                {sidebarLayout === 'dropdown' && (
+                  <div className={`w-6 h-6 bg-${themeColor}-600 rounded-full flex items-center justify-center`}>
+                    <CheckCircle size={16} className="text-white" />
                   </div>
-                  <div className="space-y-1.5 text-xs">
-                    <div className="flex items-center gap-2 text-gray-700">
-                      <div className="w-3 h-3 bg-gray-300 rounded"></div>
-                      <span>▼ Bookings</span>
-                    </div>
-                    <div className="ml-5 space-y-1">
-                      <div className="flex items-center gap-2 text-gray-500">
-                        <div className="w-2 h-2 bg-gray-200 rounded-full"></div>
-                        <span>Calendar View</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-gray-500">
-                        <div className="w-2 h-2 bg-gray-200 rounded-full"></div>
-                        <span>Manage Bookings</span>
-                      </div>
-                    </div>
-                  </div>
-                </button>
-
-                {/* Grouped Layout */}
-                <button
-                  onClick={() => {
-                    setSidebarLayout('grouped');
-                    localStorage.setItem('zapzone_sidebar_layout', 'grouped');
-                    window.dispatchEvent(new Event('zapzone_sidebar_layout_changed'));
-                    setSuccessMessage('Sidebar layout updated to Grouped');
-                    setShowSuccess(true);
-                    setTimeout(() => setShowSuccess(false), 3000);
-                  }}
-                  className={`relative p-4 rounded-lg border-2 transition-all text-left ${
-                    sidebarLayout === 'grouped'
-                      ? 'border-gray-900 bg-gray-50 shadow-md'
-                      : 'border-gray-200 hover:border-gray-400'
-                  }`}
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <div>
-                      <h4 className="text-sm font-semibold text-gray-900">Grouped</h4>
-                      <p className="text-xs text-gray-600 mt-1">Section headers with flat navigation</p>
-                    </div>
-                    {sidebarLayout === 'grouped' && (
-                      <div className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center">
-                        <CheckCircle size={14} className="text-white" />
-                      </div>
-                    )}
-                  </div>
-                  <div className="space-y-1.5 text-xs">
-                    <div className="text-gray-400 font-semibold uppercase tracking-wider">Management</div>
-                    <div className="flex items-center gap-2 text-gray-700">
-                      <div className="w-3 h-3 bg-gray-300 rounded"></div>
-                      <span>Calendar View</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-gray-700">
-                      <div className="w-3 h-3 bg-gray-300 rounded"></div>
-                      <span>Manage Bookings</span>
-                    </div>
-                  </div>
-                </button>
+                )}
               </div>
-            </div>
+              <div className="space-y-1.5 text-xs bg-white rounded-lg p-3 border border-gray-100">
+                <div className="flex items-center gap-2 text-gray-700 font-medium">
+                  <div className="w-3 h-3 bg-gray-400 rounded"></div>
+                  <span>▼ Bookings</span>
+                </div>
+                <div className="ml-5 space-y-1">
+                  <div className="flex items-center gap-2 text-gray-500">
+                    <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
+                    <span>Calendar View</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-gray-500">
+                    <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
+                    <span>Manage Bookings</span>
+                  </div>
+                </div>
+              </div>
+            </button>
+
+            {/* Grouped Layout */}
+            <button
+              onClick={() => {
+                setSidebarLayout('grouped');
+                localStorage.setItem('zapzone_sidebar_layout', 'grouped');
+                window.dispatchEvent(new Event('zapzone_sidebar_layout_changed'));
+                setSuccessMessage('Sidebar layout updated to Grouped');
+                setShowSuccess(true);
+                setTimeout(() => setShowSuccess(false), 3000);
+              }}
+              className={`relative p-5 rounded-xl border-2 transition-all text-left hover:scale-[1.02] ${
+                sidebarLayout === 'grouped'
+                  ? `border-${themeColor}-600 bg-${themeColor}-50 shadow-md`
+                  : 'border-gray-200 hover:border-gray-300 hover:shadow-sm'
+              }`}
+            >
+              <div className="flex items-start justify-between mb-3">
+                <div>
+                  <h4 className="text-base font-semibold text-gray-900">Grouped</h4>
+                  <p className="text-xs text-gray-600 mt-1">Section headers with flat navigation</p>
+                </div>
+                {sidebarLayout === 'grouped' && (
+                  <div className={`w-6 h-6 bg-${themeColor}-600 rounded-full flex items-center justify-center`}>
+                    <CheckCircle size={16} className="text-white" />
+                  </div>
+                )}
+              </div>
+              <div className="space-y-1.5 text-xs bg-white rounded-lg p-3 border border-gray-100">
+                <div className="text-gray-400 font-bold uppercase tracking-wider text-[10px] mb-1">Management</div>
+                <div className="flex items-center gap-2 text-gray-700">
+                  <div className="w-3 h-3 bg-gray-400 rounded"></div>
+                  <span>Calendar View</span>
+                </div>
+                <div className="flex items-center gap-2 text-gray-700">
+                  <div className="w-3 h-3 bg-gray-400 rounded"></div>
+                  <span>Manage Bookings</span>
+                </div>
+              </div>
+            </button>
           </div>
         </div>
 
