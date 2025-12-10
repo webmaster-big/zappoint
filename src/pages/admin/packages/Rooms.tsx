@@ -372,59 +372,40 @@ const Rooms: React.FC = () => {
 
             {/* Main Content */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                {/* Show create button if no rooms */}
-                {(rooms == null || rooms.length === 0) && !loading ? (
-                    <div className="flex flex-col items-center py-16">
-                        <div className={`w-16 h-16 rounded-full bg-${themeColor}-100 flex items-center justify-center mb-4`}>
-                            <MapPin className={`w-8 h-8 text-${fullColor}`} />
+                {/* Bulk Actions Bar */}
+                {selectionMode && rooms.length > 0 && (
+                    <div className={`mb-4 p-4 bg-${themeColor}-50 border border-${themeColor}-200 rounded-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3`}>
+                        <div className="flex items-center gap-3">
+                            <button
+                                onClick={selectAllRooms}
+                                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                                    selectedRoomIds.size === rooms.length
+                                        ? `bg-${fullColor} text-white`
+                                        : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+                                }`}
+                            >
+                                {selectedRoomIds.size === rooms.length ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
+                                {selectedRoomIds.size === rooms.length ? 'Deselect All' : 'Select All'}
+                            </button>
+                            <span className="text-sm text-gray-700 font-medium">
+                                {selectedRoomIds.size} room{selectedRoomIds.size !== 1 ? 's' : ''} selected
+                            </span>
                         </div>
-                        <h3 className="text-lg font-semibold text-gray-900 mb-2">No rooms found</h3>
-                        <p className="text-gray-600 text-sm mb-6 text-center max-w-sm">Get started by creating your first room for package bookings</p>
-                        <button
-                            onClick={() => {
-                                resetForm();
-                                setShowCreateModal(true);
-                            }}
-                            className={`bg-${fullColor} hover:bg-${themeColor}-700 text-white px-6 py-2.5 rounded-lg font-semibold transition-colors`}
-                        >
-                            Create Room
-                        </button>
-                    </div>
-                ) : (
-                    <>
-                        {/* Bulk Actions Bar */}
-                        {selectionMode && (
-                            <div className={`mb-4 p-4 bg-${themeColor}-50 border border-${themeColor}-200 rounded-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3`}>
-                                <div className="flex items-center gap-3">
-                                    <button
-                                        onClick={selectAllRooms}
-                                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                                            selectedRoomIds.size === rooms.length
-                                                ? `bg-${fullColor} text-white`
-                                                : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
-                                        }`}
-                                    >
-                                        {selectedRoomIds.size === rooms.length ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
-                                        {selectedRoomIds.size === rooms.length ? 'Deselect All' : 'Select All'}
-                                    </button>
-                                    <span className="text-sm text-gray-700 font-medium">
-                                        {selectedRoomIds.size} room{selectedRoomIds.size !== 1 ? 's' : ''} selected
-                                    </span>
-                                </div>
-                                {selectedRoomIds.size > 0 && (
-                                    <button
-                                        onClick={handleBulkDelete}
-                                        className="flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-medium transition-colors"
-                                    >
-                                        <Trash2 className="w-4 h-4" />
-                                        Delete Selected
-                                    </button>
-                                )}
-                            </div>
+                        {selectedRoomIds.size > 0 && (
+                            <button
+                                onClick={handleBulkDelete}
+                                className="flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+                            >
+                                <Trash2 className="w-4 h-4" />
+                                Delete Selected
+                            </button>
                         )}
+                    </div>
+                )}
 
-                        {/* Search and Filter Section */}
-                        <div className="mb-6 space-y-4">
+                {/* Search and Filter Section - Always visible */}
+                {!loading && (
+                    <div className="mb-6 space-y-4">
                             {/* Search Bar and Location Filter */}
                             <div className="flex flex-col sm:flex-row gap-3">
                                 <div className="relative flex-1">
@@ -524,13 +505,14 @@ const Rooms: React.FC = () => {
                                 Showing {rooms.length} room{rooms.length !== 1 ? 's' : ''}
                             </div>
                         </div>
+                )}
 
-                        {/* Rooms Grid */}
-                        {loading ? (
-                            <div className="flex justify-center items-center py-12">
-                                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-300"></div>
-                            </div>
-                        ) : rooms.length > 0 ? (
+                {/* Rooms Grid */}
+                {loading ? (
+                    <div className="flex justify-center items-center py-12">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-300"></div>
+                    </div>
+                ) : rooms.length > 0 ? (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                                 {rooms.map((room) => (
                                     <div 
@@ -606,14 +588,31 @@ const Rooms: React.FC = () => {
                                     </div>
                                 ))}
                             </div>
-                        ) : (
-                            <div className="text-center py-12 text-gray-500">
-                                No rooms match your search criteria.
-                            </div>
-                        )}
+                ) : (
+                    <div className="flex flex-col items-center py-16">
+                        <div className={`w-16 h-16 rounded-full bg-${themeColor}-100 flex items-center justify-center mb-4`}>
+                            <MapPin className={`w-8 h-8 text-${fullColor}`} />
+                        </div>
+                        <h3 className="text-lg font-semibold text-gray-900 mb-2">No rooms found</h3>
+                        <p className="text-gray-600 text-sm mb-6 text-center max-w-sm">
+                            {searchTerm || filters.is_available !== undefined 
+                                ? 'No rooms match your search criteria. Try adjusting your filters.'
+                                : 'Get started by creating your first room for package bookings'}
+                        </p>
+                        <button
+                            onClick={() => {
+                                resetForm();
+                                setShowCreateModal(true);
+                            }}
+                            className={`bg-${fullColor} hover:bg-${themeColor}-700 text-white px-6 py-2.5 rounded-lg font-semibold transition-colors`}
+                        >
+                            Create Room
+                        </button>
+                    </div>
+                )}
 
-                        {/* Pagination */}
-                        {totalPages > 1 && (
+                {/* Pagination */}
+                {!loading && totalPages > 1 && (
                             <div className="flex items-center justify-center space-x-2 mt-6">
                                 <button
                                     onClick={() => handlePageChange(currentPage - 1)}
@@ -649,8 +648,6 @@ const Rooms: React.FC = () => {
                                 </button>
                             </div>
                         )}
-                    </>
-                )}
             </div>
 
             {/* Create Modal */}
