@@ -884,8 +884,15 @@ export default function Register() {
           </p>
         </div>
 
-        <div className="mt-3 text-center text-xs text-zinc-400">
-          &copy; {new Date().getFullYear()} Zap Zone. All rights reserved.
+        <div className="mt-3 text-center">
+          <div className="mb-2 text-xs text-zinc-400">
+            <a href="https://zap-zone.com/terms-conditions/" target="_blank" rel="noopener noreferrer" className="hover:text-zinc-600 transition">
+              Terms & Conditions
+            </a>
+          </div>
+          <div className="text-xs text-zinc-400">
+            &copy; {new Date().getFullYear()} Zap Zone. All rights reserved.
+          </div>
         </div>
         </>
         )}
