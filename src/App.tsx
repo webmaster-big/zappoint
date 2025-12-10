@@ -100,7 +100,7 @@ function App() {
           <Route path="/edit-attraction/:id" element={<EditAttraction />} />
           <Route path="/attractions/edit/:id" element={<EditAttraction />} />
           <Route path="/attractions/" element={<ManageAttractions />} />
-          <Route path="/attractions/details/:id" element={<AttractionDetails />} />
+          <Route path="/attractions/details/:slug" element={<AttractionDetails />} />
           <Route path="/attractions/purchases" element={<ManagePurchases />} />
           <Route path="/attractions/purchases/:id" element={<PurchaseDetails />} />
           <Route path="/attractions/purchases/create" element={<CreatePurchase />} />
@@ -110,7 +110,7 @@ function App() {
           <Route path="/packages/create" element={<CreatePackage />} />
           <Route path="/packages/edit/:id" element={<EditPackage />} />
           <Route path="/packages" element={<Packages />} />
-          <Route path="/packages/details/:id" element={<PackageDetails />} />
+          <Route path="/packages/details/:slug" element={<PackageDetails />} />
           <Route path="/packages/promos" element={<Promo />} />
           <Route path="/packages/rooms" element={<Rooms />} />
           <Route path="/packages/add-ons" element={<ManageAddOns />} />

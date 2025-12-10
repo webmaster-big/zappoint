@@ -16,24 +16,28 @@ import {
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { packageService, type Package } from '../../../services';
 import Toast from '../../../components/ui/Toast';
+import { extractIdFromSlug } from '../../../utils/slug';
 
 const PackageDetails = () => {
-  const { id } = useParams<{ id: string }>();
+  const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const { themeColor, fullColor } = useThemeColor();
   const [packageData, setPackageData] = useState<Package | null>(null);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
+  const packageId = slug ? extractIdFromSlug(slug) : null;
+
   useEffect(() => {
     loadPackageDetails();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
+  }, [slug]);
 
   const loadPackageDetails = async () => {
+    if (!packageId) return;
     try {
       setLoading(true);
-      const response = await packageService.getPackage(parseInt(id!));
+      const response = await packageService.getPackage(packageId);
       console.log(response);
       setPackageData(response.data);
     } catch (error) {
@@ -140,7 +144,7 @@ const PackageDetails = () => {
                 {packageData.is_active ? 'Active' : 'Inactive'}
               </span>
               <button
-                onClick={() => navigate(`/packages/edit/${id}`)}
+                onClick={() => navigate(`/packages/edit/${packageId}`)}
                 className={`flex items-center px-4 py-2 bg-${themeColor}-600 text-white rounded-lg hover:bg-${themeColor}-700 transition-colors`}
               >
                 <Edit className="h-4 w-4 mr-2" />
@@ -169,7 +173,15 @@ const PackageDetails = () => {
           {packageData.features && (
             <div className="p-6 border-b border-gray-100">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">Features</h2>
-              <p className="text-gray-700 leading-relaxed">{packageData.features}</p>
+              {Array.isArray(packageData.features) ? (
+                <ul className="list-disc list-inside space-y-2">
+                  {packageData.features.map((feature: string, idx: number) => (
+                    <li key={idx} className="text-gray-700 leading-relaxed">{feature}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-gray-700 leading-relaxed">{packageData.features}</p>
+              )}
             </div>
           )}
 

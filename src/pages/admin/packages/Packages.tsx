@@ -130,12 +130,16 @@ const Packages: React.FC = () => {
     // Filter by search term
     if (searchTerm.trim()) {
       const search = searchTerm.toLowerCase();
-      result = result.filter(pkg =>
-        pkg.name?.toLowerCase().includes(search) ||
-        pkg.description?.toLowerCase().includes(search) ||
-        pkg.category?.toLowerCase().includes(search) ||
-        pkg.features?.toLowerCase().includes(search)
-      );
+      result = result.filter(pkg => {
+        const featuresStr = Array.isArray(pkg.features) 
+          ? pkg.features.join(' ').toLowerCase() 
+          : pkg.features?.toLowerCase() || '';
+        
+        return pkg.name?.toLowerCase().includes(search) ||
+          pkg.description?.toLowerCase().includes(search) ||
+          pkg.category?.toLowerCase().includes(search) ||
+          featuresStr.includes(search);
+      });
     }
 
     // Sort packages

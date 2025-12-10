@@ -17,24 +17,28 @@ import { useThemeColor } from '../../../hooks/useThemeColor';
 import { attractionService } from '../../../services/AttractionService';
 import { ASSET_URL } from '../../../utils/storage';
 import Toast from '../../../components/ui/Toast';
+import { extractIdFromSlug } from '../../../utils/slug';
 
 const AttractionDetails = () => {
-  const { id } = useParams<{ id: string }>();
+  const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const { themeColor, fullColor } = useThemeColor();
   const [attraction, setAttraction] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
+  const attractionId = slug ? extractIdFromSlug(slug) : null;
+
   useEffect(() => {
     loadAttractionDetails();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
+  }, [slug]);
 
   const loadAttractionDetails = async () => {
+    if (!attractionId) return;
     try {
       setLoading(true);
-      const response = await attractionService.getAttraction(Number(id));
+      const response = await attractionService.getAttraction(attractionId);
       setAttraction(response.data);
     } catch (error) {
       console.error('Error loading attraction details:', error);
@@ -46,8 +50,9 @@ const AttractionDetails = () => {
 
   const handleDelete = async () => {
     if (window.confirm('Are you sure you want to delete this attraction? This action cannot be undone.')) {
+      if (!attractionId) return;
       try {
-        await attractionService.deleteAttraction(Number(id));
+        await attractionService.deleteAttraction(attractionId);
         setToast({ message: 'Attraction deleted successfully', type: 'success' });
         setTimeout(() => navigate('/attractions'), 1500);
       } catch (error) {
@@ -111,7 +116,7 @@ const AttractionDetails = () => {
                 {attraction.is_active ? 'Active' : 'Inactive'}
               </span>
               <button
-                onClick={() => navigate(`/attractions/edit/${id}`)}
+                onClick={() => navigate(`/attractions/edit/${attractionId}`)}
                 className={`flex items-center px-4 py-2 bg-${themeColor}-600 text-white rounded-lg hover:bg-${themeColor}-700 transition-colors`}
               >
                 <Edit className="h-4 w-4 mr-2" />
