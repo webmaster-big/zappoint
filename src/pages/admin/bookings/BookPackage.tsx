@@ -951,7 +951,7 @@ const BookPackage: React.FC = () => {
             <div className="flex flex-col gap-2.5">
               <button
                 onClick={() => window.location.href = '/customer/register'}
-                className="w-full px-4 py-2.5 bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-all duration-200 active:scale-95"
+                className="w-full px-4 py-2.5 bg-blue-800 text-white text-sm font-medium hover:bg-blue-900 transition-all duration-200 active:scale-95"
               >
                 Create Account
               </button>

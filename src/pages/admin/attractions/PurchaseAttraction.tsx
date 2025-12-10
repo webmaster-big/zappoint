@@ -106,10 +106,11 @@ const PurchaseAttraction = () => {
   const [countryDebounceTimer, setCountryDebounceTimer] = useState<NodeJS.Timeout | null>(null);
   const [showAccountModal, setShowAccountModal] = useState(false);
 
-  // Show account modal for non-logged-in users
+  // Show account modal for non-logged-in users (optional, doesn't block access)
   useEffect(() => {
     const customerData = localStorage.getItem('zapzone_customer');
     if (!customerData) {
+      // Show modal but don't block access
       setShowAccountModal(true);
     }
   }, []);
