@@ -201,13 +201,14 @@ const CustomerLogin = () => {
             </div>
           )}
 
-          <form className="flex flex-col gap-5" onSubmit={handleSubmit}>
+          <form className="flex flex-col gap-5" onSubmit={handleSubmit} name="customer-login" method="post">
             <div>
               <label className="block text-sm font-medium text-zinc-800 mb-1">Email</label>
               <input
                 type="email"
                 name="email"
-                autoComplete="email"
+                id="customer-email"
+                autoComplete="username email"
                 required
                 value={formData.email}
                 onChange={handleChange}

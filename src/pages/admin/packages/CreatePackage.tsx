@@ -110,7 +110,7 @@ const CreatePackage: React.FC = () => {
         name: "",
         description: "",
         category: "",
-        features: "",
+        features: [""] as string[],
         attractions: [] as string[],
         rooms: [] as string[],
         price: "",
@@ -159,6 +159,31 @@ const CreatePackage: React.FC = () => {
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
         setForm((prev) => ({ ...prev, [name]: value }));
+    };
+
+    // Handle feature input change
+    const handleFeatureChange = (index: number, value: string) => {
+        setForm((prev) => {
+            const newFeatures = [...prev.features];
+            newFeatures[index] = value;
+            return { ...prev, features: newFeatures };
+        });
+    };
+
+    // Add new feature input
+    const handleAddFeature = () => {
+        setForm((prev) => ({
+            ...prev,
+            features: [...prev.features, ""]
+        }));
+    };
+
+    // Remove feature input
+    const handleRemoveFeature = (index: number) => {
+        setForm((prev) => ({
+            ...prev,
+            features: prev.features.filter((_, i) => i !== index)
+        }));
     };
 
     // Multi-select for promos and gift cards
@@ -346,7 +371,7 @@ const CreatePackage: React.FC = () => {
                 name: form.name,
                 description: form.description,
                 category: form.category,
-                features: form.features,
+                features: form.features.filter(f => f.trim()), // Filter out empty features
                 price: Number(price.toFixed(2)), // Ensure 2 decimal places
                 max_participants: maxParticipants,
                 price_per_additional: Number(pricePerAdditional.toFixed(2)), // Ensure 2 decimal places
@@ -397,7 +422,7 @@ const CreatePackage: React.FC = () => {
                 name: "",
                 description: "",
                 category: "",
-                features: "",
+                features: [""],
                 attractions: [],
                 rooms: [],
                 price: "",
@@ -646,14 +671,36 @@ const CreatePackage: React.FC = () => {
                                     {/* Features input below category */}
                                     <div>
                                         <label className="block font-semibold mb-2 text-base text-neutral-800">Features</label>
-                                        <input
-                                            type="text"
-                                            name="features"
-                                            value={form.features}
-                                            onChange={handleChange}
-                                            className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400`}
-                                            placeholder="e.g. Free drinks, VIP room, etc."
-                                        />
+                                        <div className="space-y-2">
+                                            {form.features.map((feature, index) => (
+                                                <div key={index} className="flex gap-2">
+                                                    <input
+                                                        type="text"
+                                                        value={feature}
+                                                        onChange={(e) => handleFeatureChange(index, e.target.value)}
+                                                        className={`flex-1 rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400`}
+                                                        placeholder={`Feature ${index + 1}`}
+                                                    />
+                                                    {form.features.length > 1 && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleRemoveFeature(index)}
+                                                            className="px-3 py-2 bg-red-50 text-red-600 rounded-md hover:bg-red-100 transition-colors font-semibold"
+                                                            title="Remove feature"
+                                                        >
+                                                            ×
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            ))}
+                                            <button
+                                                type="button"
+                                                onClick={handleAddFeature}
+                                                className={`w-full px-4 py-2 bg-${themeColor}-50 text-${fullColor} rounded-md hover:bg-${themeColor}-100 transition-colors font-medium text-sm`}
+                                            >
+                                                + Add Feature
+                                            </button>
+                                        </div>
                                     </div>
                                     <div>
                                         <label className="block font-semibold mb-2 text-base text-neutral-800">Description</label>
@@ -1190,7 +1237,7 @@ const CreatePackage: React.FC = () => {
                                         name: "",
                                         description: "",
                                         category: "",
-                                        features: "",
+                                        features: [""],
                                         attractions: [],
                                         rooms: [],
                                         price: "",

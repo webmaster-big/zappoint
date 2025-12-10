@@ -161,11 +161,14 @@ export default function Login() {
           </div>
         )}
 
-        <form className="flex flex-col gap-5" onSubmit={handleSubmit}>
+        <form className="flex flex-col gap-5" onSubmit={handleSubmit} name="login" method="post">
           <div>
             <label className="block text-sm font-medium text-zinc-800 mb-1">Email</label>
             <input
               type="email"
+              name="email"
+              id="email"
+              autoComplete="username email"
               className="w-full rounded-md border border-zinc-200 px-3 py-2 text-zinc-900 bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-800 focus:border-blue-800 transition text-base sm:text-base"
               placeholder="you@email.com"
               required
@@ -178,6 +181,9 @@ export default function Login() {
             <div className="relative">
               <input
                 type={showPassword ? "text" : "password"}
+                name="password"
+                id="password"
+                autoComplete="current-password"
                 className="w-full rounded-md border border-zinc-200 px-3 py-2 pr-10 text-zinc-900 bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-800 focus:border-blue-800 transition text-base sm:text-base"
                 placeholder="••••••••"
                 required

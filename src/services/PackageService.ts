@@ -100,7 +100,7 @@ export interface CreatePackageData {
   name: string;
   description: string;
   category: string;
-  features?: string;
+  features?: string | string[]; // Support both string and array for backward compatibility
   price: number;
   price_per_additional?: number;
   max_participants: number;
