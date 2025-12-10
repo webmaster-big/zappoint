@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Calendar, Users, Tag, Gift, Search, Filter, Download, Upload, X, CheckSquare, Square, Pencil, Trash2, MapPin, Eye } from "lucide-react";
+import { Users, Tag, Search, Download, Upload, X, CheckSquare, Square, Pencil, Trash2, MapPin, Eye } from "lucide-react";
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { packageService, type Package } from '../../../services';
 import { getStoredUser } from "../../../utils/storage";
@@ -183,44 +183,6 @@ const Packages: React.FC = () => {
   
   const isCompanyAdmin = userData?.role === 'company_admin';
 
-  // Helper for comma-joined or fallback
-  const displayList = (arr?: Array<{ name?: string; code?: string; [key: string]: unknown }>, prop?: string) => {
-    if (!arr || arr.length === 0) return <span className="text-gray-400 text-sm">None</span>;
-    
-    if (prop && arr[0] && typeof arr[0] === 'object') {
-      return arr.map((item, i) => (
-        <span key={i} className="text-sm text-gray-600">
-          {String(item[prop] || '')}{i < arr.length - 1 ? ', ' : ''}
-        </span>
-      ));
-    }
-    
-    return <span className="text-sm text-gray-600">{arr.map(item => item.name || item.code || '').join(", ")}</span>;
-  };
-
-  // Format availability text
-  const formatAvailability = (pkg: Package) => {
-    if (!pkg.availability_type) return "Not specified";
-    
-    if (pkg.availability_type === "daily") {
-      if (!pkg.available_days || pkg.available_days.length === 0) return "No days selected";
-      if (pkg.available_days.length === 7) return "Every day";
-      return pkg.available_days.map((day) => String(day).substring(0, 3)).join(", ");
-    } else if (pkg.availability_type === "weekly") {
-      if (!pkg.available_week_days || pkg.available_week_days.length === 0) return "No days selected";
-      return pkg.available_week_days.map((day) => `Every ${day}`).join(", ");
-    } else if (pkg.availability_type === "monthly") {
-      if (!pkg.available_month_days || pkg.available_month_days.length === 0) return "No days selected";
-      return pkg.available_month_days.map((day) => {
-        const dayStr = String(day);
-        if (dayStr === "last") return "Last day of month";
-        const suffix = dayStr === "1" ? "st" : dayStr === "2" ? "nd" : dayStr === "3" ? "rd" : "th";
-        return `${dayStr}${suffix}`;
-      }).join(", ");
-    }
-    return "Not specified";
-  };
-
   // Export functionality
   const handleOpenExportModal = () => {
     setSelectedForExport(packages.map(pkg => pkg.id));
@@ -373,7 +335,7 @@ const Packages: React.FC = () => {
     return (
       <div className="w-full mx-auto px-4 pb-6 flex flex-col items-center justify-center min-h-96">
         <div className="text-center">
-          <div className={`animate-spin rounded-full h-12 w-12 border-b-2 border-${fullColor} mx-auto mb-4`}></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto mb-4"></div>
         </div>
       </div>
     );
@@ -396,275 +358,248 @@ const Packages: React.FC = () => {
   }
 
   return (
-    <div className="w-full mx-auto px-4 pb-6 flex flex-col items-center">
-      <div className="bg-white rounded-xl p-6 w-full shadow-sm border border-gray-100 mt-8">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-          <div>
-            <h2 className="text-2xl font-semibold text-gray-900">Packages</h2>
-            <p className="text-gray-500 mt-1">Manage and view all your packages</p>
-          </div>
-          <div className="flex gap-2">
-            <button
-              className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-semibold whitespace-nowrap flex items-center gap-2"
-              onClick={() => setShowImportModal(true)}
-            >
-              <Upload size={18} />
-              Import
-            </button>
-            <button
-              className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-semibold whitespace-nowrap flex items-center gap-2"
-              onClick={handleOpenExportModal}
-              disabled={packages.length === 0}
-            >
-              <Download size={18} />
-              Export
-            </button>
+    <div className="w-full mx-auto px-4 sm:px-6 pb-6">
+      {/* Page Header with Action Buttons */}
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Packages</h1>
+          <p className="text-gray-600 mt-1">Manage and view all your packages</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg font-semibold whitespace-nowrap flex items-center gap-2 transition-colors"
+            onClick={() => setShowImportModal(true)}
+          >
+            <Upload size={18} />
+            Import
+          </button>
+          <button
+            className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg font-semibold whitespace-nowrap flex items-center gap-2 transition-colors"
+            onClick={handleOpenExportModal}
+            disabled={packages.length === 0}
+          >
+            <Download size={18} />
+            Export
+          </button>
+          <Link
+            to="/packages/create"
+            className={`bg-${fullColor} hover:bg-${themeColor}-900 text-white px-5 py-2 rounded-lg font-semibold whitespace-nowrap flex items-center gap-2 transition-colors`}
+          >
+            Create Package
+          </Link>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        {(packages == null || packages.length === 0) ? (
+          <div className="flex flex-col items-center py-16">
+            <div className={`w-16 h-16 rounded-full bg-${themeColor}-100 flex items-center justify-center mb-4`}>
+              <Tag className={`w-8 h-8 text-${fullColor}`} />
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">No packages found</h3>
+            <p className="text-gray-600 text-sm mb-6 text-center max-w-sm">Create your first package to get started</p>
             <Link
               to="/packages/create"
-              className={`bg-${fullColor} hover:bg-${themeColor}-900 text-white px-6 py-2 rounded-lg font-semibold whitespace-nowrap`}
+              className={`bg-${fullColor} hover:bg-${themeColor}-700 text-white px-6 py-2.5 rounded-lg font-semibold transition-colors`}
             >
               Create Package
             </Link>
           </div>
-        </div>
-
-        {/* Show create button if no packages */}
-        {(packages == null || packages.length === 0) ? (
-          <div className="flex flex-col items-center py-12">
-            <div className="text-gray-400 mb-2">No packages found</div>
-            <p className="text-gray-500 text-sm mb-4">Create your first package to get started</p>
-            <button
-              className={`bg-${fullColor} hover:bg-${themeColor}-900 text-white px-6 py-2 rounded-lg font-semibold`}
-              onClick={() => window.location.href = "/packages/create"}
-            >
-              Create Package
-            </button>
-          </div>
         ) : (
           <>
-            {/* Search and Filter Section */}
-            <div className="mb-6 space-y-4">
-              {/* Search Bar */}
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Search packages by name, description, or category..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className={`w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 outline-none`}
-                />
-              </div>
-
-              {/* Filter and Sort Controls */}
-              <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-                <div className="flex flex-col sm:flex-row gap-4 flex-wrap items-start sm:items-center">
-                  {/* Location Filter (Company Admin only) */}
-                  {isCompanyAdmin && uniqueLocations.length > 0 && (
-                    <div className="flex items-center gap-2">
-                      <MapPin className="w-4 h-4 text-gray-500" />
-                      <span className="text-sm font-medium text-gray-700">Location:</span>
-                      <select
-                        value={filterLocation}
-                        onChange={(e) => setFilterLocation(e.target.value)}
-                        className={`px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 outline-none`}
-                      >
-                        <option value="all">All Locations</option>
-                        {uniqueLocations.map((location) => (
-                          <option key={location.id} value={location.id}>
-                            {location.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-
-                  {/* Category Filter */}
-                  {categories.length > 1 && (
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <Filter className="w-4 h-4 text-gray-500" />
-                      <span className="text-sm font-medium text-gray-700">Category:</span>
-                      {categories.map((category) => (
-                        <button 
-                          key={category}
-                          className={`px-3 py-1.5 rounded-full text-sm transition-colors ${
-                            filterCategory === category 
-                              ? `bg-${fullColor} text-white` 
-                              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                          }`}
-                          onClick={() => setFilterCategory(category)}
-                        >
-                          {category === "all" ? "All" : category}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Sort Controls */}
-                <div className="flex items-center gap-3">
-                  <span className="text-sm font-medium text-gray-700">Sort by:</span>
-                  <select
-                    value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value)}
-                    className={`px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 outline-none`}
-                  >
-                    <option value="name">Name</option>
-                    <option value="price">Price</option>
-                    <option value="category">Category</option>
-                  </select>
-                  <button
-                    onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-                    className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm hover:bg-gray-50 transition-colors"
-                  >
-                    {sortOrder === 'asc' ? '↑ Asc' : '↓ Desc'}
-                  </button>
-                </div>
-              </div>
-
-              {/* Results count */}
-              <div className="text-sm text-gray-500">
-                Showing {filteredPackages.length} of {packages.length} package{packages.length !== 1 ? 's' : ''}
-              </div>
+        {/* Search and Filter Section */}
+        <div className="mb-6 space-y-4">
+          {/* Search Bar and Location Filter */}
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search packages by name, description, or category..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className={`w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 outline-none`}
+              />
             </div>
-
-            {/* Packages Grid */}
-            {filteredPackages.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredPackages.map((pkg) => (
-                  <div 
-                    key={pkg.id} 
-                    className="border border-gray-200 rounded-xl p-5 hover:shadow-md transition-shadow"
-                  >
-                    <div className="flex justify-between items-start mb-4">
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-lg text-gray-900 truncate">{pkg.name || "Unnamed Package"}</h3>
-                        <div className="flex items-center gap-2 mt-1 flex-wrap">
-                          <span className="text-sm text-gray-500">{pkg.category || "No category"}</span>
-                          <span className={`text-lg font-semibold text-${fullColor}`}>${pkg.price || "0"}</span>
-                        </div>
-                        {pkg.location && (
-                          <div className="flex items-center gap-1 mt-1">
-                            <MapPin className="w-3 h-3 text-gray-400" />
-                            <span className="text-xs text-gray-500">{pkg.location.name}</span>
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex gap-2 ml-2">
-                        <Link
-                          to={`/packages/details/${createSlugWithId(pkg.name, pkg.id)}`}
-                          className={`p-2 text-${fullColor} hover:bg-${themeColor}-50 rounded-lg transition-colors`}
-                          title="View details"
-                        >
-                          <Eye size={18} />
-                        </Link>
-                        <Link
-                          to={`/packages/edit/${pkg.id}`}
-                          className={`p-2 text-${fullColor} hover:bg-${themeColor}-50 rounded-lg transition-colors`}
-                          title="Edit package"
-                        >
-                          <Pencil size={18} />
-                        </Link>
-                        <button
-                          onClick={() => handleDelete(pkg.id)}
-                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                          title="Delete package"
-                        >
-                          <Trash2 size={18} />
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="mb-4">
-                      <p className="text-sm text-gray-600 line-clamp-2">{pkg.description || "No description"}</p>
-                    </div>
-
-                    <div className="grid gap-3 mb-4">
-                      <div className="flex items-start gap-2">
-                        <Calendar className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                        <div className="text-sm">
-                          <span className="font-medium">Availability: </span>
-                          <span className="text-gray-600">{formatAvailability(pkg)}</span>
-                        </div>
-                      </div>
-
-                      {pkg.max_participants && (
-                        <div className="flex items-start gap-2">
-                          <Users className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                          <div className="text-sm">
-                            <span className="font-medium">Max Participants: </span>
-                            <span className="text-gray-600">{pkg.max_participants}</span>
-                            {pkg.price_per_additional && (
-                              <span className="text-gray-600"> (${pkg.price_per_additional} per additional)</span>
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                      {pkg.promos && pkg.promos.length > 0 && (
-                        <div className="flex items-start gap-2">
-                          <Tag className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                          <div className="text-sm">
-                            <span className="font-medium">Promos: </span>
-                            {displayList(pkg.promos, 'name')}
-                          </div>
-                        </div>
-                      )}
-
-                      {pkg.gift_cards && pkg.gift_cards.length > 0 && (
-                        <div className="flex items-start gap-2">
-                          <Gift className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                          <div className="text-sm">
-                            <span className="font-medium">Gift Cards: </span>
-                            {displayList(pkg.gift_cards, 'code')}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-12 border border-dashed border-gray-300 rounded-xl">
-                <div className="text-gray-400 mb-2">No packages found</div>
-                <p className="text-gray-500 text-sm mb-4">
-                  {searchTerm 
-                    ? `No packages match "${searchTerm}"` 
-                    : filterLocation !== "all"
-                      ? `No packages for the selected location`
-                      : filterCategory !== "all" 
-                        ? `No packages in the "${filterCategory}" category` 
-                        : "Create your first package to get started"
-                  }
-                </p>
-                {(searchTerm || filterCategory !== "all" || filterLocation !== "all") && (
-                  <button
-                    className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-6 py-2 rounded-lg font-semibold mr-2"
-                    onClick={() => {
-                      setSearchTerm("");
-                      setFilterCategory("all");
-                      setFilterLocation("all");
-                    }}
-                  >
-                    Clear Filters
-                  </button>
-                )}
-                <button
-                  className={`bg-${fullColor} hover:bg-${themeColor}-900 text-white px-6 py-2 rounded-lg font-semibold`}
-                  onClick={() => window.location.href = "/packages/create"}
+            
+            {/* Location Filter (Company Admin only) */}
+            {isCompanyAdmin && uniqueLocations.length > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-gray-700 whitespace-nowrap">Location:</span>
+                <select
+                  value={filterLocation}
+                  onChange={(e) => setFilterLocation(e.target.value)}
+                  className={`px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 outline-none min-w-[200px]`}
                 >
-                  Create Package
-                </button>
+                  <option value="all">All Locations</option>
+                  {uniqueLocations.map((location) => (
+                    <option key={location.id} value={location.id}>
+                      {location.name}
+                    </option>
+                  ))}
+                </select>
               </div>
             )}
-          </>
+          </div>
+
+          {/* Category Filter and Sort Controls */}
+          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+            {/* Category Filter */}
+            {categories.length > 1 && (
+              <div className="flex items-center gap-2 flex-wrap">
+                {categories.map((category) => (
+                  <button 
+                    key={category}
+                    className={`px-3 py-1.5 rounded-full text-sm transition-colors ${
+                      filterCategory === category 
+                        ? `bg-${fullColor} text-white` 
+                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    }`}
+                    onClick={() => setFilterCategory(category)}
+                  >
+                    {category === "all" ? "All Categories" : category}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Sort Controls */}
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-medium text-gray-700">Sort:</span>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className={`px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 outline-none`}
+              >
+                <option value="name">Name</option>
+                <option value="price">Price</option>
+                <option value="category">Category</option>
+              </select>
+              <button
+                onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm hover:bg-gray-50 transition-colors"
+              >
+                {sortOrder === 'asc' ? '↑ Asc' : '↓ Desc'}
+              </button>
+            </div>
+          </div>
+
+          {/* Results count */}
+          <div className="text-sm text-gray-500">
+            Showing {filteredPackages.length} of {packages.length} package{packages.length !== 1 ? 's' : ''}
+          </div>
+        </div>
+
+        {/* Packages Grid */}
+        {filteredPackages.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {filteredPackages.map((pkg) => (
+              <div 
+                key={pkg.id} 
+                className="border-2 border-gray-200 rounded-lg overflow-hidden hover:shadow-lg hover:scale-105 hover:border-gray-300 transition-all bg-white"
+              >
+                <div className="p-4">
+                  <div className="flex justify-between items-start mb-3">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-base text-gray-900 truncate mb-1">{pkg.name || "Unnamed Package"}</h3>
+                      {pkg.location && (
+                        <div className="flex items-center gap-1">
+                          <MapPin className="w-3 h-3 text-gray-400" />
+                          <span className="text-xs text-gray-500">{pkg.location.name}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="mb-3">
+                    <p className="text-sm text-gray-600 line-clamp-2 mb-2">{pkg.description || "No description"}</p>
+                    <span className={`inline-block px-2 py-1 rounded text-xs font-medium bg-${themeColor}-100 text-${fullColor}`}>
+                      {pkg.category || "Uncategorized"}
+                    </span>
+                  </div>
+
+                  <div className="pt-3 border-t border-gray-100">
+                    <div className="flex justify-between items-center mb-3">
+                      <span className="text-lg font-bold text-gray-900">${pkg.price || "0"}</span>
+                      {pkg.max_participants && (
+                        <div className="flex items-center gap-1 text-xs text-gray-500">
+                          <Users className="w-3 h-3" />
+                          <span>{pkg.max_participants}</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex gap-1">
+                      <Link
+                        to={`/packages/details/${createSlugWithId(pkg.name, pkg.id)}`}
+                        className={`flex-1 p-1.5 text-${fullColor} hover:bg-${themeColor}-100 rounded transition-colors flex items-center justify-center`}
+                        title="View details"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </Link>
+                      <Link
+                        to={`/packages/edit/${pkg.id}`}
+                        className={`flex-1 p-1.5 text-${fullColor} hover:bg-${themeColor}-100 rounded transition-colors flex items-center justify-center`}
+                        title="Edit package"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </Link>
+                      <button
+                        onClick={() => handleDelete(pkg.id)}
+                        className="flex-1 p-1.5 text-red-500 hover:bg-red-50 rounded transition-colors flex items-center justify-center"
+                        title="Delete package"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="flex flex-col items-center py-16">
+            <div className={`w-16 h-16 rounded-full bg-${themeColor}-100 flex items-center justify-center mb-4`}>
+              <Tag className={`w-8 h-8 text-${fullColor}`} />
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">No packages found</h3>
+            <p className="text-gray-600 text-sm mb-6 text-center max-w-sm">
+              {searchTerm 
+                ? `No packages match "${searchTerm}"` 
+                : filterLocation !== "all"
+                  ? `No packages for the selected location`
+                  : filterCategory !== "all" 
+                    ? `No packages in the "${filterCategory}" category` 
+                    : "Create your first package to get started"
+              }
+            </p>
+            {(searchTerm || filterCategory !== "all" || filterLocation !== "all") && (
+              <button
+                className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-6 py-2.5 rounded-lg font-semibold mr-2 transition-colors"
+                onClick={() => {
+                  setSearchTerm("");
+                  setFilterCategory("all");
+                  setFilterLocation("all");
+                }}
+              >
+                Clear Filters
+              </button>
+            )}
+            <Link
+              to="/packages/create"
+              className={`bg-${fullColor} hover:bg-${themeColor}-700 text-white px-6 py-2.5 rounded-lg font-semibold transition-colors`}
+            >
+              Create Package
+            </Link>
+          </div>
         )}
-      </div>
+      </>
+    )}
+  </div>
 
       {/* Export Modal */}
       {showExportModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-backdrop-fade">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-xl max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col">
             <div className="p-6 border-b border-gray-200">
               <div className="flex justify-between items-center">
@@ -753,7 +688,7 @@ const Packages: React.FC = () => {
 
       {/* Import Modal */}
       {showImportModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-backdrop-fade">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-xl max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col">
             <div className="p-6 border-b border-gray-200">
               <div className="flex justify-between items-center">

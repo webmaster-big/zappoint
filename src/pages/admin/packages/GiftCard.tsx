@@ -237,7 +237,7 @@ const GiftCard: React.FC = () => {
   });
 
   return (
-    <div className="w-full mx-auto px-4 sm:px-6 pb-6">
+    <div className="px-6 py-8">
       {/* Page Header with Action Buttons */}
       <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
