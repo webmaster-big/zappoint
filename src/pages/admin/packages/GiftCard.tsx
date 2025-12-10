@@ -237,30 +237,26 @@ const GiftCard: React.FC = () => {
   });
 
   return (
-      <div className="w-full mx-auto px-4 sm:px-6 pb-6">
-        {/* Page Header */}
-        <div className="mb-6">
+    <div className="w-full mx-auto px-4 sm:px-6 pb-6">
+      {/* Page Header with Action Buttons */}
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
           <h1 className="text-2xl font-bold text-gray-900">Gift Cards</h1>
           <p className="text-gray-600 mt-1">Create and manage gift cards for your customers</p>
         </div>
+        <button
+          className={`bg-${fullColor} text-white rounded-lg px-5 py-2 flex items-center gap-2 hover:bg-${themeColor}-900 transition-colors font-semibold`}
+          onClick={() => setShowModal(true)}
+        >
+          <Plus className="w-5 h-5" /> Create Gift Card
+        </button>
+      </div>
 
-        {/* Action Bar */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
-          <div className="flex justify-end">
-            <button
-              className={`bg-${fullColor} text-white rounded-lg px-5 py-2 flex items-center gap-2 hover:bg-${themeColor}-900 transition-colors font-semibold`}
-              onClick={() => setShowModal(true)}
-            >
-              <Plus className="w-5 h-5" /> Create Gift Card
-            </button>
-          </div>
-        </div>
+      {/* Main Content */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
 
-        {/* Main Content */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-
-          {/* Filter Section */}
-          <div className="mb-6 space-y-4">
+        {/* Filter Section */}
+        <div className="mb-6 space-y-4">
             <div className="flex flex-wrap gap-2">
               <button 
                 className={`px-3 py-1.5 rounded-full text-sm transition-colors ${filterStatus === "all" ? `bg-${fullColor} text-white` : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
@@ -292,13 +288,13 @@ const GiftCard: React.FC = () => {
             </div>
           </div>
 
-          {/* Gift Cards Grid */}
-          {loading ? (
-            <div className="flex justify-center items-center py-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-300"></div>
-            </div>
-          ) : filteredGiftCards.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        {/* Gift Cards Grid */}
+        {loading ? (
+          <div className="flex justify-center items-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
+          </div>
+        ) : filteredGiftCards.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {filteredGiftCards.map((gc, i) => {
                 const isExpired = gc.expiry_date && new Date(gc.expiry_date) < new Date();
                 const status = isExpired ? 'inactive' : gc.status;
@@ -399,9 +395,9 @@ const GiftCard: React.FC = () => {
                   </div>
                 );
               })}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center py-16">
+          </div>
+        ) : (
+          <div className="flex flex-col items-center py-16">
               <div className={`w-16 h-16 rounded-full bg-${themeColor}-100 flex items-center justify-center mb-4`}>
                 <Plus className={`w-8 h-8 text-${fullColor}`} />
               </div>
@@ -413,19 +409,19 @@ const GiftCard: React.FC = () => {
               >
                 <Plus className="w-5 h-5" /> Create Gift Card
               </button>
-            </div>
-          )}
-        </div>
+          </div>
+        )}
+      </div>
 
       {/* Create Modal */}
       {showModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 ">
-            <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-md relative animate-fade-in-up border border-gray-200 m-4">
-              <button className="absolute top-4 right-4 p-1 rounded-lg hover:bg-gray-100" onClick={() => setShowModal(false)}>
-                <X className="w-5 h-5 text-gray-500" />
-              </button>
-              <h3 className="text-xl font-semibold mb-4 text-gray-900">Create Gift Card</h3>
-              <form className="space-y-4" onSubmit={handleAdd}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-md relative border border-gray-200 m-4">
+            <button className="absolute top-4 right-4 p-1 rounded-lg hover:bg-gray-100" onClick={() => setShowModal(false)}>
+              <X className="w-5 h-5 text-gray-500" />
+            </button>
+            <h3 className="text-xl font-semibold mb-4 text-gray-900">Create Gift Card</h3>
+            <form className="space-y-4" onSubmit={handleAdd}>
                 <div>
                   <label className="block text-sm font-medium text-gray-800 mb-1">Type</label>
                   <select 
@@ -507,21 +503,21 @@ const GiftCard: React.FC = () => {
                   className={`w-full bg-${fullColor} text-white py-2.5 rounded-lg font-medium mt-2 hover:bg-${themeColor}-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed`}
                 >
                   {loading ? 'Creating...' : 'Create Gift Card'}
-                </button>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {/* Edit Modal */}
-        {editIndex !== null && editForm && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-            <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-md relative animate-fade-in-up border border-gray-200 m-4">
-              <button className="absolute top-4 right-4 p-1 rounded-lg hover:bg-gray-100" onClick={closeEditModal}>
-                <X className="w-5 h-5 text-gray-500" />
               </button>
-              <h3 className="text-xl font-semibold mb-4 text-gray-900">Edit Gift Card</h3>
-              <div className="space-y-4">
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {editIndex !== null && editForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-md relative border border-gray-200 m-4">
+            <button className="absolute top-4 right-4 p-1 rounded-lg hover:bg-gray-100" onClick={closeEditModal}>
+              <X className="w-5 h-5 text-gray-500" />
+            </button>
+            <h3 className="text-xl font-semibold mb-4 text-gray-900">Edit Gift Card</h3>
+            <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-800 mb-1">Type</label>
@@ -624,23 +620,23 @@ const GiftCard: React.FC = () => {
                   >
                     Cancel
                   </button>
-                </div>
               </div>
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Toast Notification */}
-        {toast && (
-          <div className="fixed top-4 right-4 z-50">
-            <Toast 
-              message={toast.message} 
-              type={toast.type} 
-              onClose={() => setToast(null)} 
-            />
-          </div>
-        )}
-      </div>
+      {/* Toast Notification */}
+      {toast && (
+        <div className="fixed top-4 right-4 z-50">
+          <Toast 
+            message={toast.message} 
+            type={toast.type} 
+            onClose={() => setToast(null)} 
+          />
+        </div>
+      )}
+    </div>
   );
 };
 
