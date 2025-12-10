@@ -690,7 +690,7 @@ const ManageAttractions = () => {
                           <Eye className="h-4 w-4" />
                         </Link>
                         <Link
-                          to={`/edit-attraction/${createSlugWithId(attraction.name, attraction.id)}`}
+                          to={`/attractions/edit/${attraction.id}`}
                           className="text-gray-600 hover:text-gray-800"
                           title="Edit"
                         >

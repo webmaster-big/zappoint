@@ -559,7 +559,7 @@ const Packages: React.FC = () => {
                           <Eye size={18} />
                         </Link>
                         <Link
-                          to={`/packages/edit/${createSlugWithId(pkg.name, pkg.id)}`}
+                          to={`/packages/edit/${pkg.id}`}
                           className={`p-2 text-${fullColor} hover:bg-${themeColor}-50 rounded-lg transition-colors`}
                           title="Edit package"
                         >
