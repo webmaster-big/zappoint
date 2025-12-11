@@ -19,9 +19,14 @@ import type { AttractionPurchasesPurchase, AttractionPurchasesFilterOptions } fr
 import { attractionPurchaseService } from '../../../services/AttractionPurchaseService';
 import Toast from '../../../components/ui/Toast';
 import { getStoredUser } from '../../../utils/storage';
+import { locationService } from '../../../services';
+import type { Location } from '../../../services/LocationService';
+import LocationSelector from '../../../components/admin/LocationSelector';
 
 const ManagePurchases = () => {
   const { themeColor, fullColor } = useThemeColor();
+  const currentUser = getStoredUser();
+  const isCompanyAdmin = currentUser?.role === 'company_admin';
 
   // Get auth token from localStorage
   const getAuthToken = () => {
@@ -39,6 +44,8 @@ const ManagePurchases = () => {
   };
 
   const [purchases, setPurchases] = useState<AttractionPurchasesPurchase[]>([]);
+  const [locations, setLocations] = useState<Location[]>([]);
+  const [selectedLocation, setSelectedLocation] = useState<string>('');
   const [filteredPurchases, setFilteredPurchases] = useState<AttractionPurchasesPurchase[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedPurchases, setSelectedPurchases] = useState<string[]>([]);
@@ -102,7 +109,8 @@ const ManagePurchases = () => {
       console.log('🔐 Loading purchases - Auth Token:', authToken ? 'Present' : 'Missing');
       const response = await attractionPurchaseService.getPurchases({
         per_page: 100,
-        user_id: getStoredUser()?.id
+        user_id: getStoredUser()?.id,
+        ...(selectedLocation && { location_id: Number(selectedLocation) })
       });
 
       // Convert API format to component format
@@ -132,6 +140,19 @@ const ManagePurchases = () => {
       setToast({ message: 'Failed to load purchases', type: 'error' });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchLocations = async () => {
+    if (!isCompanyAdmin) return;
+    
+    try {
+      const response = await locationService.getLocations();
+      const locationsArray = Array.isArray(response.data) ? response.data : [];
+      setLocations(locationsArray);
+    } catch (error) {
+      console.error('Error fetching locations:', error);
+      setLocations([]);
     }
   };
 
@@ -190,6 +211,11 @@ const ManagePurchases = () => {
   // Load purchases from backend
   useEffect(() => {
     loadPurchases();
+  }, [selectedLocation]);
+
+  // Fetch locations on mount
+  useEffect(() => {
+    fetchLocations();
   }, []);
 
   // Apply filters when purchases or filters change
@@ -386,6 +412,17 @@ const ManagePurchases = () => {
           <p className="text-gray-600 mt-2">View and manage all customer purchases</p>
         </div>
         <div className="mt-4 sm:mt-0 flex gap-2">
+          {isCompanyAdmin && (
+            <LocationSelector
+              locations={locations}
+              selectedLocation={selectedLocation}
+              onLocationChange={setSelectedLocation}
+              themeColor={themeColor}
+              fullColor={fullColor}
+              variant="compact"
+              showAllOption={true}
+            />
+          )}
           <button
             onClick={exportToCSV}
             className={`inline-flex items-center px-4 py-2 bg-${themeColor}-600 text-white rounded-lg hover:bg-${themeColor}-700 transition-colors`}

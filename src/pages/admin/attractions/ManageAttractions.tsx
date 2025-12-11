@@ -28,6 +28,7 @@ import type {
 import { attractionService } from '../../../services/AttractionService';
 import type { Attraction } from '../../../services/AttractionService';
 import { locationService } from '../../../services/LocationService';
+import LocationSelector from '../../../components/admin/LocationSelector';
 import Toast from '../../../components/ui/Toast';
 import { createSlugWithId } from '../../../utils/slug';
 import { getStoredUser } from '../../../utils/storage';
@@ -36,7 +37,7 @@ const ManageAttractions = () => {
   const { themeColor, fullColor } = useThemeColor();
   const currentUser = getStoredUser();
   const isCompanyAdmin = currentUser?.role === 'company_admin';
-  const [locations, setLocations] = useState<Array<{ id: number; name: string }>>([]);
+  const [locations, setLocations] = useState<Array<{ id: number; name: string; address?: string; city?: string; state?: string }>>([]);
   const [selectedLocation, setSelectedLocation] = useState<number | null>(null);
   const [attractions, setAttractions] = useState<ManageAttractionsAttraction[]>([]);
 
@@ -213,7 +214,7 @@ const ManageAttractions = () => {
         try {
           const response = await locationService.getLocations();
           if (response.success && response.data) {
-            setLocations(response.data.locations);
+            setLocations(Array.isArray(response.data) ? response.data : []);
           }
         } catch (error) {
           console.error('Error fetching locations:', error);
@@ -463,18 +464,15 @@ const ManageAttractions = () => {
         </div>
         <div className="mt-4 sm:mt-0 flex gap-2">
           {isCompanyAdmin && (
-            <select
-              value={selectedLocation || ''}
-              onChange={(e) => setSelectedLocation(e.target.value ? Number(e.target.value) : null)}
-              className={`px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
-            >
-              <option value="">All Locations</option>
-              {locations.map((loc) => (
-                <option key={loc.id} value={loc.id}>
-                  {loc.name}
-                </option>
-              ))}
-            </select>
+            <LocationSelector
+              variant="compact"
+              locations={locations}
+              selectedLocation={selectedLocation?.toString() || ''}
+              onLocationChange={(id) => setSelectedLocation(id ? Number(id) : null)}
+              themeColor={themeColor}
+              fullColor={fullColor}
+              showAllOption={true}
+            />
           )}
           <button
             className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-semibold whitespace-nowrap flex items-center gap-2"

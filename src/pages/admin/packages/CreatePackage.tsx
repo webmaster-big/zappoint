@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import Toast from "../../../components/ui/Toast";
+import LocationSelector from '../../../components/admin/LocationSelector';
 import { Info, Plus, RefreshCcw, Calendar, Clock, Gift, Tag, Home } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useThemeColor } from '../../../hooks/useThemeColor';
@@ -40,7 +41,7 @@ const CreatePackage: React.FC = () => {
     
     const currentUser = getStoredUser();
     const isCompanyAdmin = currentUser?.role === 'company_admin';
-    const [locations, setLocations] = useState<Array<{ id: number; name: string }>>([]);
+    const [locations, setLocations] = useState<Array<{ id: number; name: string; address?: string; city?: string; state?: string }>>([]);
     const [selectedLocation, setSelectedLocation] = useState<number | null>(null);
 
     // Fetch locations for company admin
@@ -50,7 +51,7 @@ const CreatePackage: React.FC = () => {
                 try {
                     const response = await locationService.getLocations();
                     if (response.success && response.data) {
-                        setLocations(response.data.locations);
+                        setLocations(Array.isArray(response.data) ? response.data : []);
                     }
                 } catch (error) {
                     console.error('Error fetching locations:', error);
@@ -564,32 +565,35 @@ const CreatePackage: React.FC = () => {
                 {/* Form Section */}
                 <div className="flex-1 mx-auto">
                     <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6 md:p-8">
-                        <div className="flex items-center justify-between mb-2">
-                            <div>
-                                <h2 className="text-2xl sm:text-3xl font-bold text-neutral-900 tracking-tight">Create Package Deal</h2>
-                                <p className="text-sm text-gray-500 mt-2">Fill in the details below to create a new package deal.</p>
-                            </div>
-                            
+                        <div className="mb-6">
+                            <h2 className="text-2xl sm:text-3xl font-bold text-neutral-900 tracking-tight">Create Package Deal</h2>
+                            <p className="text-sm text-gray-500 mt-2">Fill in the details below to create a new package deal.</p>
+                        </div>
+                        
+                        <form className="space-y-8" onSubmit={handleSubmit} autoComplete="off">
+                            {/* Location Selection for company_admin */}
                             {isCompanyAdmin && (
-                                <div className="flex items-center gap-2">
-                                    <label className="text-sm font-medium text-gray-700">Location:</label>
-                                    <select
-                                        value={selectedLocation || ''}
-                                        onChange={(e) => setSelectedLocation(e.target.value ? Number(e.target.value) : null)}
-                                        className={`px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
-                                    >
-                                        <option value="">All Locations</option>
-                                        {locations.map((loc) => (
-                                            <option key={loc.id} value={loc.id}>
-                                                {loc.name}
-                                            </option>
-                                        ))}
-                                    </select>
+                                <div>
+                                    <LocationSelector
+                                        locations={locations.map(loc => ({
+                                          id: loc.id.toString(),
+                                          name: loc.name,
+                                          address: loc.address || '',
+                                          city: loc.city || '',
+                                          state: loc.state || ''
+                                        }))}
+                                        selectedLocation={selectedLocation?.toString() || ''}
+                                        onLocationChange={(id) => setSelectedLocation(id ? Number(id) : null)}
+                                        themeColor={themeColor}
+                                        fullColor={fullColor}
+                                        layout="grid"
+                                        maxWidth="100%"
+                                        showAllOption={false}
+                                    />
                                 </div>
                             )}
-                        </div>
-                        <div className="mb-8"></div>    
-                        <form className="space-y-8" onSubmit={handleSubmit} autoComplete="off">
+                            
+                            {/* Image Upload */}
                             {/* Image Upload */}
                             <div>
                                 <label className="block font-semibold mb-2 text-base text-neutral-800">Package Image</label>

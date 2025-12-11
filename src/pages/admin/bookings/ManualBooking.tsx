@@ -6,6 +6,7 @@ import bookingService from '../../../services/bookingService';
 import EmptyStateModal from '../../../components/ui/EmptyStateModal';
 import roomService from '../../../services/RoomService';
 import { locationService } from '../../../services/LocationService';
+import LocationSelector from '../../../components/admin/LocationSelector';
 import { getStoredUser, getImageUrl } from '../../../utils/storage';
 
 const ManualBooking: React.FC = () => {
@@ -13,7 +14,7 @@ const ManualBooking: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
   const currentUser = getStoredUser();
   const isCompanyAdmin = currentUser?.role === 'company_admin';
-  const [locations, setLocations] = useState<Array<{ id: number; name: string }>>([]);
+  const [locations, setLocations] = useState<Array<{ id: number; name: string; address?: string; city?: string; state?: string }>>([]);
   const [selectedLocation, setSelectedLocation] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [pkg, setPkg] = useState<any>(null);
@@ -46,7 +47,7 @@ const ManualBooking: React.FC = () => {
         try {
           const response = await locationService.getLocations();
           if (response.success && response.data) {
-            setLocations(response.data.locations);
+            setLocations(Array.isArray(response.data) ? response.data : []);
           }
         } catch (error) {
           console.error('Error fetching locations:', error);
@@ -343,7 +344,7 @@ const ManualBooking: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200">
+      <div className="">
         <div className="max-w-7xl mx-auto px-6 py-4">
           <button
             onClick={() => navigate('/bookings')}
@@ -359,21 +360,21 @@ const ManualBooking: React.FC = () => {
             </div>
             
             {isCompanyAdmin && (
-              <div className="flex items-center gap-2">
-                <label className="text-sm font-medium text-gray-700">Location:</label>
-                <select
-                  value={selectedLocation || ''}
-                  onChange={(e) => setSelectedLocation(e.target.value ? Number(e.target.value) : null)}
-                  className={`px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
-                >
-                  <option value="">All Locations</option>
-                  {locations.map((loc) => (
-                    <option key={loc.id} value={loc.id}>
-                      {loc.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <LocationSelector
+                locations={locations.map(loc => ({
+                  id: loc.id.toString(),
+                  name: loc.name,
+                  address: loc.address || '',
+                  city: loc.city || '',
+                  state: loc.state || ''
+                }))}
+                selectedLocation={selectedLocation?.toString() || ''}
+                onLocationChange={(id) => setSelectedLocation(id ? Number(id) : null)}
+                themeColor={themeColor}
+                fullColor={fullColor}
+                variant="compact"
+                showAllOption={true}
+              />
             )}
           </div>
         </div>

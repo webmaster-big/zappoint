@@ -22,7 +22,7 @@ import {
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
 import { API_BASE_URL } from '../../../utils/storage';
-import { locationService } from '../../../services/LocationService';
+import { locationService } from '../../../services';
 import { userService } from '../../../services/UserService';
 import type { 
   ManageAccountsAccount, 
@@ -68,7 +68,7 @@ const InvitationModal: React.FC<ManageAccountsInvitationModalProps> = ({
 
       if (response.success) {
         // API returns data as array directly, not data.locations
-        const locationsList = Array.isArray(response.data) ? response.data : (response.data.locations || []);
+        const locationsList = Array.isArray(response.data) ? response.data : [];
         console.log('Locations list:', locationsList);
         setLocations(locationsList);
       }

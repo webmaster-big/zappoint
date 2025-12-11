@@ -71,7 +71,7 @@ const CalendarView: React.FC = () => {
         try {
           const response = await locationService.getLocations();
           if (response.success && response.data) {
-            setLocations(response.data.locations);
+            setLocations(Array.isArray(response.data) ? response.data : []);
           }
         } catch (error) {
           console.error('Error fetching locations:', error);

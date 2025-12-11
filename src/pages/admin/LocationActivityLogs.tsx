@@ -28,6 +28,8 @@ import type {
 import { useThemeColor } from '../../hooks/useThemeColor';
 import CounterAnimation from '../../components/ui/CounterAnimation';
 import { API_BASE_URL, getStoredUser } from '../../utils/storage';
+import { locationService } from '../../services';
+import type { Location } from '../../services/LocationService';
 import { getAuthToken } from '../../services';
 
 const LocationActivityLogs = () => {
@@ -173,31 +175,22 @@ const LocationActivityLogs = () => {
 
   const loadLocations = async () => {
     try {
-      const token = getAuthToken();
-      const response = await fetch(`${API_BASE_URL}/locations`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        const locationsData = Array.isArray(data.data) ? data.data : [];
-        
-        // Transform locations data
-        const transformedLocations = locationsData.map((loc: any) => ({
-          name: loc.name,
-          id: loc.id,
-          managers: [], // Will be populated from users if needed
-          attendants: [], // Will be populated from users if needed
-          recentActivity: 0 // Will be calculated from activity logs
-        }));
-        
-        setLocations(transformedLocations);
-      }
+      const response = await locationService.getLocations();
+      const locationsData = Array.isArray(response.data) ? response.data : [];
+      
+      // Transform locations data
+      const transformedLocations = locationsData.map((loc: Location) => ({
+        name: loc.name,
+        id: loc.id,
+        managers: [], // Will be populated from users if needed
+        attendants: [], // Will be populated from users if needed
+        recentActivity: 0 // Will be calculated from activity logs
+      }));
+      
+      setLocations(transformedLocations);
     } catch (error) {
       console.error('Error loading locations:', error);
+      setLocations([]);
     }
   };
 

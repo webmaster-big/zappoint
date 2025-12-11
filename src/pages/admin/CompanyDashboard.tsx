@@ -24,6 +24,7 @@ import {
 import { Link } from 'react-router-dom';
 import { useThemeColor } from '../../hooks/useThemeColor';
 import CounterAnimation from '../../components/ui/CounterAnimation';
+import LocationSelector from '../../components/admin/LocationSelector';
 import bookingService from '../../services/bookingService';
 import { locationService, type Location } from '../../services/LocationService';
 import { metricsService } from '../../services/MetricsService';
@@ -106,7 +107,7 @@ const CompanyDashboard: React.FC = () => {
         const response = await locationService.getLocations();
         console.log('Locations response:', response);
         // Handle both response formats: response.data.locations or response.data
-        const locationsList = response.data.locations || response.data || [];
+        const locationsList = Array.isArray(response.data) ? response.data : [];
         console.log('Locations list:', locationsList);
         setLocations(locationsList);
       } catch (error) {
@@ -559,19 +560,24 @@ const CompanyDashboard: React.FC = () => {
           <p className="text-sm md:text-base text-gray-500">Multi-location booking overview and management</p>
         </div>
         <div className="flex items-center gap-3 mt-4 md:mt-0">
-          <select 
-            value={selectedLocation}
-            onChange={(e) => {
-              setSelectedLocation(e.target.value === 'all' ? 'all' : parseInt(e.target.value));
+          <LocationSelector
+            locations={locations.map(loc => ({
+              id: loc.id.toString(),
+              name: loc.name,
+              address: loc.address || '',
+              city: loc.city || '',
+              state: loc.state || ''
+            }))}
+            selectedLocation={selectedLocation === 'all' ? '' : selectedLocation.toString()}
+            onLocationChange={(locationId) => {
+              setSelectedLocation(locationId === '' ? 'all' : parseInt(locationId));
               setCurrentPage(1);
             }}
-            className="px-3 py-2 md:px-4 md:py-2.5 border border-gray-200 rounded-lg md:rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-${themeColor}-500"
-          >
-            <option value="all">All Locations ({locations.length})</option>
-            {locations.map(location => (
-              <option key={location.id} value={location.id}>{location.name}</option>
-            ))}
-          </select>
+            themeColor={themeColor}
+            fullColor={fullColor}
+            variant="compact"
+            showAllOption={true}
+          />
         </div>
       </div>
 
@@ -1055,19 +1061,26 @@ const CompanyDashboard: React.FC = () => {
               <option value="cancelled">Cancelled</option>
               <option value="completed">Completed</option>
             </select>
-            <select 
-              value={selectedLocation}
-              onChange={(e) => {
-                setSelectedLocation(e.target.value === 'all' ? 'all' : parseInt(e.target.value));
-                setCurrentPage(1);
-              }}
-              className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-${themeColor}-500"
-            >
-              <option value="all">All Locations</option>
-              {locations.map(location => (
-                <option key={location.id} value={location.id}>{location.name}</option>
-              ))}
-            </select>
+            <div className="min-w-[200px]">
+              <LocationSelector
+                locations={locations.map(loc => ({
+                  id: loc.id.toString(),
+                  name: loc.name,
+                  address: loc.address || '',
+                  city: loc.city || '',
+                  state: loc.state || ''
+                }))}
+                selectedLocation={selectedLocation === 'all' ? '' : selectedLocation.toString()}
+                onLocationChange={(locationId) => {
+                  setSelectedLocation(locationId === '' ? 'all' : parseInt(locationId));
+                  setCurrentPage(1);
+                }}
+                themeColor={themeColor}
+                fullColor={fullColor}
+                variant="compact"
+                showAllOption={true}
+              />
+            </div>
             <button className="px-3 py-2 border border-gray-200 rounded-lg text-sm flex items-center">
               <Filter size={16} className="mr-1" />
               Filter

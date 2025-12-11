@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Search, Edit2, Trash2, Users, MapPin, CheckSquare, Square, Plus, X } from 'lucide-react';
 import Toast from '../../../components/ui/Toast';
 import { roomService, locationService } from '../../../services';
+import LocationSelector from '../../../components/admin/LocationSelector';
 import type { Room, RoomFilters } from '../../../services/RoomService';
+import type { Location } from '../../../services/LocationService';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { getStoredUser } from '../../../utils/storage';
 
@@ -33,8 +35,9 @@ const Rooms: React.FC = () => {
     // Location filtering for company_admin
     const currentUser = getStoredUser();
     const isCompanyAdmin = currentUser?.role === 'company_admin';
-    const [locations, setLocations] = useState<Array<{ id: number; name: string }>>([]);
+    const [locations, setLocations] = useState<Location[]>([]);
     const [selectedLocationId, setSelectedLocationId] = useState<number | null>(null);
+    const [modalLocationId, setModalLocationId] = useState<number | null>(null);
 
     // Form state for create/edit
     const [formData, setFormData] = useState({
@@ -89,10 +92,11 @@ const Rooms: React.FC = () => {
                     const response = await locationService.getLocations();
                     console.log('Locations data:', response);
                     if (response.success && response.data) {
-                        setLocations(response.data.locations);
+                        const locationsArray = Array.isArray(response.data) ? response.data : [];
+                        setLocations(locationsArray);
                         // Set first location as default if available
-                        if (response.data.locations.length > 0 && selectedLocationId === null) {
-                            setSelectedLocationId(response.data.locations[0].id);
+                        if (locationsArray.length > 0 && selectedLocationId === null) {
+                            setSelectedLocationId(locationsArray[0].id);
                         }
                     }
                 } catch (error) {
@@ -102,7 +106,7 @@ const Rooms: React.FC = () => {
         };
         fetchLocations();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isCompanyAdmin, currentUser]);
+    }, []);
 
     // Fetch rooms
     const fetchRooms = React.useCallback(async () => {
@@ -171,8 +175,8 @@ const Rooms: React.FC = () => {
         e.preventDefault();
         
         try {
-            // Use selected location for company_admin, default to 1 otherwise
-            const locationId = isCompanyAdmin && selectedLocationId ? selectedLocationId : 1;
+            // Use modal location for company_admin, default to 1 otherwise
+            const locationId = isCompanyAdmin && modalLocationId ? modalLocationId : 1;
             
             if (creationMode === 'single') {
                 await roomService.createRoom({
@@ -410,23 +414,25 @@ const Rooms: React.FC = () => {
                                 
                                 {/* Location Filter for Company Admin */}
                                 {isCompanyAdmin && locations.length > 0 && (
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-sm font-medium text-gray-700 whitespace-nowrap">Location:</span>
-                                        <select
-                                            value={selectedLocationId || ''}
-                                            onChange={(e) => {
-                                                setSelectedLocationId(e.target.value ? Number(e.target.value) : null);
+                                    <div className="min-w-[200px]">
+                                        <LocationSelector
+                                            locations={locations.map(loc => ({
+                                                id: loc.id.toString(),
+                                                name: loc.name,
+                                                address: loc.address || '',
+                                                city: loc.city || '',
+                                                state: loc.state || ''
+                                            }))}
+                                            selectedLocation={selectedLocationId?.toString() || ''}
+                                            onLocationChange={(locationId) => {
+                                                setSelectedLocationId(locationId ? Number(locationId) : null);
                                                 setCurrentPage(1);
                                             }}
-                                            className={`px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 outline-none min-w-[200px]`}
-                                        >
-                                            <option value="">All Locations</option>
-                                            {locations.map((location) => (
-                                                <option key={location.id} value={location.id}>
-                                                    {location.name}
-                                                </option>
-                                            ))}
-                                        </select>
+                                            themeColor={themeColor}
+                                            fullColor={fullColor}
+                                            variant="compact"
+                                            showAllOption={true}
+                                        />
                                     </div>
                                 )}
                             </div>
@@ -673,6 +679,33 @@ const Rooms: React.FC = () => {
                             </div>
 
                             <form onSubmit={handleCreateRoom} className="space-y-4">
+                                {/* Location Selector */}
+                                {isCompanyAdmin && (
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                            Location <span className="text-red-500">*</span>
+                                        </label>
+                                        <LocationSelector
+                                            locations={locations.map(loc => ({
+                                                id: loc.id.toString(),
+                                                name: loc.name,
+                                                address: '',
+                                                city: '',
+                                                state: ''
+                                            }))}
+                                            selectedLocation={modalLocationId?.toString() || ''}
+                                            onLocationChange={(locationId) => {
+                                                setModalLocationId(locationId ? Number(locationId) : null);
+                                            }}
+                                            themeColor={themeColor}
+                                            fullColor={fullColor}
+                                            layout="grid"
+                                            maxWidth="100%"
+                                            showAllOption={false}
+                                        />
+                                    </div>
+                                )}
+
                                 {creationMode === 'single' ? (
                                     <>
                                         {/* Single Room Form */}

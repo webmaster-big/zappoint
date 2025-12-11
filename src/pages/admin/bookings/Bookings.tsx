@@ -22,6 +22,7 @@ import type { BookingsPageBooking, BookingsPageFilterOptions } from '../../../ty
 import bookingService from '../../../services/bookingService';
 import { createPayment } from '../../../services/PaymentService';
 import { locationService } from '../../../services/LocationService';
+import LocationSelector from '../../../components/admin/LocationSelector';
 import { getStoredUser, API_BASE_URL } from '../../../utils/storage';
 import { MapPin } from 'lucide-react';
 
@@ -139,7 +140,8 @@ const Bookings: React.FC = () => {
       if (isCompanyAdmin) {
         const response = await locationService.getLocations();
         if (response.success && response.data) {
-          setAvailableLocations(response.data.locations.map((loc: any) => ({
+          const locationsArray = Array.isArray(response.data) ? response.data : [];
+          setAvailableLocations(locationsArray.map((loc: any) => ({
             id: loc.id,
             name: loc.name
           })));
@@ -824,18 +826,15 @@ const Bookings: React.FC = () => {
           </div>
           <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mt-4 sm:mt-0">
             {isCompanyAdmin && (
-              <select
-                value={selectedLocation || ''}
-                onChange={(e) => setSelectedLocation(e.target.value ? Number(e.target.value) : null)}
-                className={`px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
-              >
-                <option value="">All Locations</option>
-                {availableLocations.map((loc) => (
-                  <option key={loc.id} value={loc.id}>
-                    {loc.name}
-                  </option>
-                ))}
-              </select>
+              <LocationSelector
+                variant="compact"
+                locations={availableLocations}
+                selectedLocation={selectedLocation?.toString() || ''}
+                onLocationChange={(id) => setSelectedLocation(id ? Number(id) : null)}
+                themeColor={themeColor}
+                fullColor={fullColor}
+                showAllOption={true}
+              />
             )}
             <button
               onClick={() => navigate('/bookings/manual')}

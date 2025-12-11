@@ -73,17 +73,7 @@ export interface ApiResponse<T> {
 
 export interface PaginatedResponse<T> {
   success: boolean;
-  data: {
-    locations: T[];
-    pagination: {
-      current_page: number;
-      last_page: number;
-      per_page: number;
-      total: number;
-      from: number;
-      to: number;
-    };
-  };
+  data: T[]; // Backend returns direct array for locations
 }
 
 class LocationService {

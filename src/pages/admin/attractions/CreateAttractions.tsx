@@ -7,10 +7,15 @@ import { attractionService } from '../../../services/AttractionService';
 import type { CreateAttractionData } from '../../../services/AttractionService';
 import Toast from '../../../components/ui/Toast';
 import { getStoredUser } from '../../../utils/storage';
+import { locationService } from '../../../services';
+import type { Location } from '../../../services/LocationService';
+import LocationSelector from '../../../components/admin/LocationSelector';
 
 const CreateAttraction = () => {
   const navigate = useNavigate();
   const { themeColor, fullColor } = useThemeColor();
+  const currentUser = getStoredUser();
+  const isCompanyAdmin = currentUser?.role === 'company_admin';
 
   // Get auth token from localStorage
   const getAuthToken = () => {
@@ -55,7 +60,29 @@ const CreateAttraction = () => {
   const [customCategory, setCustomCategory] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
-  // const [customLocation, setCustomLocation] = useState('');
+  const [locations, setLocations] = useState<Location[]>([]);
+  const [selectedLocation, setSelectedLocation] = useState<string>('');
+
+  const fetchLocations = async () => {
+    if (!isCompanyAdmin) return;
+    
+    try {
+      const response = await locationService.getLocations();
+      const locationsArray = Array.isArray(response.data) ? response.data : [];
+      setLocations(locationsArray);
+      // Set first location as default if available
+      if (locationsArray.length > 0) {
+        setSelectedLocation(locationsArray[0].id.toString());
+      }
+    } catch (error) {
+      console.error('Error fetching locations:', error);
+      setLocations([]);
+    }
+  };
+
+  React.useEffect(() => {
+    fetchLocations();
+  }, []);
 
   const handleInputChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -151,9 +178,9 @@ const CreateAttraction = () => {
       setIsSubmitting(true);
 
       // Convert form data to API format
-      // Include location_id from the currently stored user (if available)
+      // Include location_id from selected location or from the currently stored user
       const attractionData: CreateAttractionData = {
-        location_id: getStoredUser()?.location_id || undefined,
+        location_id: selectedLocation ? Number(selectedLocation) : (getStoredUser()?.location_id || undefined),
         name: formData.name,
         description: formData.description,
         price: Number(formData.price),
@@ -358,7 +385,21 @@ const CreateAttraction = () => {
                     ) : null}
                   </div>
 
-                  {/* Location input removed */}
+                  {/* Location Selection for company_admin */}
+                  {isCompanyAdmin && (
+                    <div className="sm:col-span-2">
+                      <LocationSelector
+                        locations={locations}
+                        selectedLocation={selectedLocation}
+                        onLocationChange={setSelectedLocation}
+                        themeColor={themeColor}
+                        fullColor={fullColor}
+                        layout="grid"
+                        maxWidth="100%"
+                        showAllOption={false}
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
 

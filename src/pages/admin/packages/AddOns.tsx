@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Search, Edit, Trash2, Utensils, Download, Upload, X, CheckSquare, Square } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
-import { addOnService } from '../../../services';
+import { addOnService, locationService } from '../../../services';
+import LocationSelector from '../../../components/admin/LocationSelector';
 import Toast from '../../../components/ui/Toast';
 import type { AddOnsAddon } from '../../../types/addOns.types';
-import { getStoredUser, API_BASE_URL, ASSET_URL } from '../../../utils/storage';
+import type { Location } from '../../../services/LocationService';
+import { getStoredUser, ASSET_URL } from '../../../utils/storage';
 
 const ManageAddons = () => {
   const { themeColor, fullColor } = useThemeColor();
@@ -31,8 +33,9 @@ const ManageAddons = () => {
   // Location filtering for company_admin
   const currentUser = getStoredUser();
   const isCompanyAdmin = currentUser?.role === 'company_admin';
-  const [locations, setLocations] = useState<Array<{ id: number; name: string }>>([]);
+  const [locations, setLocations] = useState<Location[]>([]);
   const [selectedLocationId, setSelectedLocationId] = useState<number | null>(null);
+  const [modalLocationId, setModalLocationId] = useState<number | null>(null);
   
   // Toast state
   const [toast, setToast] = useState<{ message: string; type?: "success" | "error" | "info" } | null>(null);
@@ -46,21 +49,14 @@ const ManageAddons = () => {
     const fetchLocations = async () => {
       if (isCompanyAdmin) {
         try {
-          const response = await fetch(`${API_BASE_URL}/locations`, {
-            headers: {
-              'Authorization': `Bearer ${currentUser?.token}`,
-              'Content-Type': 'application/json'
-            }
-          });
-          const data = await response.json();
-          console.log('Locations data:', data);
-          if (data.success && data.data) {
-            // For company_admin, backend should already filter by company
-            // If not, we'll show all locations since we don't have company_id in stored user
-            setLocations(data.data);
+          const response = await locationService.getLocations();
+          console.log('Locations data:', response);
+          if (response.success && response.data) {
+            const locationsArray = Array.isArray(response.data) ? response.data : [];
+            setLocations(locationsArray);
             // Set first location as default if available
-            if (data.data.length > 0 && selectedLocationId === null) {
-              setSelectedLocationId(data.data[0].id);
+            if (locationsArray.length > 0 && selectedLocationId === null) {
+              setSelectedLocationId(locationsArray[0].id);
             }
           }
         } catch (error) {
@@ -70,7 +66,7 @@ const ManageAddons = () => {
     };
     fetchLocations();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isCompanyAdmin, currentUser]);
+  }, [])
 
   // Load addons from backend
   useEffect(() => {
@@ -203,13 +199,13 @@ const ManageAddons = () => {
         let locationId: number;
         
         if (isCompanyAdmin) {
-          // For company_admin, use selected location or require selection
-          if (!selectedLocationId) {
+          // For company_admin, use modal location or require selection
+          if (!modalLocationId) {
             showToast('Please select a location first', 'error');
             setLoading(false);
             return;
           }
-          locationId = selectedLocationId;
+          locationId = modalLocationId;
         } else {
           // For location_manager/attendant, use their assigned location
           locationId = currentUser?.location_id || 1;
@@ -458,23 +454,25 @@ const ManageAddons = () => {
             
             {/* Location Filter for Company Admin */}
             {isCompanyAdmin && locations.length > 0 && (
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-gray-700 whitespace-nowrap">Location:</span>
-                <select
-                  value={selectedLocationId || ''}
-                  onChange={(e) => {
-                    setSelectedLocationId(e.target.value ? Number(e.target.value) : null);
+              <div className="min-w-[200px]">
+                <LocationSelector
+                  locations={locations.map(loc => ({
+                    id: loc.id.toString(),
+                    name: loc.name,
+                    address: loc.address || '',
+                    city: loc.city || '',
+                    state: loc.state || ''
+                  }))}
+                  selectedLocation={selectedLocationId?.toString() || ''}
+                  onLocationChange={(locationId) => {
+                    setSelectedLocationId(locationId ? Number(locationId) : null);
                     setCurrentPage(1);
                   }}
-                  className={`px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 outline-none min-w-[200px]`}
-                >
-                  <option value="">All Locations</option>
-                  {locations.map((location) => (
-                    <option key={location.id} value={location.id}>
-                      {location.name}
-                    </option>
-                  ))}
-                </select>
+                  themeColor={themeColor}
+                  fullColor={fullColor}
+                  variant="compact"
+                  showAllOption={true}
+                />
               </div>
             )}
           </div>
@@ -657,6 +655,33 @@ const ManageAddons = () => {
               </h2>
               
               <form onSubmit={handleSubmit} className="space-y-5">
+                {/* Location Selector */}
+                {isCompanyAdmin && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Location <span className="text-red-500">*</span>
+                    </label>
+                    <LocationSelector
+                      locations={locations.map(loc => ({
+                        id: loc.id.toString(),
+                        name: loc.name,
+                        address: loc.address || '',
+                        city: loc.city || '',
+                        state: loc.state || ''
+                      }))}
+                      selectedLocation={modalLocationId?.toString() || ''}
+                      onLocationChange={(locationId) => {
+                        setModalLocationId(locationId ? Number(locationId) : null);
+                      }}
+                      themeColor={themeColor}
+                      fullColor={fullColor}
+                      layout="grid"
+                      maxWidth="100%"
+                      showAllOption={false}
+                    />
+                  </div>
+                )}
+
                 {/* Image Upload */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">

@@ -20,6 +20,7 @@ import { useThemeColor } from '../../../hooks/useThemeColor';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
 import { customerService } from '../../../services/CustomerService';
 import { locationService } from '../../../services/LocationService';
+import LocationSelector from '../../../components/admin/LocationSelector';
 import { getStoredUser, API_BASE_URL } from '../../../utils/storage';
 
 // Recharts for charts
@@ -79,7 +80,7 @@ const CustomerAnalytics: React.FC = () => {
     try {
       const response = await locationService.getLocations();
       if (response.success && response.data) {
-        setLocations(response.data.locations);
+        setLocations(Array.isArray(response.data) ? response.data : []);
       }
     } catch (error) {
       console.error('Error fetching locations:', error);
@@ -226,18 +227,15 @@ const CustomerAnalytics: React.FC = () => {
         </div>
         <div className="flex flex-wrap items-center gap-3 mt-4 md:mt-0">
             {isCompanyAdmin && locations.length > 0 && (
-              <select 
-                value={selectedLocation ?? ''}
-                onChange={(e) => setSelectedLocation(e.target.value ? parseInt(e.target.value) : null)}
-                className={`px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-${themeColor}-500`}
-              >
-                <option value="">All Locations</option>
-                {locations.map((location) => (
-                  <option key={location.id} value={location.id}>
-                    {location.name}
-                  </option>
-                ))}
-              </select>
+              <LocationSelector
+                variant="compact"
+                locations={locations}
+                selectedLocation={selectedLocation?.toString() || ''}
+                onLocationChange={(id) => setSelectedLocation(id ? parseInt(id) : null)}
+                themeColor={themeColor}
+                fullColor={fullColor}
+                showAllOption={true}
+              />
             )}
             <select 
               value={dateRange}

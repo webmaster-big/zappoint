@@ -14,6 +14,7 @@ import { attractionService, type Attraction } from '../../../services/Attraction
 import { attractionPurchaseService } from '../../../services/AttractionPurchaseService';
 import { customerService, type Customer } from '../../../services/CustomerService';
 import { locationService } from '../../../services/LocationService';
+import LocationSelector from '../../../components/admin/LocationSelector';
 import Toast from '../../../components/ui/Toast';
 import EmptyStateModal from '../../../components/ui/EmptyStateModal';
 import { ASSET_URL, getStoredUser } from '../../../utils/storage';
@@ -75,7 +76,7 @@ const CreatePurchase = () => {
   
   const currentUser = getStoredUser();
   const isCompanyAdmin = currentUser?.role === 'company_admin';
-  const [locations, setLocations] = useState<Array<{ id: number; name: string }>>([]);
+  const [locations, setLocations] = useState<Array<{ id: number; name: string; address?: string; city?: string; state?: string }>>([]);
   const [selectedLocation, setSelectedLocation] = useState<number | null>(null);
 
   // Fetch locations for company admin
@@ -85,7 +86,7 @@ const CreatePurchase = () => {
         try {
           const response = await locationService.getLocations();
           if (response.success && response.data) {
-            setLocations(response.data.locations);
+            setLocations(Array.isArray(response.data) ? response.data : []);
           }
         } catch (error) {
           console.error('Error fetching locations:', error);
@@ -451,21 +452,21 @@ const CreatePurchase = () => {
             </div>
             
             {isCompanyAdmin && (
-              <div className="flex items-center gap-2">
-                <label className="text-sm font-medium text-gray-700">Location:</label>
-                <select
-                  value={selectedLocation || ''}
-                  onChange={(e) => setSelectedLocation(e.target.value ? Number(e.target.value) : null)}
-                  className={`px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
-                >
-                  <option value="">All Locations</option>
-                  {locations.map((loc) => (
-                    <option key={loc.id} value={loc.id}>
-                      {loc.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <LocationSelector
+                locations={locations.map(loc => ({
+                  id: loc.id.toString(),
+                  name: loc.name,
+                  address: loc.address || '',
+                  city: loc.city || '',
+                  state: loc.state || ''
+                }))}
+                selectedLocation={selectedLocation?.toString() || ''}
+                onLocationChange={(id) => setSelectedLocation(id ? Number(id) : null)}
+                themeColor={themeColor}
+                fullColor={fullColor}
+                variant="compact"
+                showAllOption={true}
+              />
             )}
           </div>
         </div>
