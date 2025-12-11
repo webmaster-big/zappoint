@@ -56,6 +56,8 @@ const CustomerAnalytics: React.FC = () => {
   const [exportFormat, setExportFormat] = useState<'csv' | 'pdf' | 'receipt'>('csv');
   const [exportSections, setExportSections] = useState<string[]>(['customers', 'revenue', 'bookings', 'activities', 'packages']);
   const [isExporting, setIsExporting] = useState(false);
+  const [exportDateRange, setExportDateRange] = useState<'7d' | '30d' | '90d' | '1y' | 'all' | ''>('all');
+  const [exportLocation, setExportLocation] = useState<number | null>(null);
   
   const user = getStoredUser();
   const isCompanyAdmin = user?.role === 'company_admin';
@@ -147,13 +149,13 @@ const CustomerAnalytics: React.FC = () => {
       };
       
       // Only add date_range if it's selected (not empty string)
-      if (dateRange) {
-        params.date_range = dateRange;
+      if (exportDateRange) {
+        params.date_range = exportDateRange;
       }
       
       // Only add location_id if selected
-      if (selectedLocation !== null) {
-        params.location_id = selectedLocation;
+      if (exportLocation !== null) {
+        params.location_id = exportLocation;
       }
 
       console.log('Export params:', params);
@@ -753,11 +755,11 @@ const CustomerAnalytics: React.FC = () => {
             <div className="mb-5">
               <label className="block text-sm font-medium text-gray-700 mb-2">Date Range</label>
               <select 
-                value={dateRange}
-                onChange={(e) => setDateRange(e.target.value as '7d' | '30d' | '90d' | '1y')}
+                value={exportDateRange}
+                onChange={(e) => setExportDateRange(e.target.value as '7d' | '30d' | '90d' | '1y' | 'all' | '')}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                <option value="">All Time</option>
+                <option value="all">All Time</option>
                 <option value="7d">Last 7 days</option>
                 <option value="30d">Last 30 days</option>
                 <option value="90d">Last 90 days</option>
@@ -770,8 +772,8 @@ const CustomerAnalytics: React.FC = () => {
               <div className="mb-5">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Location</label>
                 <select 
-                  value={selectedLocation ?? ''}
-                  onChange={(e) => setSelectedLocation(e.target.value ? parseInt(e.target.value) : null)}
+                  value={exportLocation ?? ''}
+                  onChange={(e) => setExportLocation(e.target.value ? parseInt(e.target.value) : null)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">All Locations</option>
