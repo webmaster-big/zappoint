@@ -158,8 +158,6 @@ const CustomerAnalytics: React.FC = () => {
         params.location_id = exportLocation;
       }
 
-      console.log('Export params:', params);
-
       const response = await fetch(`${API_BASE_URL}/customers/analytics/export`, {
         method: 'POST',
         headers: {
@@ -168,8 +166,6 @@ const CustomerAnalytics: React.FC = () => {
         },
         body: JSON.stringify(params),
       });
-
-      console.log('Export response status:', response.status);
 
       if (response.ok) {
         const blob = await response.blob();
@@ -188,15 +184,14 @@ const CustomerAnalytics: React.FC = () => {
         document.body.removeChild(a);
         
         setShowExportModal(false);
-        alert('Export completed successfully!');
       } else {
         const errorText = await response.text();
         console.error('Export failed:', errorText);
-        alert(`Export failed: ${response.status} - ${errorText}`);
+        alert(`Export failed: ${response.status} - Please try again or contact support.`);
       }
     } catch (error) {
       console.error('Error exporting analytics:', error);
-      alert(`Error exporting analytics: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      alert('Failed to export analytics. Please check your connection and try again.');
     } finally {
       setIsExporting(false);
     }
