@@ -175,7 +175,10 @@ const CustomerAnalytics: React.FC = () => {
         
         const contentDisposition = response.headers.get('Content-Disposition');
         const filenameMatch = contentDisposition?.match(/filename="(.+)"/);
-        const filename = filenameMatch ? filenameMatch[1] : `analytics_export_${Date.now()}.${exportFormat}`;
+        
+        // Use proper file extension based on format
+        const fileExtension = exportFormat === 'receipt' ? 'png' : exportFormat === 'pdf' ? 'html' : 'csv';
+        const filename = filenameMatch ? filenameMatch[1] : `analytics_export_${Date.now()}.${fileExtension}`;
         
         a.download = filename;
         document.body.appendChild(a);
