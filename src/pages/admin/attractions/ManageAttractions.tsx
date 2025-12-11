@@ -27,12 +27,17 @@ import type {
 } from '../../../types/manageAttractions.types';
 import { attractionService } from '../../../services/AttractionService';
 import type { Attraction } from '../../../services/AttractionService';
+import { locationService } from '../../../services/LocationService';
 import Toast from '../../../components/ui/Toast';
 import { createSlugWithId } from '../../../utils/slug';
 import { getStoredUser } from '../../../utils/storage';
 
 const ManageAttractions = () => {
   const { themeColor, fullColor } = useThemeColor();
+  const currentUser = getStoredUser();
+  const isCompanyAdmin = currentUser?.role === 'company_admin';
+  const [locations, setLocations] = useState<Array<{ id: number; name: string }>>([]);
+  const [selectedLocation, setSelectedLocation] = useState<number | null>(null);
   const [attractions, setAttractions] = useState<ManageAttractionsAttraction[]>([]);
 
   // Get auth token from localStorage
@@ -201,10 +206,27 @@ const ManageAttractions = () => {
     }
   ];
 
+  // Fetch locations for company admin
+  useEffect(() => {
+    if (isCompanyAdmin) {
+      const fetchLocations = async () => {
+        try {
+          const response = await locationService.getLocations();
+          if (response.success && response.data) {
+            setLocations(response.data.locations);
+          }
+        } catch (error) {
+          console.error('Error fetching locations:', error);
+        }
+      };
+      fetchLocations();
+    }
+  }, [isCompanyAdmin]);
+
   // Load attractions from localStorage
   useEffect(() => {
     loadAttractions();
-  }, []);
+  }, [selectedLocation]);
 
   // Apply filters when attractions or filters change
   useEffect(() => {
@@ -226,6 +248,10 @@ const ManageAttractions = () => {
       // Only add is_active filter if status is not 'all'
       if (filters.status !== 'all') {
         params.is_active = filters.status === 'active';
+      }
+      
+      if (selectedLocation !== null) {
+        params.location_id = selectedLocation;
       }
       
       const response = await attractionService.getAttractions(params);
@@ -436,6 +462,20 @@ const ManageAttractions = () => {
           <p className="text-gray-600 mt-2">View and manage all attractions in your facility</p>
         </div>
         <div className="mt-4 sm:mt-0 flex gap-2">
+          {isCompanyAdmin && (
+            <select
+              value={selectedLocation || ''}
+              onChange={(e) => setSelectedLocation(e.target.value ? Number(e.target.value) : null)}
+              className={`px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
+            >
+              <option value="">All Locations</option>
+              {locations.map((loc) => (
+                <option key={loc.id} value={loc.id}>
+                  {loc.name}
+                </option>
+              ))}
+            </select>
+          )}
           <button
             className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-semibold whitespace-nowrap flex items-center gap-2"
             onClick={() => setShowImportModal(true)}

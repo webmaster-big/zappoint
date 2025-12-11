@@ -19,6 +19,7 @@ import {
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
 import { customerService } from '../../../services/CustomerService';
+import { locationService } from '../../../services/LocationService';
 import { getStoredUser, API_BASE_URL } from '../../../utils/storage';
 
 // Recharts for charts
@@ -76,14 +77,9 @@ const CustomerAnalytics: React.FC = () => {
 
   const fetchLocations = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/locations`, {
-        headers: {
-          'Authorization': `Bearer ${user?.token}`,
-        },
-      });
-      const data = await response.json();
-      if (data.success) {
-        setLocations(data.data);
+      const response = await locationService.getLocations();
+      if (response.success && response.data) {
+        setLocations(response.data.locations);
       }
     } catch (error) {
       console.error('Error fetching locations:', error);
@@ -148,10 +144,8 @@ const CustomerAnalytics: React.FC = () => {
         include_sections: exportSections,
       };
       
-      // Only add date_range if it's selected (not empty string)
-      if (exportDateRange) {
-        params.date_range = exportDateRange;
-      }
+      // Add date_range (defaults to 'all' if not set)
+      params.date_range = exportDateRange || 'all';
       
       // Only add location_id if selected
       if (exportLocation !== null) {
@@ -174,13 +168,11 @@ const CustomerAnalytics: React.FC = () => {
         a.href = url;
         
         const contentDisposition = response.headers.get('Content-Disposition');
-        const filenameMatch = contentDisposition?.match(/filename="(.+)"/);
+        const filenameMatch = contentDisposition?.match(/filename="(.+)"/);  
         
         // Use proper file extension based on format
-        const fileExtension = exportFormat === 'receipt' ? 'png' : exportFormat === 'pdf' ? 'html' : 'csv';
-        const filename = filenameMatch ? filenameMatch[1] : `analytics_export_${Date.now()}.${fileExtension}`;
-        
-        a.download = filename;
+        const fileExtension = exportFormat === 'receipt' ? 'png' : exportFormat;
+        const filename = filenameMatch ? filenameMatch[1] : `analytics_export_${Date.now()}.${fileExtension}`;        a.download = filename;
         document.body.appendChild(a);
         a.click();
         window.URL.revokeObjectURL(url);

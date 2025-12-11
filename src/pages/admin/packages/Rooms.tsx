@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Edit2, Trash2, Users, MapPin, CheckSquare, Square, Plus, X } from 'lucide-react';
 import Toast from '../../../components/ui/Toast';
-import { roomService } from '../../../services';
+import { roomService, locationService } from '../../../services';
 import type { Room, RoomFilters } from '../../../services/RoomService';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { getStoredUser } from '../../../utils/storage';
-import { API_BASE_URL } from '../../../utils/storage';
 
 const Rooms: React.FC = () => {
     const { themeColor, fullColor } = useThemeColor();
@@ -87,21 +86,13 @@ const Rooms: React.FC = () => {
         const fetchLocations = async () => {
             if (isCompanyAdmin) {
                 try {
-                    const response = await fetch(`${API_BASE_URL}/locations`, {
-                        headers: {
-                            'Authorization': `Bearer ${currentUser?.token}`,
-                            'Content-Type': 'application/json'
-                        }
-                    });
-                    const data = await response.json();
-                    console.log('Locations data:', data);
-                    if (data.success && data.data) {
-                        // For company_admin, backend should already filter by company
-                        // If not, we'll show all locations since we don't have company_id in stored user
-                        setLocations(data.data);
+                    const response = await locationService.getLocations();
+                    console.log('Locations data:', response);
+                    if (response.success && response.data) {
+                        setLocations(response.data.locations);
                         // Set first location as default if available
-                        if (data.data.length > 0 && selectedLocationId === null) {
-                            setSelectedLocationId(data.data[0].id);
+                        if (response.data.locations.length > 0 && selectedLocationId === null) {
+                            setSelectedLocationId(response.data.locations[0].id);
                         }
                     }
                 } catch (error) {

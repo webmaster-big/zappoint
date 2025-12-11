@@ -5,11 +5,16 @@ import { useThemeColor } from '../../../hooks/useThemeColor';
 import bookingService from '../../../services/bookingService';
 import EmptyStateModal from '../../../components/ui/EmptyStateModal';
 import roomService from '../../../services/RoomService';
+import { locationService } from '../../../services/LocationService';
 import { getStoredUser, getImageUrl } from '../../../utils/storage';
 
 const ManualBooking: React.FC = () => {
   const navigate = useNavigate();
   const { themeColor, fullColor } = useThemeColor();
+  const currentUser = getStoredUser();
+  const isCompanyAdmin = currentUser?.role === 'company_admin';
+  const [locations, setLocations] = useState<Array<{ id: number; name: string }>>([]);
+  const [selectedLocation, setSelectedLocation] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [pkg, setPkg] = useState<any>(null);
   const [packages, setPackages] = useState<any[]>([]);
@@ -34,9 +39,26 @@ const ManualBooking: React.FC = () => {
     amountPaid: ''
   });
 
+  // Fetch locations for company admin
+  useEffect(() => {
+    if (isCompanyAdmin) {
+      const fetchLocations = async () => {
+        try {
+          const response = await locationService.getLocations();
+          if (response.success && response.data) {
+            setLocations(response.data.locations);
+          }
+        } catch (error) {
+          console.error('Error fetching locations:', error);
+        }
+      };
+      fetchLocations();
+    }
+  }, [isCompanyAdmin]);
+
   useEffect(() => {
     loadPackages();
-  }, []);
+  }, [selectedLocation]);
 
   useEffect(() => {
     if (form.packageId) {
@@ -56,7 +78,11 @@ const ManualBooking: React.FC = () => {
       }
 
       // Use the same method as OnsiteBooking - backend will filter based on user role
-      const response = await bookingService.getPackages({user_id: user.id});
+      const params: any = {user_id: user.id};
+      if (selectedLocation !== null) {
+        params.location_id = selectedLocation;
+      }
+      const response = await bookingService.getPackages(params);
       
       console.log('📦 Packages response:', response);
       
@@ -331,6 +357,24 @@ const ManualBooking: React.FC = () => {
               <h1 className="text-2xl font-bold text-gray-900">Record Past Booking</h1>
               <p className="text-sm text-gray-500 mt-1">Add historical booking records without validation</p>
             </div>
+            
+            {isCompanyAdmin && (
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium text-gray-700">Location:</label>
+                <select
+                  value={selectedLocation || ''}
+                  onChange={(e) => setSelectedLocation(e.target.value ? Number(e.target.value) : null)}
+                  className={`px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
+                >
+                  <option value="">All Locations</option>
+                  {locations.map((loc) => (
+                    <option key={loc.id} value={loc.id}>
+                      {loc.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
         </div>
       </div>

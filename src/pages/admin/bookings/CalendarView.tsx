@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import bookingService from '../../../services/bookingService';
+import { locationService } from '../../../services/LocationService';
 import type { Booking } from '../../../services/bookingService';
 import type { CalendarViewFilterOptions } from '../../../types/calendarView.types';
 import Toast from '../../../components/ui/Toast';
@@ -53,6 +54,7 @@ const CalendarView: React.FC = () => {
   const [toast, setToast] = useState<ToastMessage | null>(null);
   const [userData, setUserData] = useState<UserData | null>(null);
   const [filterLocation, setFilterLocation] = useState<string>('all');
+  const [locations, setLocations] = useState<Array<{ id: number; name: string }>>([]);
 
   // Load user data from localStorage
   useEffect(() => {
@@ -61,6 +63,23 @@ const CalendarView: React.FC = () => {
       setUserData(JSON.parse(stored));
     }
   }, []);
+  
+  // Fetch locations for company_admin
+  useEffect(() => {
+    const fetchLocations = async () => {
+      if (userData?.role === 'company_admin') {
+        try {
+          const response = await locationService.getLocations();
+          if (response.success && response.data) {
+            setLocations(response.data.locations);
+          }
+        } catch (error) {
+          console.error('Error fetching locations:', error);
+        }
+      }
+    };
+    fetchLocations();
+  }, [userData]);
 
   // Load bookings from API
   const loadBookings = useCallback(async () => {
@@ -297,17 +316,8 @@ const CalendarView: React.FC = () => {
   };
 
   // Get unique locations for filtering (for company-admin)
+  // Use fetched locations instead of extracting from bookings
   const getUniqueLocations = () => {
-    const locations = bookings
-      .filter(booking => booking.location)
-      .reduce((acc, booking) => {
-        if (booking.location && !acc.find(loc => loc.id === (booking.location as { id: number; name: string }).id)) {
-          const location = booking.location as { id: number; name: string };
-          acc.push({ id: location.id, name: location.name });
-        }
-        return acc;
-      }, [] as Array<{ id: number; name: string }>);
-    
     return locations;
   };
 

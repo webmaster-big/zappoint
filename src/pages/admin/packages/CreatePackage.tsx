@@ -9,7 +9,8 @@ import {
     roomService, 
     promoService, 
     giftCardService,
-    packageService 
+    packageService,
+    locationService 
 } from '../../../services';
 import type { 
     CreatePackageAttraction, 
@@ -36,6 +37,28 @@ const CreatePackage: React.FC = () => {
     const [giftCards, setGiftCards] = useState<CreatePackageGiftCard[]>([]); // must include id
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
+    
+    const currentUser = getStoredUser();
+    const isCompanyAdmin = currentUser?.role === 'company_admin';
+    const [locations, setLocations] = useState<Array<{ id: number; name: string }>>([]);
+    const [selectedLocation, setSelectedLocation] = useState<number | null>(null);
+
+    // Fetch locations for company admin
+    useEffect(() => {
+        if (isCompanyAdmin) {
+            const fetchLocations = async () => {
+                try {
+                    const response = await locationService.getLocations();
+                    if (response.success && response.data) {
+                        setLocations(response.data.locations);
+                    }
+                } catch (error) {
+                    console.error('Error fetching locations:', error);
+                }
+            };
+            fetchLocations();
+        }
+    }, [isCompanyAdmin]);
 
     // Fetch data from database on component mount
     useEffect(() => {
@@ -44,10 +67,14 @@ const CreatePackage: React.FC = () => {
                 setLoading(true);
                 
                 // Fetch all data in parallel
+                const params: any = {user_id: getStoredUser()?.id};
+                if (selectedLocation !== null) {
+                    params.location_id = selectedLocation;
+                }
                 const [attractionsRes, addOnsRes, roomsRes, promosRes, giftCardsRes] = await Promise.all([
-                    attractionService.getAttractions({user_id: getStoredUser()?.id}),
-                    addOnService.getAddOns({user_id: getStoredUser()?.id}),
-                    roomService.getRooms({user_id: getStoredUser()?.id}),
+                    attractionService.getAttractions(params),
+                    addOnService.getAddOns(params),
+                    roomService.getRooms(params),
                     promoService.getPromos(),
                     giftCardService.getGiftCards()
                 ]);
@@ -103,7 +130,7 @@ const CreatePackage: React.FC = () => {
         };
 
         fetchData();
-    }, []);
+    }, [selectedLocation]);
 
     // Form state
     const [form, setForm] = useState({
@@ -537,8 +564,31 @@ const CreatePackage: React.FC = () => {
                 {/* Form Section */}
                 <div className="flex-1 mx-auto">
                     <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6 md:p-8">
-                        <h2 className="text-2xl sm:text-3xl font-bold text-neutral-900 tracking-tight">Create Package Deal</h2>
-                        <p className="text-sm text-gray-500 mb-8 mt-2">Fill in the details below to create a new package deal.</p>    
+                        <div className="flex items-center justify-between mb-2">
+                            <div>
+                                <h2 className="text-2xl sm:text-3xl font-bold text-neutral-900 tracking-tight">Create Package Deal</h2>
+                                <p className="text-sm text-gray-500 mt-2">Fill in the details below to create a new package deal.</p>
+                            </div>
+                            
+                            {isCompanyAdmin && (
+                                <div className="flex items-center gap-2">
+                                    <label className="text-sm font-medium text-gray-700">Location:</label>
+                                    <select
+                                        value={selectedLocation || ''}
+                                        onChange={(e) => setSelectedLocation(e.target.value ? Number(e.target.value) : null)}
+                                        className={`px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
+                                    >
+                                        <option value="">All Locations</option>
+                                        {locations.map((loc) => (
+                                            <option key={loc.id} value={loc.id}>
+                                                {loc.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
+                        </div>
+                        <div className="mb-8"></div>    
                         <form className="space-y-8" onSubmit={handleSubmit} autoComplete="off">
                             {/* Image Upload */}
                             <div>

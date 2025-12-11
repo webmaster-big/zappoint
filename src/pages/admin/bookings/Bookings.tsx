@@ -21,6 +21,7 @@ import CounterAnimation from '../../../components/ui/CounterAnimation';
 import type { BookingsPageBooking, BookingsPageFilterOptions } from '../../../types/Bookings.types';
 import bookingService from '../../../services/bookingService';
 import { createPayment } from '../../../services/PaymentService';
+import { locationService } from '../../../services/LocationService';
 import { getStoredUser, API_BASE_URL } from '../../../utils/storage';
 import { MapPin } from 'lucide-react';
 
@@ -65,6 +66,10 @@ const Bookings: React.FC = () => {
   const [foundCustomersForExport, setFoundCustomersForExport] = useState<Array<{id: number, name: string, email: string}>>([]);
   const [searchingCustomers, setSearchingCustomers] = useState(false);
   const [customerSearchDebounce, setCustomerSearchDebounce] = useState<NodeJS.Timeout | null>(null);
+  
+  const currentUser = getStoredUser();
+  const isCompanyAdmin = currentUser?.role === 'company_admin';
+  const [selectedLocation, setSelectedLocation] = useState<number | null>(null);
 
   // Status and payment colors
   const statusColors = {
@@ -122,24 +127,19 @@ const Bookings: React.FC = () => {
 
   // Load bookings from backend API
   useEffect(() => {
-    loadBookings();
     loadLocations();
   }, []);
+  
+  useEffect(() => {
+    loadBookings();
+  }, [selectedLocation]);
 
   const loadLocations = async () => {
     try {
-      const user = getStoredUser();
-      if (user?.role === 'company_admin') {
-        // Fetch all locations for company admin
-        const response = await fetch(`${API_BASE_URL}/locations`, {
-          headers: {
-            'Authorization': `Bearer ${user.token}`,
-            'Accept': 'application/json'
-          }
-        });
-        const data = await response.json();
-        if (data.success && data.data) {
-          setAvailableLocations(data.data.map((loc: any) => ({
+      if (isCompanyAdmin) {
+        const response = await locationService.getLocations();
+        if (response.success && response.data) {
+          setAvailableLocations(response.data.locations.map((loc: any) => ({
             id: loc.id,
             name: loc.name
           })));
@@ -161,13 +161,17 @@ const Bookings: React.FC = () => {
       setLoading(true);
       
       // Fetch bookings from backend with filters
-      const response = await bookingService.getBookings({
+      const params: any = {
         page: 1,
         per_page: 1000,
         user_id: getStoredUser()?.id,
         sort_by: 'booking_date',
         sort_order: 'asc',
-      });
+      };
+      if (selectedLocation !== null) {
+        params.location_id = selectedLocation;
+      }
+      const response = await bookingService.getBookings(params);
       
       if (response.success && response.data) {
         // Transform backend booking data to match BookingsPageBooking interface
@@ -819,6 +823,20 @@ const Bookings: React.FC = () => {
             <p className="text-gray-800 mt-2">Manage all bookings</p>
           </div>
           <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mt-4 sm:mt-0">
+            {isCompanyAdmin && (
+              <select
+                value={selectedLocation || ''}
+                onChange={(e) => setSelectedLocation(e.target.value ? Number(e.target.value) : null)}
+                className={`px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
+              >
+                <option value="">All Locations</option>
+                {availableLocations.map((loc) => (
+                  <option key={loc.id} value={loc.id}>
+                    {loc.name}
+                  </option>
+                ))}
+              </select>
+            )}
             <button
               onClick={() => navigate('/bookings/manual')}
               className={`flex items-center px-4 py-2 bg-${fullColor} text-white rounded-lg hover:bg-${themeColor}-700 shadow-sm transition-colors`}

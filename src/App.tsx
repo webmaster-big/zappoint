@@ -45,7 +45,6 @@ import CreateAccount from "./pages/admin/users/CreateAccounts";
 import EntertainmentLandingPage from "./pages/customer/Home";
 import CustomerLogin from "./pages/customer/CustomerLogin";
 import CustomerRegister from "./pages/customer/CustomerRegister";
-import AttendantsPerformance from "./pages/admin/Attendants/AttendantsPerformance";
 import LocationAnalytics from "./pages/admin/Analytics/LocationManagerAnalytics";
 import CompanyAnalytics from "./pages/admin/Analytics/CompanyAnalytics";
 import AttendantActivityLogs from "./pages/admin/Attendants/AttendantActivityLogs";
@@ -138,13 +137,11 @@ function App() {
           <Route path="/manager/attendant/create" element={<ProtectedRoute allowedRoles={['location_manager']}><CreateAttendant /></ProtectedRoute>} />
           <Route path="/manager/attendants" element={<ProtectedRoute allowedRoles={['location_manager']}><ManageAttendants /></ProtectedRoute>} />
           <Route path="/manager/attendants/activity" element={<ProtectedRoute allowedRoles={['location_manager']}><AttendantActivityLogs /></ProtectedRoute>} />
-          <Route path="/manager/attendants/performance" element={<ProtectedRoute allowedRoles={['location_manager']}><AttendantsPerformance /></ProtectedRoute>} />
           <Route path="/manager/analytics" element={<ProtectedRoute allowedRoles={['location_manager']}><LocationAnalytics /></ProtectedRoute>} />
           
           {/* Company Admin-only Routes */}
           <Route path="/admin/analytics" element={<ProtectedRoute allowedRoles={['company_admin']}><CompanyAnalytics /></ProtectedRoute>} />
           <Route path="/admin/activity" element={<ProtectedRoute allowedRoles={['company_admin']}><LocationActivityLogs /></ProtectedRoute>} />
-          <Route path="/admin/attendants/performance" element={<ProtectedRoute allowedRoles={['company_admin']}><AttendantsPerformance /></ProtectedRoute>} />
           <Route path="/admin/users" element={<ProtectedRoute allowedRoles={['company_admin']}><ManageAccounts /></ProtectedRoute>} />
           <Route path="/admin/users/create" element={<ProtectedRoute allowedRoles={['company_admin']}><CreateAccount /></ProtectedRoute>} />
           

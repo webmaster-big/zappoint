@@ -8,6 +8,7 @@ import { promoService } from './PromoService';
 import { notificationStreamService } from './NotificationStreamService';
 import { metricsService } from './MetricsService';
 import { userService } from './UserService';
+import { locationService } from './LocationService';
 
 // Service exports for easy importing
 export { packageService } from './PackageService';
@@ -51,6 +52,10 @@ export * from './SettingsService';
 // Payment service exports
 export * from './PaymentService';
 
+// Location service exports
+export { locationService } from './LocationService';
+export type { Location, LocationFilters, CreateLocationData, UpdateLocationData } from './LocationService';
+
 // Common API response types
 export type { ApiResponse, PaginatedResponse } from './PackageService';
 
@@ -65,4 +70,5 @@ export const services = {
   notificationStream: notificationStreamService,
   metrics: metricsService,
   users: userService,
-} as const;
+  locations: locationService,
+};

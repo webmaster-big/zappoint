@@ -13,6 +13,7 @@ import type { CreatePurchaseAttraction, CreatePurchaseCustomerInfo } from '../..
 import { attractionService, type Attraction } from '../../../services/AttractionService';
 import { attractionPurchaseService } from '../../../services/AttractionPurchaseService';
 import { customerService, type Customer } from '../../../services/CustomerService';
+import { locationService } from '../../../services/LocationService';
 import Toast from '../../../components/ui/Toast';
 import EmptyStateModal from '../../../components/ui/EmptyStateModal';
 import { ASSET_URL, getStoredUser } from '../../../utils/storage';
@@ -71,17 +72,43 @@ const CreatePurchase = () => {
   const [authorizeEnvironment] = useState<'sandbox' | 'production'>('sandbox');
   const [showNoAuthAccountModal, setShowNoAuthAccountModal] = useState(false);
   const [showEmptyModal, setShowEmptyModal] = useState(false);
+  
+  const currentUser = getStoredUser();
+  const isCompanyAdmin = currentUser?.role === 'company_admin';
+  const [locations, setLocations] = useState<Array<{ id: number; name: string }>>([]);
+  const [selectedLocation, setSelectedLocation] = useState<number | null>(null);
+
+  // Fetch locations for company admin
+  useEffect(() => {
+    if (isCompanyAdmin) {
+      const fetchLocations = async () => {
+        try {
+          const response = await locationService.getLocations();
+          if (response.success && response.data) {
+            setLocations(response.data.locations);
+          }
+        } catch (error) {
+          console.error('Error fetching locations:', error);
+        }
+      };
+      fetchLocations();
+    }
+  }, [isCompanyAdmin]);
 
   // Load attractions from backend
   useEffect(() => {
     const loadAttractions = async () => {
       try {
         setLoading(true);
-        const response = await attractionService.getAttractions({
+        const params: any = {
           is_active: true,
           per_page: 100,
           user_id: getStoredUser()?.id
-        });
+        };
+        if (selectedLocation !== null) {
+          params.location_id = selectedLocation;
+        }
+        const response = await attractionService.getAttractions(params);
         
         // Convert API format to component format
         const convertedAttractions: CreatePurchaseAttraction[] = response.data.attractions.map((attr: Attraction & { location?: { id: number; name: string } }) => ({
@@ -121,7 +148,7 @@ const CreatePurchase = () => {
     };
 
     loadAttractions();
-  }, []);
+  }, [selectedLocation]);
 
   // Filter attractions based on search term
   useEffect(() => {
@@ -417,8 +444,30 @@ const CreatePurchase = () => {
     <div className="min-h-screen p-6">
       <div className="mx-auto">
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-800">Create New Purchase</h1>
-          <p className="text-gray-600">Process on-site ticket purchases for customers</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-800">Create New Purchase</h1>
+              <p className="text-gray-600">Process on-site ticket purchases for customers</p>
+            </div>
+            
+            {isCompanyAdmin && (
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium text-gray-700">Location:</label>
+                <select
+                  value={selectedLocation || ''}
+                  onChange={(e) => setSelectedLocation(e.target.value ? Number(e.target.value) : null)}
+                  className={`px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
+                >
+                  <option value="">All Locations</option>
+                  {locations.map((loc) => (
+                    <option key={loc.id} value={loc.id}>
+                      {loc.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
