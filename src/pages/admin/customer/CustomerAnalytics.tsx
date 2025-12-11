@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Users,
   TrendingUp,
@@ -10,9 +10,16 @@ import {
   Filter,
   Download,
   ChevronDown,
+  Info,
+  FileText,
+  FileSpreadsheet,
+  Receipt,
+  X,
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
+import { customerService } from '../../../services/CustomerService';
+import { getStoredUser, API_BASE_URL } from '../../../utils/storage';
 
 // Recharts for charts
 import {
@@ -32,118 +39,185 @@ import {
   ResponsiveContainer,
   Cell,
 } from 'recharts';
-import type { CustomerAnalyticsCustomerData, CustomerAnalyticsAnalyticsData } from '../../../types/CustomerAnalytics.types';
+import type { CustomerAnalyticsAnalyticsData } from '../../../types/CustomerAnalytics.types';
 
 const CustomerAnalytics: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
   const [dateRange, setDateRange] = useState<'7d' | '30d' | '90d' | '1y'>('30d');
+  const [selectedLocation, setSelectedLocation] = useState<number | null>(null);
+  const [locations, setLocations] = useState<Array<{ id: number; name: string }>>([]);
+  const [loading, setLoading] = useState(true);
+  const [keyMetrics, setKeyMetrics] = useState<any[]>([]);
+  const [analyticsData, setAnalyticsData] = useState<CustomerAnalyticsAnalyticsData | null>(null);
+  const [topActivities, setTopActivities] = useState<any[]>([]);
+  const [topPackages, setTopPackages] = useState<any[]>([]);
+  const [recentCustomers, setRecentCustomers] = useState<any[]>([]);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportFormat, setExportFormat] = useState<'csv' | 'pdf' | 'receipt'>('csv');
+  const [exportSections, setExportSections] = useState<string[]>(['customers', 'revenue', 'bookings', 'activities', 'packages']);
+  const [isExporting, setIsExporting] = useState(false);
+  
+  const user = getStoredUser();
+  const isCompanyAdmin = user?.role === 'company_admin';
 
-  // Sample customer data
-  const customerData: CustomerAnalyticsCustomerData[] = [
-  { id: '1', name: 'John Smith', email: 'john@email.com', joinDate: '2024-01-15', totalSpent: 1250, bookings: 8, lastActivity: '2024-09-20', status: 'active', satisfaction: 4.8 },
-  { id: '2', name: 'Sarah Johnson', email: 'sarah@email.com', joinDate: '2024-02-20', totalSpent: 850, bookings: 5, lastActivity: '2024-09-18', status: 'active', satisfaction: 4.5 },
-  { id: '3', name: 'Mike Wilson', email: 'mike@email.com', joinDate: '2024-03-10', totalSpent: 420, bookings: 3, lastActivity: '2024-09-15', status: 'active', satisfaction: 4.2 },
-  { id: '4', name: 'Emily Davis', email: 'emily@email.com', joinDate: '2024-06-05', totalSpent: 680, bookings: 4, lastActivity: '2024-09-10', status: 'active', satisfaction: 4.9 },
-  { id: '5', name: 'David Brown', email: 'david@email.com', joinDate: '2024-07-12', totalSpent: 320, bookings: 2, lastActivity: '2024-08-28', status: 'inactive', satisfaction: 3.8 },
-  ];
+  // Fetch locations for company admin
+  useEffect(() => {
+    if (isCompanyAdmin) {
+      fetchLocations();
+    }
+  }, [isCompanyAdmin]);
 
-  // Analytics data
-  const analyticsData: CustomerAnalyticsAnalyticsData = {
-    customerGrowth: [
-      { month: 'Jan', customers: 120, growth: 5 },
-      { month: 'Feb', customers: 145, growth: 12 },
-      { month: 'Mar', customers: 168, growth: 8 },
-      { month: 'Apr', customers: 192, growth: 14 },
-      { month: 'May', customers: 210, growth: 9 },
-      { month: 'Jun', customers: 235, growth: 12 },
-      { month: 'Jul', customers: 258, growth: 10 },
-      { month: 'Aug', customers: 285, growth: 11 },
-      { month: 'Sep', customers: 312, growth: 9 },
-    ],
-    revenueTrend: [
-      { month: 'Jan', revenue: 12500, bookings: 45 },
-      { month: 'Feb', revenue: 14200, bookings: 52 },
-      { month: 'Mar', revenue: 15800, bookings: 58 },
-      { month: 'Apr', revenue: 17200, bookings: 63 },
-      { month: 'May', revenue: 18900, bookings: 69 },
-      { month: 'Jun', revenue: 21500, bookings: 78 },
-      { month: 'Jul', revenue: 23800, bookings: 85 },
-      { month: 'Aug', revenue: 26500, bookings: 92 },
-      { month: 'Sep', revenue: 28900, bookings: 98 },
-    ],
-    bookingTimeDistribution: [
-      { time: '8 AM', count: 10 },
-      { time: '9 AM', count: 18 },
-      { time: '10 AM', count: 32 },
-      { time: '11 AM', count: 40 },
-      { time: '12 PM', count: 55 },
-      { time: '1 PM', count: 60 },
-      { time: '2 PM', count: 48 },
-      { time: '3 PM', count: 35 },
-      { time: '4 PM', count: 28 },
-      { time: '5 PM', count: 22 },
-      { time: '6 PM', count: 15 },
-    ],
-    bookingsPerCustomer: [
-      { name: 'John Smith', bookings: 8 },
-      { name: 'Sarah Johnson', bookings: 5 },
-      { name: 'Mike Wilson', bookings: 3 },
-      { name: 'Emily Davis', bookings: 4 },
-      { name: 'David Brown', bookings: 2 },
-    ],
-    statusDistribution: [
-      { status: 'active', count: 4, color: '#10b981' },
-      { status: 'inactive', count: 1, color: '#ef4444' },
-      { status: 'new', count: 0, color: '#3b82f6' },
-    ],
-    // locationDistribution removed
-    activityHours: [
-      { hour: '8 AM', activity: 12 },
-      { hour: '10 AM', activity: 45 },
-      { hour: '12 PM', activity: 78 },
-      { hour: '2 PM', activity: 65 },
-      { hour: '4 PM', activity: 89 },
-      { hour: '6 PM', activity: 95 },
-      { hour: '8 PM', activity: 72 },
-      { hour: '10 PM', activity: 38 },
-    ],
-    customerLifetimeValue: [
-      { segment: 'High Value', value: 45, color: '#10b981' },
-      { segment: 'Medium Value', value: 30, color: '#3b82f6' },
-      { segment: 'Low Value', value: 25, color: '#ef4444' },
-    ],
-    satisfactionScores: [
-      { rating: 5, count: 145, percentage: 46 },
-      { rating: 4, count: 98, percentage: 31 },
-      { rating: 3, count: 42, percentage: 13 },
-      { rating: 2, count: 18, percentage: 6 },
-      { rating: 1, count: 9, percentage: 4 },
-    ],
-    repeatCustomers: [
-      { month: 'Jan', repeatRate: 62 },
-      { month: 'Feb', repeatRate: 65 },
-      { month: 'Mar', repeatRate: 68 },
-      { month: 'Apr', repeatRate: 71 },
-      { month: 'May', repeatRate: 73 },
-      { month: 'Jun', repeatRate: 75 },
-      { month: 'Jul', repeatRate: 76 },
-      { month: 'Aug', repeatRate: 78 },
-      { month: 'Sep', repeatRate: 80 },
-    ],
+  // Fetch analytics data when date range or location changes
+  useEffect(() => {
+    fetchAnalytics();
+  }, [dateRange, selectedLocation]);
+
+  const fetchLocations = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/locations`, {
+        headers: {
+          'Authorization': `Bearer ${user?.token}`,
+        },
+      });
+      const data = await response.json();
+      if (data.success) {
+        setLocations(data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching locations:', error);
+    }
   };
 
-  // Key metrics
-  const keyMetrics = [
-    { label: 'Total Customers', value: '312', change: '+12%', icon: Users, trend: 'up' },
-    { label: 'Active Customers', value: '285', change: '+8%', icon: Activity, trend: 'up' },
-    { label: 'Avg. Satisfaction', value: '4.6/5', change: '+0.2', icon: Star, trend: 'up' },
-    { label: 'Repeat Rate', value: '78%', change: '+5%', icon: Repeat, trend: 'up' },
-    { label: 'Avg. Revenue/Customer', value: '$92.63', change: '+3.2%', icon: DollarSign, trend: 'up' },
-    { label: 'New Customers (30d)', value: '42', change: '+15%', icon: TrendingUp, trend: 'up' },
-  ];
+  const fetchAnalytics = async () => {
+    try {
+      setLoading(true);
+      const params: any = {
+        user_id: user?.id,
+        date_range: dateRange,
+      };
+      
+      if (selectedLocation !== null) {
+        params.location_id = selectedLocation;
+      }
 
-  // Colors for charts
-  // COLORS removed
+      const response = await customerService.getAnalytics(params);
+      
+      if (response.success) {
+        setKeyMetrics(response.data.keyMetrics);
+        setAnalyticsData(response.data.analyticsData);
+        setTopActivities(response.data.topActivities);
+        setTopPackages(response.data.topPackages);
+        setRecentCustomers(response.data.recentCustomers);
+      }
+    } catch (error) {
+      console.error('Error fetching analytics:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Icon mapping for metrics
+  const iconMap: Record<string, any> = {
+    'Total Customers': Users,
+    'Active Customers': Activity,
+    'Total Revenue': DollarSign,
+    'Repeat Rate': Repeat,
+    'Avg. Revenue/Customer': DollarSign,
+    'New Customers (30d)': TrendingUp,
+  };
+
+  // Tooltip descriptions for metrics
+  const metricTooltips: Record<string, string> = {
+    'Total Customers': 'Total number of unique customers who have made bookings or purchases.',
+    'Active Customers': 'Customers who have made at least one booking in the last 30 days.',
+    'Total Revenue': 'Combined revenue from all bookings and attraction purchases in the selected period.',
+    'Repeat Rate': 'Percentage of customers who made more than one booking, indicating customer loyalty.',
+    'Avg. Revenue/Customer': 'Average amount spent per customer, calculated from total revenue divided by customer count.',
+    'New Customers (30d)': 'Number of first-time customers who joined in the last 30 days.',
+  };
+
+  const handleExport = async () => {
+    try {
+      setIsExporting(true);
+      
+      const params: any = {
+        user_id: user?.id,
+        format: exportFormat,
+        include_sections: exportSections,
+      };
+      
+      // Only add date_range if it's selected (not empty string)
+      if (dateRange) {
+        params.date_range = dateRange;
+      }
+      
+      // Only add location_id if selected
+      if (selectedLocation !== null) {
+        params.location_id = selectedLocation;
+      }
+
+      console.log('Export params:', params);
+
+      const response = await fetch(`${API_BASE_URL}/customers/analytics/export`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${user?.token}`,
+        },
+        body: JSON.stringify(params),
+      });
+
+      console.log('Export response status:', response.status);
+
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        
+        const contentDisposition = response.headers.get('Content-Disposition');
+        const filenameMatch = contentDisposition?.match(/filename="(.+)"/);
+        const filename = filenameMatch ? filenameMatch[1] : `analytics_export_${Date.now()}.${exportFormat}`;
+        
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        
+        setShowExportModal(false);
+        alert('Export completed successfully!');
+      } else {
+        const errorText = await response.text();
+        console.error('Export failed:', errorText);
+        alert(`Export failed: ${response.status} - ${errorText}`);
+      }
+    } catch (error) {
+      console.error('Error exporting analytics:', error);
+      alert(`Error exporting analytics: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const toggleSection = (section: string) => {
+    setExportSections(prev => 
+      prev.includes(section) 
+        ? prev.filter(s => s !== section)
+        : [...prev, section]
+    );
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading analytics...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 p-2 sm:p-4 md:p-6 space-y-6">
@@ -158,7 +232,21 @@ const CustomerAnalytics: React.FC = () => {
             Comprehensive insights into customer behavior and performance
           </p>
         </div>
-        <div className="flex items-center gap-3 mt-4 md:mt-0">
+        <div className="flex flex-wrap items-center gap-3 mt-4 md:mt-0">
+            {isCompanyAdmin && locations.length > 0 && (
+              <select 
+                value={selectedLocation ?? ''}
+                onChange={(e) => setSelectedLocation(e.target.value ? parseInt(e.target.value) : null)}
+                className={`px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-${themeColor}-500`}
+              >
+                <option value="">All Locations</option>
+                {locations.map((location) => (
+                  <option key={location.id} value={location.id}>
+                    {location.name}
+                  </option>
+                ))}
+              </select>
+            )}
             <select 
               value={dateRange}
               onChange={(e) => setDateRange(e.target.value as '7d' | '30d' | '90d' | '1y')}
@@ -169,7 +257,10 @@ const CustomerAnalytics: React.FC = () => {
               <option value="90d">Last 90 days</option>
               <option value="1y">Last year</option>
             </select>
-            <button className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm flex items-center gap-2 hover:bg-gray-50">
+            <button 
+              onClick={() => setShowExportModal(true)}
+              className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm flex items-center gap-2 hover:bg-gray-50"
+            >
               <Download className="w-4 h-4" />
               Export
             </button>
@@ -179,12 +270,23 @@ const CustomerAnalytics: React.FC = () => {
       {/* Key Metrics Grid */}
   <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2 sm:gap-4">
         {keyMetrics.map((metric, index) => {
-          const Icon = metric.icon;
+          const Icon = iconMap[metric.label] || Users;
+          const tooltip = metricTooltips[metric.label] || '';
           return (
-            <div key={index} className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+            <div key={index} className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 group relative">
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">{metric.label}</p>
+                <div className="flex-1">
+                  <div className="flex items-center gap-1">
+                    <p className="text-sm font-medium text-gray-600">{metric.label}</p>
+                    {tooltip && (
+                      <div className="relative">
+                        <Info className="w-3 h-3 text-gray-400 cursor-help" />
+                        <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block w-48 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
+                          {tooltip}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                   <CounterAnimation value={metric.value} className="text-2xl font-bold text-gray-900 mt-1" />
                   <p className={`text-xs mt-1 ${
                     metric.trend === 'up' ? 'text-green-600' : 'text-red-600'
@@ -206,11 +308,19 @@ const CustomerAnalytics: React.FC = () => {
         {/* Booking Time Distribution Chart */}
   <div className="bg-white rounded-xl p-3 sm:p-4 shadow-sm border border-gray-100">
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-semibold text-gray-900">Booking Time Distribution</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="text-lg font-semibold text-gray-900">Booking Time Distribution</h3>
+              <div className="group relative">
+                <Info className="w-4 h-4 text-gray-400 cursor-help" />
+                <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
+                  Shows which hours of the day customers prefer to make bookings. Helps identify peak booking times.
+                </div>
+              </div>
+            </div>
             <Clock className="w-4 h-4 text-gray-400" />
           </div>
           <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={analyticsData.bookingTimeDistribution}>
+            <BarChart data={analyticsData?.bookingTimeDistribution || []}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
               <XAxis dataKey="time" stroke="#6b7280" />
               <YAxis stroke="#6b7280" />
@@ -222,11 +332,19 @@ const CustomerAnalytics: React.FC = () => {
         {/* Customer Growth Chart */}
   <div className="bg-white rounded-xl p-3 sm:p-4 shadow-sm border border-gray-100">
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-semibold text-gray-900">Customer Growth</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="text-lg font-semibold text-gray-900">Customer Growth</h3>
+              <div className="group relative">
+                <Info className="w-4 h-4 text-gray-400 cursor-help" />
+                <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
+                  Tracks total customer count over the past 9 months. Shows how your customer base is expanding.
+                </div>
+              </div>
+            </div>
             <Filter className="w-4 h-4 text-gray-400" />
           </div>
           <ResponsiveContainer width="100%" height={300}>
-            <AreaChart data={analyticsData.customerGrowth}>
+            <AreaChart data={analyticsData?.customerGrowth || []}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
               <XAxis dataKey="month" stroke="#6b7280" />
               <YAxis stroke="#6b7280" />
@@ -246,11 +364,19 @@ const CustomerAnalytics: React.FC = () => {
         {/* Revenue Trend */}
   <div className="bg-white rounded-xl p-3 sm:p-4 shadow-sm border border-gray-100">
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-semibold text-gray-900">Revenue & Bookings Trend</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="text-lg font-semibold text-gray-900">Revenue & Bookings Trend</h3>
+              <div className="group relative">
+                <Info className="w-4 h-4 text-gray-400 cursor-help" />
+                <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
+                  Displays monthly revenue and total bookings. Helps correlate booking volume with revenue performance.
+                </div>
+              </div>
+            </div>
             <Filter className="w-4 h-4 text-gray-400" />
           </div>
           <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={analyticsData.revenueTrend}>
+            <LineChart data={analyticsData?.revenueTrend || []}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
               <XAxis dataKey="month" stroke="#6b7280" />
               <YAxis yAxisId="left" stroke={`var(--color-${themeColor}-500)`} />
@@ -280,11 +406,19 @@ const CustomerAnalytics: React.FC = () => {
         {/* Bookings per Customer Chart */}
   <div className="bg-white rounded-xl p-3 sm:p-4 shadow-sm border border-gray-100">
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-semibold text-gray-900">Bookings per Customer</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="text-lg font-semibold text-gray-900">Bookings per Customer</h3>
+              <div className="group relative">
+                <Info className="w-4 h-4 text-gray-400 cursor-help" />
+                <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
+                  Shows top customers by number of bookings. Identifies your most frequent customers.
+                </div>
+              </div>
+            </div>
             <Repeat className="w-4 h-4 text-gray-400" />
           </div>
           <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={analyticsData.bookingsPerCustomer}>
+            <BarChart data={analyticsData?.bookingsPerCustomer || []}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
               <XAxis dataKey="name" stroke="#6b7280" />
               <YAxis stroke="#6b7280" />
@@ -297,13 +431,21 @@ const CustomerAnalytics: React.FC = () => {
         {/* Customer Status Distribution Chart */}
   <div className="bg-white rounded-xl p-3 sm:p-4 shadow-sm border border-gray-100">
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-semibold text-gray-900">Customer Status Distribution</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="text-lg font-semibold text-gray-900">Customer Status Distribution</h3>
+              <div className="group relative">
+                <Info className="w-4 h-4 text-gray-400 cursor-help" />
+                <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
+                  Breakdown of customers by activity status: Active (booked within last 30 days), Inactive (booked before 30 days ago), New (new customers in last 30 days).
+                </div>
+              </div>
+            </div>
             <Activity className="w-4 h-4 text-gray-400" />
           </div>
           <ResponsiveContainer width="100%" height={300}>
             <PieChart>
               <Pie
-                data={analyticsData.statusDistribution}
+                data={analyticsData?.statusDistribution || []}
                 cx="50%"
                 cy="50%"
                 labelLine={false}
@@ -313,7 +455,7 @@ const CustomerAnalytics: React.FC = () => {
                 nameKey="status"
                 label={({ status, count }) => `${status}: ${count}`}
               >
-                {analyticsData.statusDistribution.map((entry, index) => (
+                {(analyticsData?.statusDistribution || []).map((entry, index) => (
                   <Cell key={`cell-status-${index}`} fill={entry.color} />
                 ))}
               </Pie>
@@ -325,11 +467,19 @@ const CustomerAnalytics: React.FC = () => {
         {/* Activity by Hour */}
   <div className="bg-white rounded-xl p-3 sm:p-4 shadow-sm border border-gray-100">
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-semibold text-gray-900">Customer Activity by Hour</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="text-lg font-semibold text-gray-900">Customer Activity by Hour</h3>
+              <div className="group relative">
+                <Info className="w-4 h-4 text-gray-400 cursor-help" />
+                <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
+                  Shows when customers are most active on your platform. Helps optimize staffing and promotional timing.
+                </div>
+              </div>
+            </div>
             <Clock className="w-4 h-4 text-gray-400" />
           </div>
           <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={analyticsData.activityHours}>
+            <BarChart data={analyticsData?.activityHours || []}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
               <XAxis dataKey="hour" stroke="#6b7280" />
               <YAxis stroke="#6b7280" />
@@ -342,13 +492,21 @@ const CustomerAnalytics: React.FC = () => {
         {/* Customer Lifetime Value */}
   <div className="bg-white rounded-xl p-3 sm:p-4 shadow-sm border border-gray-100">
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-semibold text-gray-900">Customer Value Segments</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="text-lg font-semibold text-gray-900">Customer Value Segments</h3>
+              <div className="group relative">
+                <Info className="w-4 h-4 text-gray-400 cursor-help" />
+                <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
+                  Categorizes customers by total spending: High Value ($1000+), Medium Value ($500-$999), Low Value (under $500).
+                </div>
+              </div>
+            </div>
             <DollarSign className="w-4 h-4 text-gray-400" />
           </div>
           <ResponsiveContainer width="100%" height={300}>
             <PieChart>
               <Pie
-                data={analyticsData.customerLifetimeValue}
+                data={analyticsData?.customerLifetimeValue || []}
                 cx="50%"
                 cy="50%"
                 labelLine={false}
@@ -358,7 +516,7 @@ const CustomerAnalytics: React.FC = () => {
                 nameKey="segment"
                 label={({ segment, value }) => `${segment}: ${value}%`}
               >
-                {analyticsData.customerLifetimeValue.map((entry, index) => (
+                {(analyticsData?.customerLifetimeValue || []).map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={entry.color} />
                 ))}
               </Pie>
@@ -367,20 +525,28 @@ const CustomerAnalytics: React.FC = () => {
           </ResponsiveContainer>
         </div>
 
-        {/* Satisfaction Scores */}
+        {/* Repeat Customers */}
   <div className="bg-white rounded-xl p-3 sm:p-4 shadow-sm border border-gray-100">
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-semibold text-gray-900">Customer Satisfaction</h3>
-            <Star className="w-4 h-4 text-gray-400" />
+            <div className="flex items-center gap-2">
+              <h3 className="text-lg font-semibold text-gray-900">Repeat Customer Rate</h3>
+              <div className="group relative">
+                <Info className="w-4 h-4 text-gray-400 cursor-help" />
+                <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
+                  Percentage of customers who made multiple bookings each month. Higher rates indicate better customer loyalty.
+                </div>
+              </div>
+            </div>
+            <Repeat className="w-4 h-4 text-gray-400" />
           </div>
           <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={analyticsData.satisfactionScores}>
+            <LineChart data={analyticsData?.repeatCustomers || []}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-              <XAxis dataKey="rating" stroke="#6b7280" />
+              <XAxis dataKey="month" stroke="#6b7280" />
               <YAxis stroke="#6b7280" />
               <Tooltip />
-              <Bar dataKey="percentage" fill="#f59e0b" radius={[4, 4, 0, 0]} />
-            </BarChart>
+              <Line type="monotone" dataKey="repeatRate" stroke="#10b981" strokeWidth={2} name="Repeat Rate %" />
+            </LineChart>
           </ResponsiveContainer>
         </div>
       </div>
@@ -389,10 +555,16 @@ const CustomerAnalytics: React.FC = () => {
       {/* Top 5 Tables in grid-2 */}
   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
   <div className="bg-white rounded-xl shadow-sm p-3 sm:p-6 border border-gray-100">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+          <div className="flex items-center gap-2 mb-4">
             <Activity className={`w-5 h-5 text-${themeColor}-600`} />
-            Top 5 Most Purchased Activities by Customer
-          </h3>
+            <h3 className="text-lg font-semibold text-gray-900">Top 5 Most Purchased Activities by Customer</h3>
+            <div className="group relative">
+              <Info className="w-4 h-4 text-gray-400 cursor-help" />
+              <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
+                Shows which individual activities are most popular among your top customers. Helps identify trending attractions.
+              </div>
+            </div>
+          </div>
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-200">
@@ -402,40 +574,35 @@ const CustomerAnalytics: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {/* Example static data, replace with dynamic if available */}
-              <tr className="border-b border-gray-100 hover:bg-gray-50">
-                <td className="py-3">John Smith</td>
-                <td className="py-3">Laser Tag</td>
-                <td className="py-3 font-medium">12</td>
-              </tr>
-              <tr className="border-b border-gray-100 hover:bg-gray-50">
-                <td className="py-3">Sarah Johnson</td>
-                <td className="py-3">Bowling</td>
-                <td className="py-3 font-medium">10</td>
-              </tr>
-              <tr className="border-b border-gray-100 hover:bg-gray-50">
-                <td className="py-3">Emily Davis</td>
-                <td className="py-3">Arcade</td>
-                <td className="py-3 font-medium">9</td>
-              </tr>
-              <tr className="border-b border-gray-100 hover:bg-gray-50">
-                <td className="py-3">Mike Wilson</td>
-                <td className="py-3">Mini Golf</td>
-                <td className="py-3 font-medium">8</td>
-              </tr>
-              <tr className="border-b border-gray-100 hover:bg-gray-50">
-                <td className="py-3">David Brown</td>
-                <td className="py-3">Bumper Cars</td>
-                <td className="py-3 font-medium">7</td>
-              </tr>
+              {topActivities.length > 0 ? (
+                topActivities.map((activity, index) => (
+                  <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
+                    <td className="py-3">{activity.customer}</td>
+                    <td className="py-3">{activity.activity}</td>
+                    <td className="py-3 font-medium">{activity.purchases}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={3} className="py-8 text-center text-gray-500">
+                    No activity data available
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
   <div className="bg-white rounded-xl shadow-sm p-3 sm:p-6 border border-gray-100">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+          <div className="flex items-center gap-2 mb-4">
             <DollarSign className="w-5 h-5 text-green-600" />
-            Top 5 Most Booked Packages by Customer
-          </h3>
+            <h3 className="text-lg font-semibold text-gray-900">Top 5 Most Booked Packages by Customer</h3>
+            <div className="group relative">
+              <Info className="w-4 h-4 text-gray-400 cursor-help" />
+              <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
+                Displays the most popular package deals among customers. Reveals which bundles drive the most bookings.
+              </div>
+            </div>
+          </div>
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-200">
@@ -445,32 +612,21 @@ const CustomerAnalytics: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {/* Example static data, replace with dynamic if available */}
-              <tr className="border-b border-gray-100 hover:bg-gray-50">
-                <td className="py-3">John Smith</td>
-                <td className="py-3">Family Fun Pack</td>
-                <td className="py-3 font-medium">15</td>
-              </tr>
-              <tr className="border-b border-gray-100 hover:bg-gray-50">
-                <td className="py-3">Sarah Johnson</td>
-                <td className="py-3">Birthday Bash</td>
-                <td className="py-3 font-medium">13</td>
-              </tr>
-              <tr className="border-b border-gray-100 hover:bg-gray-50">
-                <td className="py-3">Emily Davis</td>
-                <td className="py-3">Weekend Adventure</td>
-                <td className="py-3 font-medium">11</td>
-              </tr>
-              <tr className="border-b border-gray-100 hover:bg-gray-50">
-                <td className="py-3">Mike Wilson</td>
-                <td className="py-3">Couple's Retreat</td>
-                <td className="py-3 font-medium">9</td>
-              </tr>
-              <tr className="border-b border-gray-100 hover:bg-gray-50">
-                <td className="py-3">David Brown</td>
-                <td className="py-3">Kids Zone</td>
-                <td className="py-3 font-medium">8</td>
-              </tr>
+              {topPackages.length > 0 ? (
+                topPackages.map((pkg, index) => (
+                  <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
+                    <td className="py-3">{pkg.customer}</td>
+                    <td className="py-3">{pkg.package}</td>
+                    <td className="py-3 font-medium">{pkg.bookings}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={3} className="py-8 text-center text-gray-500">
+                    No package data available
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -479,7 +635,15 @@ const CustomerAnalytics: React.FC = () => {
       {/* Recent Customers Table */}
   <div className="bg-white rounded-xl shadow-sm p-3 sm:p-6 border border-gray-100">
         <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-semibold text-gray-900">Recent Customers</h3>
+          <div className="flex items-center gap-2">
+            <h3 className="text-lg font-semibold text-gray-900">Recent Customers</h3>
+            <div className="group relative">
+              <Info className="w-4 h-4 text-gray-400 cursor-help" />
+              <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
+                List of recent customers with their activity summary. Shows join date, spending, booking count, and current status.
+              </div>
+            </div>
+          </div>
           <button className={`text-sm text-${themeColor}-600 hover:text-${themeColor}-700 flex items-center gap-1`}>
             View All <ChevronDown className="w-4 h-4" />
           </button>
@@ -492,46 +656,195 @@ const CustomerAnalytics: React.FC = () => {
                 <th className="text-left py-3 font-medium text-gray-600">Join Date</th>
                 <th className="text-left py-3 font-medium text-gray-600">Total Spent</th>
                 <th className="text-left py-3 font-medium text-gray-600">Bookings</th>
-                <th className="text-left py-3 font-medium text-gray-600">Satisfaction</th>
+                <th className="text-left py-3 font-medium text-gray-600">Last Activity</th>
                 <th className="text-left py-3 font-medium text-gray-600">Status</th>
               </tr>
             </thead>
             <tbody>
-              {customerData.map((customer) => (
-                <tr key={customer.id} className="border-b border-gray-100 hover:bg-gray-50">
-                  <td className="py-3">
-                    <div>
-                      <div className="font-medium text-gray-900">{customer.name}</div>
-                      <div className="text-xs text-gray-500">{customer.email}</div>
-                    </div>
-                  </td>
-                  {/* Location column removed */}
-                  <td className="py-3 text-gray-600">{new Date(customer.joinDate).toLocaleDateString()}</td>
-                  <td className="py-3 font-medium">${customer.totalSpent}</td>
-                  <td className="py-3 text-gray-600">{customer.bookings}</td>
-                  <td className="py-3">
-                    <div className="flex items-center gap-1">
-                      <Star className="w-3 h-3 text-yellow-400 fill-current" />
-                      <span className="text-sm font-medium">{customer.satisfaction}</span>
-                    </div>
-                  </td>
-                  <td className="py-3">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      customer.status === 'active' 
-                        ? 'bg-green-100 text-green-800'
-                        : customer.status === 'new'
-                        ? `bg-${themeColor}-100 text-${fullColor}`
-                        : 'bg-gray-100 text-gray-800'
-                    }`}>
-                      {customer.status}
-                    </span>
+              {recentCustomers.length > 0 ? (
+                recentCustomers.map((customer) => (
+                  <tr key={customer.id} className="border-b border-gray-100 hover:bg-gray-50">
+                    <td className="py-3">
+                      <div>
+                        <div className="font-medium text-gray-900">{customer.name}</div>
+                        <div className="text-xs text-gray-500">{customer.email}</div>
+                      </div>
+                    </td>
+                    <td className="py-3 text-gray-600">{new Date(customer.joinDate).toLocaleDateString()}</td>
+                    <td className="py-3 font-medium">${customer.totalSpent}</td>
+                    <td className="py-3 text-gray-600">{customer.bookings}</td>
+                    <td className="py-3">
+                      <div className="flex items-center gap-1">
+                        <Activity className="w-3 h-3 text-gray-400" />
+                        <span className="text-sm font-medium">{new Date(customer.lastActivity).toLocaleDateString()}</span>
+                      </div>
+                    </td>
+                    <td className="py-3">
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        customer.status === 'active' 
+                          ? 'bg-green-100 text-green-800'
+                          : customer.status === 'new'
+                          ? `bg-${themeColor}-100 text-${fullColor}`
+                          : 'bg-gray-100 text-gray-800'
+                      }`}>
+                        {customer.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={6} className="py-8 text-center text-gray-500">
+                    No customer data available
                   </td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
         </div>
       </div>
+
+      {/* Export Modal */}
+      {showExportModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 p-6">
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-lg font-semibold text-gray-900">Export Analytics</h3>
+              <button
+                onClick={() => setShowExportModal(false)}
+                className="p-1 hover:bg-gray-100 rounded transition-colors"
+              >
+                <X className="w-5 h-5 text-gray-400" />
+              </button>
+            </div>
+            
+            {/* Format Selection */}
+            <div className="mb-5">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Export Format</label>
+              <div className="flex gap-4">
+                {[
+                  { value: 'csv', label: 'CSV', icon: FileSpreadsheet },
+                  { value: 'pdf', label: 'PDF', icon: FileText },
+                  { value: 'receipt', label: 'Receipt', icon: Receipt }
+                ].map((format) => {
+                  const Icon = format.icon;
+                  return (
+                    <label
+                      key={format.value}
+                      className="flex items-center gap-2 cursor-pointer"
+                    >
+                      <input
+                        type="radio"
+                        name="format"
+                        value={format.value}
+                        checked={exportFormat === format.value}
+                        onChange={() => setExportFormat(format.value as 'csv' | 'pdf' | 'receipt')}
+                        className="w-4 h-4 text-blue-600"
+                      />
+                      <Icon className="w-4 h-4 text-gray-500" />
+                      <span className="text-sm text-gray-700">{format.label}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Date Range Selection */}
+            <div className="mb-5">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Date Range</label>
+              <select 
+                value={dateRange}
+                onChange={(e) => setDateRange(e.target.value as '7d' | '30d' | '90d' | '1y')}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">All Time</option>
+                <option value="7d">Last 7 days</option>
+                <option value="30d">Last 30 days</option>
+                <option value="90d">Last 90 days</option>
+                <option value="1y">Last year</option>
+              </select>
+            </div>
+
+            {/* Location Selection for Company Admin */}
+            {isCompanyAdmin && locations.length > 0 && (
+              <div className="mb-5">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Location</label>
+                <select 
+                  value={selectedLocation ?? ''}
+                  onChange={(e) => setSelectedLocation(e.target.value ? parseInt(e.target.value) : null)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">All Locations</option>
+                  {locations.map((location) => (
+                    <option key={location.id} value={location.id}>
+                      {location.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Sections Selection */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Include Sections</label>
+              <div className="space-y-2">
+                {[
+                  { id: 'customers', label: 'Customers', icon: Users },
+                  { id: 'revenue', label: 'Revenue', icon: DollarSign },
+                  { id: 'bookings', label: 'Bookings', icon: Activity },
+                  { id: 'activities', label: 'Activities', icon: TrendingUp },
+                  { id: 'packages', label: 'Packages', icon: Star }
+                ].map((section) => {
+                  const Icon = section.icon;
+                  return (
+                    <label
+                      key={section.id}
+                      className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={exportSections.includes(section.id)}
+                        onChange={() => toggleSection(section.id)}
+                        className="w-4 h-4 text-blue-600 rounded"
+                      />
+                      <Icon className="w-4 h-4 text-gray-400" />
+                      <span className="text-sm text-gray-700">{section.label}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={() => setShowExportModal(false)}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                disabled={isExporting}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleExport}
+                disabled={isExporting || exportSections.length === 0}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+              >
+                {isExporting ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Exporting...
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-4 h-4" />
+                    Export
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

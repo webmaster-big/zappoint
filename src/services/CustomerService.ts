@@ -235,6 +235,50 @@ class CustomerService {
     const response = await api.get(`/customers/list/${userId}`, { params: filters });
     return response.data;
   }
+
+  /**
+   * Get customer analytics with optional location filter
+   */
+  async getAnalytics(params: {
+    user_id?: number;
+    date_range?: '7d' | '30d' | '90d' | '1y';
+    location_id?: number;
+  }): Promise<{
+    success: boolean;
+    data: {
+      keyMetrics: Array<{
+        label: string;
+        value: string;
+        change: string;
+        trend: 'up' | 'down';
+      }>;
+      analyticsData: {
+        customerGrowth: Array<{ month: string; customers: number; growth: number }>;
+        revenueTrend: Array<{ month: string; revenue: number; bookings: number }>;
+        bookingTimeDistribution: Array<{ time: string; count: number }>;
+        bookingsPerCustomer: Array<{ name: string; bookings: number }>;
+        statusDistribution: Array<{ status: string; count: number; color: string }>;
+        activityHours: Array<{ hour: string; activity: number }>;
+        customerLifetimeValue: Array<{ segment: string; value: number; color: string }>;
+        repeatCustomers: Array<{ month: string; repeatRate: number }>;
+      };
+      topActivities: Array<{ customer: string; activity: string; purchases: number }>;
+      topPackages: Array<{ customer: string; package: string; bookings: number }>;
+      recentCustomers: Array<{
+        id: string;
+        name: string;
+        email: string;
+        joinDate: string;
+        totalSpent: number;
+        bookings: number;
+        lastActivity: string;
+        status: string;
+      }>;
+    };
+  }> {
+    const response = await api.get('/customers/analytics', { params });
+    return response.data;
+  }
 }
 
 // Export a singleton instance

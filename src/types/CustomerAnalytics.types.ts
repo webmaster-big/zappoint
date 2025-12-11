@@ -9,7 +9,6 @@ export interface CustomerAnalyticsCustomerData {
   bookings: number;
   lastActivity: string;
   status: 'active' | 'inactive' | 'new';
-  satisfaction: number;
 }
 
 export interface CustomerAnalyticsAnalyticsData {
@@ -18,7 +17,6 @@ export interface CustomerAnalyticsAnalyticsData {
   activityHours: { hour: string; activity: number }[];
   bookingTimeDistribution: { time: string; count: number }[];
   customerLifetimeValue: { segment: string; value: number; color: string }[];
-  satisfactionScores: { rating: number; count: number; percentage: number }[];
   repeatCustomers: { month: string; repeatRate: number }[];
   bookingsPerCustomer: { name: string; bookings: number }[];
   statusDistribution: { status: string; count: number; color: string }[];
