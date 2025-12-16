@@ -313,7 +313,7 @@ const PackageDetails = () => {
           {/* Rooms */}
           {packageData.rooms && packageData.rooms.length > 0 && (
             <div className="p-6 border-b border-gray-100">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">Available Rooms</h2>
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">Available Spaces</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {packageData.rooms.map((room: string | { name?: string; capacity?: number }, idx: number) => {
                   const roomObj = typeof room === 'string' ? { name: room } : room;

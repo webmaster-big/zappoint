@@ -23,7 +23,23 @@ const ManualBooking: React.FC = () => {
   const [selectedAddOns, setSelectedAddOns] = useState<{ [id: number]: number }>({});
   const [selectedAttractions, setSelectedAttractions] = useState<{ [id: number]: number }>({});
   const [creatingRoom, setCreatingRoom] = useState(false);
-  const [form, setForm] = useState({
+  const [sendEmail, setSendEmail] = useState(true);
+  const [form, setForm] = useState<{
+    customerName: string;
+    email: string;
+    phone: string;
+    packageId: string;
+    roomId: string;
+    bookingDate: string;
+    bookingTime: string;
+    participants: number;
+    paymentMethod: 'cash' | 'card' | 'paylater';
+    paymentStatus: 'paid' | 'partial' | 'pending';
+    status: 'completed' | 'confirmed' | 'pending';
+    notes: string;
+    totalAmount: string;
+    amountPaid: string;
+  }>({
     customerName: '',
     email: '',
     phone: '',
@@ -32,9 +48,9 @@ const ManualBooking: React.FC = () => {
     bookingDate: '',
     bookingTime: '',
     participants: 1,
-    paymentMethod: 'cash' as const,
-    paymentStatus: 'paid' as const,
-    status: 'completed' as const,
+    paymentMethod: 'cash',
+    paymentStatus: 'paid',
+    status: 'completed',
     notes: '',
     totalAmount: '',
     amountPaid: ''
@@ -173,7 +189,7 @@ const ManualBooking: React.FC = () => {
               room_id: response.data.id
             });
           } catch (error) {
-            console.error('Error linking room to package:', error);
+            console.error('Error linking space to package:', error);
             // Continue even if linking fails - room is still created
           }
         }
@@ -184,20 +200,20 @@ const ManualBooking: React.FC = () => {
           rooms: [...(prev.rooms || []), response.data]
         }));
 
-        // Set the newly created room as selected
+        // Set the newly created space as selected
         setForm(prev => ({
           ...prev,
           roomId: response.data.id.toString()
         }));
 
-        // Reload package details to get updated rooms
+        // Reload package details to get updated spaces
         if (form.packageId) {
           await loadPackageDetails(parseInt(form.packageId));
         }
       }
     } catch (error: any) {
-      console.error('Error creating room:', error);
-      alert('Failed to create room: ' + (error.response?.data?.message || error.message));
+      console.error('Error creating Space:', error);
+      alert('Failed to create Space: ' + (error.response?.data?.message || error.message));
     } finally {
       setCreatingRoom(false);
     }
@@ -276,8 +292,8 @@ const ManualBooking: React.FC = () => {
       const user = getStoredUser();
       const calculatedTotal = calculateTotal();
       const finalTotalAmount = form.totalAmount ? Number(form.totalAmount) : calculatedTotal;
-      const finalAmountPaid = form.amountPaid ? Number(form.amountPaid) : 
-        (form.paymentStatus === 'paid' ? finalTotalAmount : (form.paymentStatus === 'partial' ? finalTotalAmount / 2 : 0));
+      const finalAmountPaid = form.paymentMethod === 'paylater' ? 0 : (form.amountPaid ? Number(form.amountPaid) : 
+        (form.paymentStatus === 'paid' ? finalTotalAmount : (form.paymentStatus === 'partial' ? finalTotalAmount / 2 : 0)));
       
       // Prepare add-ons with price_at_booking
       const additionalAddons = Object.entries(selectedAddOns).map(([id, quantity]) => {
@@ -320,7 +336,8 @@ const ManualBooking: React.FC = () => {
         location_id: user?.location_id,
         created_by: user?.id,
         additional_addons: additionalAddons.length > 0 ? additionalAddons : undefined,
-        additional_attractions: additionalAttractions.length > 0 ? additionalAttractions : undefined
+        additional_attractions: additionalAttractions.length > 0 ? additionalAttractions : undefined,
+        send_email: sendEmail
       };
 
       console.log('Creating past booking record:', bookingData);
@@ -610,7 +627,7 @@ const ManualBooking: React.FC = () => {
                             ))}
                             <input
                               type="text"
-                              placeholder="Type new room name"
+                              placeholder="Type new Space name"
                               id="new-room-name"
                               className="rounded-lg border border-gray-300 px-4 py-2 text-sm bg-white transition-all placeholder:text-gray-400 focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent"
                               onKeyDown={(e) => {
@@ -625,7 +642,7 @@ const ManualBooking: React.FC = () => {
                             <button
                               type="button"
                               className={`p-2 rounded-lg transition-colors ${creatingRoom ? 'opacity-50 cursor-not-allowed' : 'hover:bg-${themeColor}-50'}`}
-                              title="Add new room"
+                              title="Add new Space"
                               disabled={creatingRoom}
                               onClick={() => {
                                 const input = document.getElementById('new-room-name') as HTMLInputElement;
@@ -930,6 +947,7 @@ const ManualBooking: React.FC = () => {
                       >
                         <option value="cash">Cash</option>
                         <option value="card">Card</option>
+                        <option value="paylater">Pay Later</option>
                       </select>
                     </div>
                     
@@ -959,6 +977,28 @@ const ManualBooking: React.FC = () => {
                       />
                     </div>
                   </div>
+                </div>
+              )}
+
+              {/* Send Email Receipt Checkbox */}
+              {pkg && (
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                  <label className="flex items-center space-x-3 cursor-pointer group">
+                    <input
+                      type="checkbox"
+                      checked={sendEmail}
+                      onChange={(e) => setSendEmail(e.target.checked)}
+                      className={`w-4 h-4 rounded border-gray-300 text-${themeColor}-600 focus:ring-${themeColor}-500 cursor-pointer`}
+                    />
+                    <span className="text-sm text-gray-700 group-hover:text-gray-900">
+                      Send confirmation email to customer
+                    </span>
+                  </label>
+                  {!sendEmail && (
+                    <p className="text-xs text-gray-500 mt-2">
+                      Customer will not receive a booking confirmation email
+                    </p>
+                  )}
                 </div>
               )}
 

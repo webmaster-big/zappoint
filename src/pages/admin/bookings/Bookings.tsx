@@ -26,6 +26,16 @@ import LocationSelector from '../../../components/admin/LocationSelector';
 import { getStoredUser, API_BASE_URL } from '../../../utils/storage';
 import { MapPin } from 'lucide-react';
 
+// Convert 24-hour time to 12-hour format with AM/PM
+const formatTime12Hour = (time24: string): string => {
+  if (!time24) return '';
+  const [hours24, minutes] = time24.split(':');
+  const hours = parseInt(hours24, 10);
+  const period = hours >= 12 ? 'PM' : 'AM';
+  const hours12 = hours % 12 || 12;
+  return `${hours12}:${minutes} ${period}`;
+};
+
 const Bookings: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
   const navigate = useNavigate();
@@ -693,7 +703,7 @@ const Bookings: React.FC = () => {
       booking.room?.name || '',
       booking.location?.name || '',
       booking.booking_date || '',
-      booking.booking_time || '',
+      booking.booking_time ? formatTime12Hour(booking.booking_time) : '',
       booking.participants || 0,
       booking.duration && booking.duration_unit ? `${booking.duration} ${booking.duration_unit}` : '',
       booking.status || '',
@@ -1090,7 +1100,7 @@ const Bookings: React.FC = () => {
                         <div className="font-medium text-gray-900">
                           {new Date(booking.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                         </div>
-                        <div className="text-xs text-gray-500">{booking.time}</div>
+                        <div className="text-xs text-gray-500">{formatTime12Hour(booking.time)}</div>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <div className="font-medium text-gray-900">{booking.customerName}</div>

@@ -29,12 +29,13 @@ export interface AttractionPurchase {
   id: number;
   attraction_id: number;
   customer_id?: number;
+  location_id?: number;
   guest_name?: string;
   guest_email?: string;
   guest_phone?: string;
   quantity: number;
   total_amount: number;
-  payment_method: 'card' | 'cash';
+  payment_method: 'card' | 'cash' | 'paylater';
   status: 'pending' | 'completed' | 'cancelled';
   purchase_date: string;
   notes?: string;
@@ -62,7 +63,7 @@ export interface CreatePurchaseData {
   guest_email?: string;
   guest_phone?: string;
   quantity: number;
-  payment_method: 'card' | 'cash';
+  payment_method: 'card' | 'cash' | 'paylater';
   purchase_date: string;
   notes?: string;
   // Optional fields for payment tracking
@@ -154,6 +155,13 @@ class AttractionPurchaseService {
   async getPurchase(id: number): Promise<ApiResponse<AttractionPurchase>> {
     const response = await api.get(`/attraction-purchases/${id}`);
     return response.data;
+  }
+
+  /**
+   * Alias for getPurchase - Get a specific purchase by ID
+   */
+  async getPurchaseById(id: number): Promise<ApiResponse<AttractionPurchase>> {
+    return this.getPurchase(id);
   }
 
   /**

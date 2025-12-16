@@ -57,7 +57,7 @@ export interface CreateBookingData {
   total_amount: number;
   amount_paid?: number;
   discount_amount?: number;
-  payment_method?: 'card' | 'cash';
+  payment_method?: 'card' | 'cash' | 'paylater';
   payment_status?: 'paid' | 'partial' | 'pending';
   
   // Status and notes

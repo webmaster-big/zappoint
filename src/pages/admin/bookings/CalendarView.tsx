@@ -24,6 +24,15 @@ import Toast from '../../../components/ui/Toast';
 import type { ToastMessage } from './../../../types/Toast';
 import { getStoredUser } from '../../../utils/storage';
 
+// Convert 24-hour time to 12-hour format with AM/PM
+const formatTime12Hour = (time24: string): string => {
+  if (!time24) return '';
+  const [hours24, minutes] = time24.split(':');
+  const hours = parseInt(hours24, 10);
+  const period = hours >= 12 ? 'PM' : 'AM';
+  const hours12 = hours % 12 || 12;
+  return `${hours12}:${minutes} ${period}`;
+};
 
 interface UserData {
   name: string;
@@ -350,7 +359,7 @@ const CalendarView: React.FC = () => {
                   <div>
                     <h4 className="font-medium text-gray-900">{booking.guest_name || 'Guest'}</h4>
                     <p className="text-sm text-gray-500">{getBookingTitle(booking)}</p>
-                    <p className="text-sm text-gray-500">{booking.booking_time}</p>
+                    <p className="text-sm text-gray-500">{formatTime12Hour(booking.booking_time)}</p>
                   </div>
                   <div className="flex flex-col items-end gap-2">
                     <span className={`px-2 py-1 text-xs font-medium rounded-full ${
@@ -414,10 +423,10 @@ const CalendarView: React.FC = () => {
                   <div 
                     key={booking.id} 
                     className={`text-xs rounded p-2 mb-2 cursor-pointer ${getBookingColor()}`}
-                    title={`${booking.guest_name || 'Guest'} - ${booking.booking_time}`}
+                    title={`${booking.guest_name || 'Guest'} - ${formatTime12Hour(booking.booking_time)}`}
                     onClick={() => setSelectedBooking(booking)}
                   >
-                    <div className="font-medium truncate">{booking.booking_time} - {booking.guest_name || 'Guest'}</div>
+                    <div className="font-medium truncate">{formatTime12Hour(booking.booking_time)} - {booking.guest_name || 'Guest'}</div>
                     <div className="truncate">{getBookingTitle(booking)}</div>
                   </div>
                 ))}
@@ -473,7 +482,12 @@ const CalendarView: React.FC = () => {
                 className={`border border-gray-200 rounded-lg p-3 h-32 overflow-y-auto ${
                   day.toDateString() === new Date().toDateString() ? `bg-${themeColor}-50` : ''
                 }`}
-                onClick={() => setSelectedDate(day.toISOString().split('T')[0])}
+                onClick={() => {
+                  const year = day.getFullYear();
+                  const month = String(day.getMonth() + 1).padStart(2, '0');
+                  const dayNum = String(day.getDate()).padStart(2, '0');
+                  setSelectedDate(`${year}-${month}-${dayNum}`);
+                }}
               >
                 <div className="text-sm font-medium mb-2 sticky top-0">
                   {day.getDate()}
@@ -483,13 +497,13 @@ const CalendarView: React.FC = () => {
                   <div 
                     key={booking.id} 
                     className={`text-xs rounded p-2 mb-2 cursor-pointer ${getBookingColor()}`}
-                    title={`${booking.guest_name || 'Guest'} - ${booking.booking_time}`}
+                    title={`${booking.guest_name || 'Guest'} - ${formatTime12Hour(booking.booking_time)}`}
                     onClick={e => {
                       e.stopPropagation();
                       setSelectedBooking(booking);
                     }}
                   >
-                    <div className="font-medium truncate">{booking.booking_time} - {booking.guest_name || 'Guest'}</div>
+                    <div className="font-medium truncate">{formatTime12Hour(booking.booking_time)} - {booking.guest_name || 'Guest'}</div>
                     <div className="truncate">{getBookingTitle(booking)}</div>
                   </div>
                 ))}
@@ -541,7 +555,7 @@ const CalendarView: React.FC = () => {
                     <h4 className="font-medium text-gray-900">{booking.guest_name || 'Guest'}</h4>
                     <p className="text-sm text-gray-500">{getBookingTitle(booking)}</p>
                     <p className="text-sm text-gray-500">
-                      {new Date(booking.booking_date).toLocaleDateString()} at {booking.booking_time}
+                      {new Date(booking.booking_date).toLocaleDateString()} at {formatTime12Hour(booking.booking_time)}
                     </p>
                   </div>
                   <div className="flex flex-col items-end gap-2">
@@ -893,7 +907,7 @@ const CalendarView: React.FC = () => {
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
                           <div className="flex items-center text-gray-600">
                             <Clock className="h-4 w-4 text-gray-400 mr-2" />
-                            <span>{booking.booking_time}</span>
+                            <span>{formatTime12Hour(booking.booking_time)}</span>
                           </div>
                           <div className="flex items-center text-gray-600">
                             <Users className="h-4 w-4 text-gray-400 mr-2" />
@@ -1027,7 +1041,7 @@ const CalendarView: React.FC = () => {
                     </div>
                     <div className="flex items-center">
                       <Clock className="h-4 w-4 text-gray-400 mr-3" />
-                      <span className="text-sm text-gray-900">{selectedBooking.booking_time}</span>
+                      <span className="text-sm text-gray-900">{formatTime12Hour(selectedBooking.booking_time)}</span>
                     </div>
                     <div className="flex justify-between items-center pt-2 border-t border-gray-200">
                       <span className="text-sm text-gray-600">Duration</span>
@@ -1075,7 +1089,7 @@ const CalendarView: React.FC = () => {
                 {/* Room */}
                 {selectedBooking.room ? (
                   <div className="mb-6">
-                    <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Room</h4>
+                    <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Space</h4>
                     <div className="bg-gray-50 rounded-lg p-4">
                       <div className="flex items-center justify-between">
                         <span className="font-medium text-gray-900">{String((selectedBooking.room as { name?: string }).name || 'N/A')}</span>

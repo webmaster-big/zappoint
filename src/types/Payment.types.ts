@@ -56,6 +56,7 @@ export interface Payment {
 
 export interface CreatePaymentRequest {
   booking_id?: number;
+  attraction_purchase_id?: number;
   customer_id?: number | null;
   amount: number;
   currency?: string;

@@ -1083,7 +1083,7 @@ const CheckIn: React.FC = () => {
                           <Home className={`h-5 w-5 text-${fullColor}`} />
                         </div>
                         <div>
-                          <p className="text-xs text-gray-500">Room</p>
+                          <p className="text-xs text-gray-500">Space</p>
                           <p className="font-medium text-gray-800">{(verifiedBooking.room as { name: string })?.name || 'N/A'}</p>
                         </div>
                       </div>
@@ -1538,7 +1538,7 @@ const CheckIn: React.FC = () => {
                           <Home className={`h-5 w-5 text-${fullColor}`} />
                         </div>
                         <div>
-                          <p className="text-xs text-gray-500">Room</p>
+                          <p className="text-xs text-gray-500">Space</p>
                           <p className="font-medium text-gray-800">{(selectedBooking.room as { name: string })?.name || 'N/A'}</p>
                         </div>
                       </div>

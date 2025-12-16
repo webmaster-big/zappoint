@@ -312,7 +312,7 @@ const CreatePackage: React.FC = () => {
                         const tempId = Date.now();
                         const updated = [...rooms, { id: tempId, name: value }];
                         setRooms(updated);
-                        showToast("Room added!", "success");
+                        showToast("Space added!", "success");
                     }
                     break;
                 case 'promo':
@@ -999,12 +999,29 @@ const CreatePackage: React.FC = () => {
                             
             {/* Attractions Section */}
             <div>
-                <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2 relative group">
-                    <Info className="w-5 h-5 text-primary" /> Additional Attractions
-                    <span className="absolute z-20 left-0 top-full mt-2 min-w-[250px] max-w-xs bg-gray-900 text-white text-xs rounded-md px-3 py-2 opacity-0 group-hover:opacity-100 pointer-events-none transition-all">
-                        Select extra attractions that customers can add to this package during booking
-                    </span>
-                </h3>
+                <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-xl font-bold text-neutral-900 flex items-center gap-2 relative group">
+                        <Info className="w-5 h-5 text-primary" /> Additional Attractions
+                        <span className="absolute z-20 left-0 top-full mt-2 min-w-[250px] max-w-xs bg-gray-900 text-white text-xs rounded-md px-3 py-2 opacity-0 group-hover:opacity-100 pointer-events-none transition-all">
+                            Select extra attractions that customers can add to this package during booking
+                        </span>
+                    </h3>
+                    {attractions.length > 0 && (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                if (form.attractions.length === attractions.length) {
+                                    setForm(prev => ({ ...prev, attractions: [] }));
+                                } else {
+                                    setForm(prev => ({ ...prev, attractions: attractions.map(a => a.name) }));
+                                }
+                            }}
+                            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${form.attractions.length === attractions.length ? `bg-${themeColor}-100 text-${fullColor}` : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                        >
+                            {form.attractions.length === attractions.length ? 'Deselect All' : 'Select All'}
+                        </button>
+                    )}
+                </div>
                 {attractions.length === 0 ? (
                     <div className="bg-gray-50 rounded-lg p-4 text-center border border-dashed border-gray-300">
                         <p className="text-gray-500 mb-3 text-sm">No attractions available yet</p>
@@ -1031,32 +1048,61 @@ const CreatePackage: React.FC = () => {
                         ))}
                     </div>
                 )}
-            </div>                            {/* Rooms Section */}
+            </div>                            {/* SPACE Section */}
                             <div>
-                                <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2 relative group">
-                                    <Home className="w-5 h-5 text-primary" /> Rooms
-                                    <span className="absolute z-20 left-0 top-full mt-2 min-w-[250px] max-w-xs bg-gray-900 text-white text-xs rounded-md px-3 py-2 opacity-0 group-hover:opacity-100 pointer-events-none transition-all">
-                                        Assign specific rooms or spaces where this package can be booked
-                                    </span>
-                                </h3>
+                                <div className="flex items-center justify-between mb-4">
+                                    <h3 className="text-xl font-bold text-neutral-900 flex items-center gap-2 relative group">
+                                        <Home className="w-5 h-5 text-primary" /> Space
+                                        <span className="absolute z-20 left-0 top-full mt-2 min-w-[250px] max-w-xs bg-gray-900 text-white text-xs rounded-md px-3 py-2 opacity-0 group-hover:opacity-100 pointer-events-none transition-all">
+                                            Assign specific Spaces where this package can be booked
+                                        </span>
+                                    </h3>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            if (form.rooms.length === rooms.length) {
+                                                setForm(prev => ({ ...prev, rooms: [] }));
+                                            } else {
+                                                setForm(prev => ({ ...prev, rooms: rooms.map(r => r.name) }));
+                                            }
+                                        }}
+                                        className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${form.rooms.length === rooms.length ? `bg-${themeColor}-100 text-${fullColor}` : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                                    >
+                                        {form.rooms.length === rooms.length ? 'Deselect All' : 'Select All'}
+                                    </button>
+                                </div>
                                 <div className="flex flex-wrap gap-2 mb-2">
-                                    {rooms.map((room) => (
-                                        <button
-                                            type="button"
-                                            key={room.name}
-                                            className={`px-3 py-1 rounded-full border text-sm font-medium transition-all duration-150 hover:bg-${themeColor}-50 hover:border-${themeColor}-400 focus:outline-none focus:ring-2 focus:ring-${themeColor}-200 ${form.rooms.includes(room.name) ? `bg-${themeColor}-50 border-${themeColor}-500 text-${fullColor}` : "bg-white border-gray-200 text-neutral-800"}`}
-                                            onClick={() => handleMultiSelect("rooms", room.name)}
-                                        >
-                                            {room.name}
-                                        </button>
-                                    ))}
+                                   {[...rooms]
+                                     .sort((a, b) =>
+                                       a.name.localeCompare(b.name, undefined, {
+                                         numeric: true,
+                                         sensitivity: "base",
+                                       })
+                                     )
+                                     .map((room) => (
+                                       <button
+                                         type="button"
+                                         key={room.name}
+                                         className={`px-3 py-1 rounded-full border text-sm font-medium transition-all duration-150
+                                           hover:bg-${themeColor}-50 hover:border-${themeColor}-400
+                                           focus:outline-none focus:ring-2 focus:ring-${themeColor}-200
+                                           ${
+                                             form.rooms.includes(room.name)
+                                               ? `bg-${themeColor}-50 border-${themeColor}-500 text-${fullColor}`
+                                               : "bg-white border-gray-200 text-neutral-800"
+                                           }`}
+                                         onClick={() => handleMultiSelect("rooms", room.name)}
+                                       >
+                                         {room.name}
+                                       </button>
+                                     ))}
                                     <input
                                         type="text"
-                                        placeholder="Room name"
+                                        placeholder="Space name"
                                         className="rounded-md border border-gray-200 px-2 py-1 w-24 bg-white text-sm transition-all placeholder:text-gray-400"
                                         id="room-name"
                                     />
-                                    <button type="button" className="p-2 rounded-md hover:bg-blue-50 transition" title="Add room"
+                                    <button type="button" className="p-2 rounded-md hover:bg-blue-50 transition" title="Add Space"
                                         onClick={async () => {
                                             const nameInput = document.getElementById('room-name') as HTMLInputElement;
                                             if (nameInput.value) {
@@ -1072,12 +1118,27 @@ const CreatePackage: React.FC = () => {
                             
                             {/* Add-ons Section */}
                             <div>
-                                <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2 relative group">
-                                    <Info className="w-5 h-5 text-primary" /> Add-ons
-                                    <span className="absolute z-20 left-0 top-full mt-2 min-w-[250px] max-w-xs bg-gray-900 text-white text-xs rounded-md px-3 py-2 opacity-0 group-hover:opacity-100 pointer-events-none transition-all">
-                                        Optional extras like food, decorations, or party favors that enhance this package
-                                    </span>
-                                </h3>
+                                <div className="flex items-center justify-between mb-4">
+                                    <h3 className="text-xl font-bold text-neutral-900 flex items-center gap-2 relative group">
+                                        <Info className="w-5 h-5 text-primary" /> Add-ons
+                                        <span className="absolute z-20 left-0 top-full mt-2 min-w-[250px] max-w-xs bg-gray-900 text-white text-xs rounded-md px-3 py-2 opacity-0 group-hover:opacity-100 pointer-events-none transition-all">
+                                            Optional extras like food, decorations, or party favors that enhance this package
+                                        </span>
+                                    </h3>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            if (form.addOns.length === addOns.length) {
+                                                setForm(prev => ({ ...prev, addOns: [] }));
+                                            } else {
+                                                setForm(prev => ({ ...prev, addOns: addOns.map(a => a.name) }));
+                                            }
+                                        }}
+                                        className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${form.addOns.length === addOns.length ? `bg-${themeColor}-100 text-${fullColor}` : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                                    >
+                                        {form.addOns.length === addOns.length ? 'Deselect All' : 'Select All'}
+                                    </button>
+                                </div>
                                 <div className="flex flex-wrap gap-2 mb-2">
                                     {addOns.map((add) => (
                                         <button
@@ -1360,7 +1421,7 @@ const CreatePackage: React.FC = () => {
                                 }).join(", ") : <span className='text-gray-300'>None</span>}</span>
                             </div>
                             <div className="mb-2">
-                                <span className="font-semibold">Rooms:</span> <span className="text-neutral-800 text-sm">{(form.rooms || []).length ? form.rooms.map((room: string) => {
+                                <span className="font-semibold">Space:</span> <span className="text-neutral-800 text-sm">{(form.rooms || []).length ? form.rooms.map((room: string) => {
                                     const found = rooms.find(r => r.name === room);
                                     return found ? found.name : room;
                                 }).join(", ") : <span className='text-gray-300'>None</span>}</span>

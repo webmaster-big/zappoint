@@ -55,7 +55,7 @@ const addDescriptions = (navItems: NavItem[]): NavItem[] => {
     'Packages': 'View and manage package offerings',
     'Manage Packages': 'View and edit all packages',
     'Create Package': 'Create new package deals',
-    'Rooms': 'Manage package rooms and availability',
+    'Space': 'Manage package Spaces and availability',
     'Add-ons': 'Manage package add-ons and extras',
     'Promos': 'Manage promotional offers and discounts',
     'Gift Cards': 'Handle gift card sales and redemptions',
@@ -132,7 +132,7 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
         { label: 'Packages', icon: Package, section: 'Packages', items: [
           { label: 'Manage Packages', href: '/packages', icon: List },
           { label: 'Create Package', href: '/packages/create', icon: Plus },
-          { label: 'Rooms', href: '/packages/rooms', icon: DoorOpen },
+          { label: 'Space', href: '/packages/rooms', icon: DoorOpen },
           { label: 'Add-ons', href: '/packages/add-ons', icon: UtensilsCrossed },
           { label: 'Promos', href: '/packages/promos', icon: Tag },
           { label: 'Gift Cards', href: '/packages/gift-cards', icon: Gift }
@@ -160,7 +160,7 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
         { label: 'Packages', icon: Package, section: 'Packages', items: [
           { label: 'Manage Packages', href: '/packages', icon: List },
           { label: 'Create Package', href: '/packages/create', icon: Plus },
-          { label: 'Rooms', href: '/packages/rooms', icon: DoorOpen },
+          { label: 'Space', href: '/packages/rooms', icon: DoorOpen },
           { label: 'Add-ons', href: '/packages/add-ons', icon: UtensilsCrossed },
           { label: 'Promos', href: '/packages/promos', icon: Tag },
           { label: 'Gift Cards', href: '/packages/gift-cards', icon: Gift }
@@ -197,7 +197,7 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
         { label: 'Packages', icon: Package, section: 'Packages', items: [
           { label: 'Manage Packages', href: '/packages', icon: List },
           { label: 'Create Package', href: '/packages/create', icon: Plus },
-          { label: 'Rooms', href: '/packages/rooms', icon: DoorOpen },
+          { label: 'Space', href: '/packages/rooms', icon: DoorOpen },
           { label: 'Add-ons', href: '/packages/add-ons', icon: UtensilsCrossed },
           { label: 'Promos', href: '/packages/promos', icon: Tag },
           { label: 'Gift Cards', href: '/packages/gift-cards', icon: Gift }

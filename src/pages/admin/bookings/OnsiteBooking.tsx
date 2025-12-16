@@ -42,7 +42,7 @@ interface BookingData extends Omit<OnsiteBookingData, 'customer'> {
     email: string;
     phone: string;
   };
-  paymentMethod: 'card' | 'cash';
+  paymentMethod: 'card' | 'cash' | 'paylater';
   paymentType: 'full' | 'partial';
   giftCardCode: string;
   promoCode: string;
@@ -81,6 +81,7 @@ const OnsiteBooking: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [showEmptyModal, setShowEmptyModal] = useState(false);
+  const [sendEmail, setSendEmail] = useState(true);
   const [bookingData, setBookingData] = useState<BookingData>({
     packageId: null,
     selectedAttractions: [],
@@ -381,8 +382,13 @@ const OnsiteBooking: React.FC = () => {
     
     // Set default selected date to first available date
     if (dates.length > 0 && !bookingData.date) {
-      const firstDate = dates[0].toISOString().split('T')[0];
-      setBookingData(prev => ({ ...prev, date: firstDate }));
+      // Format date as YYYY-MM-DD in local timezone to avoid timezone shift
+      const firstDate = dates[0];
+      const year = firstDate.getFullYear();
+      const month = String(firstDate.getMonth() + 1).padStart(2, '0');
+      const day = String(firstDate.getDate()).padStart(2, '0');
+      const formattedDate = `${year}-${month}-${day}`;
+      setBookingData(prev => ({ ...prev, date: formattedDate }));
     } else if (dates.length === 0) {
       console.warn('⚠️ No available dates found for this package!');
     }
@@ -844,12 +850,14 @@ const OnsiteBooking: React.FC = () => {
         })
         .filter((item): item is { addon_id: number; quantity: number; price_at_booking: number } => item !== null);
       
-      // Calculate amount paid based on payment type
+      // Calculate amount paid based on payment type and method
       const totalAmount = calculateTotal();
       const partialAmount = calculatePartialAmount();
-      const amountPaid = bookingData.paymentType === 'partial' && partialAmount > 0 
-        ? partialAmount 
-        : totalAmount;
+      const amountPaid = bookingData.paymentMethod === 'paylater' 
+        ? 0 
+        : (bookingData.paymentType === 'partial' && partialAmount > 0 
+          ? partialAmount 
+          : totalAmount);
       
       // Get created_by from localStorage
       const currentUser = getStoredUser();
@@ -871,9 +879,9 @@ const OnsiteBooking: React.FC = () => {
         duration_unit: finalDurationUnit,
         total_amount: totalAmount,
         amount_paid: amountPaid,
-        payment_method: bookingData.paymentMethod as 'cash' | 'card',
-        payment_status: bookingData.paymentType === 'partial' && partialAmount > 0 ? 'partial' as const : 'paid' as const,
-        status: bookingData.paymentType === 'partial' && partialAmount > 0 ? 'pending' as const : 'confirmed' as const,
+        payment_method: bookingData.paymentMethod as 'cash' | 'card' | 'paylater',
+        payment_status: bookingData.paymentMethod === 'paylater' ? 'pending' as const : (bookingData.paymentType === 'partial' && partialAmount > 0 ? 'partial' as const : 'paid' as const),
+        status: bookingData.paymentMethod === 'paylater' || (bookingData.paymentType === 'partial' && partialAmount > 0) ? 'pending' as const : 'confirmed' as const,
         promo_id: promoId,
         gift_card_id: giftCardId,
         notes: bookingData.notes || undefined,
@@ -1041,7 +1049,7 @@ const OnsiteBooking: React.FC = () => {
                 {bookingData.time && (
                   <div className="flex items-center gap-2">
                     <Clock className="w-4 h-4 text-gray-400" />
-                    <span className="text-gray-900">{bookingData.time}</span>
+                    <span className="text-gray-900">{formatTimeTo12Hour(bookingData.time)}</span>
                   </div>
                 )}
                 {selectedRoom && (
@@ -1302,7 +1310,7 @@ const OnsiteBooking: React.FC = () => {
   const renderStep2 = () => (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <div className="lg:col-span-2 space-y-6">
-        <h2 className="text-2xl font-bold text-gray-900 mb-6">Select Room, Date & Time</h2>
+        <h2 className="text-2xl font-bold text-gray-900 mb-6">Select Space, Date & Time</h2>
       
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 space-y-6">
         {/* Room Selection */}
@@ -1402,7 +1410,7 @@ const OnsiteBooking: React.FC = () => {
           </label>
           {selectedPackage?.rooms && selectedPackage.rooms.length > 0 && !selectedRoom ? (
             <div className="text-sm text-gray-500 bg-gray-50 rounded-lg p-4 text-center">
-              Please select a room first to see available time slots
+              Please select a Space first to see available time slots
             </div>
           ) : loadingTimeSlots ? (
             <div className="flex items-center justify-center p-8 bg-gray-50 rounded-lg">
@@ -1438,7 +1446,7 @@ const OnsiteBooking: React.FC = () => {
                 ))
               ) : (
                 <div className="col-span-full text-sm text-gray-500 bg-gray-50 rounded-lg p-4 text-center">
-                  {!selectedRoomId ? 'Select a room first' : 'No available time slots for this room on the selected date'}
+                  {!selectedRoomId ? 'Select a Space first' : 'No available time slots for this Space on the selected date'}
                 </div>
               )}
             </div>
@@ -1885,11 +1893,11 @@ const OnsiteBooking: React.FC = () => {
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">Time:</span>
-                <span className="font-medium text-gray-900">{bookingData.time}</span>
+                <span className="font-medium text-gray-900">{formatTimeTo12Hour(bookingData.time)}</span>
               </div>
               {selectedRoom && (
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Room:</span>
+                  <span className="text-gray-600">Space:</span>
                   <span className="font-medium text-gray-900">{selectedRoom}</span>
                 </div>
               )}
@@ -1987,7 +1995,7 @@ const OnsiteBooking: React.FC = () => {
           {/* Payment Method */}
           <div className="mb-4">
             <h3 className="text-sm font-medium text-gray-700 mb-3">Payment Method</h3>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               <button
                 type="button"
                 onClick={() => setBookingData(prev => ({ ...prev, paymentMethod: 'cash' }))}
@@ -2013,8 +2021,38 @@ const OnsiteBooking: React.FC = () => {
                 <CreditCard className="h-5 w-5 mx-auto mb-1" />
                 <span className="text-sm font-medium">Card</span>
               </button>
+              
+              <button
+                type="button"
+                onClick={() => setBookingData(prev => ({ ...prev, paymentMethod: 'paylater' }))}
+                className={`p-3 border rounded-lg text-center transition-colors ${
+                  bookingData.paymentMethod === 'paylater'
+                    ? `border-${themeColor}-500 bg-${themeColor}-50 text-${themeColor}-700`
+                    : 'border-gray-300 hover:border-gray-400'
+                }`}
+              >
+                <svg className="h-5 w-5 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span className="text-sm font-medium">Pay Later</span>
+              </button>
             </div>
           </div>
+      
+      {/* Pay Later Notice */}
+      {bookingData.paymentMethod === 'paylater' && (
+        <div className="mb-4 p-4 bg-orange-50 rounded-lg border border-orange-200">
+          <div className="flex items-start gap-2">
+            <svg className="w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+            </svg>
+            <div>
+              <p className="text-sm font-medium text-orange-800">Payment will be collected later</p>
+              <p className="text-xs text-orange-700 mt-1">No payment is being processed now. Customer will pay at a later time.</p>
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* Card Payment Options - Show only when card is selected */}
       {bookingData.paymentMethod === 'card' && (
@@ -2144,7 +2182,8 @@ const OnsiteBooking: React.FC = () => {
         </div>
       )}
       
-      {/* Payment Type Selection */}
+      {/* Payment Type Selection - Only show if not paylater */}
+      {bookingData.paymentMethod !== 'paylater' && (
       <div className="mb-4">
         <h3 className="text-sm font-medium text-gray-700 mb-3">Payment Type</h3>
         <div className="space-y-2">
@@ -2182,6 +2221,7 @@ const OnsiteBooking: React.FC = () => {
           )}
         </div>
       </div>
+      )}
       
       {/* Pricing Breakdown */}
       <div className="border-t border-gray-200 pt-4 mb-6">
@@ -2225,11 +2265,36 @@ const OnsiteBooking: React.FC = () => {
           <span>${calculateTotal().toFixed(2)}</span>
         </div>
         
-        {bookingData.paymentType === 'partial' && calculatePartialAmount() > 0 && (
+        {bookingData.paymentMethod === 'paylater' ? (
+          <div className="flex justify-between font-semibold text-md mt-2 pt-2 border-t border-dashed border-gray-300 text-orange-700">
+            <span>Amount Due Now</span>
+            <span>$0.00</span>
+          </div>
+        ) : bookingData.paymentType === 'partial' && calculatePartialAmount() > 0 && (
           <div className={`flex justify-between font-semibold text-md mt-2 pt-2 border-t border-dashed border-gray-300 text-${themeColor}-700`}>
             <span>Amount Due Now</span>
             <span>${calculatePartialAmount().toFixed(2)}</span>
           </div>
+        )}
+      </div>
+      
+      {/* Send Email Receipt Checkbox */}
+      <div className="mb-4">
+        <label className="flex items-center space-x-3 cursor-pointer group">
+          <input
+            type="checkbox"
+            checked={sendEmail}
+            onChange={(e) => setSendEmail(e.target.checked)}
+            className={`w-4 h-4 rounded border-gray-300 text-${themeColor}-600 focus:ring-${themeColor}-500 cursor-pointer`}
+          />
+          <span className="text-sm text-gray-700 group-hover:text-gray-900">
+            Send confirmation email to customer
+          </span>
+        </label>
+        {!sendEmail && (
+          <p className="text-xs text-gray-500 mt-1 ml-7">
+            Customer will not receive a booking confirmation email
+          </p>
         )}
       </div>
       

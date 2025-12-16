@@ -380,7 +380,7 @@ const EditPackage: React.FC = () => {
                         const tempId = Date.now();
                         const updated = [...rooms, { id: tempId, name: value }];
                         setRooms(updated);
-                        showToast("Room added!", "success");
+                        showToast("Space added!", "success");
                     }
                     break;
                 case 'promo':
@@ -1107,7 +1107,7 @@ const EditPackage: React.FC = () => {
                                 ))}
                                 <input
                                     type="text"
-                                    placeholder="Room name"
+                                    placeholder="Space name"
                                     className="rounded-md border border-gray-200 px-2 py-1 w-24 bg-white text-sm transition-all placeholder:text-gray-400"
                                     id="room-name"
                                 />
@@ -1373,7 +1373,7 @@ const EditPackage: React.FC = () => {
                                 : "No attractions selected"}</span>
                         </div>
                         <div className="mb-2">
-                            <span className="font-semibold">Rooms:</span> <span className="text-neutral-800 text-sm">{form.rooms.length > 0
+                            <span className="font-semibold">SPACE:</span> <span className="text-neutral-800 text-sm">{form.rooms.length > 0
                                 ? form.rooms.join(", ")
                                 : "No rooms selected"}</span>
                         </div>

@@ -305,7 +305,7 @@ const ViewBooking: React.FC = () => {
                     <Home className={`h-5 w-5 text-${fullColor}`} />
                   </div>
                   <div>
-                    <p className="text-sm text-gray-500">Room</p>
+                    <p className="text-sm text-gray-500">Space</p>
                     <p className="font-medium text-gray-900">{(booking.room as any)?.name}</p>
                   </div>
                 </div>

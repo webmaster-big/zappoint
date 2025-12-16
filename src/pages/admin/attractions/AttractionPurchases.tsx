@@ -11,12 +11,14 @@ import {
   CheckCircle,
   XCircle,
   Clock,
-  Eye
+  Eye,
+  DollarSign
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
 import type { AttractionPurchasesPurchase, AttractionPurchasesFilterOptions } from '../../../types/AttractionPurchases.types';
 import { attractionPurchaseService } from '../../../services/AttractionPurchaseService';
+import { createPayment } from '../../../services/PaymentService';
 import Toast from '../../../components/ui/Toast';
 import { getStoredUser } from '../../../utils/storage';
 import { locationService } from '../../../services';
@@ -59,6 +61,12 @@ const ManagePurchases = () => {
   const [itemsPerPage] = useState(10);
   const [showFilters, setShowFilters] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [selectedPurchaseForPayment, setSelectedPurchaseForPayment] = useState<AttractionPurchasesPurchase | null>(null);
+  const [paymentAmount, setPaymentAmount] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<'card' | 'cash'>('cash');
+  const [paymentNotes, setPaymentNotes] = useState('');
+  const [processingPayment, setProcessingPayment] = useState(false);
 
   // Status colors and icons
   const statusConfig = {
@@ -371,6 +379,85 @@ const ManagePurchases = () => {
     URL.revokeObjectURL(url);
   };
 
+  const handleOpenPaymentModal = (purchase: AttractionPurchasesPurchase) => {
+    setSelectedPurchaseForPayment(purchase);
+    setPaymentAmount(purchase.totalAmount.toFixed(2));
+    setPaymentMethod('cash');
+    setPaymentNotes('');
+    setShowPaymentModal(true);
+  };
+
+  const handleClosePaymentModal = () => {
+    setShowPaymentModal(false);
+    setSelectedPurchaseForPayment(null);
+    setPaymentAmount('');
+    setPaymentMethod('cash');
+    setPaymentNotes('');
+  };
+
+  const handleSubmitPayment = async () => {
+    if (!selectedPurchaseForPayment) return;
+    
+    const amount = parseFloat(paymentAmount);
+    if (isNaN(amount) || amount <= 0) {
+      setToast({ message: 'Please enter a valid payment amount', type: 'error' });
+      return;
+    }
+
+    if (amount > selectedPurchaseForPayment.totalAmount) {
+      setToast({ message: `Payment amount cannot exceed total amount of $${selectedPurchaseForPayment.totalAmount.toFixed(2)}`, type: 'error' });
+      return;
+    }
+
+    try {
+      setProcessingPayment(true);
+
+      // Get purchase details to find customer_id and location_id
+      const purchaseResponse = await attractionPurchaseService.getPurchaseById(Number(selectedPurchaseForPayment.id));
+      if (!purchaseResponse.success || !purchaseResponse.data) {
+        throw new Error('Failed to get purchase details');
+      }
+
+      const purchase = purchaseResponse.data;
+      const customerId = purchase.customer_id || null;
+      const locationId = purchase.location_id;
+
+      if (!locationId) {
+        throw new Error('Location ID not found for this purchase');
+      }
+
+      // Create payment record using PaymentService
+      const paymentResponse = await createPayment({
+        attraction_purchase_id: Number(selectedPurchaseForPayment.id),
+        customer_id: customerId,
+        location_id: locationId,
+        amount: amount,
+        currency: 'USD',
+        method: paymentMethod,
+        status: 'completed',
+        notes: paymentNotes || `Payment for attraction purchase #${selectedPurchaseForPayment.id}`,
+      });
+
+      if (!paymentResponse.success) {
+        throw new Error(paymentResponse.message || 'Failed to create payment');
+      }
+
+      // Update purchase status to completed
+      await attractionPurchaseService.updatePurchase(Number(selectedPurchaseForPayment.id), {
+        status: 'completed',
+      });
+
+      setToast({ message: 'Payment processed successfully!', type: 'success' });
+      handleClosePaymentModal();
+      loadPurchases(); // Reload to get fresh data
+    } catch (error) {
+      console.error('Error processing payment:', error);
+      setToast({ message: 'Failed to process payment. Please try again.', type: 'error' });
+    } finally {
+      setProcessingPayment(false);
+    }
+  };
+
 //   // Get unique statuses and payment methods
 //   const getUniqueValues = (key: keyof Purchase) => {
 //     const values = purchases.map(purchase => purchase[key]);
@@ -651,6 +738,15 @@ const ManagePurchases = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-3">
+                          {purchase.status === 'pending' && (
+                            <button
+                              onClick={() => handleOpenPaymentModal(purchase)}
+                              className={`text-${fullColor} hover:text-${themeColor}-900`}
+                              title="Process Payment"
+                            >
+                              <DollarSign className="h-4 w-4" />
+                            </button>
+                          )}
                           <Link
                             to={`/attractions/purchases/${purchase.id}`}
                             className={`text-${fullColor} hover:text-${themeColor}-900`}
@@ -728,6 +824,117 @@ const ManagePurchases = () => {
             type={toast.type}
             onClose={() => setToast(null)}
           />
+        </div>
+      )}
+
+      {/* Payment Modal */}
+      {showPaymentModal && selectedPurchaseForPayment && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-backdrop-fade">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4">
+            <div className={`p-6 border-b border-gray-100 bg-${themeColor}-50`}>
+              <h2 className="text-2xl font-bold text-gray-900">Process Payment</h2>
+              <p className="text-sm text-gray-600 mt-1">
+                Purchase ID: {selectedPurchaseForPayment.id}
+              </p>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {/* Payment Summary */}
+              <div className="bg-gray-50 p-4 rounded-lg space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Customer:</span>
+                  <span className="font-semibold">{selectedPurchaseForPayment.customerName}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Attraction:</span>
+                  <span className="font-semibold">{selectedPurchaseForPayment.attractionName}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Quantity:</span>
+                  <span className="font-semibold">{selectedPurchaseForPayment.quantity}</span>
+                </div>
+                <div className="flex justify-between text-sm pt-2 border-t border-gray-200">
+                  <span className="text-gray-900 font-medium">Total Amount:</span>
+                  <span className="font-bold text-green-600">
+                    ${selectedPurchaseForPayment.totalAmount.toFixed(2)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Payment Amount */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Payment Amount *
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    max={selectedPurchaseForPayment.totalAmount.toFixed(2)}
+                    value={paymentAmount}
+                    onChange={(e) => setPaymentAmount(e.target.value)}
+                    className={`w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
+                    placeholder="0.00"
+                  />
+                </div>
+              </div>
+
+              {/* Payment Method */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Payment Method *
+                </label>
+                <select
+                  value={paymentMethod}
+                  onChange={(e) => setPaymentMethod(e.target.value as 'card' | 'cash')}
+                  className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
+                >
+                  <option value="cash">Cash</option>
+                  <option value="card">Card</option>
+                </select>
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Notes (Optional)
+                </label>
+                <textarea
+                  value={paymentNotes}
+                  onChange={(e) => setPaymentNotes(e.target.value)}
+                  rows={3}
+                  className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
+                  placeholder="Add any notes about this payment..."
+                />
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-gray-100 flex gap-3 justify-end">
+              <button
+                onClick={handleClosePaymentModal}
+                disabled={processingPayment}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmitPayment}
+                disabled={processingPayment || !paymentAmount || parseFloat(paymentAmount) <= 0}
+                className={`px-4 py-2 bg-${fullColor} text-white rounded-lg hover:bg-${themeColor}-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2`}
+              >
+                {processingPayment ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                    Processing...
+                  </>
+                ) : (
+                  'Process Payment'
+                )}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

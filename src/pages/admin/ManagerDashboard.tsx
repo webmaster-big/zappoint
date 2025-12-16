@@ -880,7 +880,7 @@ const LocationManagerDashboard: React.FC = () => {
               {/* Room */}
               {selectedBooking.room && (
                 <div className="mb-6">
-                  <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Room</h4>
+                  <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Space</h4>
                   <div className="bg-gray-50 rounded-lg p-4">
                     <div className="flex items-center justify-between">
                       <span className="font-medium text-gray-900">{selectedBooking.room.name || 'N/A'}</span>

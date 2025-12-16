@@ -128,8 +128,8 @@ const Rooms: React.FC = () => {
                 setTotalPages(pagination?.last_page || 1);
             }
         } catch (error) {
-            console.error('Error fetching rooms:', error);
-            showToast('Error loading rooms', 'error');
+            console.error('Error fetching Spaces:', error);
+            showToast('Error loading Spaces', 'error');
         } finally {
             setLoading(false);
         }
@@ -185,7 +185,7 @@ const Rooms: React.FC = () => {
                     capacity: formData.capacity ? parseInt(formData.capacity) : undefined,
                     is_available: formData.is_available
                 });
-                showToast('Room created successfully!', 'success');
+                showToast('Space created successfully!', 'success');
             } else {
                 // Bulk creation
                 const roomsToCreate = generateRoomPreview();
@@ -201,15 +201,15 @@ const Rooms: React.FC = () => {
                     });
                 }
                 
-                showToast(`${roomsToCreate.length} rooms created successfully!`, 'success');
+                showToast(`${roomsToCreate.length} Spaces created successfully!`, 'success');
             }
             
             setShowCreateModal(false);
             resetForm();
             fetchRooms();
         } catch (error) {
-            console.error('Error creating room:', error);
-            showToast('Error creating room(s)', 'error');
+            console.error('Error creating Space:', error);
+            showToast('Error creating Space(s)', 'error');
         }
     };
 
@@ -225,29 +225,29 @@ const Rooms: React.FC = () => {
                 is_available: formData.is_available
             });
             
-            showToast('Room updated successfully!', 'success');
+            showToast('Space updated successfully!', 'success');
             setShowEditModal(false);
             resetForm();
             fetchRooms();
         } catch (error) {
-            console.error('Error updating room:', error);
-            showToast('Error updating room', 'error');
+            console.error('Error updating Space:', error);
+            showToast('Error updating Space', 'error');
         }
     };
 
     // Handle delete room
     const handleDeleteRoom = async (roomId: number, roomName: string) => {
-        if (!window.confirm(`Are you sure you want to delete "${roomName}"?`)) {
+        if (!window.confirm(`Are you sure you want to delete "${roomName}" Space?`)) {
             return;
         }
 
         try {
             await roomService.deleteRoom(roomId);
-            showToast('Room deleted successfully!', 'success');
+            showToast('Space deleted successfully!', 'success');
             fetchRooms();
         } catch (error) {
-            console.error('Error deleting room:', error);
-            showToast('Error deleting room', 'error');
+            console.error('Error deleting Space:', error);
+            showToast('Error deleting Space', 'error');
         }
     };
 
@@ -280,23 +280,23 @@ const Rooms: React.FC = () => {
     // Handle bulk delete
     const handleBulkDelete = async () => {
         if (selectedRoomIds.size === 0) {
-            showToast('Please select rooms to delete', 'info');
+            showToast('Please select Spaces to delete', 'info');
             return;
         }
 
-        if (!window.confirm(`Are you sure you want to delete ${selectedRoomIds.size} room(s)?`)) {
+        if (!window.confirm(`Are you sure you want to delete ${selectedRoomIds.size} Space(s)?`)) {
             return;
         }
 
         try {
             await roomService.bulkDeleteRooms(Array.from(selectedRoomIds));
-            showToast(`${selectedRoomIds.size} room(s) deleted successfully!`, 'success');
+            showToast(`${selectedRoomIds.size} Space(s) deleted successfully!`, 'success');
             setSelectedRoomIds(new Set());
             setSelectionMode(false);
             fetchRooms();
         } catch (error) {
-            console.error('Error deleting rooms:', error);
-            showToast('Error deleting rooms', 'error');
+            console.error('Error deleting Spaces:', error);
+            showToast('Error deleting Spaces', 'error');
         }
     };
 
@@ -333,8 +333,8 @@ const Rooms: React.FC = () => {
             {/* Page Header with Action Buttons */}
             <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Rooms</h1>
-                    <p className="text-gray-600 mt-1">Manage your facility rooms and their availability</p>
+                    <h1 className="text-2xl font-bold text-gray-900">Space</h1>
+                    <p className="text-gray-600 mt-1">Manage your facility Spaces and their availability</p>
                 </div>
                 <div className="flex items-center gap-2">
                     {rooms.length > 0 && (
@@ -347,7 +347,7 @@ const Rooms: React.FC = () => {
                             } text-white px-4 py-2 rounded-lg font-semibold whitespace-nowrap transition-colors flex items-center gap-2`}
                         >
                             {selectionMode ? <X className="w-4 h-4" /> : <CheckSquare className="w-4 h-4" />}
-                            {selectionMode ? 'Cancel' : 'Select Rooms'}
+                            {selectionMode ? 'Cancel' : 'Select Spaces'}
                         </button>
                     )}
                     <button
@@ -381,7 +381,7 @@ const Rooms: React.FC = () => {
                                 </span>
                             </label>
                             <span className="text-sm text-gray-600">
-                                {selectedRoomIds.size} room{selectedRoomIds.size !== 1 ? 's' : ''} selected
+                                {selectedRoomIds.size} Space{selectedRoomIds.size !== 1 ? 's' : ''} selected
                             </span>
                             {selectedRoomIds.size > 0 && (
                                 <button
@@ -389,7 +389,7 @@ const Rooms: React.FC = () => {
                                     className="text-sm text-red-600 hover:text-red-700 font-medium flex items-center gap-1"
                                 >
                                     <Trash2 className="w-4 h-4" />
-                                    Delete {selectedRoomIds.size} room{selectedRoomIds.size !== 1 ? 's' : ''}
+                                    Delete {selectedRoomIds.size} Space{selectedRoomIds.size !== 1 ? 's' : ''}
                                 </button>
                             )}
                         </div>
@@ -405,7 +405,7 @@ const Rooms: React.FC = () => {
                                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                                     <input
                                         type="text"
-                                        placeholder="Search rooms by name..."
+                                        placeholder="Search Spaces by name..."
                                         value={searchTerm}
                                         onChange={handleSearch}
                                         className={`w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 outline-none`}
@@ -552,14 +552,14 @@ const Rooms: React.FC = () => {
                                                     <button
                                                         onClick={() => handleEditClick(room)}
                                                         className={`p-1.5 text-${fullColor} hover:bg-${themeColor}-100 rounded transition-colors`}
-                                                        title="Edit room"
+                                                        title="Edit Space"
                                                     >
                                                         <Edit2 className="w-4 h-4" />
                                                     </button>
                                                     <button
                                                         onClick={() => handleDeleteRoom(room.id, room.name)}
                                                         className="p-1.5 text-red-500 hover:bg-red-50 rounded transition-colors"
-                                                        title="Delete room"
+                                                        title="Delete Space"
                                                     >
                                                         <Trash2 className="w-4 h-4" />
                                                     </button>
@@ -588,11 +588,11 @@ const Rooms: React.FC = () => {
                         <div className={`w-16 h-16 rounded-full bg-${themeColor}-100 flex items-center justify-center mb-4`}>
                             <MapPin className={`w-8 h-8 text-${fullColor}`} />
                         </div>
-                        <h3 className="text-lg font-semibold text-gray-900 mb-2">No rooms found</h3>
+                        <h3 className="text-lg font-semibold text-gray-900 mb-2">No Spaces found</h3>
                         <p className="text-gray-600 text-sm mb-6 text-center max-w-sm">
                             {searchTerm || filters.is_available !== undefined 
                                 ? 'No rooms match your search criteria. Try adjusting your filters.'
-                                : 'Get started by creating your first room for package bookings'}
+                                : 'Get started by creating your first Space for package bookings'}
                         </p>
                         <button
                             onClick={() => {
@@ -650,7 +650,7 @@ const Rooms: React.FC = () => {
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
                     <div className="bg-white rounded-lg shadow-xl w-full max-w-lg">
                         <div className="p-6">
-                            <h2 className="text-xl font-semibold text-gray-900 mb-4">Add New Room</h2>
+                            <h2 className="text-xl font-semibold text-gray-900 mb-4">Add New Space</h2>
                             
                             {/* Creation Mode Toggle */}
                             <div className="flex gap-2 mb-6 bg-gray-100 p-1 rounded-lg">
@@ -711,7 +711,7 @@ const Rooms: React.FC = () => {
                                         {/* Single Room Form */}
                                         <div>
                                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                Room Name *
+                                                Space Name *
                                             </label>
                                             <input
                                                 type="text"
@@ -720,7 +720,7 @@ const Rooms: React.FC = () => {
                                                 onChange={handleInputChange}
                                                 required
                                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                                placeholder="Enter room name"
+                                                placeholder="Enter Space name"
                                             />
                                         </div>
 
@@ -841,7 +841,7 @@ const Rooms: React.FC = () => {
                                                 onChange={(e) => setBulkFormData({ ...bulkFormData, capacity: e.target.value })}
                                                 min="1"
                                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                                placeholder="Enter capacity for all rooms"
+                                                placeholder="Enter capacity for all Spaces"
                                             />
                                         </div>
 
@@ -912,11 +912,11 @@ const Rooms: React.FC = () => {
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
                     <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
                         <div className="p-6">
-                            <h2 className="text-xl font-semibold text-gray-900 mb-4">Edit Room</h2>
+                            <h2 className="text-xl font-semibold text-gray-900 mb-4">Edit Space</h2>
                             <form onSubmit={handleUpdateRoom} className="space-y-4">
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Room Name *
+                                        Space Name *
                                     </label>
                                     <input
                                         type="text"
@@ -925,7 +925,7 @@ const Rooms: React.FC = () => {
                                         onChange={handleInputChange}
                                         required
                                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                        placeholder="Enter room name"
+                                        placeholder="Enter Space name"
                                     />
                                 </div>
 
