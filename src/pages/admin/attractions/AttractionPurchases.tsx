@@ -87,7 +87,7 @@ const ManagePurchases = () => {
     },
     {
       title: 'Total Revenue',
-      value: `$${purchases.reduce((sum, p) => sum + p.totalAmount, 0).toFixed(2)}`,
+      value: `$${purchases.reduce((sum, p) => sum + p.amountPaid, 0).toFixed(2)}`,
       change: 'All time revenue',
       accent: `bg-${themeColor}-100 text-${fullColor}`,
       icon: CheckCircle,
@@ -95,7 +95,7 @@ const ManagePurchases = () => {
     {
       title: 'Avg. Purchase',
       value: purchases.length > 0 
-        ? `$${(purchases.reduce((sum, p) => sum + p.totalAmount, 0) / purchases.length).toFixed(2)}` 
+        ? `$${(purchases.reduce((sum, p) => sum + p.amountPaid, 0) / purchases.length).toFixed(2)}` 
         : '$0.00',
       change: 'Per transaction',
       accent: `bg-${themeColor}-100 text-${fullColor}`,

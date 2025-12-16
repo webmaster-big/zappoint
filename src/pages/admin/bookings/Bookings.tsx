@@ -129,7 +129,7 @@ const Bookings: React.FC = () => {
     },
     {
       title: 'Revenue',
-      value: `$${Number(bookings.reduce((sum, booking) => sum + booking.totalAmount, 0)).toFixed(2)}`,
+      value: `$${Number(bookings.reduce((sum, booking) => sum + booking.amountPaid, 0)).toFixed(2)}`,
       change: 'All bookings',
       icon: DollarSign,
       accent: `bg-${themeColor}-100 text-${fullColor}`,
