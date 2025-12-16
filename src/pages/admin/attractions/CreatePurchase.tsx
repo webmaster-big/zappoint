@@ -53,6 +53,7 @@ const CreatePurchase = () => {
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [discount, setDiscount] = useState(0);
   const [notes, setNotes] = useState('');
+  const [amountPaid, setAmountPaid] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
@@ -364,6 +365,7 @@ const CreatePurchase = () => {
         guest_phone: customerInfo.phone || undefined,
         quantity: quantity,
         amount: totalAmount,
+        amount_paid: paymentMethod === 'paylater' ? 0 : amountPaid,
         currency: 'USD',
         method: paymentMethod as 'card' | 'cash' | 'paylater',
         payment_method: paymentMethod as 'card' | 'cash' | 'paylater',
@@ -415,6 +417,7 @@ const CreatePurchase = () => {
       setCustomerInfo({ name: '', email: '', phone: '' });
       setDiscount(0);
       setNotes('');
+      setAmountPaid(0);
       setPaymentMethod('cash');
       setSelectedCustomerId(null);
       setCardNumber('');
@@ -675,6 +678,23 @@ const CreatePurchase = () => {
                         value={discount}
                         onChange={(e) => setDiscount(Number(e.target.value))}
                         className={`w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
+                      />
+                    </div>
+
+                    {/* Amount Paid */}
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Amount Paid {paymentMethod === 'paylater' && <span className="text-gray-500 text-xs">(Auto: $0.00)</span>}
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        max={calculateTotal()}
+                        value={paymentMethod === 'paylater' ? 0 : amountPaid}
+                        onChange={(e) => setAmountPaid(Number(e.target.value))}
+                        disabled={paymentMethod === 'paylater'}
+                        className={`w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 ${paymentMethod === 'paylater' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                        placeholder="0.00"
                       />
                     </div>
 

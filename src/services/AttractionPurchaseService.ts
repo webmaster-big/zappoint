@@ -68,6 +68,7 @@ export interface CreatePurchaseData {
   notes?: string;
   // Optional fields for payment tracking
   amount?: number;
+  amount_paid?: number;
   currency?: string;
   method?: string;
   status?: 'pending' | 'completed' | 'cancelled';
