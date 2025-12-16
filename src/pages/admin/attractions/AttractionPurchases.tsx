@@ -140,6 +140,7 @@ const ManagePurchases = () => {
                       purchase.payment_method as 'credit_card' | 'paypal',
         duration: purchase.attraction?.duration ? `${purchase.attraction.duration} ${purchase.attraction.duration_unit || 'minutes'}` : '',
         activity: purchase.attraction?.category || '',
+        locationId: purchase.location_id,
       }));
 
       setPurchases(convertedPurchases);
@@ -420,10 +421,13 @@ const ManagePurchases = () => {
 
       const purchase = purchaseResponse.data;
       const customerId = purchase.customer_id || null;
-      const locationId = purchase.location_id;
+      // Use purchase location_id, or fallback to selected location, or user's location_id
+      const locationId = purchase.location_id || 
+                        (selectedLocation ? Number(selectedLocation) : null) || 
+                        currentUser?.location_id;
 
       if (!locationId) {
-        throw new Error('Location ID not found for this purchase');
+        throw new Error('Location ID not found. Please select a location or contact support.');
       }
 
       // Create payment record using PaymentService

@@ -14,6 +14,7 @@ export interface AttractionPurchasesPurchase {
   paymentMethod: string;
   duration: string;
   activity: string;
+  locationId?: number;
 }
 
 export interface AttractionPurchasesFilterOptions {
