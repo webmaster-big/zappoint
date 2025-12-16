@@ -29,6 +29,7 @@ export interface OnsiteBookingPackage {
   description: string;
   price: number;
   pricePerAdditional?: number;
+  minParticipants?: number;
   maxParticipants: number;
   category: string;
   features: string;

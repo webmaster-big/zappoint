@@ -639,30 +639,45 @@ const CreatePackage: React.FC = () => {
                             placeholder="Enter package name"
                             required
                         />
-                    </div>                                    {/* Duration Section */}
+                    </div>
+                    
+                    {/* Duration Section */}
+                    <div>
+                        <label className="block font-semibold mb-2 text-base text-neutral-800">Duration</label>
+                        <div className="flex gap-2">
+                            <input
+                                type="number"
+                                name="duration"
+                                value={form.duration}
+                                onChange={handleChange}
+                                className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400`}
+                                min="1"
+                                placeholder="Duration"
+                            />
+                            <select
+                                name="durationUnit"
+                                value={form.durationUnit}
+                                onChange={handleChange}
+                                className={`rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all`}
+                            >
+                                <option value="hours">Hours</option>
+                                <option value="minutes">Minutes</option>
+                            </select>
+                        </div>
+                    </div>
+                                    
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div>
-                                            <label className="block font-semibold mb-2 text-base text-neutral-800">Duration</label>
-                                            <div className="flex gap-2">
-                                                <input
-                                                    type="number"
-                                                    name="duration"
-                                                    value={form.duration}
-                                                    onChange={handleChange}
-                                                    className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400`}
-                                                    min="1"
-                                                    placeholder="Duration"
-                                                />
-                                                <select
-                                                    name="durationUnit"
-                                                    value={form.durationUnit}
-                                                    onChange={handleChange}
-                                                    className={`rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all`}
-                                                >
-                                                    <option value="hours">Hours</option>
-                                                    <option value="minutes">Minutes</option>
-                                                </select>
-                                            </div>
+                                            <label className="block font-semibold mb-2 text-base text-neutral-800">Min Participants</label>
+                                            <input
+                                                type="number"
+                                                name="minParticipants"
+                                                value={form.minParticipants}
+                                                onChange={handleChange}
+                                                className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400`}
+                                                min="1"
+                                                placeholder="Enter min participants"
+                                            />
                                         </div>
                                         
                                         <div>
@@ -679,37 +694,22 @@ const CreatePackage: React.FC = () => {
                                         </div>
                                     </div>
                                     
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="block font-semibold mb-2 text-base text-neutral-800">Min Participants (Optional)</label>
-                                            <input
-                                                type="number"
-                                                name="minParticipants"
-                                                value={form.minParticipants}
-                                                onChange={handleChange}
-                                                className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400`}
-                                                min="1"
-                                                placeholder="Enter min participants"
-                                            />
-                                        </div>
-                                        
-                                        {/* Additional Pricing Section */}
-                                        {form.maxParticipants && (
-                                            <div>
-                                                <label className="block font-semibold mb-2 text-base text-neutral-800">Price per Additional Participant</label>
-                                                <input
-                                                    type="number"
-                                                    name="pricePerAdditional"
-                                                    value={form.pricePerAdditional}
-                                                    onChange={handleChange}
-                                                    className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400`}
-                                                    min="0"
-                                                    step="0.01"
-                                                    placeholder="Enter price per additional"
-                                                />
-                                            </div>
-                                        )}
-                                    </div>
+                    {/* Additional Pricing Section */}
+                    {form.maxParticipants && (
+                        <div>
+                            <label className="block font-semibold mb-2 text-base text-neutral-800">Price per Additional Participant</label>
+                            <input
+                                type="number"
+                                name="pricePerAdditional"
+                                value={form.pricePerAdditional}
+                                onChange={handleChange}
+                                className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400`}
+                                min="0"
+                                step="0.01"
+                                placeholder="Enter price per additional"
+                            />
+                        </div>
+                    )}
                                     
                                     <div>
                                         <label className="block font-semibold mb-2 text-base text-neutral-800">Category</label>

@@ -58,6 +58,7 @@ export interface BookPackagePackage {
   features: string;
   price: string;
   price_per_additional: string;
+  min_participants?: number;
   max_participants: number;
   duration: number;
   duration_unit: "hours" | "minutes";

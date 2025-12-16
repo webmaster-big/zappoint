@@ -163,14 +163,23 @@ const OnsiteBooking: React.FC = () => {
           // Transform backend package data to match OnsiteBookingPackage interface
           console.log('Fetched packages:', response.data.packages);
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const transformedPackages: OnsiteBookingPackage[] = response.data.packages.map((pkg: any) => ({
-            id: pkg.id,
-            name: pkg.name,
-            description: pkg.description,
-            price: Number(pkg.price),
-            maxParticipants: pkg.max_participants,
-            category: pkg.category,
-            features: pkg.features,
+          const transformedPackages: OnsiteBookingPackage[] = response.data.packages.map((pkg: any) => {
+            console.log('🔍 Transforming package:', {
+              id: pkg.id,
+              name: pkg.name,
+              min_participants: pkg.min_participants,
+              max_participants: pkg.max_participants
+            });
+            
+            return {
+              id: pkg.id,
+              name: pkg.name,
+              description: pkg.description,
+              price: Number(pkg.price),
+              minParticipants: pkg.min_participants,
+              maxParticipants: pkg.max_participants,
+              category: pkg.category,
+              features: pkg.features,
             availabilityType: pkg.availability_type,
             availableDays: pkg.available_days || [],
             availableWeekDays: pkg.available_week_days || [],
@@ -233,8 +242,10 @@ const OnsiteBooking: React.FC = () => {
             pricePerAdditional: Number(pkg.price_per_additional || 0),
             partialPaymentPercentage: pkg.partial_payment_percentage || 0,
             partialPaymentFixed: pkg.partial_payment_fixed || 0
-          }));
+            };
+          });
           
+          console.log('✅ All transformed packages:', transformedPackages);
           setPackages(transformedPackages);
           
           // Show modal if no packages available
@@ -490,14 +501,25 @@ const OnsiteBooking: React.FC = () => {
   }, [bookingData.date, selectedRoomId, selectedPackage]);
 
   const handlePackageSelect = (pkg: OnsiteBookingPackage) => {
+    console.log('📦 Package selected:', {
+      id: pkg.id,
+      name: pkg.name,
+      minParticipants: pkg.minParticipants,
+      maxParticipants: pkg.maxParticipants
+    });
+    
     setSelectedPackage(pkg);
     setSelectedRoom("");
+    
+    const initialParticipants = pkg.minParticipants || 1;
+    console.log('👥 Setting initial participants to:', initialParticipants);
+    
     setBookingData(prev => ({ 
       ...prev, 
       packageId: pkg.id,
       selectedAttractions: [],
       selectedAddOns: [],
-      participants: pkg.maxParticipants
+      participants: initialParticipants
     }));
     setStep(2); // Move directly to step 2 (Date & Time) after selecting a package
   };
@@ -594,6 +616,24 @@ const OnsiteBooking: React.FC = () => {
       if (field === 'email' && value.includes('@')) {
         await searchCustomerByEmail(value);
       }
+    } else if (name === 'participants') {
+      // Handle participants as a number and enforce min/max constraints
+      const numValue = parseInt(value) || 0;
+      const maxParticipants = selectedPackage?.maxParticipants || 999;
+      const validValue = Math.max(1, Math.min(maxParticipants, numValue));
+      
+      console.log('👥 Participant input change:', {
+        rawValue: value,
+        parsedValue: numValue,
+        validValue: validValue,
+        maxParticipants: maxParticipants,
+        minParticipants: selectedPackage?.minParticipants
+      });
+      
+      setBookingData(prev => ({
+        ...prev,
+        participants: validValue
+      }));
     } else {
       setBookingData(prev => ({
         ...prev,
@@ -659,12 +699,16 @@ const OnsiteBooking: React.FC = () => {
     
     // Package price
     if (selectedPackage) {
-      total += selectedPackage.price;
+      const basePrice = selectedPackage.price;
+      const minParticipants = selectedPackage.minParticipants || 1;
+      const pricePerAdditional = selectedPackage.pricePerAdditional || 0;
       
-      // Additional participants cost only if exceeding max_participants
-      if (selectedPackage.pricePerAdditional && bookingData.participants > selectedPackage.maxParticipants) {
-        const additionalCount = bookingData.participants - selectedPackage.maxParticipants;
-        total += additionalCount * selectedPackage.pricePerAdditional;
+      // Base price covers min participants, charge extra for participants beyond min
+      if (bookingData.participants <= minParticipants) {
+        total += basePrice;
+      } else {
+        const additional = bookingData.participants - minParticipants;
+        total += basePrice + (additional * pricePerAdditional);
       }
     }
     
@@ -1385,18 +1429,52 @@ const OnsiteBooking: React.FC = () => {
               <Users className="w-4 h-4 mr-2" />
               Number of Participants
             </label>
-            <input
-              type="number"
-              name="participants"
-              min="1"
-              value={bookingData.participants}
-              onChange={handleInputChange}
-              className={`w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:ring-2 focus:ring-${themeColor}-400 focus:border-${themeColor}-500 transition-colors`}
-              required
-            />
-            {selectedPackage && bookingData.participants > selectedPackage.maxParticipants && selectedPackage.pricePerAdditional && (
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setBookingData(prev => ({ 
+                  ...prev, 
+                  participants: Math.max(1, prev.participants - 1) 
+                }))}
+                className="w-10 h-10 rounded-lg bg-gray-100 border border-gray-300 text-gray-800 flex items-center justify-center hover:bg-gray-200 transition-colors text-lg font-semibold"
+              >
+                -
+              </button>
+              <input
+                type="number"
+                name="participants"
+                min="1"
+                max={selectedPackage?.maxParticipants}
+                value={bookingData.participants}
+                onChange={handleInputChange}
+                onWheel={(e) => e.currentTarget.blur()}
+                onKeyDown={(e) => {
+                  if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                    e.preventDefault();
+                  }
+                }}
+                className={`w-20 text-center border-2 border-gray-200 rounded-lg px-4 py-2 focus:ring-2 focus:ring-${themeColor}-400 focus:border-${themeColor}-500 transition-colors font-semibold text-lg`}
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setBookingData(prev => ({ 
+                  ...prev, 
+                  participants: Math.min(selectedPackage?.maxParticipants || 999, prev.participants + 1) 
+                }))}
+                className="w-10 h-10 rounded-lg bg-gray-100 border border-gray-300 text-gray-800 flex items-center justify-center hover:bg-gray-200 transition-colors text-lg font-semibold"
+              >
+                +
+              </button>
+              <span className="text-sm text-gray-600">
+                {selectedPackage?.minParticipants && `${selectedPackage.minParticipants} included`}
+                {selectedPackage?.minParticipants && selectedPackage?.maxParticipants && ' • '}
+                {selectedPackage?.maxParticipants && `Max: ${selectedPackage.maxParticipants}`}
+              </span>
+            </div>
+            {selectedPackage && selectedPackage.minParticipants && bookingData.participants > (selectedPackage.minParticipants || 1) && selectedPackage.pricePerAdditional && selectedPackage.pricePerAdditional > 0 && (
               <div className={`mt-3 text-xs bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-3`}>
-                <strong>Note:</strong> Additional participants beyond {selectedPackage.maxParticipants} will be charged <strong>${selectedPackage.pricePerAdditional}</strong> each.
+                <strong>Note:</strong> Additional participants beyond {selectedPackage.minParticipants} included will be charged <strong>${selectedPackage.pricePerAdditional}</strong> each. (Max capacity: {selectedPackage.maxParticipants})
               </div>
             )}
           </div>

@@ -52,7 +52,7 @@ const BookPackage: React.FC = () => {
   const [giftCardCode, setGiftCardCode] = useState("");
   const [appliedPromo, setAppliedPromo] = useState<BookPackagePackage['promos'][0] | null>(null);
   const [appliedGiftCard, setAppliedGiftCard] = useState<BookPackagePackage['gift_cards'][0] | null>(null);
-  const [participants, setParticipants] = useState<number>(1);
+  const [participants, setParticipants] = useState<number>(pkg?.min_participants || 1);
   const [form, setForm] = useState({
     firstName: "",
     lastName: "",
@@ -123,9 +123,9 @@ const BookPackage: React.FC = () => {
         console.log('🎨 Add-ons:', response.data.add_ons);
         setPkg(response.data);
         
-        // Set default participants to max_participants
-        if (response.data.max_participants) {
-          setParticipants(response.data.max_participants);
+        // Set default participants to min_participants
+        if (response.data.min_participants) {
+          setParticipants(response.data.min_participants);
         }
       } catch (err) {
         console.error('Error fetching package:', err);
@@ -464,7 +464,7 @@ const BookPackage: React.FC = () => {
     setGiftCardCode("");
     setAppliedPromo(null);
     setAppliedGiftCard(null);
-    setParticipants(pkg?.max_participants || 1);
+    setParticipants(pkg?.min_participants || 1);
     setForm({
       firstName: "",
       lastName: "",
@@ -504,13 +504,13 @@ const BookPackage: React.FC = () => {
   const calculateBasePrice = () => {
     if (!pkg) return 0;
     const basePrice = Number(pkg.price);
-    const maxParticipants = Number(pkg.max_participants);
-    const pricePerAdditional = Number(pkg.price_per_additional);
+    const minParticipants = Number(pkg.min_participants || 1);
+    const pricePerAdditional = Number(pkg.price_per_additional || 0);
     
-    if (participants <= maxParticipants) {
+    if (participants <= minParticipants) {
       return basePrice;
     } else {
-      const additional = participants - maxParticipants;
+      const additional = participants - minParticipants;
       return basePrice + (additional * pricePerAdditional);
     }
   };
@@ -1233,26 +1233,27 @@ const BookPackage: React.FC = () => {
                   <div className="flex items-center flex-wrap gap-2">
                     <button 
                       className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-white border border-gray-300 text-gray-800 flex items-center justify-center shadow-sm text-base md:text-lg font-semibold"
-                      onClick={() => setParticipants(Math.max(Number(pkg.max_participants), participants - 1))}
+                      onClick={() => setParticipants(Math.max(1, participants - 1))}
                     >
                       -
                     </button>
                     <input 
                       type="number" 
-                      min={Number(pkg.max_participants)} 
-                      max={Number(pkg.max_participants) + 10} 
+                      min={1} 
+                      max={Number(pkg.max_participants)} 
                       value={participants} 
-                      onChange={e => setParticipants(Math.max(Number(pkg.max_participants), Math.min(Number(pkg.max_participants) + 10, Number(e.target.value))))} 
+                      onChange={e => setParticipants(Math.max(1, Math.min(Number(pkg.max_participants), Number(e.target.value))))}
+                      onWheel={(e) => e.currentTarget.blur()}
                       className="w-12 md:w-16 text-center rounded-lg border border-gray-300 px-1 md:px-2 py-1.5 md:py-2 text-sm md:text-base font-medium text-gray-800" 
                     />
                     <button 
                       className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-white border border-gray-300 text-gray-800 flex items-center justify-center shadow-sm text-base md:text-lg font-semibold"
-                      onClick={() => setParticipants(Math.min(Number(pkg.max_participants) + 10, participants + 1))}
+                      onClick={() => setParticipants(Math.min(Number(pkg.max_participants), participants + 1))}
                     >
                       +
                     </button>
                     <span className="text-xs text-gray-500 w-full sm:w-auto mt-1 sm:mt-0">
-                      Min: {pkg.max_participants} included, +${pkg.price_per_additional} each
+                      {pkg.min_participants} included, +${pkg.price_per_additional} per additional (Max: {pkg.max_participants})
                     </span>
                   </div>
                 </div>
