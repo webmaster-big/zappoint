@@ -142,6 +142,7 @@ const CreatePackage: React.FC = () => {
         attractions: [] as string[],
         rooms: [] as string[],
         price: "",
+        minParticipants: "",
         maxParticipants: "",
         pricePerAdditional: "",
         duration: "",
@@ -371,6 +372,7 @@ const CreatePackage: React.FC = () => {
         try {
             // Validate required numeric fields
             const price = parseFloat(form.price);
+            const minParticipants = form.minParticipants ? parseInt(form.minParticipants) : undefined;
             const maxParticipants = parseInt(form.maxParticipants);
             const pricePerAdditional = form.pricePerAdditional ? parseFloat(form.pricePerAdditional) : 0;
             const duration = parseInt(form.duration);
@@ -382,8 +384,14 @@ const CreatePackage: React.FC = () => {
                 return;
             }
 
-            if (isNaN(maxParticipants) || maxParticipants < 1) {
+            if (form.maxParticipants && (isNaN(maxParticipants) || maxParticipants < 1)) {
                 showToast("Please enter a valid max participants (minimum 1)", "error");
+                setSubmitting(false);
+                return;
+            }
+
+            if (form.minParticipants && minParticipants && (isNaN(minParticipants) || minParticipants < 1)) {
+                showToast("Please enter a valid min participants (minimum 1)", "error");
                 setSubmitting(false);
                 return;
             }
@@ -401,6 +409,7 @@ const CreatePackage: React.FC = () => {
                 category: form.category,
                 features: form.features.filter(f => f.trim()), // Filter out empty features
                 price: Number(price.toFixed(2)), // Ensure 2 decimal places
+                min_participants: minParticipants,
                 max_participants: maxParticipants,
                 price_per_additional: Number(pricePerAdditional.toFixed(2)), // Ensure 2 decimal places
                 duration: duration,
@@ -454,6 +463,7 @@ const CreatePackage: React.FC = () => {
                 attractions: [],
                 rooms: [],
                 price: "",
+                minParticipants: "",
                 maxParticipants: "",
                 pricePerAdditional: "",
                 duration: "",
@@ -669,9 +679,22 @@ const CreatePackage: React.FC = () => {
                                         </div>
                                     </div>
                                     
-                                    {/* Additional Pricing Section */}
-                                    {form.maxParticipants && (
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block font-semibold mb-2 text-base text-neutral-800">Min Participants (Optional)</label>
+                                            <input
+                                                type="number"
+                                                name="minParticipants"
+                                                value={form.minParticipants}
+                                                onChange={handleChange}
+                                                className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400`}
+                                                min="1"
+                                                placeholder="Enter min participants"
+                                            />
+                                        </div>
+                                        
+                                        {/* Additional Pricing Section */}
+                                        {form.maxParticipants && (
                                             <div>
                                                 <label className="block font-semibold mb-2 text-base text-neutral-800">Price per Additional Participant</label>
                                                 <input
@@ -682,11 +705,11 @@ const CreatePackage: React.FC = () => {
                                                     className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400`}
                                                     min="0"
                                                     step="0.01"
-                                                    placeholder="Enter price for each additional participant"
+                                                    placeholder="Enter price per additional"
                                                 />
                                             </div>
-                                        </div>
-                                    )}
+                                        )}
+                                    </div>
                                     
                                     <div>
                                         <label className="block font-semibold mb-2 text-base text-neutral-800">Category</label>
@@ -1356,6 +1379,7 @@ const CreatePackage: React.FC = () => {
                                         attractions: [],
                                         rooms: [],
                                         price: "",
+                                        minParticipants: "",
                                         maxParticipants: "",
                                         pricePerAdditional: "",
                                         duration: "",

@@ -48,6 +48,7 @@ const EditPackage: React.FC = () => {
         attractions: [] as string[],
         rooms: [] as string[],
         price: "",
+        minParticipants: "",
         maxParticipants: "",
         pricePerAdditional: "",
         duration: "",
@@ -197,6 +198,7 @@ const EditPackage: React.FC = () => {
                     attractions: attractionNames,
                     rooms: roomNames,
                     price: String(pkg.price || ""),
+                    minParticipants: String(pkg.min_participants || ""),
                     maxParticipants: String(pkg.max_participants || ""),
                     pricePerAdditional: String(pkg.price_per_additional || ""),
                     duration: String(pkg.duration || ""),
@@ -452,6 +454,7 @@ const EditPackage: React.FC = () => {
         }
 
         const price = parseFloat(form.price);
+        const minParticipants = form.minParticipants ? parseInt(form.minParticipants) : undefined;
         const pricePerAdditional = parseFloat(form.pricePerAdditional || '0');
         const maxParticipants = parseInt(form.maxParticipants || '0');
         const duration = parseInt(form.duration || '0');
@@ -459,6 +462,11 @@ const EditPackage: React.FC = () => {
 
         if (isNaN(price) || price < 0) {
             showToast("Please enter a valid price", "error");
+            return;
+        }
+
+        if (form.minParticipants && minParticipants && (isNaN(minParticipants) || minParticipants < 1)) {
+            showToast("Please enter a valid min participants (minimum 1)", "error");
             return;
         }
 
@@ -507,6 +515,7 @@ const EditPackage: React.FC = () => {
                 category: form.category,
                 features: form.features.filter(f => f.trim()), // Filter out empty features
                 price: Number(price.toFixed(2)),
+                min_participants: minParticipants,
                 max_participants: maxParticipants,
                 price_per_additional: Number(pricePerAdditional.toFixed(2)),
                 duration: duration,
@@ -748,21 +757,36 @@ const EditPackage: React.FC = () => {
                                     </div>
                                 </div>
                                 
-                                {form.maxParticipants && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div>
-                                        <label className="block font-semibold mb-2 text-base text-neutral-800">Price per Additional Participant</label>
+                                        <label className="block font-semibold mb-2 text-base text-neutral-800">Min Participants (Optional)</label>
                                         <input
                                             type="number"
-                                            name="pricePerAdditional"
-                                            value={form.pricePerAdditional}
+                                            name="minParticipants"
+                                            value={form.minParticipants}
                                             onChange={handleChange}
                                             className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400`}
-                                            min="0"
-                                            step="0.01"
-                                            placeholder="Enter price per additional participant"
+                                            min="1"
+                                            placeholder="Enter min participants"
                                         />
                                     </div>
-                                )}
+                                    
+                                    {form.maxParticipants && (
+                                        <div>
+                                            <label className="block font-semibold mb-2 text-base text-neutral-800">Price per Additional Participant</label>
+                                            <input
+                                                type="number"
+                                                name="pricePerAdditional"
+                                                value={form.pricePerAdditional}
+                                                onChange={handleChange}
+                                                className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400`}
+                                                min="0"
+                                                step="0.01"
+                                                placeholder="Enter price per additional"
+                                            />
+                                        </div>
+                                    )}
+                                </div>
                                 
                                 <div>
                                     <label className="block font-semibold mb-2 text-base text-neutral-800">Duration</label>
