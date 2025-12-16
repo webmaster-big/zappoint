@@ -842,8 +842,8 @@ const ManagePurchases = () => {
 
       {/* Payment Modal */}
       {showPaymentModal && selectedPurchaseForPayment && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-backdrop-fade">
-          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-backdrop-fade" onClick={() => { setShowPaymentModal(false); setSelectedPurchaseForPayment(null); }}>
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
             <div className={`p-6 border-b border-gray-100 bg-${themeColor}-50`}>
               <h2 className="text-2xl font-bold text-gray-900">Process Payment</h2>
               <p className="text-sm text-gray-600 mt-1">

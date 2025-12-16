@@ -2427,8 +2427,8 @@ const OnsiteBooking: React.FC = () => {
 
       {/* No Authorize.Net Account Modal */}
       {showNoAuthAccountModal && (
-        <div className="fixed inset-0 bg-black/75 flex items-center justify-center p-4 z-[9999] animate-backdrop-fade">
-          <div className="bg-white rounded-xl max-w-md w-full p-6 border-4 border-yellow-400 shadow-2xl animate-scale-in">
+        <div className="fixed inset-0 bg-black/75 flex items-center justify-center p-4 z-[9999] animate-backdrop-fade" onClick={() => setShowNoAuthAccountModal(false)}>
+          <div className="bg-white rounded-xl max-w-md w-full p-6 border-4 border-yellow-400 shadow-2xl animate-scale-in" onClick={(e) => e.stopPropagation()}>
             <div className="flex flex-col items-center text-center">
               <div className="w-20 h-20 bg-yellow-100 rounded-full flex items-center justify-center mb-4">
                 <svg className="w-12 h-12 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">

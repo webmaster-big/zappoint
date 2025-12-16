@@ -647,8 +647,8 @@ const Rooms: React.FC = () => {
 
             {/* Create Modal */}
             {showCreateModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-                    <div className="bg-white rounded-lg shadow-xl w-full max-w-lg">
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onClick={() => setShowCreateModal(false)}>
+                    <div className="bg-white rounded-lg shadow-xl w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
                         <div className="p-6">
                             <h2 className="text-xl font-semibold text-gray-900 mb-4">Add New Space</h2>
                             
@@ -919,8 +919,8 @@ const Rooms: React.FC = () => {
 
             {/* Edit Modal */}
             {showEditModal && selectedRoom && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-                    <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onClick={() => setShowEditModal(false)}>
+                    <div className="bg-white rounded-lg shadow-xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
                         <div className="p-6">
                             <h2 className="text-xl font-semibold text-gray-900 mb-4">Edit Space</h2>
                             <form onSubmit={handleUpdateRoom} className="space-y-4">

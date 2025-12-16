@@ -995,17 +995,6 @@ const LocationManagerDashboard: React.FC = () => {
                 </div>
               )}
 
-              {/* Action Buttons */}
-              <div className="flex gap-3 mt-6">
-                <button
-                  onClick={() => setSelectedBooking(null)}
-                  className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium transition-all duration-200 transform hover:scale-105 active:scale-95"
-                >
-                  Close
-                </button>
-                
-              </div>
-
               {/* Bottom Close Button */}
               <div className="mt-6 pt-4 border-t border-gray-200">
                 <button

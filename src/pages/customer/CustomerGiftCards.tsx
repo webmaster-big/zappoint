@@ -250,8 +250,8 @@ const CustomerGiftCards = () => {
 
           {/* Gift Card Details Modal */}
           {showDetailsModal && (
-            <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
-              <div className="bg-white max-w-lg w-full shadow-2xl">
+            <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50" onClick={() => setShowDetailsModal(null)}>
+              <div className="bg-white max-w-lg w-full shadow-2xl" onClick={(e) => e.stopPropagation()}>
                 <div className="bg-gradient-to-r from-blue-800 to-blue-900 p-6 text-white">
                   <div className="flex items-center gap-3 mb-4">
                     <Gift className="w-8 h-8" />
@@ -306,8 +306,8 @@ const CustomerGiftCards = () => {
 
           {/* Payment Modal */}
           {showPaymentModal && (
-            <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50 animate-backdrop-fade">
-              <div className="bg-white max-w-md w-full shadow-2xl">
+            <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50 animate-backdrop-fade" onClick={() => setShowPaymentModal(null)}>
+              <div className="bg-white max-w-md w-full shadow-2xl" onClick={(e) => e.stopPropagation()}>
                 <div className="bg-gradient-to-r from-blue-800 to-blue-900 p-6 text-white text-center">
                   <Gift className="w-12 h-12 mx-auto mb-3 opacity-90" />
                   <h2 className="text-2xl font-bold mb-2">Complete Purchase</h2>

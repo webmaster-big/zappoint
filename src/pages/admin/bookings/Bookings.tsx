@@ -1261,8 +1261,8 @@ const Bookings: React.FC = () => {
 
         {/* Export Modal */}
         {showExportModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-backdrop-fade">
-            <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-backdrop-fade" onClick={() => setShowExportModal(false)}>
+            <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
               <div className={`p-6 border-b border-gray-100 bg-${themeColor}-50`}>
                 <h2 className="text-2xl font-bold text-gray-900">Export Bookings</h2>
                 <p className="text-sm text-gray-600 mt-1">
@@ -1541,8 +1541,8 @@ const Bookings: React.FC = () => {
 
         {/* Payment Modal */}
         {showPaymentModal && selectedBookingForPayment && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-backdrop-fade">
-            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4">
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-backdrop-fade" onClick={() => { setShowPaymentModal(false); setSelectedBookingForPayment(null); }}>
+            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
               <div className={`p-6 border-b border-gray-100 bg-${themeColor}-50`}>
                 <h2 className="text-2xl font-bold text-gray-900">Process Payment</h2>
                 <p className="text-sm text-gray-600 mt-1">

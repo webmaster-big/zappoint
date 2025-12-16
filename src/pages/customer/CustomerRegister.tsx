@@ -655,8 +655,8 @@ const CustomerRegister = () => {
 
       {/* Terms of Service Modal */}
       {showTermsModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-backdrop-fade">
-          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-backdrop-fade" onClick={() => setShowTermsModal(false)}>
+          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-zinc-200 flex items-center justify-between">
               <h3 className="text-xl font-bold text-zinc-900">Terms of Service</h3>
               <button
@@ -722,8 +722,8 @@ const CustomerRegister = () => {
 
       {/* Privacy Policy Modal */}
       {showPrivacyModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-backdrop-fade">
-          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-backdrop-fade" onClick={() => setShowPrivacyModal(false)}>
+          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-zinc-200 flex items-center justify-between">
               <h3 className="text-xl font-bold text-zinc-900">Privacy Policy</h3>
               <button

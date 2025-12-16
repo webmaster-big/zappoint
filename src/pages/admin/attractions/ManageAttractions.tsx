@@ -799,8 +799,8 @@ const ManageAttractions = () => {
 
       {/* Export Modal */}
       {showExportModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-backdrop-fade">
-          <div className="bg-white rounded-xl max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col animate-scale-in">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-backdrop-fade" onClick={() => setShowExportModal(false)}>
+          <div className="bg-white rounded-xl max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col animate-scale-in" onClick={(e) => e.stopPropagation()}>
             <div className="p-6 border-b border-gray-200">
               <div className="flex justify-between items-center">
                 <div>
@@ -881,7 +881,7 @@ const ManageAttractions = () => {
               <button
                 onClick={handleExport}
                 disabled={selectedForExport.length === 0}
-                className={`px-4 py-2 bg-${themeColor}-700 text-white rounded-lg hover:bg-${fullColor} disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2`}
+                className={`px-4 py-2 bg-${fullColor} text-white rounded-lg hover:bg-${fullColor} disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2`}
               >
                 <Download size={18} />
                 Export {selectedForExport.length} Attraction{selectedForExport.length !== 1 ? 's' : ''}
@@ -893,8 +893,8 @@ const ManageAttractions = () => {
 
       {/* Import Modal */}
       {showImportModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-backdrop-fade">
-          <div className="bg-white rounded-xl max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col animate-scale-in">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-backdrop-fade" onClick={() => { setShowImportModal(false); setImportData(''); }}>
+          <div className="bg-white rounded-xl max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col animate-scale-in" onClick={(e) => e.stopPropagation()}>
             <div className="p-6 border-b border-gray-200">
               <div className="flex justify-between items-center">
                 <div>
@@ -982,7 +982,7 @@ const ManageAttractions = () => {
               <button
                 onClick={handleImport}
                 disabled={!importData.trim()}
-                className={`px-4 py-2 bg-${themeColor}-700 text-white rounded-lg hover:bg-${fullColor} disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2`}
+                className={`px-4 py-2 bg-${fullColor} text-white rounded-lg hover:bg-${fullColor} disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2`}
               >
                 <Upload size={18} />
                 Import Attractions

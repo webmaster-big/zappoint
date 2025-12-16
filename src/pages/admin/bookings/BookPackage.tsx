@@ -795,8 +795,8 @@ const BookPackage: React.FC = () => {
     if (!showConfirmation || !confirmationData) return null;
     
     return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto animate-backdrop-fade">
-        <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full my-8 max-h-[calc(100vh-4rem)] overflow-y-auto">
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto animate-backdrop-fade" onClick={() => setShowConfirmation(false)}>
+        <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full my-8 max-h-[calc(100vh-4rem)] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
           <div className="p-4 sm:p-8">
             {/* Success Header */}
             <div className="text-center mb-4 sm:mb-6">

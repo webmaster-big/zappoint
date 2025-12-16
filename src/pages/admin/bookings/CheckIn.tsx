@@ -800,8 +800,8 @@ const CheckIn: React.FC = () => {
 
         {/* Verification Modal (before check-in) */}
         {showVerificationModal && verifiedBooking && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-2 sm:p-4 z-50">
-            <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-2 sm:p-4 z-50" onClick={handleCancelCheckIn}>
+            <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
               {/* Modal Header */}
               <div className="sticky top-0 bg-white border-b border-gray-200 p-3 sm:p-6 flex items-center justify-between">
                 <h2 className="text-base sm:text-xl font-bold text-gray-800">Verify Booking Details</h2>
@@ -1257,8 +1257,8 @@ const CheckIn: React.FC = () => {
 
         {/* Booking Details Modal */}
         {showDetailsModal && selectedBooking && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onClick={closeModal}>
+            <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
               {/* Modal Header */}
               <div className="sticky top-0 bg-white border-b border-gray-200 p-3 sm:p-6 flex items-center justify-between">
                 <h2 className="text-base sm:text-xl font-bold text-gray-800">Booking Details</h2>
@@ -1695,8 +1695,8 @@ const CheckIn: React.FC = () => {
 
         {/* Payment Modal */}
         {showPaymentModal && selectedBookingForPayment && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-backdrop-fade">
-            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4">
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-backdrop-fade" onClick={() => { setShowPaymentModal(false); setSelectedBookingForPayment(null); }}>
+            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
               <div className={`p-6 border-b border-gray-100 bg-${themeColor}-50`}>
                 <h2 className="text-2xl font-bold text-gray-900">Process Payment</h2>
                 <p className="text-sm text-gray-600 mt-1">

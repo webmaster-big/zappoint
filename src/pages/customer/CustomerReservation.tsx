@@ -659,8 +659,8 @@ const CustomerReservations = () => {
 
       {/* Booking Details Modal */}
       {showDetailsModal && selectedBooking && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-backdrop-fade">
-          <div className="bg-white max-w-2xl w-full max-h-[90vh] overflow-y-auto animate-scale-in">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-backdrop-fade" onClick={() => setShowDetailsModal(false)}>
+          <div className="bg-white max-w-2xl w-full max-h-[90vh] overflow-y-auto animate-scale-in" onClick={(e) => e.stopPropagation()}>
             <div className="p-6 border-b border-gray-200">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold text-gray-900">Booking Details</h3>
@@ -811,8 +811,8 @@ const CustomerReservations = () => {
 
       {/* Refund Policy Modal */}
       {showRefundPolicy && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-backdrop-fade">
-          <div className="bg-white max-w-2xl w-full max-h-[80vh] overflow-y-auto animate-scale-in">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-backdrop-fade" onClick={() => setShowRefundPolicy(false)}>
+          <div className="bg-white max-w-2xl w-full max-h-[80vh] overflow-y-auto animate-scale-in" onClick={(e) => e.stopPropagation()}>
             <div className="p-6 border-b border-gray-200">
               <div className="flex items-center gap-3">
                 <Shield className="w-5 h-5 text-blue-800" />
@@ -881,8 +881,8 @@ const CustomerReservations = () => {
 
       {/* Cancel Booking Modal */}
       {showCancelModal && selectedBooking && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-backdrop-fade">
-          <div className="bg-white max-w-md w-full">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-backdrop-fade" onClick={() => setShowCancelModal(false)}>
+          <div className="bg-white max-w-md w-full" onClick={(e) => e.stopPropagation()}>
             <div className="p-6 border-b border-gray-200">
               <h3 className="text-lg font-semibold text-gray-900">Cancel Booking</h3>
               <p className="text-gray-600 mt-1 text-sm">Are you sure you want to cancel this booking?</p>

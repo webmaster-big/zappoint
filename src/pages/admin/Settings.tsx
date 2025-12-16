@@ -789,8 +789,8 @@ const Settings = () => {
 
         {/* Email Change Modal */}
         {showEmailModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-backdrop-fade">
-            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-5 relative animate-scale-in">
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-backdrop-fade" onClick={() => setShowEmailModal(false)}>
+            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-5 relative animate-scale-in" onClick={(e) => e.stopPropagation()}>
               <button
                 onClick={() => setShowEmailModal(false)}
                 className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 transition-colors"
@@ -875,8 +875,8 @@ const Settings = () => {
 
         {/* Password Change Modal */}
         {showPasswordModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-backdrop-fade">
-            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-5 relative animate-scale-in">
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-backdrop-fade" onClick={() => setShowPasswordModal(false)}>
+            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-5 relative animate-scale-in" onClick={(e) => e.stopPropagation()}>
               <button
                 onClick={() => setShowPasswordModal(false)}
                 className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 transition-colors"
@@ -982,8 +982,8 @@ const Settings = () => {
 
         {/* Company Admin - All Authorize.Net Accounts Modal */}
         {showAllAccountsModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-backdrop-fade">
-            <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col animate-scale-in">
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-backdrop-fade" onClick={() => setShowAllAccountsModal(false)}>
+            <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col animate-scale-in" onClick={(e) => e.stopPropagation()}>
               <div className="p-6 border-b border-gray-200">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -1117,8 +1117,8 @@ const Settings = () => {
 
         {/* Authorize.Net Connection Modal */}
         {showAuthorizeModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-backdrop-fade">
-            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-5 relative animate-scale-in">
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-backdrop-fade" onClick={() => { setShowAuthorizeModal(false); setAuthorizeApiLoginId(''); setAuthorizeTransactionKey(''); setAuthorizePublicClientKey(''); setSelectedLocationId(null); setShowTransactionKey(false); setShowPublicClientKey(false); }}>
+            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-5 relative animate-scale-in" onClick={(e) => e.stopPropagation()}>
               <button
                 onClick={() => {
                   setShowAuthorizeModal(false);
