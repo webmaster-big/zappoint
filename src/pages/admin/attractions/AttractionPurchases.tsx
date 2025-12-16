@@ -447,9 +447,11 @@ const ManagePurchases = () => {
         throw new Error(paymentResponse.message || 'Failed to create payment');
       }
 
-      // Update purchase status to completed
+      // Update purchase status, amount paid, and payment method
       await attractionPurchaseService.updatePurchase(Number(selectedPurchaseForPayment.id), {
         status: 'completed',
+        amount_paid: amount,
+        payment_method: paymentMethod,
       });
 
       setToast({ message: 'Payment processed successfully!', type: 'success' });
