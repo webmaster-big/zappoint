@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import Toast from "../../../components/ui/Toast";
 import LocationSelector from '../../../components/admin/LocationSelector';
-import { Info, Plus, RefreshCcw, Calendar, Clock, Gift, Tag, Home } from "lucide-react";
+import { Info, Plus, RefreshCcw, Calendar, Clock, Gift, Tag, Home, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { 
@@ -11,8 +11,10 @@ import {
     promoService, 
     giftCardService,
     packageService,
-    locationService 
+    locationService,
+    categoryService
 } from '../../../services';
+import type { Category } from '../../../services/CategoryService';
 import type { 
     CreatePackageAttraction, 
     CreatePackageAddOn, 
@@ -22,9 +24,6 @@ import type {
 } from '../../../types/createPackage.types';
 import { getStoredUser, formatTimeTo12Hour } from "../../../utils/storage";
 
-// Only categories remain in localStorage
-const initialCategories = ["Birthday", "Special", "Event"];
-
 const CreatePackage: React.FC = () => {
     const navigate = useNavigate();
     const { themeColor, fullColor } = useThemeColor();
@@ -32,7 +31,7 @@ const CreatePackage: React.FC = () => {
     // State for fetched data
     const [attractions, setAttractions] = useState<CreatePackageAttraction[]>([]); // must include id
     const [addOns, setAddOns] = useState<CreatePackageAddOn[]>([]); // must include id
-    const [categories, setCategories] = useState<string[]>(() => JSON.parse(localStorage.getItem("zapzone_categories") || JSON.stringify(initialCategories)));
+    const [categories, setCategories] = useState<Category[]>([]); // Fetch from API
     const [rooms, setRooms] = useState<CreatePackageRoom[]>([]); // must include id
     const [promos, setPromos] = useState<CreatePackagePromo[]>([]); // must include id
     const [giftCards, setGiftCards] = useState<CreatePackageGiftCard[]>([]); // must include id
@@ -72,12 +71,13 @@ const CreatePackage: React.FC = () => {
                 if (selectedLocation !== null) {
                     params.location_id = selectedLocation;
                 }
-                const [attractionsRes, addOnsRes, roomsRes, promosRes, giftCardsRes] = await Promise.all([
+                const [attractionsRes, addOnsRes, roomsRes, promosRes, giftCardsRes, categoriesRes] = await Promise.all([
                     attractionService.getAttractions(params),
                     addOnService.getAddOns(params),
                     roomService.getRooms(params),
                     promoService.getPromos(),
-                    giftCardService.getGiftCards()
+                    giftCardService.getGiftCards(),
+                    categoryService.getCategories()
                 ]);
 
                 // Transform data to match component types (include id)
@@ -117,11 +117,14 @@ const CreatePackage: React.FC = () => {
                     description: gc.description || ''
                 })) || [];
 
+                const categoriesData = categoriesRes.data || [];
+
                 setAttractions(attractionsData);
                 setAddOns(addOnsData);
                 setRooms(roomsData);
                 setPromos(promosData);
                 setGiftCards(giftCardsData);
+                setCategories(categoriesData);
             } catch (error) {
                 console.error('Error fetching data:', error);
                 showToast('Error loading data from server', 'error');
@@ -295,11 +298,12 @@ const CreatePackage: React.FC = () => {
                     }
                     break;
                 case 'category':
-                    if (!categories.includes(value)) {
-                        const updated = [...categories, value];
-                        setCategories(updated);
-                        localStorage.setItem("zapzone_categories", JSON.stringify(updated));
-                        showToast("Category added!", "success");
+                    if (!categories.some(c => c.name === value)) {
+                        const response = await categoryService.createCategory({ name: value });
+                        if (response.success && response.data) {
+                            setCategories(prev => [...prev, response.data]);
+                            showToast("Category added successfully!", "success");
+                        }
                     }
                     break;
                 case 'room':
@@ -714,18 +718,43 @@ const CreatePackage: React.FC = () => {
                                     <div>
                                         <label className="block font-semibold mb-2 text-base text-neutral-800">Category</label>
                                         <div className="flex flex-col sm:flex-row gap-2">
-                                            <select
-                                                name="category"
-                                                value={form.category}
-                                                onChange={handleChange}
-                                                className={`rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base min-w-0 flex-1 transition-all`}
-                                                required
-                                            >
-                                                <option value="">Select category</option>
-                                                {categories.map((cat) => (
-                                                    <option key={cat} value={cat}>{cat}</option>
-                                                ))}
-                                            </select>
+                                            <div className="flex gap-1 items-center flex-1">
+                                                <select
+                                                    name="category"
+                                                    value={form.category}
+                                                    onChange={handleChange}
+                                                    className={`rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base min-w-0 flex-1 transition-all`}
+                                                    required
+                                                >
+                                                    <option value="">Select category</option>
+                                                    {categories.map((cat) => (
+                                                        <option key={cat.id} value={cat.name}>{cat.name}</option>
+                                                    ))}
+                                                </select>
+                                                {form.category && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={async () => {
+                                                            const category = categories.find(c => c.name === form.category);
+                                                            if (category && window.confirm(`Are you sure you want to delete the category "${category.name}"?`)) {
+                                                                try {
+                                                                    await categoryService.deleteCategory(category.id);
+                                                                    setCategories(prev => prev.filter(c => c.id !== category.id));
+                                                                    setForm(prev => ({ ...prev, category: '' }));
+                                                                    showToast("Category deleted successfully!", "success");
+                                                                } catch (error) {
+                                                                    console.error('Error deleting category:', error);
+                                                                    showToast("Error deleting category", "error");
+                                                                }
+                                                            }
+                                                        }}
+                                                        className="p-2 rounded-md hover:bg-red-50 text-red-600 transition"
+                                                        title="Delete category"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                )}
+                                            </div>
                                             <div className="flex gap-1 items-center">
                                                 <input
                                                     type="text"
@@ -739,7 +768,18 @@ const CreatePackage: React.FC = () => {
                                                         }
                                                     }}
                                                 />
-                                                <button type="button" className="p-2 rounded-md hover:bg-gray-100 transition" title="Add category">
+                                                <button 
+                                                    type="button" 
+                                                    className="p-2 rounded-md hover:bg-gray-100 transition" 
+                                                    title="Add category"
+                                                    onClick={async () => {
+                                                        const input = document.querySelector('input[placeholder="Add category"]') as HTMLInputElement;
+                                                        if (input?.value) {
+                                                            await handleAddOption('category', input.value);
+                                                            input.value = '';
+                                                        }
+                                                    }}
+                                                >
                                                     <Plus className="w-4 h-4 text-primary" />
                                                 </button>
                                             </div>
@@ -1204,12 +1244,29 @@ const CreatePackage: React.FC = () => {
                             
                             {/* Promos Section */}
                             <div>
-                                <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2 relative group">
-                                    <Tag className="w-5 h-5 text-primary" /> Promos
-                                    <span className="absolute z-20 left-0 top-full mt-2 min-w-[250px] max-w-xs bg-gray-900 text-white text-xs rounded-md px-3 py-2 opacity-0 group-hover:opacity-100 pointer-events-none transition-all">
-                                        Link promotional codes that can be applied as discounts for this package
-                                    </span>
-                                </h3>
+                                <div className="flex items-center justify-between mb-4">
+                                    <h3 className="text-xl font-bold text-neutral-900 flex items-center gap-2 relative group">
+                                        <Tag className="w-5 h-5 text-primary" /> Promos
+                                        <span className="absolute z-20 left-0 top-full mt-2 min-w-[250px] max-w-xs bg-gray-900 text-white text-xs rounded-md px-3 py-2 opacity-0 group-hover:opacity-100 pointer-events-none transition-all">
+                                            Link promotional codes that can be applied as discounts for this package
+                                        </span>
+                                    </h3>
+                                    {promos.length > 0 && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                if (form.promos.length === promos.length) {
+                                                    setForm(prev => ({ ...prev, promos: [] }));
+                                                } else {
+                                                    setForm(prev => ({ ...prev, promos: promos.map(p => p.code) }));
+                                                }
+                                            }}
+                                            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${form.promos.length === promos.length ? `bg-${themeColor}-100 text-${fullColor}` : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                                        >
+                                            {form.promos.length === promos.length ? 'Deselect All' : 'Select All'}
+                                        </button>
+                                    )}
+                                </div>
                                 {promos.length === 0 ? (
                                     <div className="bg-gray-50 rounded-lg p-4 text-center border border-dashed border-gray-300">
                                         <p className="text-gray-500 mb-3 text-sm">No promos available yet</p>
@@ -1252,12 +1309,29 @@ const CreatePackage: React.FC = () => {
                             
                             {/* Gift Cards Section */}
                             <div>
-                                <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2 relative group">
-                                    <Gift className="w-5 h-5 text-primary" /> Gift Cards
-                                    <span className="absolute z-20 left-0 top-full mt-2 min-w-[250px] max-w-xs bg-gray-900 text-white text-xs rounded-md px-3 py-2 opacity-0 group-hover:opacity-100 pointer-events-none transition-all">
-                                        Associate gift card codes that can be redeemed when booking this package
-                                    </span>
-                                </h3>
+                                <div className="flex items-center justify-between mb-4">
+                                    <h3 className="text-xl font-bold text-neutral-900 flex items-center gap-2 relative group">
+                                        <Gift className="w-5 h-5 text-primary" /> Gift Cards
+                                        <span className="absolute z-20 left-0 top-full mt-2 min-w-[250px] max-w-xs bg-gray-900 text-white text-xs rounded-md px-3 py-2 opacity-0 group-hover:opacity-100 pointer-events-none transition-all">
+                                            Associate gift card codes that can be redeemed when booking this package
+                                        </span>
+                                    </h3>
+                                    {giftCards.length > 0 && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                if (form.giftCards.length === giftCards.length) {
+                                                    setForm(prev => ({ ...prev, giftCards: [] }));
+                                                } else {
+                                                    setForm(prev => ({ ...prev, giftCards: giftCards.map(gc => gc.code) }));
+                                                }
+                                            }}
+                                            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${form.giftCards.length === giftCards.length ? `bg-${themeColor}-100 text-${fullColor}` : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                                        >
+                                            {form.giftCards.length === giftCards.length ? 'Deselect All' : 'Select All'}
+                                        </button>
+                                    )}
+                                </div>
                                 {giftCards.length === 0 ? (
                                     <div className="bg-gray-50 rounded-lg p-4 text-center border border-dashed border-gray-300">
                                         <p className="text-gray-500 mb-3 text-sm">No gift cards available yet</p>

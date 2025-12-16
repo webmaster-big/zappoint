@@ -1286,7 +1286,7 @@ const PurchaseAttraction = () => {
                   <div className="flex items-center">
                     <Users className="h-5 w-5 text-gray-400 mr-2" />
                     <span className="text-sm text-gray-800">
-                      Duration: {attraction.duration} {attraction.durationUnit}
+                      Duration: {attraction.duration === '0' || !attraction.duration ? 'Unlimited' : `${attraction.duration} ${attraction.durationUnit}`}
                     </span>
                   </div>
                 </div>
@@ -1410,7 +1410,7 @@ const PurchaseAttraction = () => {
                 </div>
                 <div className="flex justify-between text-sm sm:text-base">
                   <span className="text-gray-600">Duration:</span>
-                  <span className="font-medium text-gray-900">{attraction.duration} {attraction.durationUnit}</span>
+                  <span className="font-medium text-gray-900">{attraction.duration === '0' || !attraction.duration ? 'Unlimited' : `${attraction.duration} ${attraction.durationUnit}`}</span>
                 </div>
               </div>
             </div>

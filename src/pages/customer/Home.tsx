@@ -70,7 +70,7 @@ const EntertainmentLandingPage = () => {
           image: Array.isArray(attr.image) ? attr.image[0] : attr.image,
           category: attr.category,
           availableLocations: attr.locations.map(loc => loc.location_name),
-          duration: `${attr.duration} ${attr.duration_unit}`,
+          duration: attr.duration === 0 || !attr.duration ? 'Unlimited' : `${attr.duration} ${attr.duration_unit}`,
           pricingType: attr.pricing_type,
           purchaseLinks: attr.purchase_links,
         }));
@@ -522,15 +522,13 @@ const EntertainmentLandingPage = () => {
                     <div className="text-xs md:text-sm text-gray-500">per person</div>
                   </div>
                 </div>
-                {selectedAttraction.duration && (
-                  <div className="flex items-center gap-2 text-gray-600">
-                    <Clock size={20} />
-                    <div>
-                      <div className="text-sm md:text-base font-semibold">{selectedAttraction.duration}</div>
-                      <div className="text-xs md:text-sm text-gray-500">Duration</div>
-                    </div>
+                <div className="flex items-center gap-2 text-gray-600">
+                  <Clock size={20} />
+                  <div>
+                    <div className="text-sm md:text-base font-semibold">{selectedAttraction.duration || 'Unlimited'}</div>
+                    <div className="text-xs md:text-sm text-gray-500">Duration</div>
                   </div>
-                )}
+                </div>
               </div>
 
               {/* Description */}
@@ -555,8 +553,14 @@ const EntertainmentLandingPage = () => {
                     <Clock size={16} className="md:w-[18px] md:h-[18px]" />
                     <span className="text-xs font-medium">Duration</span>
                   </div>
-                  <div className="text-base md:text-lg font-bold text-gray-900">{selectedAttraction.duration?.split(' ')[0]}</div>
-                  <div className="text-xs text-gray-500">{selectedAttraction.duration?.split(' ')[1] || 'min'}</div>
+                  {selectedAttraction.duration === 'Unlimited' ? (
+                    <div className="text-base md:text-lg font-bold text-gray-900">Unlimited</div>
+                  ) : (
+                    <>
+                      <div className="text-base md:text-lg font-bold text-gray-900">{selectedAttraction.duration?.split(' ')[0]}</div>
+                      <div className="text-xs text-gray-500">{selectedAttraction.duration?.split(' ')[1] || 'min'}</div>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -605,17 +609,28 @@ const EntertainmentLandingPage = () => {
                 </div>
               </div>
 
-              {/* Action Button */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleBuyTickets(selectedAttraction);
-                }}
-                className="w-full py-3 bg-blue-800 text-white font-semibold text-base hover:bg-blue-900 transition flex items-center justify-center gap-2"
-              >
-                <Ticket size={20} />
-                Buy Tickets
-              </button>
+              {/* Action Buttons */}
+              <div className="space-y-2">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleBuyTickets(selectedAttraction);
+                  }}
+                  className="w-full py-3 bg-blue-800 text-white font-semibold text-base hover:bg-blue-900 transition flex items-center justify-center gap-2"
+                >
+                  <Ticket size={20} />
+                  Buy Tickets
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowAttractionModal(false);
+                  }}
+                  className="w-full py-2.5 border border-gray-300 text-gray-700 hover:bg-gray-50 transition font-medium text-base"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -733,17 +748,28 @@ const EntertainmentLandingPage = () => {
                 </div>
               </div>
 
-              {/* Action Button */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleBookPackage(selectedPackage);
-                }}
-                className="w-full py-3 bg-blue-800 text-white font-semibold text-base hover:bg-blue-900 transition flex items-center justify-center gap-2"
-              >
-                <Package size={20} />
-                Book This Package
-              </button>
+              {/* Action Buttons */}
+              <div className="space-y-2">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleBookPackage(selectedPackage);
+                  }}
+                  className="w-full py-3 bg-blue-800 text-white font-semibold text-base hover:bg-blue-900 transition flex items-center justify-center gap-2"
+                >
+                  <Package size={20} />
+                  Book This Package
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowPackageModal(false);
+                  }}
+                  className="w-full py-2.5 border border-gray-300 text-gray-700 hover:bg-gray-50 transition font-medium text-base"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import Toast from "../../../components/ui/Toast";
-import { Info, Plus, Calendar, Clock, Gift, Tag, Home, ArrowLeft, Save } from "lucide-react";
+import { Info, Plus, Calendar, Clock, Gift, Tag, Home, ArrowLeft, Save, Trash2 } from "lucide-react";
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { 
     attractionService, 
@@ -9,8 +9,10 @@ import {
     roomService, 
     promoService, 
     giftCardService,
-    packageService 
+    packageService,
+    categoryService
 } from '../../../services';
+import type { Category } from '../../../services/CategoryService';
 import type { 
     CreatePackageAttraction, 
     CreatePackageAddOn, 
@@ -19,9 +21,6 @@ import type {
     CreatePackageGiftCard
 } from '../../../types/createPackage.types';
 import { formatTimeTo12Hour } from '../../../utils/storage';
-
-// Only categories remain in localStorage
-const initialCategories = ["Birthday", "Special", "Event", "Arcade Party", "Corporate", "Other"];
 
 const EditPackage: React.FC = () => {
     const { themeColor, fullColor } = useThemeColor();
@@ -34,7 +33,7 @@ const EditPackage: React.FC = () => {
     // State for fetched data from backend
     const [attractions, setAttractions] = useState<CreatePackageAttraction[]>([]);
     const [addOns, setAddOns] = useState<CreatePackageAddOn[]>([]);
-    const [categories, setCategories] = useState<string[]>(() => JSON.parse(localStorage.getItem("zapzone_categories") || JSON.stringify(initialCategories)));
+    const [categories, setCategories] = useState<Category[]>([]); // Fetch from API
     const [rooms, setRooms] = useState<CreatePackageRoom[]>([]);
     const [promos, setPromos] = useState<CreatePackagePromo[]>([]);
     const [giftCards, setGiftCards] = useState<CreatePackageGiftCard[]>([]);
@@ -82,12 +81,13 @@ const EditPackage: React.FC = () => {
 
             try {
                 // Step 1: Fetch all reference data first
-                const [attractionsRes, addOnsRes, roomsRes, promosRes, giftCardsRes] = await Promise.all([
+                const [attractionsRes, addOnsRes, roomsRes, promosRes, giftCardsRes, categoriesRes] = await Promise.all([
                     attractionService.getAttractions(),
                     addOnService.getAddOns(),
                     roomService.getRooms(),
                     promoService.getPromos(),
-                    giftCardService.getGiftCards()
+                    giftCardService.getGiftCards(),
+                    categoryService.getCategories()
                 ]);
 
                 // Transform data to match component types (include id)
@@ -127,12 +127,16 @@ const EditPackage: React.FC = () => {
                     description: gc.description || ''
                 })) || [];
 
+                const categoriesData = categoriesRes.data || [];
+
                 // Set reference data state
                 setAttractions(attractionsData);
                 setAddOns(addOnsData);
                 setRooms(roomsData);
                 setPromos(promosData);
                 setGiftCards(giftCardsData);
+                setCategories(categoriesData);
+                setCategories(categoriesData);
 
                 // Step 2: Now fetch the package data
                 const response = await packageService.getPackage(parseInt(id));
@@ -364,11 +368,12 @@ const EditPackage: React.FC = () => {
                     }
                     break;
                 case 'category':
-                    if (!categories.includes(value)) {
-                        const updated = [...categories, value];
-                        setCategories(updated);
-                        localStorage.setItem("zapzone_categories", JSON.stringify(updated));
-                        showToast("Category added!", "success");
+                    if (!categories.some(c => c.name === value)) {
+                        const response = await categoryService.createCategory({ name: value });
+                        if (response.success && response.data) {
+                            setCategories(prev => [...prev, response.data]);
+                            showToast("Category added successfully!", "success");
+                        }
                     }
                     break;
                 case 'room':
@@ -730,17 +735,72 @@ const EditPackage: React.FC = () => {
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div>
                                         <label className="block font-semibold mb-2 text-base text-neutral-800">Category</label>
-                                        <select
-                                            name="category"
-                                            value={form.category}
-                                            onChange={handleChange}
-                                            className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all`}
-                                        >
-                                            <option value="">Select category</option>
-                                            {categories.map((cat) => (
-                                                <option key={cat} value={cat}>{cat}</option>
-                                            ))}
-                                        </select>
+                                        <div className="flex gap-2">
+                                            <div className="flex gap-1 items-center flex-1">
+                                                <select
+                                                    name="category"
+                                                    value={form.category}
+                                                    onChange={handleChange}
+                                                    className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all`}
+                                                >
+                                                    <option value="">Select category</option>
+                                                    {categories.map((cat) => (
+                                                        <option key={cat.id} value={cat.name}>{cat.name}</option>
+                                                    ))}
+                                                </select>
+                                                {form.category && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={async () => {
+                                                            const category = categories.find(c => c.name === form.category);
+                                                            if (category && window.confirm(`Are you sure you want to delete the category "${category.name}"?`)) {
+                                                                try {
+                                                                    await categoryService.deleteCategory(category.id);
+                                                                    setCategories(prev => prev.filter(c => c.id !== category.id));
+                                                                    setForm(prev => ({ ...prev, category: '' }));
+                                                                    showToast("Category deleted successfully!", "success");
+                                                                } catch (error) {
+                                                                    console.error('Error deleting category:', error);
+                                                                    showToast("Error deleting category", "error");
+                                                                }
+                                                            }
+                                                        }}
+                                                        className="p-2 rounded-md hover:bg-red-50 text-red-600 transition"
+                                                        title="Delete category"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                            <div className="flex gap-1 items-center">
+                                                <input
+                                                    type="text"
+                                                    placeholder="New category"
+                                                    className="rounded-md border border-gray-200 px-3 py-2 bg-white text-base min-w-0 w-32"
+                                                    onKeyDown={async (e) => {
+                                                        if (e.key === 'Enter') {
+                                                            e.preventDefault();
+                                                            await handleAddOption('category', (e.target as HTMLInputElement).value);
+                                                            (e.target as HTMLInputElement).value = '';
+                                                        }
+                                                    }}
+                                                />
+                                                <button 
+                                                    type="button" 
+                                                    className="p-2 rounded-md hover:bg-gray-100 transition" 
+                                                    title="Add category"
+                                                    onClick={async () => {
+                                                        const input = document.querySelector('input[placeholder="New category"]') as HTMLInputElement;
+                                                        if (input?.value) {
+                                                            await handleAddOption('category', input.value);
+                                                            input.value = '';
+                                                        }
+                                                    }}
+                                                >
+                                                    <Plus className="w-4 h-4 text-primary" />
+                                                </button>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                                 
@@ -1080,9 +1140,26 @@ const EditPackage: React.FC = () => {
                         
                         {/* Attractions Section */}
                         <div>
-                            <h3 className={`text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2`}>
-                                <Info className={`w-5 h-5 text-${themeColor}-600`} /> Attractions
-                            </h3>
+                            <div className="flex items-center justify-between mb-4">
+                                <h3 className={`text-xl font-bold text-neutral-900 flex items-center gap-2`}>
+                                    <Info className={`w-5 h-5 text-${themeColor}-600`} /> Attractions
+                                </h3>
+                                {attractions.length > 0 && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            if (form.attractions.length === attractions.length) {
+                                                setForm(prev => ({ ...prev, attractions: [] }));
+                                            } else {
+                                                setForm(prev => ({ ...prev, attractions: attractions.map(a => a.name) }));
+                                            }
+                                        }}
+                                        className={`text-sm px-3 py-1.5 rounded-md bg-${themeColor}-50 text-${fullColor} hover:bg-${themeColor}-100 transition-colors font-medium`}
+                                    >
+                                        {form.attractions.length === attractions.length ? 'Deselect All' : 'Select All'}
+                                    </button>
+                                )}
+                            </div>
                             {attractions.length === 0 ? (
                                 <div className="bg-gray-50 rounded-lg p-4 text-center border border-dashed border-gray-300">
                                     <p className="text-gray-500 mb-3 text-sm">No attractions available yet</p>
@@ -1112,11 +1189,35 @@ const EditPackage: React.FC = () => {
                         
                         {/* Rooms Section */}
                         <div>
-                            <h3 className={`text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2`}>
-                                <Home className={`w-5 h-5 text-${themeColor}-600`} /> Rooms
-                            </h3>
+                            <div className="flex items-center justify-between mb-4">
+                                <h3 className={`text-xl font-bold text-neutral-900 flex items-center gap-2`}>
+                                    <Home className={`w-5 h-5 text-${themeColor}-600`} /> Rooms
+                                </h3>
+                                {rooms.length > 0 && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            if (form.rooms.length === rooms.length) {
+                                                setForm(prev => ({ ...prev, rooms: [] }));
+                                            } else {
+                                                setForm(prev => ({ ...prev, rooms: rooms.map(r => r.name) }));
+                                            }
+                                        }}
+                                        className={`text-sm px-3 py-1.5 rounded-md bg-${themeColor}-50 text-${fullColor} hover:bg-${themeColor}-100 transition-colors font-medium`}
+                                    >
+                                        {form.rooms.length === rooms.length ? 'Deselect All' : 'Select All'}
+                                    </button>
+                                )}
+                            </div>
                             <div className="flex flex-wrap gap-2 mb-2">
-                                {rooms.map((room) => (
+                                 {[...rooms]
+                                     .sort((a, b) =>
+                                       a.name.localeCompare(b.name, undefined, {
+                                         numeric: true,
+                                         sensitivity: "base",
+                                       })
+                                     )
+                                     .map((room) => (
                                     <button
                                         key={room.name}
                                         type="button"
@@ -1152,9 +1253,26 @@ const EditPackage: React.FC = () => {
                         
                         {/* Add-ons Section */}
                         <div>
-                            <h3 className={`text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2`}>
-                                <Info className={`w-5 h-5 text-${themeColor}-600`} /> Add-ons
-                            </h3>
+                            <div className="flex items-center justify-between mb-4">
+                                <h3 className={`text-xl font-bold text-neutral-900 flex items-center gap-2`}>
+                                    <Info className={`w-5 h-5 text-${themeColor}-600`} /> Add-ons
+                                </h3>
+                                {addOns.length > 0 && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            if (form.addOns.length === addOns.length) {
+                                                setForm(prev => ({ ...prev, addOns: [] }));
+                                            } else {
+                                                setForm(prev => ({ ...prev, addOns: addOns.map(a => a.name) }));
+                                            }
+                                        }}
+                                        className={`text-sm px-3 py-1.5 rounded-md bg-${themeColor}-50 text-${fullColor} hover:bg-${themeColor}-100 transition-colors font-medium`}
+                                    >
+                                        {form.addOns.length === addOns.length ? 'Deselect All' : 'Select All'}
+                                    </button>
+                                )}
+                            </div>
                             <div className="flex flex-wrap gap-2 mb-2">
                                 {addOns.map((addon) => (
                                     <button
@@ -1201,9 +1319,26 @@ const EditPackage: React.FC = () => {
                         
                         {/* Promos Section */}
                         <div>
-                            <h3 className={`text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2`}>
-                                <Tag className={`w-5 h-5 text-${themeColor}-600`} /> Promos
-                            </h3>
+                            <div className="flex items-center justify-between mb-4">
+                                <h3 className={`text-xl font-bold text-neutral-900 flex items-center gap-2`}>
+                                    <Tag className={`w-5 h-5 text-${themeColor}-600`} /> Promos
+                                </h3>
+                                {promos.length > 0 && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            if (form.promos.length === promos.length) {
+                                                setForm(prev => ({ ...prev, promos: [] }));
+                                            } else {
+                                                setForm(prev => ({ ...prev, promos: promos.map(p => p.code) }));
+                                            }
+                                        }}
+                                        className={`text-sm px-3 py-1.5 rounded-md bg-${themeColor}-50 text-${fullColor} hover:bg-${themeColor}-100 transition-colors font-medium`}
+                                    >
+                                        {form.promos.length === promos.length ? 'Deselect All' : 'Select All'}
+                                    </button>
+                                )}
+                            </div>
                             {promos.length === 0 ? (
                                 <div className="text-sm text-gray-500 bg-gray-50 rounded-lg p-4 border border-gray-200">
                                     No active promos available. Create promos in the Promo Management section.
@@ -1236,9 +1371,26 @@ const EditPackage: React.FC = () => {
                         
                         {/* Gift Cards Section */}
                         <div>
-                            <h3 className={`text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2`}>
-                                <Gift className={`w-5 h-5 text-${themeColor}-600`} /> Gift Cards
-                            </h3>
+                            <div className="flex items-center justify-between mb-4">
+                                <h3 className={`text-xl font-bold text-neutral-900 flex items-center gap-2`}>
+                                    <Gift className={`w-5 h-5 text-${themeColor}-600`} /> Gift Cards
+                                </h3>
+                                {giftCards.length > 0 && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            if (form.giftCards.length === giftCards.length) {
+                                                setForm(prev => ({ ...prev, giftCards: [] }));
+                                            } else {
+                                                setForm(prev => ({ ...prev, giftCards: giftCards.map(g => g.code) }));
+                                            }
+                                        }}
+                                        className={`text-sm px-3 py-1.5 rounded-md bg-${themeColor}-50 text-${fullColor} hover:bg-${themeColor}-100 transition-colors font-medium`}
+                                    >
+                                        {form.giftCards.length === giftCards.length ? 'Deselect All' : 'Select All'}
+                                    </button>
+                                )}
+                            </div>
                             {giftCards.length === 0 ? (
                                 <div className="text-sm text-gray-500 bg-gray-50 rounded-lg p-4 border border-gray-200">
                                     No active gift cards available. Create gift cards in the Gift Card Management section.

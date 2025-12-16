@@ -686,7 +686,7 @@ const ManageAttractions = () => {
                       {attraction.maxCapacity} people
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {attraction.duration} {attraction.durationUnit}
+                      {attraction.duration === '0' || !attraction.duration ? 'Unlimited' : `${attraction.duration} ${attraction.durationUnit}`}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <select

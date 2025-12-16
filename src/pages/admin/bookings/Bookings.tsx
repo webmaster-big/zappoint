@@ -1642,6 +1642,16 @@ const Bookings: React.FC = () => {
                   )}
                 </button>
               </div>
+
+              {/* Bottom Close Button */}
+              <div className="mt-6 pt-4 border-t border-gray-200">
+                <button
+                  onClick={() => handleClosePaymentModal()}
+                  className="w-full px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium rounded-lg transition-colors"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         )}

@@ -7,9 +7,11 @@ import { attractionService } from '../../../services/AttractionService';
 import type { CreateAttractionData } from '../../../services/AttractionService';
 import Toast from '../../../components/ui/Toast';
 import { getStoredUser } from '../../../utils/storage';
-import { locationService } from '../../../services';
+import { locationService, categoryService } from '../../../services';
 import type { Location } from '../../../services/LocationService';
+import type { Category } from '../../../services/CategoryService';
 import LocationSelector from '../../../components/admin/LocationSelector';
+import { Plus, Trash2, Info, Tag, Calendar } from 'lucide-react';
 
 const CreateAttraction = () => {
   const navigate = useNavigate();
@@ -57,11 +59,11 @@ const CreateAttraction = () => {
   });
 
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
-  const [customCategory, setCustomCategory] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [locations, setLocations] = useState<Location[]>([]);
   const [selectedLocation, setSelectedLocation] = useState<string>('');
+  const [categories, setCategories] = useState<Category[]>([]);
 
   const fetchLocations = async () => {
     if (!isCompanyAdmin) return;
@@ -80,8 +82,21 @@ const CreateAttraction = () => {
     }
   };
 
+  const fetchCategories = async () => {
+    try {
+      const response = await categoryService.getCategories();
+      console.log('Categories API response:', response);
+      const categoriesData = response.data || [];
+      console.log('Categories data:', categoriesData);
+      setCategories(categoriesData);
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+    }
+  };
+
   React.useEffect(() => {
     fetchLocations();
+    fetchCategories();
   }, []);
 
   const handleInputChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -156,17 +171,42 @@ const CreateAttraction = () => {
     const value = e.target.value;
     setFormData(prev => ({
       ...prev,
-      category: value === 'other' ? customCategory : value
+      category: value
     }));
   };
 
-  const handleCustomCategoryChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setCustomCategory(value);
-    setFormData(prev => ({
-      ...prev,
-      category: value
-    }));
+  const handleAddCategory = async (name: string) => {
+    if (!name.trim()) return;
+    
+    try {
+      const response = await categoryService.createCategory({ name: name.trim() });
+      if (response.success && response.data) {
+        setCategories(prev => [...prev, response.data]);
+        setFormData(prev => ({ ...prev, category: response.data.name }));
+        setToast({ message: 'Category added successfully!', type: 'success' });
+      }
+    } catch (error) {
+      console.error('Error adding category:', error);
+      setToast({ message: 'Failed to add category', type: 'error' });
+    }
+  };
+
+  const handleDeleteCategory = async (category: Category) => {
+    if (!window.confirm(`Are you sure you want to delete the category "${category.name}"?`)) {
+      return;
+    }
+    
+    try {
+      await categoryService.deleteCategory(category.id);
+      setCategories(prev => prev.filter(c => c.id !== category.id));
+      if (formData.category === category.name) {
+        setFormData(prev => ({ ...prev, category: '' }));
+      }
+      setToast({ message: 'Category deleted successfully!', type: 'success' });
+    } catch (error) {
+      console.error('Error deleting category:', error);
+      setToast({ message: 'Failed to delete category', type: 'error' });
+    }
   };
 
   // Location handlers removed
@@ -236,8 +276,8 @@ const CreateAttraction = () => {
   // LivePreview component
   const LivePreview: React.FC<{ formData: CreateAttractionsFormData; imagePreviews: string[] }> = ({ formData, imagePreviews }) => {
     return (
-      <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
-        <h2 className={`text-xl font-bold mb-4 text-${fullColor} border-b pb-2`}>Live Preview</h2>
+      <div className="rounded-xl border border-gray-200 bg-white p-4 sm:p-6 md:p-8 shadow-none">
+        <h2 className={`text-xl font-bold mb-4 text-${fullColor} pb-2`}>Live Preview</h2>
         
         {imagePreviews.length > 0 && (
           <div className="mb-4">
@@ -268,10 +308,12 @@ const CreateAttraction = () => {
                  formData.pricingType === 'per_game' ? '/game' : ''}
               </span>
             </span>
-            {formData.duration && (
+            {formData.duration ? (
               <span className="text-sm text-gray-600">
-                {formData.duration} {formData.durationUnit}
+                {formData.duration === '0' ? 'Unlimited' : `${formData.duration} ${formData.durationUnit}`}
               </span>
+            ) : (
+              <span className="text-sm text-gray-600">Unlimited</span>
             )}
           </div>
           
@@ -299,151 +341,157 @@ const CreateAttraction = () => {
   };
 
   return (
-    <div className="min-h-screen py-8 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-7xl mx-auto">
-        
+    <div className="w-full mx-auto sm:px-4 md:mt-8 pb-6 flex flex-col md:flex-row gap-8 md:gap-12">
+      {/* Form Section */}
+      <div className="flex-1 mx-auto">
+        <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6 md:p-8">
+          <div className="mb-6">
+            <h2 className="text-2xl sm:text-3xl font-bold text-neutral-900 tracking-tight">Create New Attraction</h2>
+            <p className="text-sm text-gray-500 mt-2">Set up a new attraction that customers can purchase tickets for</p>
+          </div>
+          
+          <form className="space-y-8" onSubmit={handleSubmit} autoComplete="off">
+            {/* Location Selection for company_admin */}
+            {isCompanyAdmin && (
+              <div>
+                <LocationSelector
+                  locations={locations}
+                  selectedLocation={selectedLocation}
+                  onLocationChange={setSelectedLocation}
+                  themeColor={themeColor}
+                  fullColor={fullColor}
+                  layout="grid"
+                  maxWidth="100%"
+                  showAllOption={false}
+                />
+              </div>
+            )}
+            
+            {/* Basic Information Section */}
+            <div>
+              <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2">
+                <Info className="w-5 h-5 text-primary" /> Basic Information
+              </h3>
+              <div className="space-y-5">
+                <div>
+                  <label className="block font-semibold mb-2 text-base text-neutral-800">Attraction Name</label>
+                  <input
+                    type="text"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleInputChange}
+                    className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400`}
+                    placeholder="e.g., Laser Tag, Bowling, Escape Room"
+                    required
+                  />
+                </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Form Container - 2/3 width */}
-          <div className="lg:col-span-2">
-            <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-lg overflow-hidden">
-              {/* Basic Information Section */}
-              <div className="p-6 border-b border-gray-100">
-                <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-800">Create New Attraction</h1>
-          <p className="mt-2 text-gray-600">
-            Set up a new attraction that customers can purchase tickets for
-          </p>
-        </div>
-                <h2 className="text-xl font-semibold text-gray-800 mb-6 pb-2 border-b border-gray-100">
-                  Basic Information
-                </h2>
-                
-                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                  <div className="sm:col-span-2">
-                    <label htmlFor="name" className="block text-sm font-medium text-gray-800 mb-2">
-                      Attraction Name *
-                    </label>
-                    <input
-                      type="text"
-                      name="name"
-                      id="name"
-                      required
-                      value={formData.name}
-                      onChange={handleInputChange}
-                      className={`w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent transition-colors`}
-                      placeholder="e.g., Laser Tag, Bowling, Escape Room"
-                    />
-                  </div>
+                <div>
+                  <label className="block font-semibold mb-2 text-base text-neutral-800">Description</label>
+                  <textarea
+                    name="description"
+                    rows={3}
+                    value={formData.description}
+                    onChange={handleInputChange}
+                    className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400`}
+                    placeholder="Describe the attraction in detail..."
+                    required
+                  />
+                </div>
 
-                  <div className="sm:col-span-2">
-                    <label htmlFor="description" className="block text-sm font-medium text-gray-800 mb-2">
-                      Description *
-                    </label>
-                    <textarea
-                      name="description"
-                      id="description"
-                      rows={3}
-                      required
-                      value={formData.description}
-                      onChange={handleInputChange}
-                      className={`w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent transition-colors`}
-                      placeholder="Describe the attraction in detail..."
-                    />
-                  </div>
-
-                  <div className="sm:col-span-2">
-                    <label htmlFor="category" className="block text-sm font-medium text-gray-800 mb-2">
-                      Category *
-                    </label>
-                    <select
-                      name="category"
-                      id="category"
-                      required
-                      value={formData.category === customCategory ? 'other' : formData.category}
-                      onChange={handleCategoryChange}
-                      className={`w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent transition-colors`}
-                    >
-                      <option value="">Select a category</option>
-                      <option value="adventure">Adventure</option>
-                      <option value="sports">Sports</option>
-                      <option value="arcade">Arcade</option>
-                      <option value="entertainment">Entertainment</option>
-                      <option value="educational">Educational</option>
-                      <option value="food">Food & Dining</option>
-                      <option value="kids">Kids</option>
-                      <option value="other">Other</option>
-                    </select>
-                    {formData.category === customCategory || formData.category === 'other' ? (
+                <div>
+                  <label className="block font-semibold mb-2 text-base text-neutral-800">Category</label>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <div className="flex gap-1 items-center flex-1">
+                      <select
+                        name="category"
+                        value={formData.category}
+                        onChange={handleCategoryChange}
+                        className={`rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base min-w-0 flex-1 transition-all`}
+                        required
+                      >
+                        <option value="">Select category</option>
+                        {categories.map((cat) => (
+                          <option key={cat.id} value={cat.name}>{cat.name}</option>
+                        ))}
+                      </select>
+                      {formData.category && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const category = categories.find(c => c.name === formData.category);
+                            if (category) handleDeleteCategory(category);
+                          }}
+                          className="p-2 rounded-md hover:bg-red-50 text-red-600 transition"
+                          title="Delete category"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex gap-1 items-center">
                       <input
                         type="text"
-                        placeholder="Enter custom category"
-                        className="mt-2 w-full px-4 py-2 border border-gray-200 rounded-lg"
-                        value={customCategory}
-                        onChange={handleCustomCategoryChange}
+                        placeholder="Add category"
+                        className="rounded-md border border-gray-200 px-3 py-2 bg-white text-base min-w-0 w-32 transition-all"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleAddCategory((e.target as HTMLInputElement).value);
+                            (e.target as HTMLInputElement).value = '';
+                          }
+                        }}
                       />
-                    ) : null}
-                  </div>
-
-                  {/* Location Selection for company_admin */}
-                  {isCompanyAdmin && (
-                    <div className="sm:col-span-2">
-                      <LocationSelector
-                        locations={locations}
-                        selectedLocation={selectedLocation}
-                        onLocationChange={setSelectedLocation}
-                        themeColor={themeColor}
-                        fullColor={fullColor}
-                        layout="grid"
-                        maxWidth="100%"
-                        showAllOption={false}
-                      />
+                      <button 
+                        type="button" 
+                        className="p-2 rounded-md hover:bg-gray-100 transition"
+                        title="Add category"
+                        onClick={() => {
+                          const input = document.querySelector('input[placeholder="Add category"]') as HTMLInputElement;
+                          if (input?.value) {
+                            handleAddCategory(input.value);
+                            input.value = '';
+                          }
+                        }}
+                      >
+                        <Plus className="w-4 h-4 text-primary" />
+                      </button>
                     </div>
-                  )}
+                  </div>
                 </div>
               </div>
+            </div>
 
-              {/* Pricing & Capacity Section */}
-              <div className="p-6 border-b border-gray-100">
-                <h2 className="text-xl font-semibold text-gray-800 mb-6 pb-2 border-b border-gray-100">
-                  Pricing & Capacity
-                </h2>
-                
-                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+            {/* Pricing & Capacity Section */}
+            <div>
+              <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2">
+                <Tag className="w-5 h-5 text-primary" /> Pricing & Capacity
+              </h3>
+              <div className="space-y-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label htmlFor="price" className="block text-sm font-medium text-gray-800 mb-2">
-                      Price *
-                    </label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <span className="text-gray-500">$</span>
-                      </div>
-                      <input
-                        type="number"
-                        name="price"
-                        id="price"
-                        min="0"
-                        step="0.01"
-                        required
-                        value={formData.price}
-                        onChange={handleInputChange}
-                        className={`w-full pl-8 px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent transition-colors`}
-                        placeholder="0.00"
-                      />
-                    </div>
+                    <label className="block font-semibold mb-2 text-base text-neutral-800">Price</label>
+                    <input
+                      type="number"
+                      name="price"
+                      min="0"
+                      step="0.01"
+                      value={formData.price}
+                      onChange={handleInputChange}
+                      className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400`}
+                      placeholder="0.00"
+                      required
+                    />
                   </div>
 
                   <div>
-                    <label htmlFor="pricingType" className="block text-sm font-medium text-gray-800 mb-2">
-                      Pricing Type *
-                    </label>
+                    <label className="block font-semibold mb-2 text-base text-neutral-800">Pricing Type</label>
                     <select
                       name="pricingType"
-                      id="pricingType"
-                      required
                       value={formData.pricingType}
                       onChange={handleInputChange}
-                      className={`w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent transition-colors`}
+                      className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all`}
+                      required
                     >
                       <option value="per_person">Per Person</option>
                       <option value="per_group">Per Group</option>
@@ -452,44 +500,40 @@ const CreateAttraction = () => {
                       <option value="fixed">Fixed Price</option>
                     </select>
                   </div>
+                </div>
 
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label htmlFor="maxCapacity" className="block text-sm font-medium text-gray-800 mb-2">
-                      Maximum Capacity *
-                    </label>
+                    <label className="block font-semibold mb-2 text-base text-neutral-800">Maximum Capacity</label>
                     <input
                       type="number"
                       name="maxCapacity"
-                      id="maxCapacity"
                       min="1"
-                      required
                       value={formData.maxCapacity}
                       onChange={handleInputChange}
-                      className={`w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent transition-colors`}
+                      className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400`}
                       placeholder="e.g., 10"
+                      required
                     />
                   </div>
 
                   <div>
-                    <label htmlFor="duration" className="block text-sm font-medium text-gray-800 mb-2">
-                      Duration
-                    </label>
-                    <div className={`flex rounded-lg overflow-hidden border border-gray-200 focus-within:ring-2 focus-within:ring-${themeColor}-500 focus-within:border-transparent`}>
+                    <label className="block font-semibold mb-2 text-base text-neutral-800">Duration (0 for unlimited)</label>
+                    <div className="flex rounded-md overflow-hidden border border-gray-200">
                       <input
                         type="number"
                         name="duration"
-                        id="duration"
-                        min="1"
+                        min="0"
                         value={formData.duration}
                         onChange={handleInputChange}
-                        className="flex-1 px-4 py-3 focus:outline-none"
-                        placeholder="e.g., 60"
+                        className="flex-1 px-4 py-2 focus:outline-none text-neutral-900"
+                        placeholder="0 = unlimited"
                       />
                       <select
                         name="durationUnit"
                         value={formData.durationUnit}
                         onChange={handleInputChange}
-                        className="px-3 py-3 bg-gray-50 text-gray-800 border-l border-gray-200 focus:outline-none"
+                        className="px-3 py-2 bg-gray-50 text-gray-800 border-l border-gray-200 focus:outline-none"
                       >
                         <option value="minutes">Minutes</option>
                         <option value="hours">Hours</option>
@@ -498,27 +542,26 @@ const CreateAttraction = () => {
                   </div>
                 </div>
               </div>
+            </div>
 
-              {/* Availability Section */}
-              <div className="p-6 border-b border-gray-100">
-                <h2 className="text-xl font-semibold text-gray-800 mb-6 pb-2 border-b border-gray-100">
-                  Availability
-                </h2>
-                
-                <div className="mb-8">
-                  <label className="block text-sm font-medium text-gray-800 mb-3">
-                    Available Days
-                  </label>
+            {/* Availability Section */}
+            <div>
+              <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-primary" /> Availability
+              </h3>
+              <div className="space-y-5">
+                <div>
+                  <label className="block font-semibold mb-2 text-base text-neutral-800">Available Days</label>
                   <div className="flex flex-wrap gap-2">
                     {daysOfWeek.map(day => (
                       <button
                         key={day.key}
                         type="button"
                         onClick={() => handleAvailabilityChange(day.key)}
-                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        className={`px-4 py-2 rounded-md text-sm font-semibold transition-all ${
                           formData.availability[day.key] 
-                            ? `bg-${fullColor} text-white shadow-md` 
-                            : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                            ? `bg-${fullColor} text-white shadow-sm` 
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                         }`}
                       >
                         {day.label}
@@ -527,58 +570,38 @@ const CreateAttraction = () => {
                   </div>
                 </div>
               </div>
+            </div>
 
-              {/* Images Section */}
-              <div className="p-6 border-b border-gray-100">
-                <h2 className="text-xl font-semibold text-gray-800 mb-6 pb-2 border-b border-gray-100">
-                  Images
-                </h2>
-                
-                <div className="mb-6">
-                  <label className="block text-sm font-medium text-gray-800 mb-3">
-                    Upload Images (Max 5)
-                  </label>
-                  <div className="mt-1 flex justify-center px-6 pt-8 pb-8 border-2 border-dashed border-gray-300 rounded-xl hover:border-blue-400 transition-colors">
-                    <div className="space-y-2 text-center">
-                      <div className="flex text-sm text-gray-600 justify-center">
-                        <label
-                          htmlFor="image-upload"
-                          className={`relative cursor-pointer bg-white rounded-md font-medium text-${themeColor}-600 hover:text-${themeColor}-500 focus-within:outline-none`}
-                        >
-                          <span>Select images</span>
-                          <input
-                            id="image-upload"
-                            name="image-upload"
-                            type="file"
-                            className="sr-only"
-                            multiple
-                            accept="image/*"
-                            onChange={handleImageUpload}
-                          />
-                        </label>
-                      </div>
-                      <p className="text-xs text-gray-500">PNG, JPG, GIF up to 10MB</p>
-                    </div>
-                  </div>
+            {/* Images Section */}
+            <div>
+              <h3 className="text-xl font-bold mb-4 text-neutral-900">Images</h3>
+              <div className="space-y-5">
+                <div>
+                  <label className="block font-semibold mb-2 text-base text-neutral-800">Upload Images (Max 5)</label>
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    className={`block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-${themeColor}-50 file:text-${fullColor} hover:file:bg-${themeColor}-100`}
+                  />
                 </div>
 
                 {imagePreviews.length > 0 && (
-                  <div className="mt-6">
-                    <label className="block text-sm font-medium text-gray-800 mb-3">
-                      Image Previews
-                    </label>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block font-semibold mb-2 text-base text-neutral-800">Image Previews</label>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                       {imagePreviews.map((preview, index) => (
-                        <div key={index} className="relative group rounded-xl overflow-hidden shadow-sm">
+                        <div key={index} className="relative group rounded-lg overflow-hidden">
                           <img
                             src={preview}
                             alt={`Preview ${index + 1}`}
-                            className="h-40 w-full object-cover"
+                            className="h-32 w-full object-cover"
                           />
                           <button
                             type="button"
                             onClick={() => removeImage(index)}
-                            className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center opacity-80 group-hover:opacity-100 transition-opacity"
+                            className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center opacity-90 hover:opacity-100 transition-opacity text-xs"
                           >
                             ×
                           </button>
@@ -588,35 +611,33 @@ const CreateAttraction = () => {
                   </div>
                 )}
               </div>
-
-              {/* Form Actions */}
-              <div className="px-6 py-5 bg-gray-50 text-right space-x-3">
-                <button
-                  type="button"
-                  onClick={() => navigate('/manage-attractions')}
-                  disabled={isSubmitting}
-                  className={`px-5 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-800 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-${themeColor}-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed`}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className={`px-5 py-2.5 bg-${fullColor} border border-transparent rounded-lg shadow-sm text-sm font-medium text-white hover:from-${fullColor} hover:to-${fullColor} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-${themeColor}-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed`}
-                >
-                  {isSubmitting ? 'Creating...' : 'Create Attraction'}
-                </button>
-              </div>
-            </form>
-          </div>
-
-          {/* Live Preview Container - 1/3 width, sticky */}
-          <div className="lg:col-span-1">
-            <div className="sticky top-8">
-              <LivePreview formData={formData} imagePreviews={imagePreviews} />
             </div>
-          </div>
+
+            {/* Form Actions */}
+            <div className="flex gap-3 pt-6 border-t border-gray-200">
+              <button
+                type="button"
+                onClick={() => navigate('/manage-attractions')}
+                disabled={isSubmitting}
+                className={`flex-1 px-6 py-2.5 border border-gray-300 rounded-md text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed`}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className={`flex-1 px-6 py-2.5 bg-${fullColor} border border-transparent rounded-md text-sm font-semibold text-white hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed`}
+              >
+                {isSubmitting ? 'Creating...' : 'Create Attraction'}
+              </button>
+            </div>
+          </form>
         </div>
+      </div>
+
+      {/* Live Preview Section */}
+      <div className="w-full md:w-[420px] md:max-w-sm md:sticky md:top-1 h-fit">
+        <LivePreview formData={formData} imagePreviews={imagePreviews} />
       </div>
 
       {/* Toast Notification */}

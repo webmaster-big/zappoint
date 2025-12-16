@@ -1293,6 +1293,16 @@ const CompanyDashboard: React.FC = () => {
                   </div>
                 ))}
               </div>
+
+              {/* Bottom Close Button */}
+              <div className="mt-6 pt-4 border-t border-gray-200">
+                <button
+                  onClick={() => setSelectedTimeSlot(null)}
+                  className="w-full px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium rounded-lg transition-colors"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1545,6 +1555,16 @@ const CompanyDashboard: React.FC = () => {
                 <button
                   onClick={() => setSelectedBooking(null)}
                   className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium transition-all duration-200 transform hover:scale-105 active:scale-95"
+                >
+                  Close
+                </button>
+              </div>
+
+              {/* Bottom Close Button */}
+              <div className="mt-6 pt-4 border-t border-gray-200">
+                <button
+                  onClick={() => setSelectedBooking(null)}
+                  className="w-full px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium rounded-lg transition-colors"
                 >
                   Close
                 </button>

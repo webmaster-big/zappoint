@@ -54,6 +54,8 @@ export * from './PaymentService';
 
 // Location service exports
 export { locationService } from './LocationService';
+export { categoryService } from './CategoryService';
+export type { Category, CreateCategoryData, UpdateCategoryData } from './CategoryService';
 export type { Location, LocationFilters, CreateLocationData, UpdateLocationData } from './LocationService';
 
 // Common API response types
