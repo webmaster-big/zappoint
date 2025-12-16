@@ -134,6 +134,7 @@ const ManagePurchases = () => {
         quantity: purchase.quantity,
         status: purchase.status === 'completed' ? 'confirmed' : purchase.status as 'confirmed' | 'pending' | 'cancelled' | 'refunded',
         totalAmount: Number(purchase.total_amount),
+        amountPaid: Number(purchase.amount_paid || 0),
         createdAt: purchase.created_at,
         paymentMethod: purchase.payment_method === 'e-wallet' ? 'paypal' : 
                       purchase.payment_method === 'credit' ? 'credit_card' : 
@@ -680,7 +681,8 @@ const ManagePurchases = () => {
                 <th scope="col" className="px-6 py-4 font-medium">Customer</th>
                 <th scope="col" className="px-6 py-4 font-medium">Attraction</th>
                 <th scope="col" className="px-6 py-4 font-medium">Quantity</th>
-                <th scope="col" className="px-6 py-4 font-medium">Amount</th>
+                <th scope="col" className="px-6 py-4 font-medium">Total</th>
+                <th scope="col" className="px-6 py-4 font-medium">Paid</th>
                 <th scope="col" className="px-6 py-4 font-medium">Payment</th>
                 <th scope="col" className="px-6 py-4 font-medium">Date</th>
                 <th scope="col" className="px-6 py-4 font-medium">Status</th>
@@ -690,7 +692,7 @@ const ManagePurchases = () => {
             <tbody className="divide-y divide-gray-100">
               {currentPurchases.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-6 py-8 text-center text-gray-800">
+                  <td colSpan={10} className="px-6 py-8 text-center text-gray-800">
                     No purchases found
                   </td>
                 </tr>
@@ -721,6 +723,11 @@ const ManagePurchases = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         ${purchase.totalAmount.toFixed(2)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <span className={purchase.amountPaid >= purchase.totalAmount ? 'text-green-600 font-semibold' : 'text-orange-600'}>
+                          ${purchase.amountPaid.toFixed(2)}
+                        </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         <span className="capitalize">{purchase.paymentMethod.replace('_', ' ')}</span>

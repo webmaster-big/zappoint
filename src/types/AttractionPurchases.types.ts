@@ -10,6 +10,7 @@ export interface AttractionPurchasesPurchase {
   quantity: number;
   status: 'confirmed' | 'pending' | 'cancelled' | 'refunded';
   totalAmount: number;
+  amountPaid: number;
   createdAt: string;
   paymentMethod: string;
   duration: string;
