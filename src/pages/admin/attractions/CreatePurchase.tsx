@@ -399,9 +399,14 @@ const CreatePurchase = () => {
         try {
           await attractionPurchaseService.sendReceipt(
             createdPurchase.id,
-            qrCodeData
+            qrCodeData,
+            sendEmail
           );
-          setToast({ message: 'Purchase completed! Receipt sent to email.', type: 'success' });
+          if (sendEmail) {
+            setToast({ message: 'Purchase completed! Receipt sent to email.', type: 'success' });
+          } else {
+            setToast({ message: 'Purchase completed! (Email not sent per request)', type: 'info' });
+          }
         } catch (emailError) {
           console.error('❌ Error sending email:', emailError);
           setToast({ message: 'Purchase completed! (Email failed to send)', type: 'info' });

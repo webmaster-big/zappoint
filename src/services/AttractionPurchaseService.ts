@@ -233,9 +233,10 @@ class AttractionPurchaseService {
    * Send receipt email with QR code
    * Backend determines recipient email from purchase record (customer email or guest_email)
    */
-  async sendReceipt(id: number, qrCode: string): Promise<ApiResponse<{ email_sent_to: string }>> {
+  async sendReceipt(id: number, qrCode: string, sendEmail: boolean = true): Promise<ApiResponse<{ email_sent_to: string }>> {
     const response = await api.post(`/attraction-purchases/${id}/qrcode`, {
       qr_code: qrCode,
+      send_email: sendEmail,
     });
     return response.data;
   }
