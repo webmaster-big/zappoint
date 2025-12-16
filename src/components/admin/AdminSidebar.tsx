@@ -49,7 +49,7 @@ const addDescriptions = (navItems: NavItem[]): NavItem[] => {
     'Create Purchase': 'Add a new purchase for attractions',
     'Check-in Scanner': 'Scan QR codes to check in attraction tickets',
     'Calendar View': 'See all bookings in a calendar format',
-    'Room Schedule': 'Daily room allocation and booking timeline',
+    'Space Schedule': 'Daily space allocation and booking timeline',
     'Bookings': 'Manage existing bookings and reservations',
     'Manage Bookings': 'View and edit all bookings',
     'Create Bookings': 'Create new bookings for customers',
@@ -128,6 +128,7 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
         ]},
         { label: 'Bookings', icon: Calendar, section: 'Bookings', items: [
           { label: 'Calendar View', href: '/bookings/calendar', icon: CalendarDays },
+          { label: 'Space Schedule', href: '/bookings/space-schedule', icon: LayoutGrid },
           { label: 'Manage Bookings', href: '/bookings', icon: List },
           { label: 'Create Bookings', href: '/bookings/create', icon: Plus },
           { label: 'Check-in Scanner', href: '/bookings/check-in', icon: ScanLine }
@@ -156,7 +157,7 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
         ]},
         { label: 'Bookings', icon: Calendar, section: 'Bookings', items: [
           { label: 'Calendar View', href: '/bookings/calendar', icon: CalendarDays },
-          { label: 'Room Schedule', href: '/bookings/room-schedule', icon: LayoutGrid },
+          { label: 'Space Schedule', href: '/bookings/space-schedule', icon: LayoutGrid },
           { label: 'Manage Bookings', href: '/bookings', icon: List },
           { label: 'Create Bookings', href: '/bookings/create', icon: Plus },
           { label: 'Check-in Scanner', href: '/bookings/check-in', icon: ScanLine }
@@ -194,7 +195,7 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
         ]},
         { label: 'Bookings', icon: Calendar, section: 'Bookings', items: [
           { label: 'Calendar View', href: '/bookings/calendar', icon: CalendarDays },
-          { label: 'Room Schedule', href: '/bookings/room-schedule', icon: LayoutGrid },
+          { label: 'Space Schedule', href: '/bookings/space-schedule', icon: LayoutGrid },
           { label: 'Manage Bookings', href: '/bookings', icon: List },
           { label: 'Create Bookings', href: '/bookings/create', icon: Plus },
           { label: 'Check-in Scanner', href: '/bookings/check-in', icon: ScanLine }

@@ -60,7 +60,7 @@ import ViewBooking from "./pages/admin/bookings/ViewBooking";
 import AttractionDetails from "./pages/admin/attractions/AttractionDetails";
 import PurchaseDetails from "./pages/admin/attractions/PurchaseDetails";
 import PackageDetails from "./pages/admin/packages/PackageDetails";
-import RoomSchedule from "./pages/admin/bookings/RoomSchedule";
+import SpaceSchedule from "./pages/admin/bookings/SpaceSchedule";
 
 
 function App() {
@@ -121,7 +121,7 @@ function App() {
           <Route path="/bookings/edit/:id" element={<EditBooking />} />
           <Route path="/bookings/:id" element={<ViewBooking />} />
           <Route path="/bookings/calendar" element={<CalendarView />} />
-          <Route path="/bookings/room-schedule" element={<RoomSchedule />} />
+          <Route path="/bookings/space-schedule" element={<SpaceSchedule />} />
           <Route path="/bookings/create" element={<OnsiteBooking />} />
           <Route path="/bookings/manual" element={<ManualBooking />} />
           <Route path="/bookings/check-in" element={<CheckIn />} />

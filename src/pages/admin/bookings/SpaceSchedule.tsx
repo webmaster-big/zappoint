@@ -17,10 +17,10 @@ interface BookingCell {
   rowSpan: number;
 }
 
-const RoomSchedule = () => {
+const SpaceSchedule = () => {
   const { themeColor, fullColor } = useThemeColor();
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [rooms, setRooms] = useState<Room[]>([]);
+  const [spaces, setSpaces] = useState<Room[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
@@ -98,9 +98,9 @@ const RoomSchedule = () => {
   // Filter time slots to only show rows with bookings
   const getVisibleTimeSlots = (): TimeSlot[] => {
     return timeSlots.filter(slot => {
-      // Check if any room has a booking at this time or continuing through this time
-      return rooms.some(room => {
-        const cellData = getBookingForCell(room, slot);
+      // Check if any space has a booking at this time or continuing through this time
+      return spaces.some(space => {
+        const cellData = getBookingForCell(space, slot);
         return cellData !== null;
       });
     });
@@ -110,9 +110,9 @@ const RoomSchedule = () => {
     try {
       setLoading(true);
       
-      // Fetch rooms
-      const roomsResponse = await roomService.getRooms();
-      setRooms(Array.isArray(roomsResponse.data) ? roomsResponse.data : roomsResponse.data.rooms || []);
+      // Fetch spaces
+      const spacesResponse = await roomService.getRooms();
+      setSpaces(Array.isArray(spacesResponse.data) ? spacesResponse.data : spacesResponse.data.rooms || []);
 
       // Format date as YYYY-MM-DD for booking_date filter
       const year = selectedDate.getFullYear();
@@ -125,7 +125,7 @@ const RoomSchedule = () => {
       });
       
       const fetchedBookings = bookingsResponse.data.bookings || [];
-      console.log('Fetched bookings for Room Schedule:', dateStr, fetchedBookings);
+      console.log('Fetched bookings for Space Schedule:', dateStr, fetchedBookings);
       setBookings(fetchedBookings);
 
       // Extract time interval from the first booking's package
@@ -142,7 +142,7 @@ const RoomSchedule = () => {
     }
   }, [selectedDate]);
 
-  // Fetch rooms and bookings
+  // Fetch spaces and bookings
   useEffect(() => {
     loadData();
   }, [loadData]);
@@ -164,14 +164,14 @@ const RoomSchedule = () => {
     setSelectedDate(new Date());
   };
 
-  // Check if a booking occupies a specific time slot for a room
-  const getBookingForCell = (room: Room, slot: TimeSlot): BookingCell | null => {
-    const roomBookings = bookings.filter(b => 
-      b.room_id === room.id && 
+  // Check if a booking occupies a specific time slot for a space
+  const getBookingForCell = (space: Room, slot: TimeSlot): BookingCell | null => {
+    const spaceBookings = bookings.filter(b => 
+      b.room_id === space.id && 
       (b.status === 'confirmed' || b.status === 'checked-in' || b.status === 'pending')
     );
 
-    for (const booking of roomBookings) {
+    for (const booking of spaceBookings) {
       // Parse booking time (format: "HH:mm" or "HH:mm:ss")
       const [bookingHour, bookingMinute] = booking.booking_time.split(':').map(Number);
       
@@ -219,8 +219,8 @@ const RoomSchedule = () => {
     <div className="p-6">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Room Schedule</h1>
-        <p className="text-gray-600">Daily room allocation and booking timeline</p>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">Space Schedule</h1>
+        <p className="text-gray-600">Daily space allocation and booking timeline</p>
       </div>
 
       {/* Date Navigation */}
@@ -291,21 +291,21 @@ const RoomSchedule = () => {
                       Time
                     </div>
                   </th>
-                  {rooms.length === 0 ? (
+                  {spaces.length === 0 ? (
                     <th className="px-4 py-3 text-center text-gray-500" colSpan={100}>
-                      No rooms available
+                      No spaces available
                     </th>
                   ) : (
-                    rooms.map(room => (
+                    spaces.map(space => (
                       <th 
-                        key={room.id} 
+                        key={space.id} 
                         className="px-4 py-3 text-center text-sm font-semibold text-gray-700 border-r border-gray-200 min-w-[200px]"
                       >
                         <div className="flex flex-col items-center gap-1">
-                          <span>{room.name}</span>
+                          <span>{space.name}</span>
                           <span className="text-xs font-normal text-gray-500 flex items-center gap-1">
                             <Users className="w-3 h-3" />
-                            Max {room.capacity}
+                            Max {space.capacity}
                           </span>
                         </div>
                       </th>
@@ -319,8 +319,8 @@ const RoomSchedule = () => {
                   <td className="sticky left-0 bg-white z-10 px-4 py-2 text-sm text-gray-600 border-r border-gray-200 font-medium" style={{ height: '60px' }}>
                     {slot.time}
                   </td>
-                  {rooms.map(room => {
-                    const cellData = getBookingForCell(room, slot);
+                  {spaces.map(space => {
+                    const cellData = getBookingForCell(space, slot);
                     
                     // Skip if this slot is occupied by a booking that started earlier
                     if (cellData && cellData.rowSpan === 0) {
@@ -345,7 +345,7 @@ const RoomSchedule = () => {
                       
                       return (
                         <td
-                          key={room.id}
+                          key={space.id}
                           rowSpan={rowSpan}
                           className={`px-2 py-2 border-r border-gray-200 cursor-pointer hover:bg-gray-50 transition ${getBgColor()}`}
                           style={{ verticalAlign: 'top' }}
@@ -393,7 +393,7 @@ const RoomSchedule = () => {
                     // Empty cell
                     return (
                       <td
-                        key={room.id}
+                        key={space.id}
                         className="px-2 py-2 border-r border-gray-200 text-center text-gray-400 text-xs hover:bg-blue-50 cursor-pointer transition"
                         style={{ height: '60px' }}
                       >
@@ -579,4 +579,4 @@ const RoomSchedule = () => {
   );
 };
 
-export default RoomSchedule;
+export default SpaceSchedule;
