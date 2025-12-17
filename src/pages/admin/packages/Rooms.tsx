@@ -509,7 +509,14 @@ const Rooms: React.FC = () => {
                     </div>
                 ) : rooms.length > 0 ? (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                                {rooms.map((room) => (
+                                {[...rooms]
+                                     .sort((a, b) =>
+                                       a.name.localeCompare(b.name, undefined, {
+                                         numeric: true,
+                                         sensitivity: "base",
+                                       })
+                                     )
+                                     .map((room) => (
                                     <div 
                                         key={room.id} 
                                         className={`relative border-2 rounded-lg p-4 transition-all ${
