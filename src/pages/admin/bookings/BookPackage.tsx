@@ -64,7 +64,11 @@ const BookPackage: React.FC = () => {
     city: "",
     state: "",
     zip: "",
-    country: "United States"
+    country: "United States",
+    // Guest of Honor
+    guestOfHonorName: "",
+    guestOfHonorAge: "",
+    guestOfHonorGender: ""
   });
   const [paymentType, setPaymentType] = useState<'full' | 'partial'>('full');
   const [currentStep, setCurrentStep] = useState(1);
@@ -457,7 +461,10 @@ const BookPackage: React.FC = () => {
       city: "",
       state: "",
       zip: "",
-      country: "United States"
+      country: "United States",
+      guestOfHonorName: "",
+      guestOfHonorAge: "",
+      guestOfHonorGender: ""
     });
     setPaymentType('full');
     setCurrentStep(1);
@@ -671,6 +678,9 @@ const BookPackage: React.FC = () => {
         gift_card_code: appliedGiftCard ? appliedGiftCard.code : undefined,
         notes: form.notes || undefined,
         transaction_id: paymentResponse.transaction_id,
+        guest_of_honor_name: pkg.has_guest_of_honor && form.guestOfHonorName ? form.guestOfHonorName : undefined,
+        guest_of_honor_age: pkg.has_guest_of_honor && form.guestOfHonorAge ? parseInt(form.guestOfHonorAge) : undefined,
+        guest_of_honor_gender: pkg.has_guest_of_honor && form.guestOfHonorGender ? form.guestOfHonorGender as 'male' | 'female' | 'other' : undefined,
       };
       
       console.log('📦 === BOOKING DATA BEING SENT TO BACKEND ===');
@@ -1451,6 +1461,54 @@ const BookPackage: React.FC = () => {
                     />
                   </div>
                 </div>
+
+                {/* Guest of Honor Section - Only show if package has guest of honor enabled */}
+                {pkg?.has_guest_of_honor && (
+                  <div className="mt-6 pt-6 border-t border-gray-200">
+                    <h4 className="text-base font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                      <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                      </svg>
+                      Guest of Honor Information
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                      <div className="md:col-span-2">
+                        <label className="block font-medium mb-2 text-gray-800 text-sm">Guest of Honor Name</label>
+                        <input 
+                          type="text" 
+                          placeholder="Enter guest of honor name" 
+                          className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600" 
+                          value={form.guestOfHonorName} 
+                          onChange={e => setForm(f => ({ ...f, guestOfHonorName: e.target.value }))} 
+                        />
+                      </div>
+                      <div>
+                        <label className="block font-medium mb-2 text-gray-800 text-sm">Age</label>
+                        <input 
+                          type="number" 
+                          placeholder="Age" 
+                          min="0"
+                          className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600" 
+                          value={form.guestOfHonorAge} 
+                          onChange={e => setForm(f => ({ ...f, guestOfHonorAge: e.target.value }))} 
+                        />
+                      </div>
+                      <div>
+                        <label className="block font-medium mb-2 text-gray-800 text-sm">Gender</label>
+                        <select
+                          className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                          value={form.guestOfHonorGender}
+                          onChange={e => setForm(f => ({ ...f, guestOfHonorGender: e.target.value }))}
+                        >
+                          <option value="">Select Gender</option>
+                          <option value="male">Male</option>
+                          <option value="female">Female</option>
+                          <option value="other">Other</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Billing Information Section */}
                 <div className="mt-6 pt-6 border-t border-gray-200">

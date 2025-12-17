@@ -47,6 +47,7 @@ export interface OnsiteBookingPackage {
   pricePerAdditional1hr: string;
   partialPaymentPercentage?: number;
   partialPaymentFixed?: number;
+  has_guest_of_honor?: boolean;
   rooms?: (string | OnsiteBookingRoom)[];
   image?: string;
 }

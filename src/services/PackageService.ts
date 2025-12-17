@@ -47,6 +47,7 @@ export interface Package {
   is_active: boolean;
   partial_payment_percentage?: number;
   partial_payment_fixed?: number;
+  has_guest_of_honor?: boolean;
   created_at: string;
   updated_at: string;
   location?: {

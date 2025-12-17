@@ -163,6 +163,7 @@ const CreatePackage: React.FC = () => {
         timeSlotInterval: "30", // Interval between time slots in minutes
         partialPaymentPercentage: "0", // Percentage for partial payments
         partialPaymentFixed: "0", // Fixed amount for partial payments
+        hasGuestOfHonor: false,
     });
 
 
@@ -430,6 +431,7 @@ const CreatePackage: React.FC = () => {
                 time_slot_interval: timeSlotInterval,
                 partial_payment_percentage: form.partialPaymentPercentage ? parseInt(form.partialPaymentPercentage) : undefined,
                 partial_payment_fixed: form.partialPaymentFixed ? parseInt(form.partialPaymentFixed) : undefined,
+                has_guest_of_honor: form.hasGuestOfHonor,
                 attraction_ids: form.attractions.map(name => {
                     const found = attractions.find(a => a.name === name);
                     return found?.id;
@@ -485,6 +487,7 @@ const CreatePackage: React.FC = () => {
                 timeSlotInterval: "30",
                 partialPaymentPercentage: "0",
                 partialPaymentFixed: "0",
+                hasGuestOfHonor: false,
             });
             setImagePreview("");
             
@@ -1432,6 +1435,23 @@ const CreatePackage: React.FC = () => {
                                 </div>
                             </div>
 
+                            {/* Guest of Honor Toggle */}
+                            <div>
+                                <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2">
+                                    <Gift className="w-5 h-5 text-primary" /> Guest of Honor
+                                </h3>
+                                <label className="flex items-center space-x-3 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={form.hasGuestOfHonor}
+                                        onChange={(e) => setForm(prev => ({ ...prev, hasGuestOfHonor: e.target.checked }))}
+                                        className={`w-5 h-5 rounded border-gray-300 text-${themeColor}-600 focus:ring-${themeColor}-500 cursor-pointer`}
+                                    />
+                                    <span className="text-base text-neutral-800">Enable guest of honor fields for this package</span>
+                                </label>
+                                <p className="text-xs text-gray-500 mt-2">When enabled, customers can specify the name, age, and gender of the guest of honor during booking.</p>
+                            </div>
+
                             
                             <div className="flex gap-2 mt-6">
                                 <button
@@ -1471,6 +1491,7 @@ const CreatePackage: React.FC = () => {
                                         timeSlotInterval: "30",
                                         partialPaymentPercentage: "0",
                                         partialPaymentFixed: "0",
+                                        hasGuestOfHonor: false,
                                     })}
                                 >
                                     <RefreshCcw className="w-5 h-5" /> Reset

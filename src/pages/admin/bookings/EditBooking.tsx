@@ -54,6 +54,9 @@ const EditBooking: React.FC = () => {
     notes: '',
     giftCardCode: '',
     promoCode: '',
+    guestOfHonorName: '',
+    guestOfHonorAge: '',
+    guestOfHonorGender: '',
   });
 
   // Load booking data and package details from backend
@@ -131,6 +134,9 @@ const EditBooking: React.FC = () => {
           notes: bookingData.notes || '',
           giftCardCode: '',
           promoCode: '',
+          guestOfHonorName: bookingData.guest_of_honor_name || '',
+          guestOfHonorAge: bookingData.guest_of_honor_age ? String(bookingData.guest_of_honor_age) : '',
+          guestOfHonorGender: bookingData.guest_of_honor_gender || '',
         });
 
         // Set selected attractions from booking
@@ -340,6 +346,9 @@ const EditBooking: React.FC = () => {
         room_id: formData.roomId || undefined,
         additional_attractions: additionalAttractions.length > 0 ? additionalAttractions : undefined,
         additional_addons: additionalAddons.length > 0 ? additionalAddons : undefined,
+        guest_of_honor_name: packageDetails?.has_guest_of_honor && formData.guestOfHonorName ? formData.guestOfHonorName : undefined,
+        guest_of_honor_age: packageDetails?.has_guest_of_honor && formData.guestOfHonorAge ? parseInt(formData.guestOfHonorAge) : undefined,
+        guest_of_honor_gender: packageDetails?.has_guest_of_honor && formData.guestOfHonorGender ? formData.guestOfHonorGender as 'male' | 'female' | 'other' : undefined,
       });
 
       if (response.success) {
@@ -842,6 +851,61 @@ const EditBooking: React.FC = () => {
               placeholder="Any special requests or notes..."
             />
           </div>
+
+          {/* Guest of Honor */}
+          {packageDetails?.has_guest_of_honor && (
+            <div className="p-6 border-b border-gray-100">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Guest of Honor</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label htmlFor="guestOfHonorName" className="block text-sm font-medium text-gray-800 mb-2">
+                    Name
+                  </label>
+                  <input
+                    type="text"
+                    name="guestOfHonorName"
+                    id="guestOfHonorName"
+                    value={formData.guestOfHonorName}
+                    onChange={handleInputChange}
+                    className={`w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
+                    placeholder="Guest of Honor's Name"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="guestOfHonorAge" className="block text-sm font-medium text-gray-800 mb-2">
+                    Age
+                  </label>
+                  <input
+                    type="number"
+                    name="guestOfHonorAge"
+                    id="guestOfHonorAge"
+                    value={formData.guestOfHonorAge}
+                    onChange={handleInputChange}
+                    min="0"
+                    className={`w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
+                    placeholder="Age"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="guestOfHonorGender" className="block text-sm font-medium text-gray-800 mb-2">
+                    Gender
+                  </label>
+                  <select
+                    name="guestOfHonorGender"
+                    id="guestOfHonorGender"
+                    value={formData.guestOfHonorGender}
+                    onChange={handleInputChange}
+                    className={`w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
+                  >
+                    <option value="">Select Gender</option>
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Form Actions */}
           <div className="px-6 py-5 bg-gray-50 text-right space-x-3">

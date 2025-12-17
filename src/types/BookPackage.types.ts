@@ -77,6 +77,7 @@ export interface BookPackagePackage {
   updated_at: string;
   partial_payment_percentage?: number | null;
   partial_payment_fixed?: number | null;
+  has_guest_of_honor?: boolean;
   location?: {
     id: number;
     company_id: number;

@@ -104,6 +104,9 @@ export interface UpdateBookingData {
   status?: 'pending' | 'confirmed' | 'checked-in' | 'completed' | 'cancelled';
   notes?: string;
   special_requests?: string;
+  guest_of_honor_name?: string;
+  guest_of_honor_age?: number;
+  guest_of_honor_gender?: 'male' | 'female' | 'other';
   additional_attractions?: Array<{
     attraction_id: number;
     quantity: number;
@@ -175,6 +178,9 @@ export interface Booking {
   status: 'pending' | 'confirmed' | 'checked-in' | 'completed' | 'cancelled';
   notes?: string;
   special_requests?: string;
+  guest_of_honor_name?: string;
+  guest_of_honor_age?: number;
+  guest_of_honor_gender?: 'male' | 'female' | 'other';
   checked_in_at?: string;
   completed_at?: string;
   cancelled_at?: string;

@@ -32,6 +32,9 @@ interface ExtendedBookingData extends CreateBookingData {
     price_at_booking: number;
   }>;
   created_by?: number;
+  guest_of_honor_name?: string;
+  guest_of_honor_age?: number;
+  guest_of_honor_gender?: 'male' | 'female' | 'other';
 }
 
 interface BookingData extends Omit<OnsiteBookingData, 'customer'> {
@@ -46,6 +49,9 @@ interface BookingData extends Omit<OnsiteBookingData, 'customer'> {
   giftCardCode: string;
   promoCode: string;
   notes: string;
+  guestOfHonorName: string;
+  guestOfHonorAge: string;
+  guestOfHonorGender: string;
 }
 
 const OnsiteBooking: React.FC = () => {
@@ -99,7 +105,10 @@ const OnsiteBooking: React.FC = () => {
     giftCardCode: '',
     promoCode: '',
     notes: '',
-    total: 0
+    total: 0,
+    guestOfHonorName: '',
+    guestOfHonorAge: '',
+    guestOfHonorGender: ''
   });
 
   // Check if all required fields are filled for final submission
@@ -770,7 +779,10 @@ const OnsiteBooking: React.FC = () => {
       giftCardCode: '',
       promoCode: '',
       notes: '',
-      total: 0
+      total: 0,
+      guestOfHonorName: '',
+      guestOfHonorAge: '',
+      guestOfHonorGender: ''
     });
     setCardNumber('');
     setCardMonth('');
@@ -922,6 +934,9 @@ const OnsiteBooking: React.FC = () => {
         additional_attractions: additionalAttractions.length > 0 ? additionalAttractions : undefined,
         additional_addons: additionalAddons.length > 0 ? additionalAddons : undefined,
         created_by: createdBy,
+        guest_of_honor_name: selectedPackage.has_guest_of_honor && bookingData.guestOfHonorName ? bookingData.guestOfHonorName : undefined,
+        guest_of_honor_age: selectedPackage.has_guest_of_honor && bookingData.guestOfHonorAge ? parseInt(bookingData.guestOfHonorAge) : undefined,
+        guest_of_honor_gender: selectedPackage.has_guest_of_honor && bookingData.guestOfHonorGender ? bookingData.guestOfHonorGender as 'male' | 'female' | 'other' : undefined,
       };
       
       console.log('📤 Sending on-site booking request:', bookingData_request);
@@ -1816,6 +1831,57 @@ const OnsiteBooking: React.FC = () => {
             placeholder="Any special requests, dietary restrictions, or important information..."
           />
         </div>
+
+        {/* Guest of Honor Section - Only show if package has guest of honor enabled */}
+        {selectedPackage?.has_guest_of_honor && (
+          <div className="pt-6 border-t border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+              </svg>
+              Guest of Honor Information
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Guest of Honor Name</label>
+                <input
+                  type="text"
+                  name="guestOfHonorName"
+                  value={bookingData.guestOfHonorName}
+                  onChange={handleInputChange}
+                  className={`w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:ring-2 focus:ring-${themeColor}-400 focus:border-${themeColor}-500 transition-colors`}
+                  placeholder="Enter guest of honor name"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Age</label>
+                <input
+                  type="number"
+                  name="guestOfHonorAge"
+                  value={bookingData.guestOfHonorAge}
+                  onChange={handleInputChange}
+                  min="0"
+                  className={`w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:ring-2 focus:ring-${themeColor}-400 focus:border-${themeColor}-500 transition-colors`}
+                  placeholder="Age"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Gender</label>
+                <select
+                  name="guestOfHonorGender"
+                  value={bookingData.guestOfHonorGender}
+                  onChange={handleInputChange}
+                  className={`w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:ring-2 focus:ring-${themeColor}-400 focus:border-${themeColor}-500 transition-colors`}
+                >
+                  <option value="">Select Gender</option>
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
       
       <div className="flex gap-3 pt-4">
