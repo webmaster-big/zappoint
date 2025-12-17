@@ -323,6 +323,50 @@ const ViewBooking: React.FC = () => {
                   </span>
                 </div>
               </div>
+
+              {/* Guest of Honor Section - Only show if data exists */}
+              {(booking as any).guest_of_honor_name && (
+                <>
+                  <div className="col-span-2">
+                    <div className="border-t border-gray-200 my-4"></div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Guest of Honor</h3>
+                  </div>
+                  
+                  <div className="flex items-start gap-3">
+                    <div className={`p-2 bg-${themeColor}-100 rounded-lg`}>
+                      <User className={`h-5 w-5 text-${fullColor}`} />
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500">Name</p>
+                      <p className="font-medium text-gray-900">{(booking as any).guest_of_honor_name}</p>
+                    </div>
+                  </div>
+
+                  {(booking as any).guest_of_honor_age && (
+                    <div className="flex items-start gap-3">
+                      <div className={`p-2 bg-${themeColor}-100 rounded-lg`}>
+                        <User className={`h-5 w-5 text-${fullColor}`} />
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-500">Age</p>
+                        <p className="font-medium text-gray-900">{(booking as any).guest_of_honor_age} years old</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {(booking as any).guest_of_honor_gender && (
+                    <div className="flex items-start gap-3">
+                      <div className={`p-2 bg-${themeColor}-100 rounded-lg`}>
+                        <User className={`h-5 w-5 text-${fullColor}`} />
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-500">Gender</p>
+                        <p className="font-medium text-gray-900 capitalize">{(booking as any).guest_of_honor_gender}</p>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           </div>
 

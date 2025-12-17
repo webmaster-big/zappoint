@@ -902,6 +902,31 @@ const LocationManagerDashboard: React.FC = () => {
                 </div>
               )}
 
+              {/* Guest of Honor Section - Only show if data exists */}
+              {selectedBooking.guest_of_honor_name && (
+                <div className="mb-6">
+                  <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Guest of Honor</h4>
+                  <div className="bg-purple-50 rounded-lg p-4 border-l-4 border-purple-600 space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Name</span>
+                      <span className="text-sm font-medium text-gray-900">{selectedBooking.guest_of_honor_name}</span>
+                    </div>
+                    {selectedBooking.guest_of_honor_age && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Age</span>
+                        <span className="text-sm font-medium text-gray-900">{selectedBooking.guest_of_honor_age} years old</span>
+                      </div>
+                    )}
+                    {selectedBooking.guest_of_honor_gender && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Gender</span>
+                        <span className="text-sm font-medium text-gray-900 capitalize">{selectedBooking.guest_of_honor_gender}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* Attractions */}
               {selectedBooking.attractions && Array.isArray(selectedBooking.attractions) && selectedBooking.attractions.length > 0 && (
                 <div className="mb-6">

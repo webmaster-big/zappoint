@@ -420,24 +420,49 @@ const ManualBooking: React.FC = () => {
             
             {/* Step 1: Package Selection */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <div className="mb-6">
-                <h2 className="text-2xl font-bold text-gray-900 mb-1">Select Package</h2>
-                <p className="text-sm text-gray-600">Choose the package for this booking</p>
+              <div className="mb-6 flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900 mb-1">
+                    {form.packageId ? 'Selected Package' : 'Select Package'}
+                  </h2>
+                  <p className="text-sm text-gray-600">
+                    {form.packageId ? 'Your chosen package for this booking' : 'Choose the package for this booking'}
+                  </p>
+                </div>
+                {form.packageId && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setForm(prev => ({ ...prev, packageId: '', roomId: '' }));
+                      setPkg(null);
+                      setSelectedAddOns({});
+                      setSelectedAttractions({});
+                    }}
+                    className={`px-4 py-2 bg-white border-2 border-${themeColor}-500 text-${themeColor}-700 font-medium rounded-lg hover:bg-${themeColor}-50 transition-all flex items-center gap-2`}
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                    Change Package
+                  </button>
+                )}
               </div>
               <div className="grid grid-cols-1 gap-4">
-                {Array.isArray(packages) && packages.map((p: any) => (
+                {Array.isArray(packages) && packages
+                  .filter((p: any) => !form.packageId || form.packageId === p.id.toString())
+                  .map((p: any) => (
                   <div
                     key={p.id}
                     onClick={() => {
-                      const event = {
-                        target: { name: 'packageId', value: form.packageId === p.id.toString() ? '' : p.id.toString() }
-                      } as any;
-                      handleInputChange(event);
+                      if (!form.packageId) {
+                        const event = {
+                          target: { name: 'packageId', value: p.id.toString() }
+                        } as any;
+                        handleInputChange(event);
+                      }
                     }}
-                    className={`border-2 rounded-lg p-5 cursor-pointer transition-all ${
+                    className={`border-2 rounded-lg p-5 transition-all ${
                       form.packageId === p.id.toString()
                         ? `border-${themeColor}-500 bg-${themeColor}-50 shadow-sm`
-                        : `border-gray-200 hover:border-${themeColor}-300 hover:bg-gray-50`
+                        : `border-gray-200 hover:border-${themeColor}-300 hover:bg-gray-50 cursor-pointer`
                     }`}
                   >
                     <div className="flex items-start justify-between gap-4">

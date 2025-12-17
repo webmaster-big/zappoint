@@ -1089,7 +1089,24 @@ const CheckIn: React.FC = () => {
                       </div>
                     ) : null}
 
-                    
+                    {/* Guest of Honor Section - Only show if data exists */}
+                    {(verifiedBooking as any).guest_of_honor_name && (
+                      <>
+                        <div className="col-span-full border-t border-gray-200 my-2"></div>
+                        <div className="flex items-center gap-3 col-span-full">
+                          <div className="p-2 bg-purple-100 rounded-lg">
+                            <User className="h-5 w-5 text-purple-600" />
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-500">Guest of Honor</p>
+                            <p className="font-medium text-gray-800">{(verifiedBooking as any).guest_of_honor_name}</p>
+                            {(verifiedBooking as any).guest_of_honor_age && (
+                              <p className="text-xs text-gray-600">{(verifiedBooking as any).guest_of_honor_age} years old{(verifiedBooking as any).guest_of_honor_gender ? ` • ${(verifiedBooking as any).guest_of_honor_gender}` : ''}</p>
+                            )}
+                          </div>
+                        </div>
+                      </>
+                    )}
 
                     {verifiedBooking.attractions && Array.isArray(verifiedBooking.attractions) && verifiedBooking.attractions.length > 0 && (
                       <div className="flex items-start gap-3 col-span-full">
