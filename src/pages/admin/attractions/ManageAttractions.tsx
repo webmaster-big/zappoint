@@ -359,8 +359,13 @@ const ManageAttractions = () => {
       } else {
         await attractionService.deactivateAttraction(Number(id));
       }
+      
+      // Update attraction status in state without full reload
+      setAttractions(prev => prev.map(attraction => 
+        attraction.id === id ? { ...attraction, status: newStatus } : attraction
+      ));
+      
       setToast({ message: 'Status updated successfully', type: 'success' });
-      loadAttractions(); // Reload the list
     } catch (error) {
       console.error('Error updating status:', error);
       setToast({ message: 'Failed to update status', type: 'error' });
@@ -371,8 +376,11 @@ const ManageAttractions = () => {
     if (window.confirm('Are you sure you want to delete this attraction? This action cannot be undone.')) {
       try {
         await attractionService.deleteAttraction(Number(id));
+        
+        // Remove attraction from state without full reload
+        setAttractions(prev => prev.filter(attraction => attraction.id !== id));
+        
         setToast({ message: 'Attraction deleted successfully', type: 'success' });
-        loadAttractions(); // Reload the list
       } catch (error) {
         console.error('Error deleting attraction:', error);
         setToast({ message: 'Failed to delete attraction', type: 'error' });
@@ -389,9 +397,12 @@ const ManageAttractions = () => {
         await Promise.all(
           selectedAttractions.map(id => attractionService.deleteAttraction(Number(id)))
         );
+        
+        // Remove attractions from state without full reload
+        setAttractions(prev => prev.filter(attraction => !selectedAttractions.includes(attraction.id)));
+        
         setToast({ message: `${selectedAttractions.length} attraction(s) deleted successfully`, type: 'success' });
         setSelectedAttractions([]);
-        loadAttractions(); // Reload the list
       } catch (error) {
         console.error('Error deleting attractions:', error);
         setToast({ message: 'Failed to delete some attractions', type: 'error' });
@@ -411,9 +422,16 @@ const ManageAttractions = () => {
             : attractionService.deactivateAttraction(Number(id))
         )
       );
+      
+      // Update attractions status in state without full reload
+      setAttractions(prev => prev.map(attraction => 
+        selectedAttractions.includes(attraction.id) 
+          ? { ...attraction, status: newStatus }
+          : attraction
+      ));
+      
       setToast({ message: `${selectedAttractions.length} attraction(s) updated successfully`, type: 'success' });
       setSelectedAttractions([]);
-      loadAttractions(); // Reload the list
     } catch (error) {
       console.error('Error updating attractions:', error);
       setToast({ message: 'Failed to update some attractions', type: 'error' });

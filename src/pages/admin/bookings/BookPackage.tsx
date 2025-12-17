@@ -100,7 +100,6 @@ const BookPackage: React.FC = () => {
   const [customerId, setCustomerId] = useState<number | null>(null);
   const [countryDebounceTimer, setCountryDebounceTimer] = useState<NodeJS.Timeout | null>(null);
   const [showAccountModal, setShowAccountModal] = useState(false);
-  const [sendEmail, setSendEmail] = useState(true);
 
   // Show account modal for non-logged-in users
   useEffect(() => {
@@ -470,7 +469,6 @@ const BookPackage: React.FC = () => {
     setCardYear("");
     setCardCVV("");
     setPaymentError("");
-    setSendEmail(true);
   };
   
   // Handle card number input with formatting
@@ -673,7 +671,6 @@ const BookPackage: React.FC = () => {
         gift_card_code: appliedGiftCard ? appliedGiftCard.code : undefined,
         notes: form.notes || undefined,
         transaction_id: paymentResponse.transaction_id,
-        send_email: sendEmail,
       };
       
       console.log('📦 === BOOKING DATA BEING SENT TO BACKEND ===');
@@ -755,7 +752,7 @@ const BookPackage: React.FC = () => {
         });
         
         try {
-          await bookingService.storeQrCode(bookingId, qrCodeBase64, sendEmail);
+          await bookingService.storeQrCode(bookingId, qrCodeBase64);
           console.log('✅ QR code stored');
         } catch (qrError) {
           console.error('⚠️ Failed to store QR code:', qrError);
@@ -1797,26 +1794,6 @@ const BookPackage: React.FC = () => {
                     </svg>
                     <span className="hidden sm:inline">Back</span>
                   </button>
-                </div>
-                
-                {/* Send Email Receipt Checkbox */}
-                <div className="mt-6 mb-4">
-                  <label className="flex items-center space-x-3 cursor-pointer group">
-                    <input
-                      type="checkbox"
-                      checked={sendEmail}
-                      onChange={(e) => setSendEmail(e.target.checked)}
-                      className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                    />
-                    <span className="text-sm text-gray-700 group-hover:text-gray-900">
-                      Send booking confirmation email
-                    </span>
-                  </label>
-                  {!sendEmail && (
-                    <p className="text-xs text-gray-500 mt-1 ml-7">
-                      You will not receive a booking confirmation email
-                    </p>
-                  )}
                 </div>
                 
                 <div className="mt-6">

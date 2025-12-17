@@ -192,6 +192,22 @@ const ManageAddons = () => {
         
         const result = await addOnService.updateAddOn(parseInt(editingAddon.id), updatePayload);
         console.log('Update result:', result);
+        
+        // Update addon in state without full reload
+        if (result.data) {
+          setAddons(prev => prev.map(addon => 
+            addon.id === editingAddon.id 
+              ? {
+                  ...addon,
+                  name: result.data.name,
+                  price: result.data.price || 0,
+                  image: result.data.image ? (result.data.image.startsWith('http') ? result.data.image : `${ASSET_URL}${result.data.image}`) : addon.image,
+                  location: result.data.location && typeof result.data.location === 'object' ? result.data.location : addon.location,
+                }
+              : addon
+          ));
+        }
+        
         showToast('Add-on updated successfully!', 'success');
       } else {
         // Create new add-on
@@ -231,10 +247,22 @@ const ManageAddons = () => {
         
         const result = await addOnService.createAddOn(createPayload);
         console.log('Create result:', result);
+        
+        // Add new addon to state without full reload
+        if (result.data) {
+          const newAddon: AddOnsAddon = {
+            id: result.data.id.toString(),
+            name: result.data.name,
+            price: result.data.price || 0,
+            image: result.data.image ? (result.data.image.startsWith('http') ? result.data.image : `${ASSET_URL}${result.data.image}`) : '',
+            location: result.data.location && typeof result.data.location === 'object' ? result.data.location : null,
+          };
+          setAddons(prev => [...prev, newAddon]);
+        }
+        
         showToast('Add-on created successfully!', 'success');
       }
 
-      await loadAddons();
       resetForm();
       setShowModal(false);
     } catch (error: any) {
@@ -268,8 +296,11 @@ const ManageAddons = () => {
       try {
         setLoading(true);
         await addOnService.deleteAddOn(parseInt(id));
+        
+        // Remove addon from state without full reload
+        setAddons(prev => prev.filter(addon => addon.id !== id));
+        
         showToast('Add-on deleted successfully!', 'success');
-        await loadAddons();
       } catch (error) {
         console.error('Error deleting add-on:', error);
         showToast('Error deleting add-on', 'error');
