@@ -441,26 +441,8 @@ const OnsiteBooking: React.FC = () => {
         setAvailableTimeSlots(data.available_slots);
         setLoadingTimeSlots(false);
         
-        // Auto-select first available time slot only on initial load
-        if (isFirstUpdate && data.available_slots.length > 0) {
-          setBookingData((prev) => {
-            // Only set if no time is currently selected
-            if (!prev.time) {
-              return { ...prev, time: data.available_slots[0].start_time };
-            }
-            
-            // Check if previously selected time is still available
-            const timeIsAvailable = data.available_slots.some(
-              (slot: TimeSlot) => slot.start_time === prev.time
-            );
-            
-            // If not available, select first available slot
-            if (!timeIsAvailable) {
-              return { ...prev, time: data.available_slots[0]?.start_time || "" };
-            }
-            
-            return prev;
-          });
+        // Mark first update as complete (no auto-selection)
+        if (isFirstUpdate) {
           isFirstUpdate = false;
         }
       } catch (err) {

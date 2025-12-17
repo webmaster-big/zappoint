@@ -106,13 +106,50 @@ const SpaceSchedule = () => {
     });
   };
 
+  // Natural sort function: alphabetical first, then numerical
+  const naturalSort = (a: Room, b: Room): number => {
+    const nameA = a.name;
+    const nameB = b.name;
+    
+    // Split into chunks of text and numbers
+    const chunksA = nameA.match(/(\d+|\D+)/g) || [];
+    const chunksB = nameB.match(/(\d+|\D+)/g) || [];
+    
+    const maxLength = Math.max(chunksA.length, chunksB.length);
+    
+    for (let i = 0; i < maxLength; i++) {
+      const chunkA = chunksA[i] || '';
+      const chunkB = chunksB[i] || '';
+      
+      // Check if both chunks are numeric
+      const isNumA = /^\d+$/.test(chunkA);
+      const isNumB = /^\d+$/.test(chunkB);
+      
+      if (isNumA && isNumB) {
+        // Both are numbers, compare numerically
+        const diff = parseInt(chunkA) - parseInt(chunkB);
+        if (diff !== 0) return diff;
+      } else {
+        // At least one is text, compare as strings (case-insensitive)
+        const comparison = chunkA.toLowerCase().localeCompare(chunkB.toLowerCase());
+        if (comparison !== 0) return comparison;
+      }
+    }
+    
+    return 0;
+  };
+
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
       
       // Fetch spaces
       const spacesResponse = await roomService.getRooms();
-      setSpaces(Array.isArray(spacesResponse.data) ? spacesResponse.data : spacesResponse.data.rooms || []);
+      const fetchedSpaces = Array.isArray(spacesResponse.data) ? spacesResponse.data : spacesResponse.data.rooms || [];
+      
+      // Sort spaces: alphabetical first, then numerical
+      const sortedSpaces = [...fetchedSpaces].sort(naturalSort);
+      setSpaces(sortedSpaces);
 
       // Format date as YYYY-MM-DD for booking_date filter
       const year = selectedDate.getFullYear();
