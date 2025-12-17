@@ -548,7 +548,7 @@ const ManageAddons = () => {
             {currentAddons.map((addon) => (
               <div 
                 key={addon.id} 
-                className="border-2 border-gray-200 rounded-lg overflow-hidden hover:shadow-lg hover:scale-105 hover:border-gray-300 transition-all bg-white"
+                className="border-2 border-gray-200 rounded-lg overflow-hidden hover:shadow-md hover:scale-105 hover:border-gray-300 transition-all bg-white"
               >
                 <div className="h-40 bg-gradient-to-br from-gray-50 to-gray-100 relative">
                   {addon.image ? (
