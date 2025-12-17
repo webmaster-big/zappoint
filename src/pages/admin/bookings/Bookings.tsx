@@ -1152,6 +1152,7 @@ const Bookings: React.FC = () => {
                           onChange={(e) => handlePaymentStatusChange(booking.id, e.target.value as BookingsPageBooking['paymentStatus'])}
                           className={`text-xs font-medium px-2 py-1 rounded-full ${paymentStatusColors[(booking.paymentStatus || 'pending') as keyof typeof paymentStatusColors]} border-none focus:ring-2 focus:ring-${themeColor}-600`}
                         >
+                          <option value="pending">Pending</option>
                           <option value="partial">Partial</option>
                           <option value="paid">Paid</option>
                         </select>

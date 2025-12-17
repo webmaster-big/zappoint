@@ -405,7 +405,7 @@ const bookingService = {
   /**
    * Store QR code for a booking
    */
-  async storeQrCode(bookingId: number, qrCodeBase64: string): Promise<{ 
+  async storeQrCode(bookingId: number, qrCodeBase64: string, sendEmail: boolean = true): Promise<{ 
     success: boolean; 
     message: string;
     data: {
@@ -414,7 +414,8 @@ const bookingService = {
     };
   }> {
     const response = await api.post(`/bookings/${bookingId}/qrcode`, {
-      qr_code: qrCodeBase64
+      qr_code: qrCodeBase64,
+      send_email: sendEmail
     });
     return response.data;
   },

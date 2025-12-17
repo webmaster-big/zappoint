@@ -767,7 +767,7 @@ const BookPackage: React.FC = () => {
         });
         
         try {
-          await bookingService.storeQrCode(bookingId, qrCodeBase64);
+          await bookingService.storeQrCode(bookingId, qrCodeBase64, sendEmail);
           console.log('✅ QR code stored');
         } catch (qrError) {
           console.error('⚠️ Failed to store QR code:', qrError);

@@ -1010,10 +1010,10 @@ const OnsiteBooking: React.FC = () => {
         
         console.log('📱 QR Code generated for reference:', referenceNumber);
         
-        // Step 4: Store QR code via separate API call
+        // Step 4: Store QR code with email preference
         try {
-          const qrResponse = await bookingService.storeQrCode(bookingId, qrCodeBase64);
-          console.log('✅ QR code stored:', qrResponse);
+          await bookingService.storeQrCode(bookingId, qrCodeBase64, sendEmail);
+          console.log('✅ QR code stored with email preference:', sendEmail);
         } catch (qrError) {
           console.error('⚠️ Failed to store QR code, but booking was created:', qrError);
           // Don't fail the entire process if QR storage fails
