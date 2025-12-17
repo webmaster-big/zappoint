@@ -1094,8 +1094,8 @@ const CheckIn: React.FC = () => {
                       <>
                         <div className="col-span-full border-t border-gray-200 my-2"></div>
                         <div className="flex items-center gap-3 col-span-full">
-                          <div className="p-2 bg-purple-100 rounded-lg">
-                            <User className="h-5 w-5 text-purple-600" />
+                          <div className={`p-2 bg-${themeColor}-100 rounded-lg`}>
+                            <User className={`h-5 w-5 text-${fullColor}`} />
                           </div>
                           <div>
                             <p className="text-xs text-gray-500">Guest of Honor</p>

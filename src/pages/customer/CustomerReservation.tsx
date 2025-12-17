@@ -314,8 +314,8 @@ const CustomerReservations = () => {
 
           <!-- Guest of Honor -->
           ${(booking as any).guest_of_honor_name ? `
-          <div style="margin-bottom: 25px; background: #faf5ff; padding: 15px; border-left: 4px solid #9333ea;">
-            <h4 style="margin: 0 0 10px 0; font-size: 13px; color: #7e22ce; text-transform: uppercase; letter-spacing: 0.5px;">Guest of Honor</h4>
+          <div style="margin-bottom: 25px; background: #f8fafc; padding: 15px;">
+            <h4 style="margin: 0 0 10px 0; font-size: 13px; color: #1e40af; text-transform: uppercase; letter-spacing: 0.5px;">Guest of Honor</h4>
             <div style="font-size: 14px; color: #1e293b;">
               <div style="margin-bottom: 4px;"><span style="color: #64748b;">Name:</span> <strong>${(booking as any).guest_of_honor_name}</strong></div>
               ${(booking as any).guest_of_honor_age ? `<div style="margin-bottom: 4px;"><span style="color: #64748b;">Age:</span> <strong>${(booking as any).guest_of_honor_age} years old</strong></div>` : ''}
@@ -795,7 +795,7 @@ const CustomerReservations = () => {
               {(selectedBooking as any).guest_of_honor_name && (
                 <div>
                   <h4 className="font-medium text-gray-900 mb-2 text-sm">Guest of Honor</h4>
-                  <div className="bg-purple-50 p-4 border-l-4 border-purple-600 space-y-1">
+                  <div className="bg-gray-50 p-4 space-y-1">
                     <div className="flex justify-between">
                       <span className="text-gray-600">Name:</span>
                       <span className="font-medium text-gray-900">{(selectedBooking as any).guest_of_honor_name}</span>

@@ -906,7 +906,7 @@ const LocationManagerDashboard: React.FC = () => {
               {selectedBooking.guest_of_honor_name && (
                 <div className="mb-6">
                   <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Guest of Honor</h4>
-                  <div className="bg-purple-50 rounded-lg p-4 border-l-4 border-purple-600 space-y-2">
+                  <div className="bg-gray-50 rounded-lg p-4 space-y-2">
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-gray-600">Name</span>
                       <span className="text-sm font-medium text-gray-900">{selectedBooking.guest_of_honor_name}</span>
