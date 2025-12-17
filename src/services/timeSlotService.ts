@@ -47,13 +47,12 @@ export interface AvailableSlotsResponse {
 
 export interface AvailableSlotsRequest {
   package_id: number;
-  room_id: number;
   date: string;
 }
 
 const timeSlotService = {
   /**
-   * Get available time slots for a package, room, and date via SSE
+   * Get available time slots for a package and date via SSE (auto-finds available rooms)
    * Returns an EventSource for real-time updates
    */
   getAvailableSlotsSSE(params: AvailableSlotsRequest): EventSource {
@@ -61,7 +60,8 @@ const timeSlotService = {
     const token = getStoredUser()?.token;
     
     // Build URL with auth token as query parameter (EventSource doesn't support custom headers)
-    let url = `${API_BASE_URL}/package-time-slots/available-slots/${params.package_id}/${params.room_id}/${params.date}`;
+    // New endpoint automatically finds available rooms for each time slot
+    let url = `${API_BASE_URL}/package-time-slots/available-slots/${params.package_id}/${params.date}`;
     
     if (token) {
       url += `?token=${encodeURIComponent(token)}`;
@@ -71,12 +71,12 @@ const timeSlotService = {
   },
 
   /**
-   * Get available time slots for a package, room, and date (one-time fetch)
+   * Get available time slots for a package and date (one-time fetch, auto-finds available rooms)
    * Use this for initial load or when SSE is not needed
    */
   async getAvailableSlots(params: AvailableSlotsRequest): Promise<AvailableSlotsResponse> {
     const response = await api.get(
-      `/package-time-slots/available-slots/${params.package_id}/${params.room_id}/${params.date}`
+      `/package-time-slots/available-slots/${params.package_id}/${params.date}`
     );
     return response.data;
   },

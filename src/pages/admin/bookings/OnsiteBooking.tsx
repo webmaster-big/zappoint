@@ -8,7 +8,6 @@ import EmptyStateModal from '../../../components/ui/EmptyStateModal';
 import DatePicker from '../../../components/ui/DatePicker';
 import LocationSelector from '../../../components/admin/LocationSelector';
 import type { 
-  OnsiteBookingRoom, 
   OnsiteBookingPackage, 
   OnsiteBookingData 
 } from '../../../types/onsiteBooking.types';
@@ -63,8 +62,6 @@ const OnsiteBooking: React.FC = () => {
   const [loadingPackages, setLoadingPackages] = useState(true);
   const [loadingCustomer, setLoadingCustomer] = useState(false);
   const [step, setStep] = useState(1);
-  const [selectedRoom, setSelectedRoom] = useState<string>("");
-  const [selectedRoomId, setSelectedRoomId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   
   // Card payment details
@@ -114,8 +111,7 @@ const OnsiteBooking: React.FC = () => {
       bookingData.customer.firstName.trim() &&
       bookingData.customer.lastName.trim() &&
       bookingData.customer.email.trim() &&
-      bookingData.customer.phone.trim() &&
-      (!selectedPackage.rooms || selectedPackage.rooms.length === 0 || selectedRoom)
+      bookingData.customer.phone.trim()
     );
   };
 
@@ -405,9 +401,9 @@ const OnsiteBooking: React.FC = () => {
     }
   }, [selectedPackage, bookingData.date]);
 
-  // Fetch available time slots via SSE when date or room changes
+  // Fetch available time slots via SSE when date changes (backend auto-finds available rooms)
   useEffect(() => {
-    if (!selectedPackage || !bookingData.date || !selectedRoomId) {
+    if (!selectedPackage || !bookingData.date) {
       setAvailableTimeSlots([]);
       return;
     }
@@ -415,17 +411,14 @@ const OnsiteBooking: React.FC = () => {
     console.log('🕐 Fetching time slots for:', {
       package_id: selectedPackage.id,
       package_name: selectedPackage.name,
-      room_id: selectedRoomId,
-      room_name: selectedRoom,
       date: bookingData.date,
     });
     
     setLoadingTimeSlots(true);
     
-    // Create SSE connection
+    // Create SSE connection - backend will automatically find available rooms for each slot
     const eventSource = timeSlotService.getAvailableSlotsSSE({
       package_id: selectedPackage.id,
-      room_id: selectedRoomId,
       date: bookingData.date,
     });
     
@@ -481,7 +474,6 @@ const OnsiteBooking: React.FC = () => {
       console.error('EventSource readyState:', eventSource.readyState);
       console.error('Failed to fetch time slots for:', {
         package_id: selectedPackage?.id,
-        room_id: selectedRoomId,
         date: bookingData.date,
       });
       setLoadingTimeSlots(false);
@@ -498,7 +490,7 @@ const OnsiteBooking: React.FC = () => {
       console.log('🔌 Closing SSE connection');
       eventSource.close();
     };
-  }, [bookingData.date, selectedRoomId, selectedPackage]);
+  }, [bookingData.date, selectedPackage]);
 
   const handlePackageSelect = (pkg: OnsiteBookingPackage) => {
     console.log('📦 Package selected:', {
@@ -509,7 +501,6 @@ const OnsiteBooking: React.FC = () => {
     });
     
     setSelectedPackage(pkg);
-    setSelectedRoom("");
     
     const initialParticipants = pkg.minParticipants || 1;
     console.log('👥 Setting initial participants to:', initialParticipants);
@@ -761,8 +752,6 @@ const OnsiteBooking: React.FC = () => {
 
   const resetForm = () => {
     setSelectedPackage(null);
-    setSelectedRoom('');
-    setSelectedRoomId(null);
     setBookingData({
       packageId: null,
       selectedAttractions: [],
@@ -908,13 +897,13 @@ const OnsiteBooking: React.FC = () => {
       const createdBy = currentUser?.id;
       
       // Create booking data matching Laravel BookingController validation
+      // Note: room_id is omitted - backend will automatically assign an available room
       const bookingData_request: ExtendedBookingData = {
         guest_name: `${bookingData.customer.firstName} ${bookingData.customer.lastName}`,
         guest_email: bookingData.customer.email,
         guest_phone: bookingData.customer.phone,
         location_id: 1,
         package_id: selectedPackage.id,
-        room_id: selectedRoomId || undefined,
         type: 'package' as const,
         booking_date: bookingData.date,
         booking_time: bookingData.time,
@@ -1078,7 +1067,7 @@ const OnsiteBooking: React.FC = () => {
           )}
           
           {/* Booking Details */}
-          {(bookingData.date || bookingData.time || selectedRoom || bookingData.participants > 0) && (
+          {(bookingData.date || bookingData.time || bookingData.participants > 0) && (
             <div className="pb-4 border-b border-gray-200">
               <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Details</h4>
               <div className="space-y-2 text-sm">
@@ -1096,14 +1085,7 @@ const OnsiteBooking: React.FC = () => {
                     <span className="text-gray-900">{formatTimeTo12Hour(bookingData.time)}</span>
                   </div>
                 )}
-                {selectedRoom && (
-                  <div className="flex items-center gap-2">
-                    <svg className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"></path>
-                    </svg>
-                    <span className="text-gray-900">{selectedRoom}</span>
-                  </div>
-                )}
+                {/* Space will be auto-assigned by backend */}
                 {bookingData.participants > 0 && (
                   <div className="flex items-center gap-2">
                     <Users className="w-4 h-4 text-gray-400" />
@@ -1357,55 +1339,7 @@ const OnsiteBooking: React.FC = () => {
         <h2 className="text-2xl font-bold text-gray-900 mb-6">Select Space, Date & Time</h2>
       
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 space-y-6">
-        {/* Room Selection */}
-        {selectedPackage?.rooms && selectedPackage.rooms.length > 0 && (
-          <div>
-            <h3 className="font-semibold text-gray-900 mb-3 flex items-center">
-              <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"></path>
-              </svg>
-              Room Selection
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              {selectedPackage.rooms.map((r) => {
-                const room = r as OnsiteBookingRoom;
-                const isSelected = room.id ? selectedRoomId === room.id : selectedRoom === room.name;
-                return (
-                  <label 
-                    key={room.id || room.name} 
-                    className={`flex items-center gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all ${
-                      isSelected 
-                        ? `border-${themeColor}-500 bg-${themeColor}-50 shadow-sm` 
-                        : `border-gray-200 hover:border-${themeColor}-300 hover:bg-gray-50`
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="roomSelection"
-                      value={room.id?.toString() || room.name}
-                      checked={isSelected}
-                      onChange={() => {
-                        if (room.id) {
-                          setSelectedRoomId(room.id);
-                          setSelectedRoom(room.name);
-                        } else {
-                          setSelectedRoom(room.name);
-                        }
-                      }}
-                      className={`accent-${fullColor} w-4 h-4`}
-                    />
-                    <div className="flex-1">
-                      <span className="font-medium text-gray-900 text-sm">{room.name}</span>
-                      {room.capacity && (
-                        <p className="text-xs text-gray-500 mt-0.5">Capacity: {room.capacity}</p>
-                      )}
-                    </div>
-                  </label>
-                );
-              })}
-            </div>
-          </div>
-        )}
+        {/* Room will be automatically assigned by backend based on availability */}
 
 
         {/* Date and Time Grid */}
@@ -1486,11 +1420,7 @@ const OnsiteBooking: React.FC = () => {
             <Clock className="w-4 h-4 mr-2" />
             Select Time Slot
           </label>
-          {selectedPackage?.rooms && selectedPackage.rooms.length > 0 && !selectedRoom ? (
-            <div className="text-sm text-gray-500 bg-gray-50 rounded-lg p-4 text-center">
-              Please select a Space first to see available time slots
-            </div>
-          ) : loadingTimeSlots ? (
+          {loadingTimeSlots ? (
             <div className="flex items-center justify-center p-8 bg-gray-50 rounded-lg">
               <div className={`animate-spin rounded-full h-8 w-8 border-b-2 border-${fullColor}`}></div>
               <span className="ml-3 text-sm text-gray-600">Loading available time slots...</span>
@@ -1515,7 +1445,6 @@ const OnsiteBooking: React.FC = () => {
                         checked={bookingData.time === slot.start_time}
                         onChange={handleInputChange}
                         className={`accent-${fullColor} w-4 h-4`}
-                        disabled={!selectedRoomId}
                       />
                       <span className="font-semibold text-sm text-gray-900">{formatTimeTo12Hour(slot.start_time)}</span>
                     </div>
@@ -1524,7 +1453,7 @@ const OnsiteBooking: React.FC = () => {
                 ))
               ) : (
                 <div className="col-span-full text-sm text-gray-500 bg-gray-50 rounded-lg p-4 text-center">
-                  {!selectedRoomId ? 'Select a Space first' : 'No available time slots for this Space on the selected date'}
+                  No available time slots for the selected date. Space will be auto-assigned.
                 </div>
               )}
             </div>
@@ -1556,12 +1485,7 @@ const OnsiteBooking: React.FC = () => {
         <button
           type="button"
           onClick={() => setStep(3)}
-          className={`flex-2 px-8 py-3 rounded-lg font-semibold transition-colors ${
-            selectedPackage?.rooms && selectedPackage.rooms.length > 0 && !selectedRoom
-              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-              : `bg-${fullColor} text-white hover:bg-${themeColor}-700 shadow-sm`
-          }`}
-          disabled={selectedPackage?.rooms && selectedPackage.rooms.length > 0 && !selectedRoom}
+          className={`flex-2 px-8 py-3 rounded-lg font-semibold transition-colors bg-${fullColor} text-white hover:bg-${themeColor}-700 shadow-sm`}
         >
           Continue to Attractions & Add-ons
         </button>
@@ -1973,12 +1897,10 @@ const OnsiteBooking: React.FC = () => {
                 <span className="text-gray-600">Time:</span>
                 <span className="font-medium text-gray-900">{formatTimeTo12Hour(bookingData.time)}</span>
               </div>
-              {selectedRoom && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Space:</span>
-                  <span className="font-medium text-gray-900">{selectedRoom}</span>
-                </div>
-              )}
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600">Space:</span>
+                <span className="font-medium text-gray-900">Auto-assigned</span>
+              </div>
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">Duration:</span>
                 <span className="font-medium text-gray-900">{selectedPackage && formatDuration(selectedPackage)}</span>

@@ -47,7 +47,6 @@ const BookPackage: React.FC = () => {
   
   const [selectedAddOns, setSelectedAddOns] = useState<{ [id: number]: number }>({});
   const [selectedAttractions, setSelectedAttractions] = useState<{ [id: number]: number }>({});
-  const [selectedRoomId, setSelectedRoomId] = useState<number | null>(null);
   const [promoCode, setPromoCode] = useState("");
   const [giftCardCode, setGiftCardCode] = useState("");
   const [appliedPromo, setAppliedPromo] = useState<BookPackagePackage['promos'][0] | null>(null);
@@ -368,9 +367,10 @@ const BookPackage: React.FC = () => {
     }
   }, [pkg, selectedDate]);
 
-  // Fetch available time slots via SSE when date or room changes
+  // Fetch available time slots via SSE when date changes
+  // Backend automatically finds available rooms for each time slot
   useEffect(() => {
-    if (!pkg || !selectedDate || !selectedRoomId) {
+    if (!pkg || !selectedDate) {
       setAvailableTimeSlots([]);
       return;
     }
@@ -380,7 +380,6 @@ const BookPackage: React.FC = () => {
     // Create SSE connection
     const eventSource = timeSlotService.getAvailableSlotsSSE({
       package_id: pkg.id,
-      room_id: selectedRoomId,
       date: selectedDate,
     });
     
@@ -433,7 +432,7 @@ const BookPackage: React.FC = () => {
     return () => {
       eventSource.close();
     };
-  }, [selectedDate, selectedRoomId, pkg]);
+  }, [selectedDate, pkg]);
 
   // Handle add-on/attraction quantity change
   const handleAddOnQty = (id: number, qty: number) => {
@@ -459,7 +458,7 @@ const BookPackage: React.FC = () => {
   const resetForm = () => {
     setSelectedAddOns({});
     setSelectedAttractions({});
-    setSelectedRoomId(null);
+    // Room will be auto-assigned by backend
     setPromoCode("");
     setGiftCardCode("");
     setAppliedPromo(null);
@@ -566,7 +565,7 @@ const BookPackage: React.FC = () => {
 
   // Handle booking submission with payment processing
   const handlePayNow = async () => {
-    if (!pkg || !selectedRoomId) return;
+    if (!pkg) return;
     
     // Validate card information
     if (!cardNumber || !cardMonth || !cardYear || !cardCVV) {
@@ -673,7 +672,7 @@ const BookPackage: React.FC = () => {
         customer_id: customerId || undefined,
         location_id: pkg.location_id || 1,
         package_id: pkg.id,
-        room_id: selectedRoomId,
+        // Note: room_id is omitted - backend will automatically assign an available room
         type: 'package' as const,
         booking_date: selectedDate,
         booking_time: selectedTime,
@@ -713,7 +712,6 @@ const BookPackage: React.FC = () => {
       console.log('Booking Details:', {
         location_id: bookingData.location_id,
         package_id: bookingData.package_id,
-        room_id: bookingData.room_id,
         type: bookingData.type,
         date: bookingData.booking_date,
         time: bookingData.booking_time,
@@ -854,12 +852,10 @@ const BookPackage: React.FC = () => {
                   <span className="text-gray-600">Participants:</span>
                   <span className="font-medium text-gray-900">{participants}</span>
                 </div>
-                {selectedRoomId && pkg?.rooms && (
-                  <div className="flex justify-between text-sm sm:text-base">
-                    <span className="text-gray-600">Room:</span>
-                    <span className="font-medium text-gray-900">{pkg.rooms.find(r => r.id === selectedRoomId)?.name}</span>
-                  </div>
-                )}
+                <div className="flex justify-between text-sm sm:text-base">
+                  <span className="text-gray-600">Room:</span>
+                  <span className="font-medium text-gray-900">Auto-assigned</span>
+                </div>
                 <div className="flex justify-between text-sm sm:text-base">
                   <span className="text-gray-600">Duration:</span>
                   <span className="font-medium text-gray-900">{formatDuration()}</span>
@@ -1147,30 +1143,8 @@ const BookPackage: React.FC = () => {
           <div className="space-y-4 md:space-y-6 bg-white rounded-xl shadow-sm p-4 md:p-6 border border-gray-100">
             {currentStep === 1 ? (
               <>
-                {/* Room Selection - Moved to top */}
-                {pkg.rooms && pkg.rooms.length > 0 && (
-                  <div className="border border-gray-200 rounded-xl p-4 md:p-5">
-                    <label className="block font-medium mb-3 text-gray-800 text-xs md:text-sm uppercase tracking-wide">Room Selection</label>
-                    <div className="space-y-2">
-                      {pkg.rooms.map((room) => (
-                        <label key={room.id} className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg cursor-pointer">
-                          <input
-                            type="radio"
-                            name="roomSelection"
-                            value={room.id}
-                            checked={selectedRoomId === room.id}
-                            onChange={() => setSelectedRoomId(room.id)}
-                            className="accent-blue-800"
-                          />
-                          <span className="font-medium text-gray-800 text-sm">{room.name}</span>
-                          {room.capacity && <span className="text-gray-500 text-xs ml-auto">Capacity: {room.capacity}</span>}
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                
                 {/* Date and Time Selection */}
+                {/* Room will be automatically assigned by backend */}
                 <div className="bg-blue-50 p-4 md:p-5 rounded-xl">
                   <h3 className="font-medium mb-3 md:mb-4 text-gray-800 text-xs md:text-sm uppercase tracking-wide">Select Date & Time</h3>
                   
@@ -1203,7 +1177,6 @@ const BookPackage: React.FC = () => {
                                   checked={selectedTime === slot.start_time}
                                   onChange={() => setSelectedTime(slot.start_time)}
                                   className="accent-blue-800"
-                                  disabled={!selectedRoomId}
                                 />
                                 <div className="flex flex-col">
                                   <span className="text-sm text-gray-800">{formatTimeTo12Hour(slot.start_time)}</span>
@@ -1212,7 +1185,7 @@ const BookPackage: React.FC = () => {
                               </label>
                             ))
                           ) : (
-                            <span className="text-xs text-gray-400 col-span-2">{!selectedRoomId ? 'Select a room first' : 'No available times for this room on the selected date'}</span>
+                            <span className="text-xs text-gray-400 col-span-2">No available times for the selected date. Room will be auto-assigned.</span>
                           )}
                         </div>
                       )}
@@ -1410,12 +1383,12 @@ const BookPackage: React.FC = () => {
                 
                 <div className="flex justify-end pt-4">
                   <button 
-                    className={`py-2.5 md:py-3 px-4 md:px-6 rounded-lg font-medium transition shadow-sm flex items-center text-sm md:text-base ${(!selectedRoomId || !selectedTime) ? 'bg-gray-300 text-gray-400 cursor-not-allowed' : 'bg-blue-800 text-white hover:bg-blue-800'}`}
+                    className={`py-2.5 md:py-3 px-4 md:px-6 rounded-lg font-medium transition shadow-sm flex items-center text-sm md:text-base ${!selectedTime ? 'bg-gray-300 text-gray-400 cursor-not-allowed' : 'bg-blue-800 text-white hover:bg-blue-800'}`}
                     onClick={() => {
                       setCurrentStep(2);
                       window.scrollTo({ top: 0, behavior: 'smooth' });
                     }}
-                    disabled={!selectedRoomId || !selectedTime}
+                    disabled={!selectedTime}
                   >
                     Continue to Personal Info
                     <svg className="ml-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -1937,14 +1910,12 @@ const BookPackage: React.FC = () => {
                 </div>
               )}
               
-              {selectedRoomId && (
-                <div>
-                  <div className="font-medium text-gray-800 mb-2 text-sm">Room</div>
-                  <div className="flex justify-between text-gray-600 pl-2 text-xs mb-1">
-                    <span>{pkg.rooms.find(r => r.id === selectedRoomId)?.name}</span>
-                  </div>
+              <div>
+                <div className="font-medium text-gray-800 mb-2 text-sm">Room</div>
+                <div className="flex justify-between text-gray-600 pl-2 text-xs mb-1">
+                  <span>Auto-assigned</span>
                 </div>
-              )}
+              </div>
               
               {Object.entries(selectedAddOns).some(([, qty]) => qty > 0) && (
                 <div>
