@@ -247,7 +247,8 @@ const OnsiteBooking: React.FC = () => {
             pricePerAdditional1hr: pkg.price_per_additional_1hr?.toString() || '0',
             pricePerAdditional: Number(pkg.price_per_additional || 0),
             partialPaymentPercentage: pkg.partial_payment_percentage || 0,
-            partialPaymentFixed: pkg.partial_payment_fixed || 0
+            partialPaymentFixed: pkg.partial_payment_fixed || 0,
+            has_guest_of_honor: pkg.has_guest_of_honor || false
             };
           });
           
