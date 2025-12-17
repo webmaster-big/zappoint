@@ -83,6 +83,7 @@ const BookPackage: React.FC = () => {
   // Date and time selection
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [selectedTime, setSelectedTime] = useState<string>("");
+  const [selectedRoomId, setSelectedRoomId] = useState<number | null>(null);
   const [availableDates, setAvailableDates] = useState<Date[]>([]);
   const [availableTimeSlots, setAvailableTimeSlots] = useState<TimeSlot[]>([]);
   const [loadingTimeSlots, setLoadingTimeSlots] = useState(false);
@@ -458,7 +459,7 @@ const BookPackage: React.FC = () => {
   const resetForm = () => {
     setSelectedAddOns({});
     setSelectedAttractions({});
-    // Room will be auto-assigned by backend
+    setSelectedRoomId(null);
     setPromoCode("");
     setGiftCardCode("");
     setAppliedPromo(null);
@@ -672,7 +673,7 @@ const BookPackage: React.FC = () => {
         customer_id: customerId || undefined,
         location_id: pkg.location_id || 1,
         package_id: pkg.id,
-        // Note: room_id is omitted - backend will automatically assign an available room
+        room_id: selectedRoomId || undefined,
         type: 'package' as const,
         booking_date: selectedDate,
         booking_time: selectedTime,
@@ -709,15 +710,22 @@ const BookPackage: React.FC = () => {
         zip: form.zip,
         country: form.country
       });
+      console.log('\n🔍 === CRITICAL BOOKING FIELDS VALIDATION ===');
+      console.log('✅ room_id:', bookingData.room_id ? `${bookingData.room_id} (from selected time slot)` : '❌ MISSING - This will cause booking to fail!');
+      console.log('✅ booking_time:', bookingData.booking_time || '❌ MISSING');
+      console.log('✅ booking_date:', bookingData.booking_date || '❌ MISSING');
+      console.log('📍 Selected time slot details:', availableTimeSlots.find(slot => slot.start_time === selectedTime));
       console.log('Booking Details:', {
         location_id: bookingData.location_id,
         package_id: bookingData.package_id,
+        room_id: bookingData.room_id,
         type: bookingData.type,
         date: bookingData.booking_date,
         time: bookingData.booking_time,
         participants: bookingData.participants,
         duration: `${bookingData.duration} ${bookingData.duration_unit}`
       });
+      console.log('=========================================\n');
       console.log('Payment Information:', {
         total_amount: bookingData.total_amount,
         amount_paid: bookingData.amount_paid,
@@ -1175,7 +1183,18 @@ const BookPackage: React.FC = () => {
                                   name="timeSelection"
                                   value={slot.start_time}
                                   checked={selectedTime === slot.start_time}
-                                  onChange={() => setSelectedTime(slot.start_time)}
+                                  onChange={() => {
+                                    setSelectedTime(slot.start_time);
+                                    if (slot.room_id) {
+                                      setSelectedRoomId(slot.room_id);
+                                      console.log('🏠 Room auto-assigned from time slot:', {
+                                        time: slot.start_time,
+                                        room_id: slot.room_id,
+                                        room_name: slot.room_name,
+                                        available_rooms_count: slot.available_rooms_count
+                                      });
+                                    }
+                                  }}
                                   className="accent-blue-800"
                                 />
                                 <div className="flex flex-col">

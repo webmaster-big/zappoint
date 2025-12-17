@@ -58,6 +58,7 @@ const OnsiteBooking: React.FC = () => {
   const [selectedPackage, setSelectedPackage] = useState<OnsiteBookingPackage | null>(null);
   const [availableDates, setAvailableDates] = useState<Date[]>([]);
   const [availableTimeSlots, setAvailableTimeSlots] = useState<TimeSlot[]>([]);
+  const [selectedRoomId, setSelectedRoomId] = useState<number | null>(null);
   const [loadingTimeSlots, setLoadingTimeSlots] = useState(false);
   const [loadingPackages, setLoadingPackages] = useState(true);
   const [loadingCustomer, setLoadingCustomer] = useState(false);
@@ -607,6 +608,22 @@ const OnsiteBooking: React.FC = () => {
       if (field === 'email' && value.includes('@')) {
         await searchCustomerByEmail(value);
       }
+    } else if (name === 'time') {
+      // When time is selected, also capture the room_id from the time slot
+      const selectedSlot = availableTimeSlots.find(slot => slot.start_time === value);
+      if (selectedSlot && selectedSlot.room_id) {
+        setSelectedRoomId(selectedSlot.room_id);
+        console.log('🏠 Room auto-assigned from time slot:', {
+          time: value,
+          room_id: selectedSlot.room_id,
+          room_name: selectedSlot.room_name,
+          available_rooms_count: selectedSlot.available_rooms_count
+        });
+      }
+      setBookingData(prev => ({
+        ...prev,
+        [name]: value
+      }));
     } else if (name === 'participants') {
       // Handle participants as a number and enforce min/max constraints
       const numValue = parseInt(value) || 0;
@@ -779,6 +796,7 @@ const OnsiteBooking: React.FC = () => {
     setCardCVV('');
     setUseAuthorizeNet(false);
     setPaymentError('');
+    setSelectedRoomId(null);
     setStep(1);
   };
 
@@ -897,13 +915,14 @@ const OnsiteBooking: React.FC = () => {
       const createdBy = currentUser?.id;
       
       // Create booking data matching Laravel BookingController validation
-      // Note: room_id is omitted - backend will automatically assign an available room
+      // room_id comes from the selected time slot (backend pre-assigns available room per slot)
       const bookingData_request: ExtendedBookingData = {
         guest_name: `${bookingData.customer.firstName} ${bookingData.customer.lastName}`,
         guest_email: bookingData.customer.email,
         guest_phone: bookingData.customer.phone,
         location_id: 1,
         package_id: selectedPackage.id,
+        room_id: selectedRoomId || undefined,
         type: 'package' as const,
         booking_date: bookingData.date,
         booking_time: bookingData.time,
@@ -926,6 +945,12 @@ const OnsiteBooking: React.FC = () => {
       console.log('📤 Sending on-site booking request:', bookingData_request);
       console.log('🎟️ Additional attractions:', additionalAttractions);
       console.log('➕ Additional add-ons:', additionalAddons);
+      console.log('\n🔍 === BOOKING REQUEST VALIDATION ===');
+      console.log('✅ room_id:', bookingData_request.room_id ? `${bookingData_request.room_id} (from selected time slot)` : '❌ MISSING - This will cause booking to fail!');
+      console.log('✅ booking_time:', bookingData_request.booking_time || '❌ MISSING');
+      console.log('✅ booking_date:', bookingData_request.booking_date || '❌ MISSING');
+      console.log('📍 Selected time slot details:', availableTimeSlots.find(slot => slot.start_time === bookingData.time));
+      console.log('================================\n');
       
       // Step 1: Process card payment if using Authorize.Net
       if (bookingData.paymentMethod === 'card' && useAuthorizeNet) {
