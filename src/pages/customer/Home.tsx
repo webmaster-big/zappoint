@@ -282,6 +282,63 @@ const EntertainmentLandingPage = () => {
         .animate-scale-in {
           animation: scale-in 0.3s ease-out;
         }
+        
+        /* Hide scrollbar but keep functionality */
+        .modal-scroll {
+          scrollbar-width: none; /* Firefox */
+          -ms-overflow-style: none; /* IE and Edge */
+        }
+        .modal-scroll::-webkit-scrollbar {
+          display: none; /* Chrome, Safari, Opera */
+        }
+        
+        /* Gradient indicator for more content - Modern & Minimal */
+        .scroll-indicator::after {
+          content: '';
+          position: absolute;
+          bottom: 0;
+          left: 0;
+          right: 0;
+          height: 60px;
+          background: linear-gradient(to top, rgba(255, 255, 255, 0.97) 0%, rgba(255, 255, 255, 0) 100%);
+          pointer-events: none;
+          opacity: 1;
+          transition: opacity 0.2s ease;
+        }
+        
+        .scroll-indicator::before {
+          content: '';
+          position: absolute;
+          bottom: 16px;
+          left: 50%;
+          transform: translateX(-50%);
+          width: 4px;
+          height: 4px;
+          background: rgba(0, 0, 0, 0.3);
+          border-radius: 50%;
+          pointer-events: none;
+          z-index: 10;
+          animation: pulse-scroll 2s ease-in-out infinite;
+          box-shadow: 0 0 0 0 rgba(0, 0, 0, 0.2);
+          transition: opacity 0.2s ease;
+        }
+        
+        @keyframes pulse-scroll {
+          0%, 100% {
+            opacity: 0.4;
+            transform: translateX(-50%) scale(1);
+          }
+          50% {
+            opacity: 0.8;
+            transform: translateX(-50%) scale(1.5);
+          }
+        }
+        
+        .scroll-indicator.scrolled-bottom::after,
+        .scroll-indicator.scrolled-bottom::before {
+          opacity: 0 !important;
+          display: none;
+        }
       `}</style>
       {/* Hero Section */}
       <section className="relative text-white py-12 md:py-24 lg:py-38 overflow-hidden pt-20 md:pt-24" style={{marginTop: '-4rem'}}>
@@ -308,9 +365,9 @@ const EntertainmentLandingPage = () => {
               <span className="text-xs md:text-sm font-medium">Premium Entertainment Experience</span>
             </div>
             
-            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-7xl font-bold mb-4 md:mb-6 bg-gradient-to-r from-white to-blue-100 bg-clip-text text-transparent">
+            <p className="text-3xl sm:text-4xl md:text-5xl lg:text-7xl font-bold mb-4 md:mb-6 text-white">
               Unleash the Fun at ZapZone!
-            </h1>
+            </p>
             <p className="text-sm sm:text-base md:text-lg lg:text-xl mb-6 md:mb-10 text-blue-50 max-w-4xl mx-auto leading-relaxed px-2">
               Discover thrilling attractions and amazing packages across all our locations. 
               From laser tag adventures to unforgettable celebrations - your next adventure awaits!
@@ -561,20 +618,31 @@ const EntertainmentLandingPage = () => {
       {/* Attraction Details Modal */}
       {showAttractionModal && selectedAttraction && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-3 md:p-4 z-50 animate-backdrop-fade" onClick={() => setShowAttractionModal(false)}>
-          <div className="bg-white max-w-md md:max-w-lg w-full max-h-[85vh] md:max-h-[80vh] overflow-y-auto shadow-2xl animate-scale-in" onClick={(e) => e.stopPropagation()}>
+          <div 
+            className="bg-white max-w-md md:max-w-lg w-full max-h-[85vh] md:max-h-[80vh] overflow-y-auto modal-scroll shadow-2xl animate-scale-in relative scroll-indicator" 
+            onClick={(e) => e.stopPropagation()}
+            onScroll={(e) => {
+              const target = e.currentTarget;
+              if (target.scrollTop > 5) {
+                target.classList.add('scrolled-bottom');
+              } else {
+                target.classList.remove('scrolled-bottom');
+              }
+            }}
+          >
             {/* Modal Header */}
             <div className="sticky top-0 z-10">
               <div className="relative h-32 md:h-40 bg-gradient-to-br from-violet-500 to-blue-800">
                 <button
                   type="button"
                   onClick={() => setShowAttractionModal(false)}
-                  className="absolute top-3 right-3 md:top-4 md:right-4 p-2 md:p-2.5 bg-white hover:bg-gray-100 text-gray-900 transition-all shadow-lg z-20 rounded-full cursor-pointer"
+                  className="absolute top-3 right-3 md:top-4 md:right-4 p-1.5 md:p-2 bg-white hover:bg-gray-100 text-gray-900 transition-all shadow-lg z-20 rounded-full cursor-pointer"
                 >
-                  <X size={20} className="md:w-6 md:h-6" />
+                  <X size={16} className="md:w-5 md:h-5" />
                 </button>
                 <div className="absolute inset-0 flex items-center justify-center px-4">
                   <div className="text-center">
-                    <h2 className="text-2xl md:text-4xl font-bold text-white mb-2 line-clamp-2">{selectedAttraction.name}</h2>
+                    <p className="text-2xl md:text-4xl font-bold mb-2 line-clamp-2 text-white block">{selectedAttraction.name}</p>
                   </div>
                 </div>
               </div>
@@ -727,20 +795,31 @@ const EntertainmentLandingPage = () => {
       {/* Package Details Modal */}
       {showPackageModal && selectedPackage && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-3 md:p-4 z-50 animate-backdrop-fade" onClick={() => setShowPackageModal(false)}>
-          <div className="bg-white max-w-md md:max-w-lg w-full max-h-[85vh] md:max-h-[80vh] overflow-y-auto shadow-2xl animate-scale-in" onClick={(e) => e.stopPropagation()}>
+          <div 
+            className="bg-white max-w-md md:max-w-lg w-full max-h-[85vh] md:max-h-[80vh] overflow-y-auto modal-scroll shadow-2xl animate-scale-in relative scroll-indicator" 
+            onClick={(e) => e.stopPropagation()}
+            onScroll={(e) => {
+              const target = e.currentTarget;
+              if (target.scrollTop > 5) {
+                target.classList.add('scrolled-bottom');
+              } else {
+                target.classList.remove('scrolled-bottom');
+              }
+            }}
+          >
             {/* Modal Header */}
             <div className="sticky top-0 z-10">
               <div className="relative h-32 md:h-40 bg-gradient-to-br from-blue-800 to-violet-500">
                 <button
                   type="button"
                   onClick={() => setShowPackageModal(false)}
-                  className="absolute top-3 right-3 md:top-4 md:right-4 p-2 md:p-2.5 bg-white hover:bg-gray-100 text-gray-900 transition-all shadow-lg z-20 rounded-full cursor-pointer"
+                  className="absolute top-3 right-3 md:top-4 md:right-4 p-1.5 md:p-2 bg-white hover:bg-gray-100 text-gray-900 transition-all shadow-lg z-20 rounded-full cursor-pointer"
                 >
-                  <X size={20} className="md:w-6 md:h-6" />
+                  <X size={16} className="md:w-5 md:h-5" />
                 </button>
                 <div className="absolute inset-0 flex items-center justify-center px-4">
                   <div className="text-center">
-                    <h2 className="text-2xl md:text-4xl font-bold text-white mb-2 line-clamp-2">{selectedPackage.name}</h2>
+                    <p className="text-2xl md:text-4xl font-bold mb-2 line-clamp-2 text-white block">{selectedPackage.name}</p>
                   </div>
                 </div>
               </div>
@@ -994,7 +1073,7 @@ const EntertainmentLandingPage = () => {
             
             {/* Locations */}
             <div className="md:col-span-2 lg:ps-20 text-center md:text-left">
-              <h4 className="font-bold mb-4 md:mb-5 text-white text-base md:text-lg uppercase tracking-wider">Locations</h4>
+              <p className="font-bold mb-4 md:mb-5 text-white text-base md:text-lg uppercase tracking-wider">Locations</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-sm md:text-base text-blue-200">
                 <a href="https://bowlerolanesbc.com/" target="_blank" rel="noopener noreferrer" className="block hover:text-white transition-colors duration-200">Battle Creek</a>
                 <a href="https://brighton.zap-zone.com/" target="_blank" rel="noopener noreferrer" className="block hover:text-white transition-colors duration-200">Brighton</a>
@@ -1011,7 +1090,7 @@ const EntertainmentLandingPage = () => {
             
             {/* Support */}
             <div className="text-center md:text-left">
-              <h4 className="font-bold mb-4 md:mb-5 text-white text-base md:text-lg uppercase tracking-wider">Support</h4>
+              <p className="font-bold mb-4 md:mb-5 text-white text-base md:text-lg uppercase tracking-wider">Support</p>
               <div className="space-y-2.5 text-sm md:text-base text-blue-200 mb-6">
                 <a href="https://zap-zone.com/contact-us/" target="_blank" rel="noopener noreferrer" className="block hover:text-white transition-colors duration-200">Contact Us</a>
                 <a href="https://zap-zone.com/eventcoordinator/" target="_blank" rel="noopener noreferrer" className="block hover:text-white transition-colors duration-200">Event Coordinator</a>
