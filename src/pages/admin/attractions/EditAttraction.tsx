@@ -9,7 +9,7 @@ import Toast from '../../../components/ui/Toast';
 import { ASSET_URL, getStoredUser } from '../../../utils/storage';
 import { categoryService } from '../../../services';
 import type { Category } from '../../../services/CategoryService';
-import { Plus, Trash2, Info, Tag, Calendar } from 'lucide-react';
+import { Plus, Trash2, Info, Tag, Calendar, Clock } from 'lucide-react';
 
 const EditAttraction = () => {
   const navigate = useNavigate();
@@ -44,6 +44,13 @@ const EditAttraction = () => {
     images: [],
     bookingLink: '',
     embedCode: '',
+    availability_schedules: [
+      {
+        days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'],
+        start_time: '09:00',
+        end_time: '17:00'
+      }
+    ],
     availability: {
       monday: true,
       tuesday: true,
@@ -88,6 +95,13 @@ const EditAttraction = () => {
           images: attraction.image ? (Array.isArray(attraction.image) ? attraction.image : [attraction.image]) : [],
           bookingLink: '',
           embedCode: '',
+          availability_schedules: (attraction as any).availability_schedules || [
+            {
+              days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'],
+              start_time: '09:00',
+              end_time: '17:00'
+            }
+          ],
           availability: typeof attraction.availability === 'object' ? {
             monday: (attraction.availability as Record<string, boolean>).monday ?? true,
             tuesday: (attraction.availability as Record<string, boolean>).tuesday ?? true,
@@ -148,14 +162,46 @@ const EditAttraction = () => {
     }));
   };
 
-  const handleAvailabilityChange = (day: keyof CreateAttractionsFormData['availability']) => {
+  const addSchedule = () => {
     setFormData(prev => ({
       ...prev,
-      availability: {
-        ...prev.availability,
-        [day]: !prev.availability[day]
-      }
+      availability_schedules: [
+        ...prev.availability_schedules,
+        {
+          days: [],
+          start_time: '09:00',
+          end_time: '17:00'
+        }
+      ]
     }));
+  };
+
+  const removeSchedule = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      availability_schedules: prev.availability_schedules.filter((_, i) => i !== index)
+    }));
+  };
+
+  const toggleScheduleDay = (scheduleIndex: number, day: string) => {
+    setFormData(prev => {
+      const newSchedules = [...prev.availability_schedules];
+      const schedule = newSchedules[scheduleIndex];
+      if (schedule.days.includes(day)) {
+        schedule.days = schedule.days.filter(d => d !== day);
+      } else {
+        schedule.days = [...schedule.days, day];
+      }
+      return { ...prev, availability_schedules: newSchedules };
+    });
+  };
+
+  const updateScheduleTime = (scheduleIndex: number, field: 'start_time' | 'end_time', value: string) => {
+    setFormData(prev => {
+      const newSchedules = [...prev.availability_schedules];
+      newSchedules[scheduleIndex][field] = value;
+      return { ...prev, availability_schedules: newSchedules };
+    });
   };
 
   const handleImageUpload = async (e: ChangeEvent<HTMLInputElement>) => {
@@ -270,6 +316,7 @@ const EditAttraction = () => {
         category: formData.category,
         duration: formData.duration ? Number(formData.duration) : undefined,
         duration_unit: formData.durationUnit as 'hours' | 'minutes',
+        availability_schedules: formData.availability_schedules,
         availability: formData.availability,
         image: formData.images.length > 0 ? formData.images : undefined, // Send all images as array
         is_active: true,
@@ -361,15 +408,22 @@ const EditAttraction = () => {
           </div>
           
           <div className="pt-2 border-t border-gray-100">
-            <h4 className="font-medium text-gray-800 mb-2">Available Days:</h4>
-            <div className="flex flex-wrap gap-1">
-              {Object.entries(formData.availability)
-                .filter(([, v]) => v)
-                .map(([day]) => (
-                  <span key={day} className={`bg-${themeColor}-100 text-${fullColor} px-2 py-1 rounded text-xs`}>
-                    {day.slice(0, 3)}
-                  </span>
-                ))}
+            <h4 className="font-medium text-gray-800 mb-2">Availability Schedules:</h4>
+            <div className="space-y-2">
+              {formData.availability_schedules.map((schedule, index) => (
+                <div key={index} className="text-sm">
+                  <div className="flex flex-wrap gap-1 mb-1">
+                    {schedule.days.map(day => (
+                      <span key={day} className={`bg-${themeColor}-100 text-${fullColor} px-2 py-1 rounded text-xs`}>
+                        {day.slice(0, 3)}
+                      </span>
+                    ))}
+                  </div>
+                  <div className="text-xs text-gray-600">
+                    {schedule.start_time} - {schedule.end_time}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
@@ -593,28 +647,79 @@ const EditAttraction = () => {
             {/* Availability Section */}
             <div>
               <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2">
-                <Calendar className="w-5 h-5 text-primary" /> Availability
+                <Calendar className="w-5 h-5 text-primary" /> Availability Schedules
               </h3>
-              <div className="space-y-5">
-                <div>
-                  <label className="block font-semibold mb-2 text-base text-neutral-800">Available Days</label>
-                  <div className="flex flex-wrap gap-2">
-                    {daysOfWeek.map(day => (
-                      <button
-                        key={day.key}
-                        type="button"
-                        onClick={() => handleAvailabilityChange(day.key)}
-                        className={`px-4 py-2 rounded-md text-sm font-semibold transition-all ${
-                          formData.availability[day.key] 
-                            ? `bg-${fullColor} text-white shadow-sm` 
-                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                        }`}
-                      >
-                        {day.label}
-                      </button>
-                    ))}
+              <div className="space-y-4">
+                {formData.availability_schedules.map((schedule, index) => (
+                  <div key={index} className="border border-gray-200 rounded-lg p-4 space-y-4">
+                    <div className="flex justify-between items-center">
+                      <h4 className="font-semibold text-neutral-800">Schedule {index + 1}</h4>
+                      {formData.availability_schedules.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeSchedule(index)}
+                          className="text-red-600 hover:bg-red-50 p-2 rounded-md transition"
+                          title="Remove schedule"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                    
+                    <div>
+                      <label className="block font-medium mb-2 text-sm text-neutral-700">Days</label>
+                      <div className="flex flex-wrap gap-2">
+                        {daysOfWeek.map(day => (
+                          <button
+                            key={day.key}
+                            type="button"
+                            onClick={() => toggleScheduleDay(index, day.key)}
+                            className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                              schedule.days.includes(day.key)
+                                ? `bg-${fullColor} text-white shadow-sm` 
+                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            }`}
+                          >
+                            {day.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block font-medium mb-2 text-sm text-neutral-700 flex items-center gap-1">
+                          <Clock className="w-4 h-4" /> Start Time
+                        </label>
+                        <input
+                          type="time"
+                          value={schedule.start_time}
+                          onChange={(e) => updateScheduleTime(index, 'start_time', e.target.value)}
+                          className="w-full rounded-md border border-gray-200 px-3 py-2 focus:ring-2 focus:ring-primary focus:border-primary bg-white text-neutral-900"
+                        />
+                      </div>
+                      <div>
+                        <label className="block font-medium mb-2 text-sm text-neutral-700 flex items-center gap-1">
+                          <Clock className="w-4 h-4" /> End Time
+                        </label>
+                        <input
+                          type="time"
+                          value={schedule.end_time}
+                          onChange={(e) => updateScheduleTime(index, 'end_time', e.target.value)}
+                          className="w-full rounded-md border border-gray-200 px-3 py-2 focus:ring-2 focus:ring-primary focus:border-primary bg-white text-neutral-900"
+                        />
+                      </div>
+                    </div>
                   </div>
-                </div>
+                ))}
+                
+                <button
+                  type="button"
+                  onClick={addSchedule}
+                  className={`w-full px-4 py-2 border-2 border-dashed border-gray-300 rounded-md text-sm font-medium text-gray-600 hover:border-${themeColor}-500 hover:text-${fullColor} transition-all flex items-center justify-center gap-2`}
+                >
+                  <Plus className="w-4 h-4" /> Add Another Schedule
+                </button>
               </div>
             </div>
 

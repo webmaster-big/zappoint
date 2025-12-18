@@ -14,7 +14,6 @@ import Packages from "./pages/admin/packages/Packages"
 import BookPackage from "./pages/admin/bookings/BookPackage"
 import GiftCard from "./pages/admin/packages/GiftCard"
 import Promo from "./pages/admin/packages/Promo"
-import EmbedBookingRoute from "./components/embed/EmbedBookingRoute";
 import Bookings from "./pages/admin/bookings/Bookings"
 import EditBooking from "./pages/admin/bookings/EditBooking"
 import CalendarView from "./pages/admin/bookings/CalendarView"
@@ -78,7 +77,6 @@ function App() {
         <Route path="/home" element={<Home />} />
         <Route path="/book/package/:location/:slug" element={<BookPackage />} />
         <Route path="/purchase/attraction/:location/:slug" element={<PurchaseAttraction />} />
-        <Route path="/embed/booking/:packageId" element={<EmbedBookingRoute />} />
         
         {/* Customer Routes */}
         <Route element={<CustomerLayout />}>

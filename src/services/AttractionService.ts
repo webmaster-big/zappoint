@@ -58,6 +58,12 @@ export interface AttractionFilters {
   user_id?: number;
 }
 
+export interface AttractionAvailabilitySchedule {
+  days: string[];
+  start_time: string;
+  end_time: string;
+}
+
 export interface CreateAttractionData {
   location_id: number;
   name: string;
@@ -70,6 +76,7 @@ export interface CreateAttractionData {
   duration?: number;
   duration_unit?: 'hours' | 'minutes';
   availability?: Record<string, unknown>;
+  availability_schedules?: AttractionAvailabilitySchedule[];
   image?: string | string[]; // Support both single image and array
   rating?: number;
   min_age?: number;

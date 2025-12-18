@@ -1,5 +1,11 @@
 // Types for: src/pages/admin/attractions/CreateAttractions.tsx
 
+export interface AttractionAvailabilitySchedule {
+  days: string[];
+  start_time: string;
+  end_time: string;
+}
+
 export interface CreateAttractionsFormData {
   name: string;
   description: string;
@@ -12,7 +18,9 @@ export interface CreateAttractionsFormData {
   images: string[];
   bookingLink: string;
   embedCode: string;
-  availability: {
+  availability_schedules: AttractionAvailabilitySchedule[];
+  // Legacy availability structure (for backward compatibility)
+  availability?: {
     monday: boolean;
     tuesday: boolean;
     wednesday: boolean;
