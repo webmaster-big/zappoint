@@ -7,7 +7,12 @@ import {
   Star,
   Shield,
   Zap,
-  ShoppingCart
+  ShoppingCart,
+  ChevronLeft,
+  ChevronRight,
+  Tag,
+  Clock,
+  DollarSign
 } from 'lucide-react';
 import type { PurchaseAttractionAttraction, PurchaseAttractionCustomerInfo } from '../../../types/PurchaseAttraction.types';
 import { attractionService, type Attraction } from '../../../services/AttractionService';
@@ -107,6 +112,7 @@ const PurchaseAttraction = () => {
   const [showCountrySuggestions, setShowCountrySuggestions] = useState(false);
   const [countryDebounceTimer, setCountryDebounceTimer] = useState<NodeJS.Timeout | null>(null);
   const [showAccountModal, setShowAccountModal] = useState(false);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
   // Show account modal for non-logged-in users (optional, doesn't block access)
   useEffect(() => {
@@ -1265,29 +1271,128 @@ const PurchaseAttraction = () => {
           {/* Right Column - Attraction Summary */}
           <div className="lg:col-span-1">
             <div className="bg-white shadow-sm rounded-lg overflow-hidden lg:sticky lg:top-8">
+              {/* Image Carousel */}
               {attraction.images && attraction.images.length > 0 && (
-                <img 
-                  src={attraction.images[0]} 
-                  alt={attraction.name}
-                  className="w-full h-48 object-cover"
-                />
+                <div className="relative group">
+                  <div className="relative h-64 overflow-hidden bg-gray-100">
+                    <img 
+                      src={attraction.images[currentImageIndex]} 
+                      alt={`${attraction.name} - Image ${currentImageIndex + 1}`}
+                      className="w-full h-full object-cover transition-opacity duration-300"
+                    />
+                    
+                    {/* Navigation Arrows */}
+                    {attraction.images.length > 1 && (
+                      <>
+                        <button
+                          onClick={() => setCurrentImageIndex((prev) => 
+                            prev === 0 ? attraction.images!.length - 1 : prev - 1
+                          )}
+                          className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-200"
+                          aria-label="Previous image"
+                        >
+                          <ChevronLeft className="h-5 w-5" />
+                        </button>
+                        <button
+                          onClick={() => setCurrentImageIndex((prev) => 
+                            prev === attraction.images!.length - 1 ? 0 : prev + 1
+                          )}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-200"
+                          aria-label="Next image"
+                        >
+                          <ChevronRight className="h-5 w-5" />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                  
+                  {/* Image Indicators */}
+                  {attraction.images.length > 1 && (
+                    <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
+                      {attraction.images.map((_, index) => (
+                        <button
+                          key={index}
+                          onClick={() => setCurrentImageIndex(index)}
+                          className={`h-2 rounded-full transition-all duration-200 ${
+                            index === currentImageIndex 
+                              ? 'w-6 bg-white' 
+                              : 'w-2 bg-white/50 hover:bg-white/75'
+                          }`}
+                          aria-label={`Go to image ${index + 1}`}
+                        />
+                      ))}
+                    </div>
+                  )}
+                  
+                  {/* Image Counter */}
+                  {attraction.images.length > 1 && (
+                    <div className="absolute top-3 right-3 bg-black/60 text-white text-xs px-2.5 py-1 rounded-full">
+                      {currentImageIndex + 1} / {attraction.images.length}
+                    </div>
+                  )}
+                </div>
               )}
               
               <div className="p-4 md:p-6">
-                <h2 className="text-lg md:text-xl font-bold text-gray-900 mb-2">{attraction.name}</h2>
-                <p className="text-sm md:text-base text-gray-600 mb-4">{attraction.description}</p>
+                {/* Attraction Header */}
+                <div className="mb-4">
+                  <h2 className="text-lg md:text-xl font-bold text-gray-900 mb-1">{attraction.name}</h2>
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                      <Tag className="h-3 w-3 mr-1" />
+                      {attraction.category}
+                    </span>
+                  </div>
+                  <p className="text-sm md:text-base text-gray-600 leading-relaxed">{attraction.description}</p>
+                </div>
                 
-                <div className="space-y-3 mb-6">
-                  <div className="flex items-center">
-                    <MapPin className="h-5 w-5 text-gray-400 mr-2" />
-                    <span className="text-sm text-gray-800">{attraction.location}</span>
+                {/* Attraction Details Grid */}
+                <div className="grid grid-cols-2 gap-3 mb-6 pb-4 border-b border-gray-200">
+                  <div className="flex items-start gap-2">
+                    <div className="p-2 bg-blue-50 rounded-lg">
+                      <MapPin className="h-4 w-4 text-blue-600" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Location</p>
+                      <p className="text-sm font-medium text-gray-900">{attraction.location}</p>
+                    </div>
                   </div>
                   
-                  <div className="flex items-center">
-                    <Users className="h-5 w-5 text-gray-400 mr-2" />
-                    <span className="text-sm text-gray-800">
-                      Duration: {attraction.duration === '0' || !attraction.duration ? 'Unlimited' : `${attraction.duration} ${attraction.durationUnit}`}
-                    </span>
+                  <div className="flex items-start gap-2">
+                    <div className="p-2 bg-blue-50 rounded-lg">
+                      <Clock className="h-4 w-4 text-blue-600" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Duration</p>
+                      <p className="text-sm font-medium text-gray-900">
+                        {attraction.duration === '0' || !attraction.duration ? 'Unlimited' : `${attraction.duration} ${attraction.durationUnit}`}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-start gap-2">
+                    <div className="p-2 bg-blue-50 rounded-lg">
+                      <Users className="h-4 w-4 text-blue-600" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Capacity</p>
+                      <p className="text-sm font-medium text-gray-900">Up to {attraction.maxCapacity}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-start gap-2">
+                    <div className="p-2 bg-blue-50 rounded-lg">
+                      <DollarSign className="h-4 w-4 text-blue-600" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Pricing</p>
+                      <p className="text-sm font-medium text-gray-900">
+                        {attraction.pricingType === 'per_person' ? 'Per Person' : 
+                         attraction.pricingType === 'per_group' ? 'Per Group' :
+                         attraction.pricingType === 'per_hour' ? 'Per Hour' :
+                         attraction.pricingType === 'per_game' ? 'Per Game' : 'Fixed'}
+                      </p>
+                    </div>
                   </div>
                 </div>
                 
