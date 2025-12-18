@@ -20,6 +20,7 @@ import type {
     CreatePackagePromo,
     CreatePackageGiftCard
 } from '../../../types/createPackage.types';
+import type { AvailabilitySchedule } from '../../../services/PackageService';
 import { formatTimeTo12Hour } from '../../../utils/storage';
 
 const EditPackage: React.FC = () => {
@@ -59,10 +60,11 @@ const EditPackage: React.FC = () => {
         availableDays: [] as string[],
         availableWeekDays: [] as string[],
         availableMonthDays: [] as string[],
+        timeSlotStart: "09:00",
+        timeSlotEnd: "17:00",
+        timeSlotInterval: "30",
+        availability_schedules: [] as AvailabilitySchedule[],
         image: "" as string, // base64 or data url
-        timeSlotStart: "09:00", // Start time for available time slots
-        timeSlotEnd: "17:00", // End time for available time slots
-        timeSlotInterval: "30", // Interval between time slots in minutes
         partialPaymentPercentage: "0", // Percentage for partial payments
         partialPaymentFixed: "0", // Fixed amount for partial payments
         hasGuestOfHonor: false,
@@ -215,10 +217,11 @@ const EditPackage: React.FC = () => {
                     availableDays: availableDays,
                     availableWeekDays: availableWeekDays,
                     availableMonthDays: availableMonthDays,
-                    image: pkg.image || "",
                     timeSlotStart: formatTime(pkg.time_slot_start || "09:00"),
                     timeSlotEnd: formatTime(pkg.time_slot_end || "17:00"),
                     timeSlotInterval: String(pkg.time_slot_interval || "30"),
+                    availability_schedules: pkg.availability_schedules || [],
+                    image: pkg.image || "",
                     partialPaymentPercentage: String(pkg.partial_payment_percentage || "0"),
                     partialPaymentFixed: String(pkg.partial_payment_fixed || "0"),
                     hasGuestOfHonor: pkg.has_guest_of_honor || false,
@@ -311,6 +314,30 @@ const EditPackage: React.FC = () => {
                 return { ...prev, [name]: [...arr, value] };
             }
         });
+    };
+
+    // Availability Schedule Management
+    const addNewSchedule = () => {
+        const newSchedule: AvailabilitySchedule = {
+            availability_type: 'weekly',
+            day_configuration: [],
+            time_slot_start: '09:00',
+            time_slot_end: '17:00',
+            time_slot_interval: 30,
+            priority: form.availability_schedules.length,
+            is_active: true
+        };
+        setForm(prev => ({
+            ...prev,
+            availability_schedules: [...prev.availability_schedules, newSchedule]
+        }));
+    };
+
+    const removeSchedule = (index: number) => {
+        setForm(prev => ({
+            ...prev,
+            availability_schedules: prev.availability_schedules.filter((_, i) => i !== index)
+        }));
     };
 
     // Handle availability selection
@@ -551,6 +578,20 @@ const EditPackage: React.FC = () => {
             const response = await packageService.updatePackage(parseInt(id), updateData);
             console.log("Update response:", response);
             
+            // Update availability schedules separately
+            if (form.availability_schedules.length > 0) {
+                try {
+                    await packageService.updateAvailabilitySchedules(parseInt(id), {
+                        schedules: form.availability_schedules
+                    });
+                } catch (scheduleError) {
+                    console.error('Error updating availability schedules:', scheduleError);
+                    showToast("Package updated but failed to update availability schedules", "error");
+                    setSubmitting(false);
+                    return;
+                }
+            }
+            
             showToast("Package updated successfully!", "success");
             
             // Navigate back after a short delay
@@ -575,23 +616,8 @@ const EditPackage: React.FC = () => {
 
     // Format availability for display
     const formatAvailability = () => {
-        if (form.availabilityType === "daily") {
-            if (form.availableDays.length === 0) return "No days selected";
-            if (form.availableDays.length === 7) return "Every day";
-            return form.availableDays.map(day => day.substring(0, 3)).join(", ");
-        } else if (form.availabilityType === "weekly") {
-            if (form.availableWeekDays.length === 0) return "No days selected";
-            return form.availableWeekDays.map(day => `Every ${day}`).join(", ");
-        } else if (form.availabilityType === "monthly") {
-            if (form.availableMonthDays.length === 0) return "No days selected";
-            return form.availableMonthDays.map(dayWeek => {
-                const [day, week] = dayWeek.split('-');
-                const weekSuffix = week === "1" ? "st" : week === "2" ? "nd" : week === "3" ? "rd" : week === "4" ? "th" : "last";
-                const weekText = week === "last" ? "Last week" : `${week}${weekSuffix} week`;
-                return `${day.substring(0, 3)} (${weekText})`;
-            }).join(", ");
-        }
-        return "Not specified";
+        if (form.availability_schedules.length === 0) return "No schedules configured";
+        return `${form.availability_schedules.length} schedule(s) configured`;
     };
 
     // Format duration for display
@@ -602,17 +628,21 @@ const EditPackage: React.FC = () => {
 
     // Generate time slots based on backend logic
     const generateTimeSlots = () => {
-        if (!form.duration || !form.timeSlotStart || !form.timeSlotEnd || !form.timeSlotInterval) {
+        if (form.availability_schedules.length === 0 || !form.duration) {
             return [];
         }
 
+        // Use first schedule for preview
+        const schedule = form.availability_schedules[0];
+        if (!schedule) return [];
+
         const slots = [];
         const slotDuration = form.durationUnit === 'hours' ? parseInt(form.duration) * 60 : parseInt(form.duration);
-        const interval = parseInt(form.timeSlotInterval);
+        const interval = schedule.time_slot_interval;
         
         // Parse start and end times
-        const [startHour, startMin] = form.timeSlotStart.split(':').map(Number);
-        const [endHour, endMin] = form.timeSlotEnd.split(':').map(Number);
+        const [startHour, startMin] = schedule.time_slot_start.split(':').map(Number);
+        const [endHour, endMin] = schedule.time_slot_end.split(':').map(Number);
         
         let currentMinutes = startHour * 60 + startMin;
         const endMinutes = endHour * 60 + endMin;
@@ -915,11 +945,61 @@ const EditPackage: React.FC = () => {
                         {/* Availability Section */}
                         <div>
                             <h3 className={`text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2`}>
-                                <Calendar className={`w-5 h-5 text-${themeColor}-600`} /> Availability
+                                <Calendar className={`w-5 h-5 text-${themeColor}-600`} /> Availability Schedules
                             </h3>
                             <div className="space-y-4">
+                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                    <p className="text-sm text-blue-900 mb-2">
+                                        <strong>{form.availability_schedules.length}</strong> availability schedule(s) configured for this package.
+                                    </p>
+                                    <p className="text-xs text-blue-700">
+                                        Availability schedules are managed through the package creation system and define when this package can be booked with different time configurations.
+                                    </p>
+                                </div>
+                                
+                                {form.availability_schedules.length > 0 && (
+                                    <div className="space-y-2">
+                                        {form.availability_schedules.map((schedule, idx) => (
+                                            <div key={idx} className="border border-gray-200 rounded-lg p-3">
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <span className={`px-2 py-1 rounded text-xs font-medium bg-${themeColor}-100 text-${fullColor}`}>
+                                                        {schedule.availability_type}
+                                                    </span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => removeSchedule(idx)}
+                                                        className="text-red-500 hover:text-red-700"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                                <div className="text-sm text-gray-700">
+                                                    <div><strong>Days:</strong> {schedule.day_configuration?.join(', ') || 'All days'}</div>
+                                                    <div><strong>Time:</strong> {schedule.time_slot_start} - {schedule.time_slot_end}</div>
+                                                    <div><strong>Interval:</strong> {schedule.time_slot_interval} min</div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                                
+                                <button
+                                    type="button"
+                                    onClick={addNewSchedule}
+                                    className={`w-full px-4 py-3 rounded-lg border-2 border-dashed border-${themeColor}-300 text-${fullColor} hover:bg-${themeColor}-50 transition-colors flex items-center justify-center gap-2`}
+                                >
+                                    <Plus className="w-5 h-5" />
+                                    Add New Schedule
+                                </button>
+                                
+                                <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                                    <p className="text-xs text-gray-600">
+                                        Note: For detailed schedule configuration with full UI controls, please recreate the package or contact support.
+                                    </p>
+                                </div>
+                                
                                 <div>
-                                    <label className="block font-semibold mb-2 text-base text-neutral-800">Schedule Type</label>
+                                    <label className="block font-semibold mb-2 text-base text-neutral-800">Legacy Schedule Type (Deprecated)</label>
                                     <div className="flex flex-wrap gap-4">
                                         <label className="flex items-center gap-2">
                                             <input
