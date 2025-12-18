@@ -96,6 +96,16 @@ export interface PackageFilters {
   user_id?: number;
 }
 
+export interface AvailabilitySchedule {
+  availability_type: 'daily' | 'weekly' | 'monthly';
+  day_configuration: string[] | null;
+  time_slot_start: string;
+  time_slot_end: string;
+  time_slot_interval: number;
+  priority?: number;
+  is_active?: boolean;
+}
+
 export interface CreatePackageData {
   location_id: number;
   name: string;
@@ -105,18 +115,29 @@ export interface CreatePackageData {
   price: number;
   price_per_additional?: number;
   max_participants: number;
+  min_participants?: number;
   duration: number;
   duration_unit: 'hours' | 'minutes';
   price_per_additional_30min?: number;
   price_per_additional_1hr?: number;
-  availability_type: 'daily' | 'weekly' | 'monthly';
+  // Old format (deprecated but kept for backward compatibility)
+  availability_type?: 'daily' | 'weekly' | 'monthly';
   available_days?: string[] | number[];
   available_week_days?: string[] | number[];
   available_month_days?: string[] | number[];
+  // New format
+  availability_schedules?: AvailabilitySchedule[];
   image?: string;
+  status?: 'active' | 'inactive';
   is_active?: boolean;
   partial_payment_percentage?: number;
   partial_payment_fixed?: number;
+  has_guest_of_honor?: boolean;
+  attraction_ids?: (number | undefined)[];
+  room_ids?: (number | undefined)[];
+  addon_ids?: (number | undefined)[];
+  promo_ids?: (number | undefined)[];
+  gift_card_ids?: (number | undefined)[];
 }
 
 export type UpdatePackageData = Partial<CreatePackageData>;
@@ -271,6 +292,41 @@ class PackageService {
     }>;
   }> {
     const response = await api.post('/packages/bulk-import', { packages });
+    return response.data;
+  }
+
+  /**
+   * Get availability schedules for a package
+   */
+  async getAvailabilitySchedules(packageId: number): Promise<ApiResponse<AvailabilitySchedule[]>> {
+    const response = await api.get(`/packages/${packageId}/availability-schedules`);
+    return response.data;
+  }
+
+  /**
+   * Create a single availability schedule for a package
+   */
+  async storeAvailabilitySchedule(packageId: number, schedule: AvailabilitySchedule): Promise<ApiResponse<AvailabilitySchedule>> {
+    const response = await api.post(`/packages/${packageId}/availability-schedules`, schedule);
+    return response.data;
+  }
+
+  /**
+   * Update availability schedules for a package (bulk replace)
+   */
+  async updateAvailabilitySchedules(
+    packageId: number,
+    data: { schedules: AvailabilitySchedule[] }
+  ): Promise<ApiResponse<AvailabilitySchedule[]>> {
+    const response = await api.put(`/packages/${packageId}/availability-schedules`, data);
+    return response.data;
+  }
+
+  /**
+   * Delete a specific availability schedule
+   */
+  async deleteAvailabilitySchedule(packageId: number, scheduleId: number): Promise<ApiResponse<null>> {
+    const response = await api.delete(`/packages/${packageId}/availability-schedules/${scheduleId}`);
     return response.data;
   }
 }

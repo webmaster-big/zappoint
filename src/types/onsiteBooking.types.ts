@@ -23,6 +23,20 @@ export interface OnsiteBookingAttraction {
   image?: string;
 }
 
+export interface OnsiteBookingAvailabilitySchedule {
+  id: number;
+  package_id: number;
+  availability_type: "daily" | "weekly" | "monthly";
+  day_configuration: string[] | null;
+  time_slot_start: string;
+  time_slot_end: string;
+  time_slot_interval: number;
+  priority: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface OnsiteBookingPackage {
   id: number;
   name: string;
@@ -33,10 +47,11 @@ export interface OnsiteBookingPackage {
   maxParticipants: number;
   category: string;
   features: string;
-  availabilityType: string;
-  availableDays: string[];
-  availableWeekDays: string[];
-  availableMonthDays: string[];
+  availabilityType?: string;
+  availableDays?: string[];
+  availableWeekDays?: string[];
+  availableMonthDays?: string[];
+  availability_schedules?: OnsiteBookingAvailabilitySchedule[];
   attractions: OnsiteBookingAttraction[];
   addOns: OnsiteBookingAddOn[];
   giftCards: OnsiteBookingGiftCard[];

@@ -49,6 +49,20 @@ export interface BookPackagePromoOrGiftCard {
   discount_value?: string;
 }
 
+export interface BookPackageAvailabilitySchedule {
+  id: number;
+  package_id: number;
+  availability_type: "daily" | "weekly" | "monthly";
+  day_configuration: string[] | null;
+  time_slot_start: string;
+  time_slot_end: string;
+  time_slot_interval: number;
+  priority: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface BookPackagePackage {
   id: number;
   location_id: number;
@@ -64,13 +78,14 @@ export interface BookPackagePackage {
   duration_unit: "hours" | "minutes";
   price_per_additional_30min?: string | null;
   price_per_additional_1hr?: string | null;
-  availability_type: "daily" | "weekly" | "monthly";
-  available_days: string[];
-  available_week_days: string[];
-  available_month_days: string[];
-  time_slot_start: string;
-  time_slot_end: string;
-  time_slot_interval: number;
+  availability_type?: "daily" | "weekly" | "monthly";
+  available_days?: string[];
+  available_week_days?: string[];
+  available_month_days?: string[];
+  time_slot_start?: string;
+  time_slot_end?: string;
+  time_slot_interval?: number;
+  availability_schedules?: BookPackageAvailabilitySchedule[];
   image?: string;
   is_active: boolean;
   created_at: string;

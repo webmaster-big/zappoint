@@ -190,6 +190,7 @@ const OnsiteBooking: React.FC = () => {
             availableDays: pkg.available_days || [],
             availableWeekDays: pkg.available_week_days || [],
             availableMonthDays: pkg.available_month_days || [],
+            availability_schedules: pkg.availability_schedules || [],
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             attractions: pkg.attractions?.map((a: any) => ({
               id: a.id.toString(),
@@ -321,6 +322,9 @@ const OnsiteBooking: React.FC = () => {
       return;
     }
     
+    console.log('📅 Calculating available dates for package:', selectedPackage.name);
+    console.log('📅 Availability schedules:', selectedPackage.availability_schedules);
+    
     const today = new Date();
     const dates: Date[] = [];
     
@@ -329,65 +333,60 @@ const OnsiteBooking: React.FC = () => {
       const date = new Date();
       date.setDate(today.getDate() + i);
       
-      // Check if date matches package availability
+      // Check if date matches any availability schedule
       let isAvailable = false;
       
-      if (selectedPackage.availabilityType === "daily") {
-        // Daily: Check if the day of week is in available_days
-        const dayName = date.toLocaleDateString('en-US', { weekday: 'long' });
-        isAvailable = selectedPackage.availableDays.includes(dayName);
-      } 
-      else if (selectedPackage.availabilityType === "weekly") {
-        // Weekly: Check if the day of week is in available_week_days (every week)
-        const dayName = date.toLocaleDateString('en-US', { weekday: 'long' });
-        isAvailable = selectedPackage.availableWeekDays.includes(dayName);
-      } 
-      else if (selectedPackage.availabilityType === "monthly") {
-        // Monthly: Check patterns like "Sunday-last", "Monday-1st", "15", etc.
-        const dayName = date.toLocaleDateString('en-US', { weekday: 'long' });
-        const weekOfMonth = getWeekOfMonth(date);
-        const isInLastWeek = isLastWeekOfMonth(date);
-        const dayOfMonth = date.getDate();
-        
-        for (const pattern of selectedPackage.availableMonthDays) {
-          // Check for specific day number (e.g., "15", "1", "30")
-          if (!isNaN(Number(pattern)) && dayOfMonth === Number(pattern)) {
+      if (selectedPackage.availability_schedules && selectedPackage.availability_schedules.length > 0) {
+        for (const schedule of selectedPackage.availability_schedules) {
+          if (!schedule.is_active) continue;
+          
+          if (schedule.availability_type === "daily") {
             isAvailable = true;
             break;
-          }
-          
-          // Check for day-week patterns (e.g., "Sunday-last", "Monday-1st")
-          if (pattern.includes('-')) {
-            const [patternDay, patternWeek] = pattern.split('-');
+          } 
+          else if (schedule.availability_type === "weekly") {
+            const dayName = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][date.getDay()];
+            if (i < 7) {
+              console.log(`📅 Checking ${date.toDateString()} (${dayName}) against schedule:`, schedule.day_configuration);
+            }
+            if (schedule.day_configuration && schedule.day_configuration.includes(dayName)) {
+              isAvailable = true;
+              break;
+            }
+          } 
+          else if (schedule.availability_type === "monthly") {
+            // For monthly, day_configuration contains patterns like "sunday-first", "monday-last", etc.
+            const dayName = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][date.getDay()];
+            const weekOfMonth = getWeekOfMonth(date);
+            const isInLastWeek = isLastWeekOfMonth(date);
             
-            if (patternDay === dayName) {
-              if (patternWeek === 'last' && isInLastWeek) {
-                isAvailable = true;
-                break;
-              } else if (patternWeek === '1st' && weekOfMonth === 1) {
-                isAvailable = true;
-                break;
-              } else if (patternWeek === '2nd' && weekOfMonth === 2) {
-                isAvailable = true;
-                break;
-              } else if (patternWeek === '3rd' && weekOfMonth === 3) {
-                isAvailable = true;
-                break;
-              } else if (patternWeek === '4th' && weekOfMonth === 4) {
-                isAvailable = true;
-                break;
+            if (schedule.day_configuration) {
+              for (const pattern of schedule.day_configuration) {
+                const [day, week] = pattern.split('-');
+                
+                if (day === dayName) {
+                  if (week === 'last' && isInLastWeek) {
+                    isAvailable = true;
+                    break;
+                  } else if (week === 'first' && weekOfMonth === 1) {
+                    isAvailable = true;
+                    break;
+                  } else if (week === 'second' && weekOfMonth === 2) {
+                    isAvailable = true;
+                    break;
+                  } else if (week === 'third' && weekOfMonth === 3) {
+                    isAvailable = true;
+                    break;
+                  } else if (week === 'fourth' && weekOfMonth === 4) {
+                    isAvailable = true;
+                    break;
+                  }
+                }
               }
             }
           }
           
-          // Check for "last" (last day of month)
-          if (pattern === 'last') {
-            const lastDayOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0);
-            if (dayOfMonth === lastDayOfMonth.getDate()) {
-              isAvailable = true;
-              break;
-            }
-          }
+          if (isAvailable) break;
         }
       }
       
@@ -396,18 +395,14 @@ const OnsiteBooking: React.FC = () => {
       }
     }
     
+    console.log(`📅 Total available dates found: ${dates.length}`);
+    if (dates.length > 0) {
+      console.log('📅 First 5 available dates:', dates.slice(0, 5).map(d => d.toDateString()));
+    }
+    
     setAvailableDates(dates);
     
-    // Set default selected date to first available date
-    if (dates.length > 0 && !bookingData.date) {
-      // Format date as YYYY-MM-DD in local timezone to avoid timezone shift
-      const firstDate = dates[0];
-      const year = firstDate.getFullYear();
-      const month = String(firstDate.getMonth() + 1).padStart(2, '0');
-      const day = String(firstDate.getDate()).padStart(2, '0');
-      const formattedDate = `${year}-${month}-${day}`;
-      setBookingData(prev => ({ ...prev, date: formattedDate }));
-    } else if (dates.length === 0) {
+    if (dates.length === 0) {
       console.warn('⚠️ No available dates found for this package!');
     }
   }, [selectedPackage, bookingData.date]);
