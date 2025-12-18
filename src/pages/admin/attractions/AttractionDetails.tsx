@@ -9,8 +9,6 @@ import {
   Clock,
   DollarSign,
   Calendar,
-  CheckCircle,
-  XCircle,
   Tag
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
@@ -18,12 +16,36 @@ import { attractionService } from '../../../services/AttractionService';
 import { ASSET_URL } from '../../../utils/storage';
 import Toast from '../../../components/ui/Toast';
 import { extractIdFromSlug } from '../../../utils/slug';
+import { formatTimeRange } from '../../../utils/timeFormat';
+
+interface AttractionAvailabilitySchedule {
+  days: string[];
+  start_time: string;
+  end_time: string;
+}
+
+interface Attraction {
+  id: number;
+  name: string;
+  description: string;
+  category: string;
+  price: number;
+  pricing_type?: string;
+  max_capacity: number;
+  duration?: number;
+  duration_unit?: string;
+  image?: string | string[];
+  location?: { name: string };
+  created_at: string;
+  is_active: boolean;
+  availability?: AttractionAvailabilitySchedule[];
+}
 
 const AttractionDetails = () => {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const { themeColor, fullColor } = useThemeColor();
-  const [attraction, setAttraction] = useState<any>(null);
+  const [attraction, setAttraction] = useState<Attraction | null>(null);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
@@ -39,7 +61,7 @@ const AttractionDetails = () => {
     try {
       setLoading(true);
       const response = await attractionService.getAttraction(attractionId);
-      setAttraction(response.data);
+      setAttraction(response.data as Attraction);
     } catch (error) {
       console.error('Error loading attraction details:', error);
       setToast({ message: 'Failed to load attraction details', type: 'error' });
@@ -86,8 +108,6 @@ const AttractionDetails = () => {
       </div>
     );
   }
-
-  const daysOfWeek = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 
   return (
     <div className="min-h-screen bg-gray-50 px-6 py-8">
@@ -236,29 +256,35 @@ const AttractionDetails = () => {
 
           {/* Availability */}
           <div className="p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Weekly Availability</h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {daysOfWeek.map((day) => {
-                const isAvailable = attraction.availability?.[day] !== false;
-                return (
-                  <div
-                    key={day}
-                    className={`flex items-center justify-between p-3 rounded-lg border ${
-                      isAvailable
-                        ? `border-${themeColor}-200 bg-${themeColor}-50`
-                        : 'border-gray-200 bg-gray-50'
-                    }`}
-                  >
-                    <span className="text-sm font-medium capitalize">{day}</span>
-                    {isAvailable ? (
-                      <CheckCircle className={`h-4 w-4 text-${fullColor}`} />
-                    ) : (
-                      <XCircle className="h-4 w-4 text-gray-400" />
-                    )}
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Availability Schedule</h2>
+            {attraction.availability && Array.isArray(attraction.availability) && attraction.availability.length > 0 ? (
+              <div className="space-y-3">
+                {attraction.availability.map((schedule, index: number) => (
+                  <div key={index} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                    <div className="flex flex-wrap gap-2 mb-3">
+                      {schedule.days && schedule.days.map((day) => (
+                        <span 
+                          key={day} 
+                          className={`px-3 py-1.5 bg-${themeColor}-600 text-white text-sm font-medium rounded capitalize`}
+                        >
+                          {day}
+                        </span>
+                      ))}
+                    </div>
+                    <div className="flex items-center gap-2 text-gray-700">
+                      <Clock className={`h-4 w-4 text-${fullColor}`} />
+                      <span className="font-medium">
+                        {formatTimeRange(schedule.start_time, schedule.end_time)}
+                      </span>
+                    </div>
                   </div>
-                );
-              })}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <p className="text-gray-600">No availability schedule configured for this attraction.</p>
+              </div>
+            )}
           </div>
         </div>
       </div>

@@ -17,6 +17,7 @@ import type { Attraction, Package as PackageType, BookingType } from '../../type
 import { customerService, type GroupedAttraction, type GroupedPackage } from '../../services/CustomerService';
 import { ASSET_URL } from '../../utils/storage';
 import { generateSlug, generateLocationSlug } from '../../utils/slug';
+import { convertTo12Hour } from '../../utils/timeFormat';
 
 const EntertainmentLandingPage = () => {
   const [selectedLocation, setSelectedLocation] = useState('All Locations');
@@ -37,6 +38,7 @@ const EntertainmentLandingPage = () => {
   // Load data from backend on mount
   useEffect(() => {
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Reload data when search changes (with debounce)
@@ -45,6 +47,7 @@ const EntertainmentLandingPage = () => {
       loadData();
     }, 500);
     return () => clearTimeout(timeoutId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery]);
 
   const loadData = async () => {
@@ -59,21 +62,25 @@ const EntertainmentLandingPage = () => {
 
       if (attractionsResponse.success && attractionsResponse.data) {
         // Transform grouped attractions to match component format
-        const transformedAttractions: Attraction[] = attractionsResponse.data.map((attr: GroupedAttraction) => ({
-          id: attr.purchase_links[0]?.attraction_id || 0,
-          name: attr.name,
-          description: attr.description,
-          price: attr.price,
-          minAge: attr.min_age,
-          capacity: attr.max_capacity,
-          rating: attr.rating || 4.5,
-          image: Array.isArray(attr.image) ? attr.image[0] : attr.image,
-          category: attr.category,
-          availableLocations: attr.locations.map(loc => loc.location_name),
-          duration: attr.duration === 0 || !attr.duration ? 'Unlimited' : `${attr.duration} ${attr.duration_unit}`,
-          pricingType: attr.pricing_type,
-          purchaseLinks: attr.purchase_links,
-        }));
+        // Note: availability is fetched separately when modal opens since grouped endpoint doesn't include it
+        const transformedAttractions: Attraction[] = attractionsResponse.data.map((attr: GroupedAttraction) => {
+          return {
+            id: attr.purchase_links[0]?.attraction_id || 0,
+            name: attr.name,
+            description: attr.description,
+            price: attr.price,
+            minAge: attr.min_age,
+            capacity: attr.max_capacity,
+            rating: attr.rating || 4.5,
+            image: Array.isArray(attr.image) ? attr.image[0] : attr.image,
+            category: attr.category,
+            availableLocations: attr.locations.map(loc => loc.location_name),
+            duration: attr.duration === 0 || !attr.duration ? 'Unlimited' : `${attr.duration} ${attr.duration_unit}`,
+            pricingType: attr.pricing_type,
+            purchaseLinks: attr.purchase_links,
+            availability: undefined, // Will be loaded when modal opens
+          };
+        });
         setAttractions(transformedAttractions);
 
         // Extract unique locations from attractions
@@ -94,20 +101,24 @@ const EntertainmentLandingPage = () => {
 
       if (packagesResponse.success && packagesResponse.data) {
         // Transform grouped packages to match component format
-        const transformedPackages: PackageType[] = packagesResponse.data.map((pkg: GroupedPackage) => ({
-          id: pkg.booking_links[0]?.package_id || 0,
-          name: pkg.name,
-          description: pkg.description,
-          price: pkg.price,
-          duration: `${pkg.duration} hours`,
-          participants: `Up to ${pkg.max_guests} guests`,
-          includes: [], // This would need to be added to backend if needed
-          rating: 4.8, // Default rating, backend doesn't return this yet
-          image: Array.isArray(pkg.image) ? pkg.image[0] : pkg.image,
-          category: pkg.category,
-          availableLocations: pkg.locations.map(loc => loc.location_name),
-          bookingLinks: pkg.booking_links,
-        }));
+        // Note: availability_schedules is fetched separately when modal opens since grouped endpoint doesn't include it
+        const transformedPackages: PackageType[] = packagesResponse.data.map((pkg: GroupedPackage) => {
+          return {
+            id: pkg.booking_links[0]?.package_id || 0,
+            name: pkg.name,
+            description: pkg.description,
+            price: pkg.price,
+            duration: `${pkg.duration} hours`,
+            participants: `Up to ${pkg.max_guests} guests`,
+            includes: [], // This would need to be added to backend if needed
+            rating: 4.8, // Default rating, backend doesn't return this yet
+            image: Array.isArray(pkg.image) ? pkg.image[0] : pkg.image,
+            category: pkg.category,
+            availableLocations: pkg.locations.map(loc => loc.location_name),
+            bookingLinks: pkg.booking_links,
+            availability_schedules: undefined, // Will be loaded when modal opens
+          };
+        });
         setPackages(transformedPackages);
       }
     } catch (error) {
@@ -134,8 +145,34 @@ const EntertainmentLandingPage = () => {
     return matchesLocation && matchesSearch;
   });
 
-  const handleAttractionClick = (attraction: Attraction) => {
-    setSelectedAttraction(attraction);
+  const handleAttractionClick = async (attraction: Attraction) => {
+    // Fetch full attraction details to get availability schedules
+    try {
+      const response = await customerService.getAttraction(attraction.id);
+      if (response.success && response.data) {
+        // Parse availability if it's a string
+        let availability = (response.data as any).availability;
+        if (typeof availability === 'string') {
+          try {
+            availability = JSON.parse(availability);
+          } catch (e) {
+            console.error('Failed to parse availability:', e);
+            availability = undefined;
+          }
+        }
+        
+        // Merge the full details with the attraction
+        setSelectedAttraction({
+          ...attraction,
+          availability: availability
+        });
+      } else {
+        setSelectedAttraction(attraction);
+      }
+    } catch (error) {
+      console.error('Error fetching attraction details:', error);
+      setSelectedAttraction(attraction);
+    }
     setShowAttractionModal(true);
   };
 
@@ -153,8 +190,34 @@ const EntertainmentLandingPage = () => {
     return ASSET_URL + img;
   };
 
-  const handlePackageClick = (pkg: PackageType) => {
-    setSelectedPackage(pkg);
+  const handlePackageClick = async (pkg: PackageType) => {
+    // Fetch full package details to get availability schedules
+    try {
+      const response = await customerService.getPackage(pkg.id);
+      if (response.success && response.data) {
+        // Parse availability_schedules if it's a string
+        let availability_schedules = (response.data as any).availability_schedules;
+        if (typeof availability_schedules === 'string') {
+          try {
+            availability_schedules = JSON.parse(availability_schedules);
+          } catch (e) {
+            console.error('Failed to parse availability_schedules:', e);
+            availability_schedules = undefined;
+          }
+        }
+        
+        // Merge the full details with the package
+        setSelectedPackage({
+          ...pkg,
+          availability_schedules: availability_schedules
+        });
+      } else {
+        setSelectedPackage(pkg);
+      }
+    } catch (error) {
+      console.error('Error fetching package details:', error);
+      setSelectedPackage(pkg);
+    }
     setShowPackageModal(true);
   };
 
@@ -188,6 +251,12 @@ const EntertainmentLandingPage = () => {
       const url = `${window.location.origin}/book/package/${locationSlug}/${itemSlug}`;
       window.open(url, '_blank');
     }
+  };
+
+  // Helper function to format time in 12-hour format
+  const formatTime = (time: string) => {
+    if (!time) return '';
+    return convertTo12Hour(time);
   };
 
   return (
@@ -581,19 +650,38 @@ const EntertainmentLandingPage = () => {
               </div>
 
               {/* Availability Schedule */}
-              <div className="mb-4 md:mb-6 bg-blue-50 p-3 md:p-4">
-                <h3 className="text-xs md:text-sm font-bold text-gray-900 mb-2 md:mb-3 flex items-center gap-2">
-                  <Calendar size={16} className="text-blue-800 md:w-[18px] md:h-[18px]" />
-                  Available Days
+              <div className="mb-4 md:mb-6">
+                <h3 className="text-base md:text-lg font-bold text-gray-900 mb-2 md:mb-3 flex items-center gap-2">
+                  <Calendar size={18} className="text-blue-800" />
+                  Availability Schedule
                 </h3>
-                <div className="flex flex-wrap gap-1.5 md:gap-2">
-                  {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
-                    <span key={day} className="px-2 py-1 md:px-3 md:py-1 bg-blue-800 text-white text-xs md:text-sm font-medium">
-                      {day}
-                    </span>
-                  ))}
-                </div>
-                <p className="text-xs text-gray-600 mt-2">Open all week</p>
+                {selectedAttraction.availability && Array.isArray(selectedAttraction.availability) && selectedAttraction.availability.length > 0 ? (
+                  <div className="space-y-2">
+                    {selectedAttraction.availability.map((schedule, index) => (
+                      schedule.days && Array.isArray(schedule.days) && schedule.days.length > 0 ? (
+                        <div key={index} className="bg-blue-50 border border-blue-200 rounded-lg p-3 md:p-4">
+                          <div className="flex flex-wrap gap-1.5 mb-2">
+                            {schedule.days.map((day) => (
+                              <span key={day} className="px-2 py-1 bg-blue-800 text-white text-xs font-medium rounded capitalize">
+                                {day.substring(0, 3)}
+                              </span>
+                            ))}
+                          </div>
+                          <div className="flex items-center gap-2 text-sm text-gray-700">
+                            <Clock size={14} className="text-blue-600" />
+                            <span className="font-medium">
+                              {formatTime(schedule.start_time)} - {formatTime(schedule.end_time)}
+                            </span>
+                          </div>
+                        </div>
+                      ) : null
+                    ))}
+                  </div>
+                ) : (
+                  <div className="bg-gray-50 p-3 md:p-4 rounded-lg">
+                    <p className="text-sm text-gray-600">Availability schedule not specified. Please contact location for details.</p>
+                  </div>
+                )}
               </div>
 
               {/* Available Locations */}
@@ -733,6 +821,42 @@ const EntertainmentLandingPage = () => {
                     All-Inclusive
                   </span>
                 </div>
+              </div>
+
+              {/* Availability Schedule */}
+              <div className="mb-4 md:mb-6">
+                <h3 className="text-base md:text-lg font-bold text-gray-900 mb-2 md:mb-3 flex items-center gap-2">
+                  <Calendar size={18} className="text-blue-800" />
+                  Availability Schedule
+                </h3>
+                {selectedPackage.availability_schedules && Array.isArray(selectedPackage.availability_schedules) && selectedPackage.availability_schedules.length > 0 ? (
+                  <div className="space-y-2">
+                    {selectedPackage.availability_schedules.map((schedule, index) => (
+                      schedule.day_configuration && Array.isArray(schedule.day_configuration) && schedule.day_configuration.length > 0 ? (
+                        <div key={index} className="bg-blue-50 border border-blue-200 rounded-lg p-3 md:p-4">
+                          <div className="flex flex-wrap gap-1.5 mb-2">
+                            {schedule.day_configuration.map((day) => (
+                              <span key={day} className="px-2 py-1 bg-blue-800 text-white text-xs font-medium rounded capitalize">
+                                {day.substring(0, 3)}
+                              </span>
+                            ))}
+                          </div>
+                          <div className="flex items-center gap-2 text-sm text-gray-700">
+                            <Clock size={14} className="text-blue-600" />
+                            <span className="font-medium">
+                              {formatTime(schedule.time_slot_start)} - {formatTime(schedule.time_slot_end)}
+                            </span>
+                            
+                          </div>
+                        </div>
+                      ) : null
+                    ))}
+                  </div>
+                ) : (
+                  <div className="bg-gray-50 p-3 md:p-4 rounded-lg">
+                    <p className="text-sm text-gray-600">Availability schedule not specified. Please contact location for details.</p>
+                  </div>
+                )}
               </div>
 
               {/* Available Locations */}

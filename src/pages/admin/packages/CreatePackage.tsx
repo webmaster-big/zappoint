@@ -16,6 +16,7 @@ import {
 } from '../../../services';
 import type { Category } from '../../../services/CategoryService';
 import type { AvailabilitySchedule } from '../../../services/PackageService';
+import { formatTimeRange } from '../../../utils/timeFormat';
 import type { 
     CreatePackageAttraction, 
     CreatePackageAddOn, 
@@ -537,7 +538,7 @@ const CreatePackage: React.FC = () => {
                 }).join(', ');
             }
             
-            return `${dayText} (${time_slot_start}-${time_slot_end})`;
+            return `${dayText} (${formatTimeRange(time_slot_start, time_slot_end)})`;
         }).join(', ');
     };
 
@@ -1016,10 +1017,11 @@ const CreatePackage: React.FC = () => {
                                                                             const startM = currentMinutes % 60;
                                                                             const endH = Math.floor(slotEndMinutes / 60);
                                                                             const endM = slotEndMinutes % 60;
+                                                                            const startTime = `${String(startH).padStart(2, '0')}:${String(startM).padStart(2, '0')}`;
+                                                                            const endTime = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
                                                                             slots.push(
                                                                                 <span key={currentMinutes} className="px-2 py-1 bg-white border border-gray-200 rounded text-xs">
-                                                                                    {`${String(startH).padStart(2, '0')}:${String(startM).padStart(2, '0')}`} - 
-                                                                                    {`${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`}
+                                                                                    {formatTimeRange(startTime, endTime)}
                                                                                 </span>
                                                                             );
                                                                         }

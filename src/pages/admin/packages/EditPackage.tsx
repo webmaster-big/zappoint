@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import Toast from "../../../components/ui/Toast";
-import { Info, Plus, Calendar, Clock, Gift, Tag, Home, ArrowLeft, Save, Trash2 } from "lucide-react";
+import { Info, Plus, Calendar, Clock, Gift, Tag, Home, ArrowLeft, Save, Trash2, X } from "lucide-react";
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { 
     attractionService, 
@@ -13,6 +13,7 @@ import {
     categoryService
 } from '../../../services';
 import type { Category } from '../../../services/CategoryService';
+import { formatTimeRange } from '../../../utils/timeFormat';
 import type { 
     CreatePackageAttraction, 
     CreatePackageAddOn, 
@@ -21,7 +22,6 @@ import type {
     CreatePackageGiftCard
 } from '../../../types/createPackage.types';
 import type { AvailabilitySchedule } from '../../../services/PackageService';
-import { formatTimeTo12Hour } from '../../../utils/storage';
 
 const EditPackage: React.FC = () => {
     const { themeColor, fullColor } = useThemeColor();
@@ -340,30 +340,14 @@ const EditPackage: React.FC = () => {
         }));
     };
 
-    // Handle availability selection
-    const handleAvailabilityChange = (type: "daily" | "weekly" | "monthly", value: string) => {
-        if (type === "daily") {
-            setForm(prev => {
-                const days = prev.availableDays.includes(value)
-                    ? prev.availableDays.filter(d => d !== value)
-                    : [...prev.availableDays, value];
-                return { ...prev, availableDays: days };
-            });
-        } else if (type === "weekly") {
-            setForm(prev => {
-                const days = prev.availableWeekDays.includes(value)
-                    ? prev.availableWeekDays.filter(d => d !== value)
-                    : [...prev.availableWeekDays, value];
-                return { ...prev, availableWeekDays: days };
-            });
-        } else if (type === "monthly") {
-            setForm(prev => {
-                const days = prev.availableMonthDays.includes(value)
-                    ? prev.availableMonthDays.filter(d => d !== value)
-                    : [...prev.availableMonthDays, value];
-                return { ...prev, availableMonthDays: days };
-            });
-        }
+    // Update a specific schedule
+    const updateSchedule = (index: number, updates: Partial<AvailabilitySchedule>) => {
+        setForm(prev => ({
+            ...prev,
+            availability_schedules: prev.availability_schedules.map((schedule, i) =>
+                i === index ? { ...schedule, ...updates } : schedule
+            )
+        }));
     };
 
     // Add option with API calls instead of localStorage
@@ -492,7 +476,6 @@ const EditPackage: React.FC = () => {
         const pricePerAdditional = parseFloat(form.pricePerAdditional || '0');
         const maxParticipants = parseInt(form.maxParticipants || '0');
         const duration = parseInt(form.duration || '0');
-        const timeSlotInterval = parseInt(form.timeSlotInterval || '30');
 
         if (isNaN(price) || price < 0) {
             showToast("Please enter a valid price", "error");
@@ -555,13 +538,6 @@ const EditPackage: React.FC = () => {
                 duration: duration,
                 duration_unit: form.durationUnit,
                 location_id: 1, // Default location ID
-                availability_type: form.availabilityType,
-                available_days: form.availabilityType === 'daily' ? form.availableDays : [],
-                available_week_days: form.availabilityType === 'weekly' ? form.availableWeekDays : [],
-                available_month_days: form.availabilityType === 'monthly' ? form.availableMonthDays : [],
-                time_slot_start: form.timeSlotStart || "09:00",
-                time_slot_end: form.timeSlotEnd || "17:00",
-                time_slot_interval: timeSlotInterval || 30,
                 partial_payment_percentage: form.partialPaymentPercentage ? parseInt(form.partialPaymentPercentage) : undefined,
                 partial_payment_fixed: form.partialPaymentFixed ? parseInt(form.partialPaymentFixed) : undefined,
                 has_guest_of_honor: form.hasGuestOfHonor,
@@ -624,51 +600,6 @@ const EditPackage: React.FC = () => {
     const formatDuration = () => {
         if (!form.duration) return "Not specified";
         return `${form.duration} ${form.durationUnit}`;
-    };
-
-    // Generate time slots based on backend logic
-    const generateTimeSlots = () => {
-        if (form.availability_schedules.length === 0 || !form.duration) {
-            return [];
-        }
-
-        // Use first schedule for preview
-        const schedule = form.availability_schedules[0];
-        if (!schedule) return [];
-
-        const slots = [];
-        const slotDuration = form.durationUnit === 'hours' ? parseInt(form.duration) * 60 : parseInt(form.duration);
-        const interval = schedule.time_slot_interval;
-        
-        // Parse start and end times
-        const [startHour, startMin] = schedule.time_slot_start.split(':').map(Number);
-        const [endHour, endMin] = schedule.time_slot_end.split(':').map(Number);
-        
-        let currentMinutes = startHour * 60 + startMin;
-        const endMinutes = endHour * 60 + endMin;
-        
-        while (currentMinutes < endMinutes) {
-            const slotEndMinutes = currentMinutes + slotDuration;
-            
-            // Only add slot if it fits before end time
-            if (slotEndMinutes <= endMinutes) {
-                const startH = Math.floor(currentMinutes / 60);
-                const startM = currentMinutes % 60;
-                const endH = Math.floor(slotEndMinutes / 60);
-                const endM = slotEndMinutes % 60;
-                
-                slots.push({
-                    start_time: `${String(startH).padStart(2, '0')}:${String(startM).padStart(2, '0')}`,
-                    end_time: `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`,
-                    duration: form.duration,
-                    duration_unit: form.durationUnit
-                });
-            }
-            
-            currentMinutes += interval;
-        }
-        
-        return slots;
     };
 
     // Loading state
@@ -948,35 +879,210 @@ const EditPackage: React.FC = () => {
                                 <Calendar className={`w-5 h-5 text-${themeColor}-600`} /> Availability Schedules
                             </h3>
                             <div className="space-y-4">
-                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                                    <p className="text-sm text-blue-900 mb-2">
+                                <div className={`bg-${themeColor}-50 border border-${themeColor}-200 rounded-lg p-4`}>
+                                    <p className={`text-sm text-${fullColor} mb-2`}>
                                         <strong>{form.availability_schedules.length}</strong> availability schedule(s) configured for this package.
                                     </p>
-                                    <p className="text-xs text-blue-700">
+                                    <p className={`text-xs text-${fullColor}`}>
                                         Availability schedules are managed through the package creation system and define when this package can be booked with different time configurations.
                                     </p>
                                 </div>
                                 
-                                {form.availability_schedules.length > 0 && (
-                                    <div className="space-y-2">
-                                        {form.availability_schedules.map((schedule, idx) => (
-                                            <div key={idx} className="border border-gray-200 rounded-lg p-3">
-                                                <div className="flex justify-between items-start mb-2">
-                                                    <span className={`px-2 py-1 rounded text-xs font-medium bg-${themeColor}-100 text-${fullColor}`}>
-                                                        {schedule.availability_type}
-                                                    </span>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => removeSchedule(idx)}
-                                                        className="text-red-500 hover:text-red-700"
-                                                    >
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </button>
-                                                </div>
-                                                <div className="text-sm text-gray-700">
-                                                    <div><strong>Days:</strong> {schedule.day_configuration?.join(', ') || 'All days'}</div>
-                                                    <div><strong>Time:</strong> {schedule.time_slot_start} - {schedule.time_slot_end}</div>
-                                                    <div><strong>Interval:</strong> {schedule.time_slot_interval} min</div>
+                                {form.availability_schedules.length === 0 ? (
+                                    <div className="text-center py-8 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+                                        <Calendar className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                                        <p className="text-gray-600 mb-4">No availability schedules configured</p>
+                                        <button
+                                            type="button"
+                                            onClick={addNewSchedule}
+                                            className={`px-4 py-2 bg-${fullColor} text-white rounded-md hover:bg-${themeColor}-900 transition flex items-center gap-2 mx-auto`}
+                                        >
+                                            <Plus className="w-4 h-4" />
+                                            Add First Schedule
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-4">
+                                        {form.availability_schedules.map((schedule, index) => (
+                                            <div key={index} className="border border-gray-200 rounded-lg p-4 bg-gray-50 relative">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removeSchedule(index)}
+                                                    className="absolute top-3 right-3 p-1 hover:bg-red-100 rounded-md transition text-red-600"
+                                                    title="Remove schedule"
+                                                >
+                                                    <X className="w-4 h-4" />
+                                                </button>
+
+                                                <div className="space-y-4">
+                                                    {/* Schedule Type */}
+                                                    <div>
+                                                        <label className="block font-semibold mb-2 text-sm text-neutral-800">
+                                                            Schedule Type
+                                                        </label>
+                                                        <div className="flex flex-wrap gap-2">
+                                                            {(['daily', 'weekly', 'monthly'] as const).map((type) => (
+                                                                <button
+                                                                    key={type}
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        updateSchedule(index, {
+                                                                            availability_type: type,
+                                                                            day_configuration: type === 'daily' ? null : schedule.day_configuration
+                                                                        });
+                                                                    }}
+                                                                    className={`px-4 py-2 rounded-md text-sm font-medium transition ${
+                                                                        schedule.availability_type === type
+                                                                            ? `bg-${fullColor} text-white`
+                                                                            : 'bg-white border border-gray-300 text-gray-700 hover:border-gray-400'
+                                                                    }`}
+                                                                >
+                                                                    {type.charAt(0).toUpperCase() + type.slice(1)}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Day Configuration for Weekly */}
+                                                    {schedule.availability_type === 'weekly' && (
+                                                        <div>
+                                                            <label className="block font-semibold mb-2 text-sm text-neutral-800">
+                                                                Select Days
+                                                            </label>
+                                                            <div className="flex flex-wrap gap-2">
+                                                                {['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map(day => {
+                                                                    const isSelected = schedule.day_configuration?.includes(day) || false;
+                                                                    return (
+                                                                        <button
+                                                                            key={day}
+                                                                            type="button"
+                                                                            onClick={() => {
+                                                                                const current = schedule.day_configuration || [];
+                                                                                const updated = isSelected
+                                                                                    ? current.filter(d => d !== day)
+                                                                                    : [...current, day];
+                                                                                updateSchedule(index, { day_configuration: updated.length > 0 ? updated : null });
+                                                                            }}
+                                                                            className={`px-3 py-1.5 rounded-md border text-sm font-medium transition ${
+                                                                                isSelected
+                                                                                    ? `bg-${fullColor} text-white border-${themeColor}-500`
+                                                                                    : 'bg-white border-gray-300 text-gray-700 hover:border-gray-400'
+                                                                            }`}
+                                                                        >
+                                                                            {day.charAt(0).toUpperCase() + day.slice(1)}
+                                                                        </button>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+                                                    {/* Day Configuration for Monthly */}
+                                                    {schedule.availability_type === 'monthly' && (
+                                                        <div>
+                                                            <label className="block font-semibold mb-2 text-sm text-neutral-800">
+                                                                Select Occurrences
+                                                            </label>
+                                                            <div className="space-y-2 max-h-60 overflow-y-auto border border-gray-200 rounded-md p-3 bg-white">
+                                                                {['first', 'second', 'third', 'fourth', 'last'].map(occurrence => 
+                                                                    ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map(day => {
+                                                                        const value = `${occurrence}-${day}`;
+                                                                        const isSelected = schedule.day_configuration?.includes(value) || false;
+                                                                        return (
+                                                                            <label key={value} className="flex items-center gap-2 cursor-pointer hover:bg-gray-100 p-1 rounded">
+                                                                                <input
+                                                                                    type="checkbox"
+                                                                                    checked={isSelected}
+                                                                                    onChange={() => {
+                                                                                        const current = schedule.day_configuration || [];
+                                                                                        const updated = isSelected
+                                                                                            ? current.filter(d => d !== value)
+                                                                                            : [...current, value];
+                                                                                        updateSchedule(index, { day_configuration: updated.length > 0 ? updated : null });
+                                                                                    }}
+                                                                                    className="rounded border-gray-300"
+                                                                                />
+                                                                                <span className="text-sm">
+                                                                                    {occurrence.charAt(0).toUpperCase() + occurrence.slice(1)} {day.charAt(0).toUpperCase() + day.slice(1)}
+                                                                                </span>
+                                                                            </label>
+                                                                        );
+                                                                    })
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+                                                    {/* Time Slot Configuration */}
+                                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                                        <div>
+                                                            <label className="block text-xs font-medium text-gray-600 mb-1">Start Time</label>
+                                                            <input
+                                                                type="time"
+                                                                value={schedule.time_slot_start}
+                                                                onChange={(e) => updateSchedule(index, { time_slot_start: e.target.value })}
+                                                                className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm"
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-xs font-medium text-gray-600 mb-1">End Time</label>
+                                                            <input
+                                                                type="time"
+                                                                value={schedule.time_slot_end}
+                                                                onChange={(e) => updateSchedule(index, { time_slot_end: e.target.value })}
+                                                                className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm"
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-xs font-medium text-gray-600 mb-1">Interval (min)</label>
+                                                            <input
+                                                                type="number"
+                                                                value={schedule.time_slot_interval}
+                                                                onChange={(e) => updateSchedule(index, { time_slot_interval: parseInt(e.target.value) || 30 })}
+                                                                min="15"
+                                                                step="15"
+                                                                className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm"
+                                                            />
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Preview generated time slots */}
+                                                    {form.duration && schedule.time_slot_start && schedule.time_slot_end && (
+                                                        <div className="mt-3 pt-3 border-t border-gray-200">
+                                                            <p className="text-xs font-medium text-gray-600 mb-2">Generated Time Slots:</p>
+                                                            <div className="flex flex-wrap gap-1">
+                                                                {(() => {
+                                                                    const slotDuration = form.durationUnit === 'hours' ? parseInt(form.duration) * 60 : parseInt(form.duration);
+                                                                    const interval = schedule.time_slot_interval;
+                                                                    const [startHour, startMin] = schedule.time_slot_start.split(':').map(Number);
+                                                                    const [endHour, endMin] = schedule.time_slot_end.split(':').map(Number);
+                                                                    let currentMinutes = startHour * 60 + startMin;
+                                                                    const endMinutes = endHour * 60 + endMin;
+                                                                    const slots = [];
+                                                                    
+                                                                    while (currentMinutes < endMinutes) {
+                                                                        const slotEndMinutes = currentMinutes + slotDuration;
+                                                                        if (slotEndMinutes <= endMinutes) {
+                                                                            const startH = Math.floor(currentMinutes / 60);
+                                                                            const startM = currentMinutes % 60;
+                                                                            const endH = Math.floor(slotEndMinutes / 60);
+                                                                            const endM = slotEndMinutes % 60;
+                                                                            const startTime = `${String(startH).padStart(2, '0')}:${String(startM).padStart(2, '0')}`;
+                                                                            const endTime = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+                                                                            slots.push(
+                                                                                <span key={currentMinutes} className="px-2 py-1 bg-white border border-gray-200 rounded text-xs">
+                                                                                    {formatTimeRange(startTime, endTime)}
+                                                                                </span>
+                                                                            );
+                                                                        }
+                                                                        currentMinutes += interval;
+                                                                    }
+                                                                    
+                                                                    return slots.length > 0 ? slots : <span className="text-xs text-gray-500">No valid slots with current configuration</span>;
+                                                                })()}
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
                                         ))}
@@ -991,231 +1097,6 @@ const EditPackage: React.FC = () => {
                                     <Plus className="w-5 h-5" />
                                     Add New Schedule
                                 </button>
-                                
-                                <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-                                    <p className="text-xs text-gray-600">
-                                        Note: For detailed schedule configuration with full UI controls, please recreate the package or contact support.
-                                    </p>
-                                </div>
-                                
-                                <div>
-                                    <label className="block font-semibold mb-2 text-base text-neutral-800">Legacy Schedule Type (Deprecated)</label>
-                                    <div className="flex flex-wrap gap-4">
-                                        <label className="flex items-center gap-2">
-                                            <input
-                                                type="radio"
-                                                name="availabilityType"
-                                                value="daily"
-                                                checked={form.availabilityType === "daily"}
-                                                onChange={handleChange}
-                                                className="accent-primary"
-                                            />
-                                            <span>Daily</span>
-                                        </label>
-                                        <label className="flex items-center gap-2">
-                                            <input
-                                                type="radio"
-                                                name="availabilityType"
-                                                value="weekly"
-                                                checked={form.availabilityType === "weekly"}
-                                                onChange={handleChange}
-                                                className="accent-primary"
-                                            />
-                                            <span>Weekly</span>
-                                        </label>
-                                        <label className="flex items-center gap-2">
-                                            <input
-                                                type="radio"
-                                                name="availabilityType"
-                                                value="monthly"
-                                                checked={form.availabilityType === "monthly"}
-                                                onChange={handleChange}
-                                                className="accent-primary"
-                                            />
-                                            <span>Monthly</span>
-                                        </label>
-                                    </div>
-                                </div>
-                                
-                                {form.availabilityType === "daily" && (
-                                    <div>
-                                        <label className="block font-semibold mb-2 text-base text-neutral-800">Available Days</label>
-                                        <div className="flex flex-wrap gap-2">
-                                            {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].map((day) => (
-                                                <button
-                                                    key={day}
-                                                    type="button"
-                                                    onClick={() => handleAvailabilityChange("daily", day)}
-                                                    className={`px-4 py-2 rounded-md text-sm font-semibold transition-all ${
-                                                        form.availableDays.includes(day)
-                                                            ? `bg-${themeColor}-50 border border-${themeColor}-500 text-${fullColor}`
-                                                            : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                                                    }`}
-                                                >
-                                                    {day}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-                                
-                                {form.availabilityType === "weekly" && (
-                                    <div>
-                                        <label className="block font-semibold mb-2 text-base text-neutral-800">Available Week Days</label>
-                                        <div className="flex flex-wrap gap-2">
-                                            {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].map((day) => (
-                                                <button
-                                                    key={day}
-                                                    type="button"
-                                                    onClick={() => handleAvailabilityChange("weekly", day)}
-                                                    className={`px-4 py-2 rounded-md text-sm font-semibold transition-all ${
-                                                        form.availableWeekDays.includes(day)
-                                                            ? `bg-${themeColor}-50 border border-${themeColor}-500 text-${fullColor}`
-                                                            : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                                                    }`}
-                                                >
-                                                    Every {day}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-                                
-                                {form.availabilityType === "monthly" && (
-                                    <div className="space-y-4">
-                                        <div>
-                                            <label className="block font-semibold mb-3 text-base text-neutral-800">Select Day and Week of Month</label>
-                                            <p className="text-sm text-gray-500 mb-4">Choose which day(s) of the week and which week(s) of the month this package is available.</p>
-                                            
-                                            <div className="space-y-4">
-                                                {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].map(day => (
-                                                    <div key={day} className="border border-gray-200 rounded-lg p-4">
-                                                        <div className="flex items-center justify-between mb-3">
-                                                            <span className="font-medium text-gray-900">{day}</span>
-                                                            <span className="text-sm text-gray-500">
-                                                                {form.availableMonthDays.filter(item => item.startsWith(day)).length > 0 
-                                                                    ? `${form.availableMonthDays.filter(item => item.startsWith(day)).length} week(s) selected`
-                                                                    : 'No weeks selected'
-                                                                }
-                                                            </span>
-                                                        </div>
-                                                        <div className="flex flex-wrap gap-2">
-                                                            {["1", "2", "3", "4", "last"].map(week => {
-                                                                const value = `${day}-${week}`;
-                                                                const isSelected = form.availableMonthDays.includes(value);
-                                                                return (
-                                                                    <button
-                                                                        type="button"
-                                                                        key={value}
-                                                                        className={`px-3 py-1.5 rounded-full border text-sm font-medium transition-all duration-150 hover:bg-${themeColor}-50 hover:border-${themeColor}-400 focus:outline-none focus:ring-2 focus:ring-${themeColor}-200 ${isSelected ? `bg-${themeColor}-50 border-${themeColor}-500 text-${fullColor}` : "bg-white border-gray-200 text-neutral-800"}`}
-                                                                        onClick={() => {
-                                                                            setForm(prev => {
-                                                                                const arr = prev.availableMonthDays;
-                                                                                if (arr.includes(value)) {
-                                                                                    return { ...prev, availableMonthDays: arr.filter(v => v !== value) };
-                                                                                } else {
-                                                                                    return { ...prev, availableMonthDays: [...arr, value] };
-                                                                                }
-                                                                            });
-                                                                        }}
-                                                                    >
-                                                                        {week === "last" ? "Last Week" : `${week}${week === "1" ? "st" : week === "2" ? "nd" : week === "3" ? "rd" : "th"} Week`}
-                                                                    </button>
-                                                                );
-                                                            })}
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-                                
-                                {/* Time Slot Configuration */}
-                                <div className={`mt-6 border-t border-${themeColor}-200 pt-6`}>
-                                    <h4 className={`text-lg font-semibold mb-4 text-${fullColor} flex items-center gap-2`}>
-                                        <Clock className={`w-5 h-5 text-${fullColor}`} /> Time Slot Configuration
-                                    </h4>
-                                    <p className="text-sm text-gray-500 mb-4">Configure the available booking time slots for this package.</p>
-                                    
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                        <div>
-                                            <label className="block font-semibold mb-2 text-base text-neutral-800">Start Time</label>
-                                            <input
-                                                type="time"
-                                                name="timeSlotStart"
-                                                value={form.timeSlotStart}
-                                                onChange={handleChange}
-                                                className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all`}
-                                            />
-                                            <p className="text-xs text-gray-500 mt-1">First available time slot</p>
-                                        </div>
-                                        
-                                        <div>
-                                            <label className="block font-semibold mb-2 text-base text-neutral-800">End Time</label>
-                                            <input
-                                                type="time"
-                                                name="timeSlotEnd"
-                                                value={form.timeSlotEnd}
-                                                onChange={handleChange}
-                                                className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all`}
-                                            />
-                                            <p className="text-xs text-gray-500 mt-1">Last available time slot</p>
-                                        </div>
-                                        
-                                        <div>
-                                            <label className="block font-semibold mb-2 text-base text-neutral-800">Interval (minutes)</label>
-                                            <select
-                                                name="timeSlotInterval"
-                                                value={form.timeSlotInterval}
-                                                onChange={handleChange}
-                                                className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all`}
-                                            >
-                                                <option value="15">15 minutes</option>
-                                                <option value="30">30 minutes</option>
-                                                <option value="45">45 minutes</option>
-                                                <option value="60">1 hour</option>
-                                                <option value="90">1.5 hours</option>
-                                                <option value="120">2 hours</option>
-                                            </select>
-                                            <p className="text-xs text-gray-500 mt-1">Time between slots</p>
-                                        </div>
-                                    </div>
-                                    
-                                    {/* Time Slot Preview */}
-                                    {form.duration && (
-                                        <div className={`mt-6 p-4 bg-${themeColor}-50 rounded-lg border border-${themeColor}-200`}>
-                                            <h4 className={`text-sm font-semibold text-${fullColor} mb-3 flex items-center gap-2`}>
-                                                <Clock className="w-4 h-4" />
-                                                Generated Time Slots Preview
-                                            </h4>
-                                            {generateTimeSlots().length > 0 ? (
-                                                <>
-                                                    <p className={`text-xs text-${themeColor}-700 mb-3`}>
-                                                        {generateTimeSlots().length} slot(s) available based on your configuration
-                                                    </p>
-                                                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-60 overflow-y-auto">
-                                                        {generateTimeSlots().map((slot, idx) => (
-                                                            <div
-                                                                key={idx}
-                                                                className={`bg-white px-3 py-2 rounded border border-${themeColor}-300 text-center`}
-                                                            >
-                                                                <div className={`text-sm font-semibold text-${fullColor}`}>
-                                                                    {formatTimeTo12Hour(slot.start_time)}
-                                                                </div>
-                                                              
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                </>
-                                            ) : (
-                                                <p className={`text-xs text-${themeColor}-700`}>
-                                                    No available slots - check if duration fits within the time range
-                                                </p>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
                             </div>
                         </div>
                         
@@ -1675,7 +1556,7 @@ const EditPackage: React.FC = () => {
                             {(form.giftCards || []).length ? (form.giftCards || []).map((code: string) => {
                                 const giftCard = giftCards.find(g => g.code === code);
                                 return giftCard ? (
-                                    <span key={code} className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-md font-semibold">
+                                    <span key={code} className={`px-2 py-1 bg-${themeColor}-100 text-${fullColor} text-xs rounded-md font-semibold`}>
                                         {giftCard.name}
                                     </span>
                                 ) : null;

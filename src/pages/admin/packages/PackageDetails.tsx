@@ -17,6 +17,7 @@ import { useThemeColor } from '../../../hooks/useThemeColor';
 import { packageService, type Package } from '../../../services';
 import Toast from '../../../components/ui/Toast';
 import { extractIdFromSlug } from '../../../utils/slug';
+import { formatTimeRange } from '../../../utils/timeFormat';
 
 const PackageDetails = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -269,8 +270,51 @@ const PackageDetails = () => {
             </div>
           </div>
 
-          {/* Availability */}
-          {packageData.availability_type === 'daily' && packageData.available_days && (
+          {/* Availability Schedules */}
+          {(packageData as any).availability_schedules && (packageData as any).availability_schedules.length > 0 ? (
+            <div className="p-6 border-b border-gray-100">
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">Availability Schedules</h2>
+              <div className="space-y-3">
+                {(packageData as any).availability_schedules.map((schedule: any, index: number) => (
+                  <div key={schedule.id || index} className={`bg-${themeColor}-50 border border-${themeColor}-200 rounded-lg p-4`}>
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <Calendar className={`h-5 w-5 text-${fullColor}`} />
+                        <span className="font-semibold text-gray-900">Schedule {index + 1}</span>
+                      </div>
+                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                        schedule.is_active 
+                          ? 'bg-green-100 text-green-800' 
+                          : 'bg-gray-100 text-gray-800'
+                      }`}>
+                        {schedule.is_active ? 'Active' : 'Inactive'}
+                      </span>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap gap-1.5">
+                        {schedule.day_configuration.map((day: string) => (
+                          <span key={day} className={`px-2 py-1 bg-${fullColor} text-white text-xs font-medium rounded capitalize`}>
+                            {day}
+                          </span>
+                        ))}
+                      </div>
+                      <div className="flex items-center gap-2 text-sm text-gray-700">
+                        <Clock size={16} className={`text-${fullColor}`} />
+                        <span className="font-medium">
+                          {formatTimeRange(schedule.time_slot_start, schedule.time_slot_end)}
+                        </span>
+                        {schedule.time_slot_interval && (
+                          <span className="text-xs text-gray-500 ml-2">
+                            ({schedule.time_slot_interval} min intervals)
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : packageData.availability_type === 'daily' && packageData.available_days ? (
             <div className="p-6 border-b border-gray-100">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">Weekly Availability</h2>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -300,15 +344,12 @@ const PackageDetails = () => {
                 })}
               </div>
             </div>
-          )}
-
-          {/* Other Availability Types */}
-          {packageData.availability_type !== 'daily' && (
+          ) : packageData.availability_type ? (
             <div className="p-6 border-b border-gray-100">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">Availability</h2>
               <p className="text-gray-700">{formatAvailability(packageData)}</p>
             </div>
-          )}
+          ) : null}
 
           {/* Rooms */}
           {packageData.rooms && packageData.rooms.length > 0 && (
@@ -318,11 +359,11 @@ const PackageDetails = () => {
                 {packageData.rooms.map((room: string | { name?: string; capacity?: number }, idx: number) => {
                   const roomObj = typeof room === 'string' ? { name: room } : room;
                   return (
-                    <div key={idx} className="bg-indigo-50 rounded-lg p-4 border border-indigo-200">
+                    <div key={idx} className={`bg-${themeColor}-50 rounded-lg p-4 border border-${themeColor}-200`}>
                       <div className="flex justify-between items-start">
                         <p className="text-gray-900 font-medium">{roomObj.name || String(room)}</p>
                         {roomObj.capacity && (
-                          <span className="text-indigo-700 text-sm font-semibold">
+                          <span className={`text-${fullColor} text-sm font-semibold`}>
                             <Users className="w-4 h-4 inline mr-1" />
                             {roomObj.capacity}
                           </span>
@@ -392,7 +433,7 @@ const PackageDetails = () => {
                 {packageData.promos.map((promo: string | { name?: string; code?: string }, idx: number) => {
                   const promoObj = typeof promo === 'string' ? { name: promo } : promo;
                   return (
-                    <div key={idx} className="bg-green-50 rounded-lg p-4 border border-green-200">
+                    <div key={idx} className={`bg-${themeColor}-50 rounded-lg p-4 border border-${themeColor}-200`}>
                       <p className="text-gray-900 font-medium">{promoObj.name || promoObj.code || String(promo)}</p>
                     </div>
                   );
@@ -409,7 +450,7 @@ const PackageDetails = () => {
                 {packageData.gift_cards.map((giftCard: string | { code?: string }, idx: number) => {
                   const cardObj = typeof giftCard === 'string' ? { code: giftCard } : giftCard;
                   return (
-                    <div key={idx} className="bg-purple-50 rounded-lg p-4 border border-purple-200">
+                    <div key={idx} className={`bg-${themeColor}-50 rounded-lg p-4 border border-${themeColor}-200`}>
                       <p className="text-gray-900 font-medium">{cardObj.code || String(giftCard)}</p>
                     </div>
                   );

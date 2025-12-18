@@ -1,5 +1,24 @@
 // Customer-related type definitions
 
+// Availability Schedule types
+export interface AttractionAvailabilitySchedule {
+  days: string[];
+  start_time: string;
+  end_time: string;
+}
+
+export interface PackageAvailabilitySchedule {
+  id?: number;
+  package_id?: number;
+  availability_type: string;
+  day_configuration: string[];
+  time_slot_start: string;
+  time_slot_end: string;
+  time_slot_interval?: number;
+  priority?: number;
+  is_active?: boolean;
+}
+
 // User types
 export interface Customer {
   id: string;
@@ -52,6 +71,7 @@ export interface Attraction {
   duration?: string;
   pricingType?: string;
   purchaseLinks?: AttractionPurchaseLink[];
+  availability?: AttractionAvailabilitySchedule[];
 }
 
 // Package types
@@ -75,6 +95,7 @@ export interface Package {
   category: 'celebration' | 'corporate' | 'family' | 'adventure' | 'romance' | 'premium' | string;
   availableLocations: string[];
   bookingLinks?: PackageBookingLink[];
+  availability_schedules?: PackageAvailabilitySchedule[];
 }
 
 // Reservation types

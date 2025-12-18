@@ -100,6 +100,12 @@ export interface AttractionPurchaseLink {
   location_id: number;
 }
 
+export interface AttractionAvailabilitySchedule {
+  days: string[];
+  start_time: string;
+  end_time: string;
+}
+
 export interface GroupedAttraction {
   name: string;
   description: string;
@@ -114,6 +120,7 @@ export interface GroupedAttraction {
   min_age: number;
   locations: GroupedAttractionLocation[];
   purchase_links: AttractionPurchaseLink[];
+  availability?: AttractionAvailabilitySchedule[];
 }
 
 // Types for grouped packages
@@ -135,6 +142,32 @@ export interface PackageBookingLink {
   location_id: number;
 }
 
+export interface PackageAvailabilitySchedule {
+  id?: number;
+  package_id?: number;
+  availability_type: string;
+  day_configuration: string[];
+  time_slot_start: string;
+  time_slot_end: string;
+  time_slot_interval?: number;
+  priority?: number;
+  is_active?: boolean;
+}
+
+export interface PackageAvailabilitySchedule {
+  id?: number;
+  package_id?: number;
+  availability_type: string;
+  day_configuration: string[];
+  time_slot_start: string;
+  time_slot_end: string;
+  time_slot_interval?: number;
+  priority?: number;
+  is_active?: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface GroupedPackage {
   name: string;
   description: string;
@@ -145,6 +178,7 @@ export interface GroupedPackage {
   image: string | string[];
   locations: GroupedPackageLocation[];
   booking_links: PackageBookingLink[];
+  availability_schedules?: PackageAvailabilitySchedule[];
 }
 
 /**
@@ -172,11 +206,27 @@ class CustomerService {
   }
 
   /**
+   * Get single attraction details by ID
+   */
+  async getAttraction(id: number): Promise<ApiResponse<any>> {
+    const response = await api.get(`/attractions/${id}`);
+    return response.data;
+  }
+
+  /**
    * Get packages grouped by name with all available locations
    */
   async getGroupedPackages(search?: string): Promise<ApiResponse<GroupedPackage[]>> {
     const params = search ? { search } : {};
     const response = await api.get('/packages/grouped-by-name', { params });
+    return response.data;
+  }
+
+  /**
+   * Get single package details by ID
+   */
+  async getPackage(id: number): Promise<ApiResponse<any>> {
+    const response = await api.get(`/packages/${id}`);
     return response.data;
   }
 

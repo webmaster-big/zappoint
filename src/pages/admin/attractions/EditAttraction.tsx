@@ -10,6 +10,7 @@ import { ASSET_URL, getStoredUser } from '../../../utils/storage';
 import { categoryService } from '../../../services';
 import type { Category } from '../../../services/CategoryService';
 import { Plus, Trash2, Info, Tag, Calendar, Clock } from 'lucide-react';
+import { formatTimeRange } from '../../../utils/timeFormat';
 
 const EditAttraction = () => {
   const navigate = useNavigate();
@@ -393,7 +394,7 @@ const EditAttraction = () => {
                     ))}
                   </div>
                   <div className="text-xs text-gray-600">
-                    {schedule.start_time} - {schedule.end_time}
+                    {formatTimeRange(schedule.start_time, schedule.end_time)}
                   </div>
                 </div>
               ))}
