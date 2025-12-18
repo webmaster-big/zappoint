@@ -44,22 +44,13 @@ const EditAttraction = () => {
     images: [],
     bookingLink: '',
     embedCode: '',
-    availability_schedules: [
+    availability: [
       {
         days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'],
         start_time: '09:00',
         end_time: '17:00'
       }
     ],
-    availability: {
-      monday: true,
-      tuesday: true,
-      wednesday: true,
-      thursday: true,
-      friday: true,
-      saturday: true,
-      sunday: true
-    },
   });
 
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
@@ -95,30 +86,13 @@ const EditAttraction = () => {
           images: attraction.image ? (Array.isArray(attraction.image) ? attraction.image : [attraction.image]) : [],
           bookingLink: '',
           embedCode: '',
-          availability_schedules: (attraction as any).availability_schedules || [
-            {
-              days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'],
-              start_time: '09:00',
-              end_time: '17:00'
-            }
-          ],
-          availability: typeof attraction.availability === 'object' ? {
-            monday: (attraction.availability as Record<string, boolean>).monday ?? true,
-            tuesday: (attraction.availability as Record<string, boolean>).tuesday ?? true,
-            wednesday: (attraction.availability as Record<string, boolean>).wednesday ?? true,
-            thursday: (attraction.availability as Record<string, boolean>).thursday ?? true,
-            friday: (attraction.availability as Record<string, boolean>).friday ?? true,
-            saturday: (attraction.availability as Record<string, boolean>).saturday ?? true,
-            sunday: (attraction.availability as Record<string, boolean>).sunday ?? true
-          } : {
-            monday: true,
-            tuesday: true,
-            wednesday: true,
-            thursday: true,
-            friday: true,
-            saturday: true,
-            sunday: true
-          },
+          availability: Array.isArray((attraction as any).availability) 
+            ? (attraction as any).availability 
+            : [{
+                days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'],
+                start_time: '09:00',
+                end_time: '17:00'
+              }],
         });
 
         // Set image previews if images exist (handle both string and array)
@@ -165,8 +139,8 @@ const EditAttraction = () => {
   const addSchedule = () => {
     setFormData(prev => ({
       ...prev,
-      availability_schedules: [
-        ...prev.availability_schedules,
+      availability: [
+        ...prev.availability,
         {
           days: [],
           start_time: '09:00',
@@ -179,28 +153,28 @@ const EditAttraction = () => {
   const removeSchedule = (index: number) => {
     setFormData(prev => ({
       ...prev,
-      availability_schedules: prev.availability_schedules.filter((_, i) => i !== index)
+      availability: prev.availability.filter((_, i) => i !== index)
     }));
   };
 
   const toggleScheduleDay = (scheduleIndex: number, day: string) => {
     setFormData(prev => {
-      const newSchedules = [...prev.availability_schedules];
+      const newSchedules = [...prev.availability];
       const schedule = newSchedules[scheduleIndex];
       if (schedule.days.includes(day)) {
         schedule.days = schedule.days.filter(d => d !== day);
       } else {
         schedule.days = [...schedule.days, day];
       }
-      return { ...prev, availability_schedules: newSchedules };
+      return { ...prev, availability: newSchedules };
     });
   };
 
   const updateScheduleTime = (scheduleIndex: number, field: 'start_time' | 'end_time', value: string) => {
     setFormData(prev => {
-      const newSchedules = [...prev.availability_schedules];
+      const newSchedules = [...prev.availability];
       newSchedules[scheduleIndex][field] = value;
-      return { ...prev, availability_schedules: newSchedules };
+      return { ...prev, availability: newSchedules };
     });
   };
 
@@ -316,7 +290,6 @@ const EditAttraction = () => {
         category: formData.category,
         duration: formData.duration ? Number(formData.duration) : undefined,
         duration_unit: formData.durationUnit as 'hours' | 'minutes',
-        availability_schedules: formData.availability_schedules,
         availability: formData.availability,
         image: formData.images.length > 0 ? formData.images : undefined, // Send all images as array
         is_active: true,
@@ -410,7 +383,7 @@ const EditAttraction = () => {
           <div className="pt-2 border-t border-gray-100">
             <h4 className="font-medium text-gray-800 mb-2">Availability Schedules:</h4>
             <div className="space-y-2">
-              {formData.availability_schedules.map((schedule, index) => (
+              {formData.availability.map((schedule, index) => (
                 <div key={index} className="text-sm">
                   <div className="flex flex-wrap gap-1 mb-1">
                     {schedule.days.map(day => (
@@ -650,11 +623,11 @@ const EditAttraction = () => {
                 <Calendar className="w-5 h-5 text-primary" /> Availability Schedules
               </h3>
               <div className="space-y-4">
-                {formData.availability_schedules.map((schedule, index) => (
+                {formData.availability.map((schedule, index) => (
                   <div key={index} className="border border-gray-200 rounded-lg p-4 space-y-4">
                     <div className="flex justify-between items-center">
                       <h4 className="font-semibold text-neutral-800">Schedule {index + 1}</h4>
-                      {formData.availability_schedules.length > 1 && (
+                      {formData.availability.length > 1 && (
                         <button
                           type="button"
                           onClick={() => removeSchedule(index)}

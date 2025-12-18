@@ -75,8 +75,7 @@ export interface CreateAttractionData {
   unit?: string;
   duration?: number;
   duration_unit?: 'hours' | 'minutes';
-  availability?: Record<string, unknown>;
-  availability_schedules?: AttractionAvailabilitySchedule[];
+  availability?: AttractionAvailabilitySchedule[];
   image?: string | string[]; // Support both single image and array
   rating?: number;
   min_age?: number;

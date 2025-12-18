@@ -18,16 +18,6 @@ export interface CreateAttractionsFormData {
   images: string[];
   bookingLink: string;
   embedCode: string;
-  availability_schedules: AttractionAvailabilitySchedule[];
-  // Legacy availability structure (for backward compatibility)
-  availability?: {
-    monday: boolean;
-    tuesday: boolean;
-    wednesday: boolean;
-    thursday: boolean;
-    friday: boolean;
-    saturday: boolean;
-    sunday: boolean;
-  };
+  availability: AttractionAvailabilitySchedule[];
   id?: string;
 }

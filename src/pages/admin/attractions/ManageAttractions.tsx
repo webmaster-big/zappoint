@@ -127,7 +127,11 @@ const ManageAttractions = () => {
         category: attraction.category,
         duration: attraction.duration ? Number(attraction.duration) : undefined,
         duration_unit: attraction.durationUnit as 'hours' | 'minutes',
-        availability: attraction.availability,
+        availability: Array.isArray(attraction.availability) ? attraction.availability : [{
+          days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'],
+          start_time: '09:00',
+          end_time: '17:00'
+        }],
         image: attraction.images?.[0],
         is_active: attraction.status === 'active',
       }));
