@@ -607,7 +607,7 @@ const CreatePurchase = () => {
               
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Phone (Optional)
+                    Phone
                   </label>
                   <input
                     type="tel"
