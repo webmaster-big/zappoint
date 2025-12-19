@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { API_BASE_URL, ASSET_URL, getStoredUser, setStoredUser } from '../../../utils/storage';
+import StandardButton from '../../../components/ui/StandardButton';
 import type { CompanyAdminProfileData } from '../../../types/CompanyAdminProfile.types';
 import { getAuthToken } from '../../../services';
 
@@ -605,30 +606,34 @@ const CompanyAdminProfile = () => {
             <div className="flex space-x-3">
               {isEditing ? (
                 <>
-                  <button
+                  <StandardButton
                     onClick={handleCancel}
-                    className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition flex items-center"
+                    variant="secondary"
+                    size="md"
+                    icon={X}
                   >
-                    <X size={18} className="mr-2" />
                     Cancel
-                  </button>
-                  <button
+                  </StandardButton>
+                  <StandardButton
                     onClick={handleSave}
                     disabled={isLoading}
-                    className={`px-4 py-2 bg-${fullColor} text-white rounded-lg hover:bg-${themeColor}-900 transition flex items-center disabled:opacity-50`}
+                    loading={isLoading}
+                    variant="primary"
+                    size="md"
+                    icon={Save}
                   >
-                    <Save size={18} className="mr-2" />
                     {isLoading ? 'Saving...' : 'Save Changes'}
-                  </button>
+                  </StandardButton>
                 </>
               ) : (
-                <button
+                <StandardButton
                   onClick={handleEdit}
-                  className={`px-4 py-2 bg-${fullColor} text-white rounded-lg hover:bg-${themeColor}-900 transition flex items-center`}
+                  variant="primary"
+                  size="md"
+                  icon={Edit2}
                 >
-                  <Edit2 size={18} className="mr-2" />
                   Edit Profile
-                </button>
+                </StandardButton>
               )}
             </div>
           </div>
@@ -640,18 +645,20 @@ const CompanyAdminProfile = () => {
             {tabs.map((tab) => {
               const Icon = tab.icon;
               return (
-                <button
+                <StandardButton
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center px-6 py-4 border-b-2 font-medium text-sm transition-all ${
+                  variant="ghost"
+                  size="md"
+                  icon={Icon}
+                  className={`rounded-none border-b-2 ${
                     activeTab === tab.id
                       ? `border-${fullColor} text-${fullColor} bg-${themeColor}-50`
                       : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                   }`}
                 >
-                  <Icon size={18} className="mr-2" />
                   {tab.label}
-                </button>
+                </StandardButton>
               );
             })}
           </div>

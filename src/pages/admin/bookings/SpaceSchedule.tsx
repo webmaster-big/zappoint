@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Calendar, ChevronLeft, ChevronRight, Clock, Users, Package as PackageIcon } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, Clock, Users, Package as PackageIcon, X } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import bookingService from '../../../services/bookingService';
 import { roomService } from '../../../services/RoomService';
+import StandardButton from '../../../components/ui/StandardButton';
 import type { Booking } from '../../../services/bookingService';
 import type { Room } from '../../../services/RoomService';
 
@@ -264,12 +265,14 @@ const SpaceSchedule = () => {
       <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <button
+            <StandardButton
+              variant="ghost"
+              size="sm"
+              icon={ChevronLeft}
               onClick={goToPreviousDay}
-              className="p-2 hover:bg-gray-100 rounded-lg transition"
             >
-              <ChevronLeft className="w-5 h-5" />
-            </button>
+              {''}
+            </StandardButton>
             
             <div className="flex items-center gap-2">
               <Calendar className={`w-5 h-5 text-${fullColor}`} />
@@ -283,20 +286,22 @@ const SpaceSchedule = () => {
               </h2>
             </div>
 
-            <button
+            <StandardButton
+              variant="ghost"
+              size="sm"
+              icon={ChevronRight}
               onClick={goToNextDay}
-              className="p-2 hover:bg-gray-100 rounded-lg transition"
             >
-              <ChevronRight className="w-5 h-5" />
-            </button>
+              {''}
+            </StandardButton>
           </div>
 
-          <button
+          <StandardButton
+            variant="primary"
             onClick={goToToday}
-            className={`px-4 py-2 bg-${fullColor} text-white rounded-lg hover:opacity-90 transition font-medium`}
           >
             Today
-          </button>
+          </StandardButton>
         </div>
       </div>
 
@@ -453,12 +458,14 @@ const SpaceSchedule = () => {
             <div className="p-6">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xl font-semibold text-gray-900">Booking Details</h3>
-                <button
+                <StandardButton
+                  variant="ghost"
+                  size="sm"
+                  icon={X}
                   onClick={() => setSelectedBooking(null)}
-                  className="text-gray-500 hover:text-gray-800"
                 >
-                  <span className="text-2xl leading-none">&times;</span>
-                </button>
+                  {''}
+                </StandardButton>
               </div>
 
               {/* Customer Information */}
@@ -626,12 +633,13 @@ const SpaceSchedule = () => {
 
               {/* Footer Buttons */}
               <div className="mt-6 pt-4 border-t border-gray-200">
-                <button
+                <StandardButton
+                  variant="secondary"
                   onClick={() => setSelectedBooking(null)}
-                  className="w-full px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium rounded-lg transition-colors"
+                  fullWidth
                 >
                   Close
-                </button>
+                </StandardButton>
               </div>
             </div>
           </div>

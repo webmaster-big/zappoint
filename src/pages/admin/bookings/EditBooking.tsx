@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Calendar, Users, DollarSign, Package, Clock, Mail, Phone, User, Home, Gift, Tag, Plus, Minus, AlertCircle } from 'lucide-react';
+import StandardButton from '../../../components/ui/StandardButton';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import bookingService, { type Booking } from '../../../services/bookingService';
 import packageService from '../../../services/PackageService';
@@ -382,12 +383,13 @@ const EditBooking: React.FC = () => {
           <AlertCircle className="h-16 w-16 text-red-600 mx-auto mb-4" />
           <h1 className="text-3xl font-bold text-gray-800 mb-4">Booking Not Found</h1>
           <p className="text-gray-600 mb-6">The booking you're looking for doesn't exist.</p>
-          <button
+          <StandardButton
+            variant="primary"
+            size="md"
             onClick={() => navigate('/bookings')}
-            className={`px-6 py-2 bg-${fullColor} text-white rounded-lg hover:bg-${themeColor}-900`}
           >
             Back to Bookings
-          </button>
+          </StandardButton>
         </div>
       </div>
     );
@@ -595,21 +597,23 @@ const EditBooking: React.FC = () => {
                       {isSelected && selectedAttraction && (
                         <div className="mt-3 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                           <label className="text-sm font-medium text-gray-700">Quantity:</label>
-                          <button
-                            type="button"
+                          <StandardButton
+                            variant="ghost"
+                            size="sm"
+                            icon={Minus}
                             onClick={() => handleAttractionQuantityChange(attraction.id.toString(), selectedAttraction.quantity - 1)}
-                            className="p-1 rounded hover:bg-gray-200"
                           >
-                            <Minus size={16} />
-                          </button>
+                            {''}
+                          </StandardButton>
                           <span className="w-12 text-center">{selectedAttraction.quantity}</span>
-                          <button
-                            type="button"
+                          <StandardButton
+                            variant="ghost"
+                            size="sm"
+                            icon={Plus}
                             onClick={() => handleAttractionQuantityChange(attraction.id.toString(), selectedAttraction.quantity + 1)}
-                            className="p-1 rounded hover:bg-gray-200"
                           >
-                            <Plus size={16} />
-                          </button>
+                            {''}
+                          </StandardButton>
                         </div>
                       )}
                     </div>
@@ -653,21 +657,23 @@ const EditBooking: React.FC = () => {
                       {isSelected && selectedAddOn && (
                         <div className="mt-3 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                           <label className="text-sm font-medium text-gray-700">Quantity:</label>
-                          <button
-                            type="button"
+                          <StandardButton
+                            variant="ghost"
+                            size="sm"
+                            icon={Minus}
                             onClick={() => handleAddOnQuantityChange(addonData.id, selectedAddOn.quantity - 1)}
-                            className="p-1 rounded hover:bg-gray-200"
                           >
-                            <Minus size={16} />
-                          </button>
+                            {''}
+                          </StandardButton>
                           <span className="w-12 text-center">{selectedAddOn.quantity}</span>
-                          <button
-                            type="button"
+                          <StandardButton
+                            variant="ghost"
+                            size="sm"
+                            icon={Plus}
                             onClick={() => handleAddOnQuantityChange(addonData.id, selectedAddOn.quantity + 1)}
-                            className="p-1 rounded hover:bg-gray-200"
                           >
-                            <Plus size={16} />
-                          </button>
+                            {''}
+                          </StandardButton>
                         </div>
                       )}
                     </div>
@@ -909,24 +915,23 @@ const EditBooking: React.FC = () => {
 
           {/* Form Actions */}
           <div className="px-6 py-5 bg-gray-50 text-right space-x-3">
-            <button
-              type="button"
+            <StandardButton
+              variant="secondary"
+              size="md"
               onClick={() => navigate('/bookings')}
               disabled={submitting}
-              className="px-5 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-800 hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Cancel
-            </button>
-            <button
+            </StandardButton>
+            <StandardButton
+              variant="primary"
+              size="md"
               type="submit"
               disabled={submitting}
-              className={`px-5 py-2.5 bg-${fullColor} border border-transparent rounded-lg shadow-sm text-sm font-medium text-white hover:bg-${themeColor}-900 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 inline-flex`}
+              loading={submitting}
             >
-              {submitting && (
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-              )}
               {submitting ? 'Updating...' : 'Update Booking'}
-            </button>
+            </StandardButton>
           </div>
         </form>
       </div>

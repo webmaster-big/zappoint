@@ -16,6 +16,7 @@ import {
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { packageService, type Package } from '../../../services';
 import Toast from '../../../components/ui/Toast';
+import StandardButton from '../../../components/ui/StandardButton';
 import { extractIdFromSlug } from '../../../utils/slug';
 import { formatTimeRange } from '../../../utils/timeFormat';
 
@@ -97,12 +98,13 @@ const PackageDetails = () => {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <h2 className="text-2xl font-bold text-gray-900 mb-4">Package not found</h2>
-          <button
+          <StandardButton
+            variant="secondary"
+            size="md"
             onClick={() => navigate('/packages')}
-            className={`text-${fullColor} hover:underline`}
           >
             Back to Packages
-          </button>
+          </StandardButton>
         </div>
       </div>
     );
@@ -124,12 +126,12 @@ const PackageDetails = () => {
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-4">
-            <button
+            <StandardButton
+              variant="ghost"
+              size="sm"
+              icon={ArrowLeft}
               onClick={() => navigate('/packages')}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              <ArrowLeft className="h-5 w-5 text-gray-600" />
-            </button>
+            />
           </div>
           <div className="flex justify-between items-start">
             <div>
@@ -144,20 +146,22 @@ const PackageDetails = () => {
               }`}>
                 {packageData.is_active ? 'Active' : 'Inactive'}
               </span>
-              <button
+              <StandardButton
+                variant="primary"
+                size="md"
+                icon={Edit}
                 onClick={() => navigate(`/packages/edit/${packageId}`)}
-                className={`flex items-center px-4 py-2 bg-${themeColor}-600 text-white rounded-lg hover:bg-${themeColor}-700 transition-colors`}
               >
-                <Edit className="h-4 w-4 mr-2" />
                 Edit
-              </button>
-              <button
+              </StandardButton>
+              <StandardButton
+                variant="danger"
+                size="md"
+                icon={Trash2}
                 onClick={handleDelete}
-                className="flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
               >
-                <Trash2 className="h-4 w-4 mr-2" />
                 Delete
-              </button>
+              </StandardButton>
             </div>
           </div>
         </div>

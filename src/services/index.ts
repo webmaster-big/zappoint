@@ -58,6 +58,17 @@ export { categoryService } from './CategoryService';
 export type { Category, CreateCategoryData, UpdateCategoryData } from './CategoryService';
 export type { Location, LocationFilters, CreateLocationData, UpdateLocationData } from './LocationService';
 
+// Analytics service exports
+export { default as analyticsService } from './AnalyticsService';
+export type { 
+  LocationAnalyticsParams, 
+  CompanyAnalyticsParams,
+  ExportAnalyticsParams, 
+  ExportCompanyAnalyticsParams,
+  LocationAnalyticsResponse,
+  CompanyAnalyticsResponse
+} from './AnalyticsService';
+
 // Common API response types
 export type { ApiResponse, PaginatedResponse } from './PackageService';
 

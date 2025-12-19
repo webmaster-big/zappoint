@@ -41,10 +41,32 @@ export interface LocationManagerAnalyticsMetrics {
     Afternoon: number;
     Evening: number;
   };
+  timeSlotCounts: {
+    Morning: number;
+    Afternoon: number;
+    Evening: number;
+  };
   attractionPopularity: Record<string, number>;
   bookingStatus: Record<string, number>;
+  purchaseStatus: Record<string, number>;
   avgBookingValue: number;
+  avgPurchaseValue: number;
+  bookingRevenue: number;
+  purchaseRevenue: number;
   occupancyRate: number;
+  dailyRevenue: { date: string; amount: number }[];
+  dayRevenue: Record<string, number>;
+  dayBookingCount: Record<string, number>;
+  recentTransactions: Array<{
+    type: 'Package Booking' | 'Ticket Purchase';
+    name: string;
+    amount: number;
+    date: string;
+    customer: string;
+    status: string;
+  }>;
+  revenueChange: number;
+  revenueGrowth: 'up' | 'down';
 }
 
 export interface LocationManagerAnalyticsMetricCardProps {

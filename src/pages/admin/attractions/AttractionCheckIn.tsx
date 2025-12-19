@@ -17,6 +17,7 @@ import {
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { attractionPurchaseService, type AttractionPurchase } from '../../../services/AttractionPurchaseService';
 import Toast from '../../../components/ui/Toast';
+import StandardButton from '../../../components/ui/StandardButton';
 
 interface ScanResult {
   purchaseId: number;
@@ -384,15 +385,15 @@ const AttractionCheckIn = () => {
                 </p>
                 
                 <div className="flex flex-col sm:flex-row gap-4">
-                  <button
+                  <StandardButton
+                    variant="primary"
+                    size="lg"
                     onClick={startScanning}
                     disabled={processing}
-                    className={`px-6 py-3 bg-${themeColor}-600 text-white rounded-lg hover:bg-${themeColor}-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed`}
-                    title="Start camera to scan QR codes in real-time"
+                    icon={Camera}
                   >
-                    <Camera className="h-5 w-5" />
                     Start Camera
-                  </button>
+                  </StandardButton>
 
                   <label className="px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors flex items-center gap-2 cursor-pointer" title="Upload a QR code image from your device">
                     <Upload className="h-5 w-5" />
@@ -421,12 +422,13 @@ const AttractionCheckIn = () => {
           {/* Scanner Controls */}
           {scanning && !processing && (
             <div className="mt-4 flex justify-center">
-              <button
+              <StandardButton
+                variant="danger"
+                size="md"
                 onClick={stopScanning}
-                className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
               >
                 Stop Camera
-              </button>
+              </StandardButton>
             </div>
           )}
 
@@ -449,12 +451,14 @@ const AttractionCheckIn = () => {
               {/* Modal Header */}
               <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex items-center justify-between">
                 <h2 className="text-xl font-bold text-gray-800">Verify Ticket Details</h2>
-                <button
+                <StandardButton
+                  variant="ghost"
+                  size="sm"
                   onClick={handleCancelCheckIn}
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                  icon={X}
                 >
-                  <X className="h-5 w-5 text-gray-600" />
-                </button>
+                  {''}
+                </StandardButton>
               </div>
 
               {/* Modal Body */}
@@ -623,40 +627,38 @@ const AttractionCheckIn = () => {
 
               {/* Modal Footer - Action Buttons */}
               <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 p-6 flex gap-4">
-                <button
+                <StandardButton
+                  variant="secondary"
+                  size="lg"
                   onClick={handleCancelCheckIn}
-                  className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors font-medium"
+                  fullWidth
                 >
                   Cancel
-                </button>
+                </StandardButton>
                 
                 {verifiedPurchase.status === 'pending' && (
-                  <button
+                  <StandardButton
+                    variant="primary"
+                    size="lg"
                     onClick={handleConfirmCheckIn}
                     disabled={processing}
-                    className={`flex-1 px-6 py-3 bg-${themeColor}-600 text-white rounded-lg hover:bg-${themeColor}-700 transition-colors font-medium flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed`}
+                    loading={processing}
+                    icon={CheckCircle}
+                    fullWidth
                   >
-                    {processing ? (
-                      <>
-                        <RefreshCw className="h-5 w-5 animate-spin" />
-                        Checking In...
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle className="h-5 w-5" />
-                        Confirm Check-In
-                      </>
-                    )}
-                  </button>
+                    {processing ? 'Checking In...' : 'Confirm Check-In'}
+                  </StandardButton>
                 )}
                 
                 {verifiedPurchase.status !== 'pending' && (
-                  <button
+                  <StandardButton
+                    variant="primary"
+                    size="lg"
                     onClick={handleCancelCheckIn}
-                    className={`flex-1 px-6 py-3 bg-${themeColor}-600 text-white rounded-lg hover:bg-${themeColor}-700 transition-colors font-medium`}
+                    fullWidth
                   >
                     Close & Scan Next
-                  </button>
+                  </StandardButton>
                 )}
               </div>
             </div>
@@ -777,23 +779,26 @@ const AttractionCheckIn = () => {
 
             {/* Actions */}
             <div className="flex gap-4">
-              <button
+              <StandardButton
+                variant="primary"
+                size="lg"
                 onClick={() => {
                   resetScan();
                   startScanning();
                 }}
-                className={`flex-1 px-6 py-3 bg-${themeColor}-600 text-white rounded-lg hover:bg-${themeColor}-700 transition-colors flex items-center justify-center gap-2`}
+                icon={Camera}
+                fullWidth
               >
-                <Camera className="h-5 w-5" />
                 Scan Next Ticket
-              </button>
+              </StandardButton>
               
-              <button
+              <StandardButton
+                variant="secondary"
+                size="lg"
                 onClick={resetScan}
-                className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
               >
                 Reset
-              </button>
+              </StandardButton>
             </div>
           </div>
         )}

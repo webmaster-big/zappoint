@@ -12,6 +12,7 @@ import {
   Filter,
   Trash2
 } from 'lucide-react';
+import StandardButton from '../../components/ui/StandardButton';
 import { useThemeColor } from '../../hooks/useThemeColor';
 import type { NotificationsNotification } from '../../types/Notifications.types';
 import { API_BASE_URL } from '../../utils/storage';
@@ -328,33 +329,36 @@ const Notifications = () => {
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-4">
         <div className="flex items-center justify-between">
           <div className="flex gap-2">
-            <button
+            <StandardButton
+              variant="secondary"
+              size="sm"
               onClick={() => setShowFilters(!showFilters)}
-              className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
+              icon={Filter}
             >
-              <Filter className="h-4 w-4" />
               Filter
-            </button>
+            </StandardButton>
             
             {unreadCount > 0 && (
-              <button
+              <StandardButton
+                variant="primary"
+                size="sm"
                 onClick={markAllAsRead}
-                className={`flex items-center gap-2 px-3 py-2 text-sm text-${fullColor} hover:bg-${themeColor}-50 rounded-lg transition-colors`}
+                icon={CheckCircle}
               >
-                <CheckCircle className="h-4 w-4" />
                 Mark all read
-              </button>
+              </StandardButton>
             )}
           </div>
 
           {notifications.length > 0 && (
-            <button
+            <StandardButton
+              variant="ghost"
+              size="sm"
               onClick={clearAllNotifications}
-              className="flex items-center gap-2 px-3 py-2 text-sm text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+              icon={Trash2}
             >
-              <Trash2 className="h-4 w-4" />
               Clear all
-            </button>
+            </StandardButton>
           )}
         </div>
 
@@ -362,46 +366,34 @@ const Notifications = () => {
         {showFilters && (
           <div className="mt-4 pt-4 border-t border-gray-100">
             <div className="flex gap-2 flex-wrap">
-              <button
+              <StandardButton
+                variant={filter === 'all' ? 'primary' : 'secondary'}
+                size="sm"
                 onClick={() => setFilter('all')}
-                className={`px-3 py-2 text-sm rounded-lg transition-colors ${
-                  filter === 'all'
-                    ? `bg-${fullColor} text-white`
-                    : 'text-gray-700 hover:bg-gray-50'
-                }`}
               >
                 All
-              </button>
-              <button
+              </StandardButton>
+              <StandardButton
+                variant={filter === 'unread' ? 'primary' : 'secondary'}
+                size="sm"
                 onClick={() => setFilter('unread')}
-                className={`px-3 py-2 text-sm rounded-lg transition-colors ${
-                  filter === 'unread'
-                    ? `bg-${fullColor} text-white`
-                    : 'text-gray-700 hover:bg-gray-50'
-                }`}
               >
                 Unread
-              </button>
-              <button
+              </StandardButton>
+              <StandardButton
+                variant={filter === 'bookings' ? 'primary' : 'secondary'}
+                size="sm"
                 onClick={() => setFilter('bookings')}
-                className={`px-3 py-2 text-sm rounded-lg transition-colors ${
-                  filter === 'bookings'
-                    ? `bg-${fullColor} text-white`
-                    : 'text-gray-700 hover:bg-gray-50'
-                }`}
               >
                 Bookings
-              </button>
-              <button
+              </StandardButton>
+              <StandardButton
+                variant={filter === 'purchases' ? 'primary' : 'secondary'}
+                size="sm"
                 onClick={() => setFilter('purchases')}
-                className={`px-3 py-2 text-sm rounded-lg transition-colors ${
-                  filter === 'purchases'
-                    ? `bg-${fullColor} text-white`
-                    : 'text-gray-700 hover:bg-gray-50'
-                }`}
               >
                 Purchases
-              </button>
+              </StandardButton>
             </div>
           </div>
         )}
@@ -490,21 +482,21 @@ const Notifications = () => {
                         {/* Actions */}
                         <div className="flex items-center gap-1 flex-shrink-0">
                           {!notification.read && (
-                            <button
+                            <StandardButton
+                              variant="ghost"
+                              size="sm"
                               onClick={() => markAsRead(notification.id)}
-                              className={`p-1 text-gray-400 hover:text-${fullColor} transition-colors`}
+                              icon={Check}
                               title="Mark as read"
-                            >
-                              <Check className="h-4 w-4" />
-                            </button>
+                            />
                           )}
-                          <button
+                          <StandardButton
+                            variant="ghost"
+                            size="sm"
                             onClick={() => deleteNotification(notification.id)}
-                            className="p-1 text-gray-400 hover:text-red-600 transition-colors"
+                            icon={Trash2}
                             title="Delete notification"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
+                          />
                         </div>
                       </div>
                     </div>
@@ -524,28 +516,22 @@ const Notifications = () => {
               Showing page {currentPage} of {totalPages} ({totalNotifications} total)
             </div>
             <div className="flex gap-2">
-              <button
+              <StandardButton
+                variant="secondary"
+                size="sm"
                 onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                 disabled={currentPage === 1}
-                className={`px-3 py-2 text-sm rounded-lg transition-colors ${
-                  currentPage === 1
-                    ? 'text-gray-400 cursor-not-allowed'
-                    : `text-${fullColor} hover:bg-${themeColor}-50`
-                }`}
               >
                 Previous
-              </button>
-              <button
+              </StandardButton>
+              <StandardButton
+                variant="secondary"
+                size="sm"
                 onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                 disabled={currentPage === totalPages}
-                className={`px-3 py-2 text-sm rounded-lg transition-colors ${
-                  currentPage === totalPages
-                    ? 'text-gray-400 cursor-not-allowed'
-                    : `text-${fullColor} hover:bg-${themeColor}-50`
-                }`}
               >
                 Next
-              </button>
+              </StandardButton>
             </div>
           </div>
         </div>

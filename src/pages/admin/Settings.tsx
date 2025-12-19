@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Palette, Lock, Mail, CheckCircle, X, Eye, EyeOff, Building2, MapPin, Trash2 } from 'lucide-react';
 import { useThemeColor } from '../../hooks/useThemeColor';
+import StandardButton from '../../components/ui/StandardButton';
 import {
   getAuthorizeNetAccount,
   getAllAuthorizeNetAccounts,
@@ -500,12 +501,13 @@ const Settings = () => {
                   <p className="text-sm text-gray-900">{currentEmail || 'No email set'}</p>
                 </div>
               </div>
-              <button
+              <StandardButton
                 onClick={openEmailModal}
-                className={`px-4 py-2 text-sm font-medium text-${themeColor}-600 hover:text-${themeColor}-700 hover:bg-${themeColor}-50 rounded-lg transition-colors`}
+                variant="ghost"
+                size="sm"
               >
                 Change Email
-              </button>
+              </StandardButton>
             </div>
 
             {/* Password Section */}
@@ -519,12 +521,13 @@ const Settings = () => {
                   <p className="text-sm text-gray-500">••••••••</p>
                 </div>
               </div>
-              <button
+              <StandardButton
                 onClick={openPasswordModal}
-                className={`px-4 py-2 text-sm font-medium text-${themeColor}-600 hover:text-${themeColor}-700 hover:bg-${themeColor}-50 rounded-lg transition-colors`}
+                variant="ghost"
+                size="sm"
               >
                 Change Password
-              </button>
+              </StandardButton>
             </div>
           </div>
         </div>
@@ -566,31 +569,34 @@ const Settings = () => {
                 </div>
                 <div className="flex gap-2">
                   {userRole === 'company_admin' && (
-                    <button
+                    <StandardButton
                       onClick={() => {
                         setShowAllAccountsModal(true);
                         fetchAllAuthorizeAccounts();
                       }}
-                      className={`px-4 py-2 text-sm font-medium text-${themeColor}-600 hover:text-${themeColor}-700 hover:bg-${themeColor}-50 rounded-lg transition-colors flex items-center gap-2`}
+                      variant="ghost"
+                      size="sm"
+                      icon={Building2}
                     >
-                      <Building2 size={16} />
                       View All
-                    </button>
+                    </StandardButton>
                   )}
                   {authorizeConnected ? (
-                    <button
+                    <StandardButton
                       onClick={handleAuthorizeDisconnect}
-                      className="px-4 py-2 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                      variant="danger"
+                      size="sm"
                     >
                       Disconnect
-                    </button>
+                    </StandardButton>
                   ) : (
-                    <button
+                    <StandardButton
                       onClick={() => setShowAuthorizeModal(true)}
-                      className={`px-4 py-2 text-sm font-medium text-${themeColor}-600 hover:text-${themeColor}-700 hover:bg-${themeColor}-50 rounded-lg transition-colors`}
+                      variant="ghost"
+                      size="sm"
                     >
                       Connect Account
-                    </button>
+                    </StandardButton>
                   )}
                 </div>
               </div>
@@ -620,9 +626,10 @@ const Settings = () => {
                 const shade2 = shadeEntries[1]?.[1] || shadeEntries[0]?.[1] || '#000';
                 
                 return (
-                  <button
+                  <StandardButton
                     key={color.name}
                     onClick={() => handleColorSelect(color.name)}
+                    variant="ghost"
                     className={`group relative flex flex-col items-center gap-2 p-3 rounded-lg border-2 transition-all hover:scale-105 ${
                       selectedColor === color.name
                         ? 'border-gray-900 bg-gray-50 shadow-md'
@@ -648,7 +655,7 @@ const Settings = () => {
                         <CheckCircle size={16} className="text-white" />
                       </div>
                     )}
-                  </button>
+                  </StandardButton>
                 );
               })}
             </div>
@@ -663,10 +670,11 @@ const Settings = () => {
                 {Object.entries(
                   AVAILABLE_COLORS.find((c) => c.name === selectedColor)?.shades || {}
                 ).map(([shade, hex]) => (
-                  <button
+                  <StandardButton
                     key={shade}
                     onClick={() => handleShadeSelect(shade)}
-                    className={`group relative cursor-pointer transition-all ${
+                    variant="ghost"
+                    className={`group relative cursor-pointer transition-all p-0 ${
                       selectedShade === shade ? 'ring-4 ring-green-500 ring-offset-2' : 'hover:scale-110'
                     }`}
                     title={`${selectedColor}-${shade}: ${hex}`}
@@ -687,7 +695,7 @@ const Settings = () => {
                         {shade}
                       </span>
                     </div>
-                  </button>
+                  </StandardButton>
                 ))}
               </div>
             </div>
@@ -701,7 +709,7 @@ const Settings = () => {
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Dropdown Layout */}
-            <button
+            <StandardButton
               onClick={() => {
                 setSidebarLayout('dropdown');
                 localStorage.setItem('zapzone_sidebar_layout', 'dropdown');
@@ -710,7 +718,8 @@ const Settings = () => {
                 setShowSuccess(true);
                 setTimeout(() => setShowSuccess(false), 3000);
               }}
-              className={`relative p-5 rounded-xl border-2 transition-all text-left hover:scale-[1.02] ${
+              variant="ghost"
+              className={`relative p-5 rounded-xl border-2 transition-all text-left hover:scale-[1.02] h-auto ${
                 sidebarLayout === 'dropdown'
                   ? `border-${themeColor}-600 bg-${themeColor}-50 shadow-md`
                   : 'border-gray-200 hover:border-gray-300 hover:shadow-sm'
@@ -743,10 +752,10 @@ const Settings = () => {
                   </div>
                 </div>
               </div>
-            </button>
+            </StandardButton>
 
             {/* Grouped Layout */}
-            <button
+            <StandardButton
               onClick={() => {
                 setSidebarLayout('grouped');
                 localStorage.setItem('zapzone_sidebar_layout', 'grouped');
@@ -783,7 +792,7 @@ const Settings = () => {
                   <span>Manage Bookings</span>
                 </div>
               </div>
-            </button>
+            </StandardButton>
           </div>
         </div>
 
@@ -791,12 +800,13 @@ const Settings = () => {
         {showEmailModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-backdrop-fade" onClick={() => setShowEmailModal(false)}>
             <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-5 relative animate-scale-in" onClick={(e) => e.stopPropagation()}>
-              <button
+              <StandardButton
                 onClick={() => setShowEmailModal(false)}
-                className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                <X size={20} />
-              </button>
+                variant="ghost"
+                size="sm"
+                icon={X}
+                className="absolute top-3 right-3 text-gray-400 hover:text-gray-600"
+              />
               
               <div className="mb-4">
                 <h3 className="text-xl font-bold text-gray-900">Change Email Address</h3>
@@ -843,30 +853,32 @@ const Settings = () => {
                       placeholder="Enter your password"
                       required
                     />
-                    <button
+                    <StandardButton
                       type="button"
                       onClick={() => setShowEmailPassword(!showEmailPassword)}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                    >
-                      {showEmailPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                    </button>
+                      variant="ghost"
+                      size="sm"
+                      icon={showEmailPassword ? EyeOff : Eye}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0"
+                    />
                   </div>
                 </div>
 
                 <div className="flex gap-2 pt-3">
-                  <button
-                    type="button"
+                  <StandardButton
+                    variant="secondary"
                     onClick={() => setShowEmailModal(false)}
-                    className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition-colors"
+                    fullWidth
                   >
                     Cancel
-                  </button>
-                  <button
+                  </StandardButton>
+                  <StandardButton
                     type="submit"
-                    className={`flex-1 px-3 py-2 text-sm bg-${themeColor}-600 text-white rounded-lg font-medium hover:bg-${themeColor}-700 transition-colors`}
+                    variant="primary"
+                    fullWidth
                   >
                     Update Email
-                  </button>
+                  </StandardButton>
                 </div>
               </form>
             </div>
@@ -877,12 +889,13 @@ const Settings = () => {
         {showPasswordModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-backdrop-fade" onClick={() => setShowPasswordModal(false)}>
             <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-5 relative animate-scale-in" onClick={(e) => e.stopPropagation()}>
-              <button
+              <StandardButton
                 onClick={() => setShowPasswordModal(false)}
-                className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                <X size={20} />
-              </button>
+                variant="ghost"
+                size="sm"
+                icon={X}
+                className="absolute top-3 right-3 text-gray-400 hover:text-gray-600"
+              />
               
               <div className="mb-4">
                 <h3 className="text-xl font-bold text-gray-900">Change Password</h3>
@@ -903,13 +916,14 @@ const Settings = () => {
                       placeholder="Enter current password"
                       required
                     />
-                    <button
+                    <StandardButton
                       type="button"
                       onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                    >
-                      {showCurrentPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                    </button>
+                      variant="ghost"
+                      size="sm"
+                      icon={showCurrentPassword ? EyeOff : Eye}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0"
+                    />
                   </div>
                 </div>
 
@@ -926,13 +940,14 @@ const Settings = () => {
                       placeholder="Enter new password"
                       required
                     />
-                    <button
+                    <StandardButton
                       type="button"
                       onClick={() => setShowNewPassword(!showNewPassword)}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                    >
-                      {showNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                    </button>
+                      variant="ghost"
+                      size="sm"
+                      icon={showNewPassword ? EyeOff : Eye}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0"
+                    />
                   </div>
                   <p className="text-xs text-gray-500 mt-1">Must be at least 8 characters</p>
                 </div>
@@ -950,30 +965,32 @@ const Settings = () => {
                       placeholder="Confirm new password"
                       required
                     />
-                    <button
+                    <StandardButton
                       type="button"
                       onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                    >
-                      {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                    </button>
+                      variant="ghost"
+                      size="sm"
+                      icon={showConfirmPassword ? EyeOff : Eye}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0"
+                    />
                   </div>
                 </div>
 
                 <div className="flex gap-2 pt-3">
-                  <button
-                    type="button"
+                  <StandardButton
+                    variant="secondary"
                     onClick={() => setShowPasswordModal(false)}
-                    className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition-colors"
+                    fullWidth
                   >
                     Cancel
-                  </button>
-                  <button
+                  </StandardButton>
+                  <StandardButton
                     type="submit"
-                    className={`flex-1 px-3 py-2 text-sm bg-${themeColor}-600 text-white rounded-lg font-medium hover:bg-${themeColor}-700 transition-colors`}
+                    variant="primary"
+                    fullWidth
                   >
                     Update Password
-                  </button>
+                  </StandardButton>
                 </div>
               </form>
             </div>
@@ -995,12 +1012,13 @@ const Settings = () => {
                       <p className="text-sm text-gray-600 mt-1">View all connected Authorize.Net accounts across locations</p>
                     </div>
                   </div>
-                  <button
+                  <StandardButton
                     onClick={() => setShowAllAccountsModal(false)}
-                    className="text-gray-400 hover:text-gray-600 transition-colors"
-                  >
-                    <X size={24} />
-                  </button>
+                    variant="ghost"
+                    size="sm"
+                    icon={X}
+                    className="text-gray-400 hover:text-gray-600"
+                  />
                 </div>
               </div>
 
@@ -1076,14 +1094,15 @@ const Settings = () => {
                             <div className={`w-3 h-3 rounded-full ${
                               account.is_active ? 'bg-green-500 animate-pulse' : 'bg-gray-400'
                             }`}></div>
-                            <button
+                            <StandardButton
                               onClick={() => handleLocationDisconnect(account.location_id, account.location.name)}
-                              className="px-3 py-2 text-xs font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors flex items-center gap-1.5"
+                              variant="danger"
+                              size="sm"
+                              icon={Trash2}
                               title="Disconnect this location"
                             >
-                              <Trash2 size={14} />
                               Disconnect
-                            </button>
+                            </StandardButton>
                           </div>
                         </div>
                       </div>
@@ -1094,21 +1113,23 @@ const Settings = () => {
 
               <div className="p-6 border-t border-gray-200">
                 <div className="flex gap-3">
-                  <button
+                  <StandardButton
                     onClick={() => setShowAllAccountsModal(false)}
-                    className="flex-1 px-4 py-3 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition-colors"
+                    variant="secondary"
+                    fullWidth
                   >
                     Close
-                  </button>
-                  <button
+                  </StandardButton>
+                  <StandardButton
                     onClick={() => {
                       setShowAllAccountsModal(false);
                       setShowAuthorizeModal(true);
                     }}
-                    className={`flex-1 px-4 py-3 bg-${themeColor}-600 text-white rounded-lg font-medium hover:bg-${themeColor}-700 transition-colors`}
+                    variant="primary"
+                    fullWidth
                   >
                     Connect New Location
-                  </button>
+                  </StandardButton>
                 </div>
               </div>
             </div>
@@ -1119,7 +1140,7 @@ const Settings = () => {
         {showAuthorizeModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-backdrop-fade" onClick={() => { setShowAuthorizeModal(false); setAuthorizeApiLoginId(''); setAuthorizeTransactionKey(''); setAuthorizePublicClientKey(''); setSelectedLocationId(null); setShowTransactionKey(false); setShowPublicClientKey(false); }}>
             <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-5 relative animate-scale-in" onClick={(e) => e.stopPropagation()}>
-              <button
+              <StandardButton
                 onClick={() => {
                   setShowAuthorizeModal(false);
                   setAuthorizeApiLoginId('');
@@ -1129,10 +1150,11 @@ const Settings = () => {
                   setShowTransactionKey(false);
                   setShowPublicClientKey(false);
                 }}
-                className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                <X size={20} />
-              </button>
+                variant="ghost"
+                size="sm"
+                icon={X}
+                className="absolute top-3 right-3 text-gray-400 hover:text-gray-600"
+              />
               
               <div className="mb-4">
                 <h3 className="text-xl font-bold text-gray-900">Connect Authorize.Net</h3>
@@ -1190,13 +1212,14 @@ const Settings = () => {
                       placeholder="Enter Transaction Key"
                       required
                     />
-                    <button
+                    <StandardButton
                       type="button"
                       onClick={() => setShowTransactionKey(!showTransactionKey)}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                    >
-                      {showTransactionKey ? <EyeOff size={16} /> : <Eye size={16} />}
-                    </button>
+                      variant="ghost"
+                      size="sm"
+                      icon={showTransactionKey ? EyeOff : Eye}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0"
+                    />
                   </div>
                 </div>
 
@@ -1213,13 +1236,14 @@ const Settings = () => {
                       placeholder="Enter Public Client Key"
                       required
                     />
-                    <button
+                    <StandardButton
                       type="button"
                       onClick={() => setShowPublicClientKey(!showPublicClientKey)}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                    >
-                      {showPublicClientKey ? <EyeOff size={16} /> : <Eye size={16} />}
-                    </button>
+                      variant="ghost"
+                      size="sm"
+                      icon={showPublicClientKey ? EyeOff : Eye}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0"
+                    />
                   </div>
                   <p className="text-xs text-gray-500 mt-1">
                     Required for Accept.js payment processing
@@ -1231,9 +1255,10 @@ const Settings = () => {
                     Environment
                   </label>
                   <div className="grid grid-cols-2 gap-2">
-                    <button
+                    <StandardButton
                       type="button"
                       onClick={() => setAuthorizeEnvironment('sandbox')}
+                      variant="ghost"
                       className={`px-3 py-2 text-sm rounded-lg border-2 font-medium transition-all ${
                         authorizeEnvironment === 'sandbox'
                           ? `border-${themeColor}-600 bg-${themeColor}-50 text-${themeColor}-700`
@@ -1241,10 +1266,11 @@ const Settings = () => {
                       }`}
                     >
                       Sandbox
-                    </button>
-                    <button
+                    </StandardButton>
+                    <StandardButton
                       type="button"
                       onClick={() => setAuthorizeEnvironment('production')}
+                      variant="ghost"
                       className={`px-3 py-2 text-sm rounded-lg border-2 font-medium transition-all ${
                         authorizeEnvironment === 'production'
                           ? `border-${themeColor}-600 bg-${themeColor}-50 text-${themeColor}-700`
@@ -1252,7 +1278,7 @@ const Settings = () => {
                       }`}
                     >
                       Production
-                    </button>
+                    </StandardButton>
                   </div>
                 </div>
 
@@ -1269,8 +1295,8 @@ const Settings = () => {
                 </div>
 
                 <div className="flex gap-2 pt-3">
-                  <button
-                    type="button"
+                  <StandardButton
+                    variant="secondary"
                     onClick={() => {
                       setShowAuthorizeModal(false);
                       setAuthorizeApiLoginId('');
@@ -1280,18 +1306,20 @@ const Settings = () => {
                       setShowTransactionKey(false);
                       setShowPublicClientKey(false);
                     }}
-                    className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition-colors"
+                    fullWidth
                     disabled={loadingAuthorize}
                   >
                     Cancel
-                  </button>
-                  <button
+                  </StandardButton>
+                  <StandardButton
                     type="submit"
-                    className={`flex-1 px-3 py-2 text-sm bg-${themeColor}-600 text-white rounded-lg font-medium hover:bg-${themeColor}-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed`}
+                    variant="primary"
+                    fullWidth
                     disabled={loadingAuthorize}
+                    loading={loadingAuthorize}
                   >
-                    {loadingAuthorize ? 'Connecting...' : 'Connect Account'}
-                  </button>
+                    Connect Account
+                  </StandardButton>
                 </div>
               </form>
             </div>

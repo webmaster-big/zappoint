@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import Toast from "../../../components/ui/Toast";
+import StandardButton from "../../../components/ui/StandardButton";
 import { Info, Plus, Calendar, Clock, Gift, Tag, Home, ArrowLeft, Save, Trash2, X } from "lucide-react";
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { 
@@ -713,8 +714,9 @@ const EditPackage: React.FC = () => {
                                                     ))}
                                                 </select>
                                                 {form.category && (
-                                                    <button
-                                                        type="button"
+                                                    <StandardButton
+                                                        variant="ghost"
+                                                        size="sm"
                                                         onClick={async () => {
                                                             const category = categories.find(c => c.name === form.category);
                                                             if (category && window.confirm(`Are you sure you want to delete the category "${category.name}"?`)) {
@@ -729,11 +731,11 @@ const EditPackage: React.FC = () => {
                                                                 }
                                                             }
                                                         }}
-                                                        className="p-2 rounded-md hover:bg-red-50 text-red-600 transition"
-                                                        title="Delete category"
+                                                        className="!p-2 text-red-600 hover:bg-red-50"
+                                                        icon={Trash2}
                                                     >
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </button>
+                                                        {""}
+                                                    </StandardButton>
                                                 )}
                                             </div>
                                             <div className="flex gap-1 items-center">
@@ -749,10 +751,11 @@ const EditPackage: React.FC = () => {
                                                         }
                                                     }}
                                                 />
-                                                <button 
-                                                    type="button" 
-                                                    className="p-2 rounded-md hover:bg-gray-100 transition" 
-                                                    title="Add category"
+                                                <StandardButton
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="!p-2"
+                                                    icon={Plus}
                                                     onClick={async () => {
                                                         const input = document.querySelector('input[placeholder="New category"]') as HTMLInputElement;
                                                         if (input?.value) {
@@ -761,8 +764,8 @@ const EditPackage: React.FC = () => {
                                                         }
                                                     }}
                                                 >
-                                                    <Plus className="w-4 h-4 text-primary" />
-                                                </button>
+                                                    {""}
+                                                </StandardButton>
                                             </div>
                                         </div>
                                     </div>
@@ -850,24 +853,24 @@ const EditPackage: React.FC = () => {
                                                     placeholder={`Feature ${index + 1}`}
                                                 />
                                                 {form.features.length > 1 && (
-                                                    <button
-                                                        type="button"
+                                                    <StandardButton
+                                                        variant="danger"
+                                                        size="md"
                                                         onClick={() => handleRemoveFeature(index)}
-                                                        className="px-3 py-2 bg-red-50 text-red-600 rounded-md hover:bg-red-100 transition-colors font-semibold"
-                                                        title="Remove feature"
                                                     >
                                                         ×
-                                                    </button>
+                                                    </StandardButton>
                                                 )}
                                             </div>
                                         ))}
-                                        <button
-                                            type="button"
+                                        <StandardButton
+                                            variant="secondary"
+                                            size="md"
+                                            fullWidth
                                             onClick={handleAddFeature}
-                                            className={`w-full px-4 py-2 bg-${themeColor}-50 text-${fullColor} rounded-md hover:bg-${themeColor}-100 transition-colors font-medium text-sm`}
                                         >
                                             + Add Feature
-                                        </button>
+                                        </StandardButton>
                                     </div>
                                 </div>
                             </div>
@@ -892,27 +895,28 @@ const EditPackage: React.FC = () => {
                                     <div className="text-center py-8 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
                                         <Calendar className="w-12 h-12 text-gray-400 mx-auto mb-3" />
                                         <p className="text-gray-600 mb-4">No availability schedules configured</p>
-                                        <button
-                                            type="button"
+                                        <StandardButton
+                                            variant="primary"
+                                            size="md"
                                             onClick={addNewSchedule}
-                                            className={`px-4 py-2 bg-${fullColor} text-white rounded-md hover:bg-${themeColor}-900 transition flex items-center gap-2 mx-auto`}
+                                            icon={Plus}
                                         >
-                                            <Plus className="w-4 h-4" />
                                             Add First Schedule
-                                        </button>
+                                        </StandardButton>
                                     </div>
                                 ) : (
                                     <div className="space-y-4">
                                         {form.availability_schedules.map((schedule, index) => (
                                             <div key={index} className="border border-gray-200 rounded-lg p-4 bg-gray-50 relative">
-                                                <button
-                                                    type="button"
+                                                <StandardButton
+                                                    variant="ghost"
+                                                    size="sm"
                                                     onClick={() => removeSchedule(index)}
-                                                    className="absolute top-3 right-3 p-1 hover:bg-red-100 rounded-md transition text-red-600"
-                                                    title="Remove schedule"
+                                                    className="absolute top-3 right-3 !p-1 text-red-600 hover:bg-red-100"
+                                                    icon={X}
                                                 >
-                                                    <X className="w-4 h-4" />
-                                                </button>
+                                                    {""}
+                                                </StandardButton>
 
                                                 <div className="space-y-4">
                                                     {/* Schedule Type */}
@@ -922,23 +926,19 @@ const EditPackage: React.FC = () => {
                                                         </label>
                                                         <div className="flex flex-wrap gap-2">
                                                             {(['daily', 'weekly', 'monthly'] as const).map((type) => (
-                                                                <button
+                                                                <StandardButton
                                                                     key={type}
-                                                                    type="button"
+                                                                    variant={schedule.availability_type === type ? "primary" : "secondary"}
+                                                                    size="md"
                                                                     onClick={() => {
                                                                         updateSchedule(index, {
                                                                             availability_type: type,
                                                                             day_configuration: type === 'daily' ? null : schedule.day_configuration
                                                                         });
                                                                     }}
-                                                                    className={`px-4 py-2 rounded-md text-sm font-medium transition ${
-                                                                        schedule.availability_type === type
-                                                                            ? `bg-${fullColor} text-white`
-                                                                            : 'bg-white border border-gray-300 text-gray-700 hover:border-gray-400'
-                                                                    }`}
                                                                 >
                                                                     {type.charAt(0).toUpperCase() + type.slice(1)}
-                                                                </button>
+                                                                </StandardButton>
                                                             ))}
                                                         </div>
                                                     </div>
@@ -953,9 +953,10 @@ const EditPackage: React.FC = () => {
                                                                 {['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map(day => {
                                                                     const isSelected = schedule.day_configuration?.includes(day) || false;
                                                                     return (
-                                                                        <button
+                                                                        <StandardButton
                                                                             key={day}
-                                                                            type="button"
+                                                                            variant={isSelected ? "primary" : "secondary"}
+                                                                            size="sm"
                                                                             onClick={() => {
                                                                                 const current = schedule.day_configuration || [];
                                                                                 const updated = isSelected
@@ -963,14 +964,9 @@ const EditPackage: React.FC = () => {
                                                                                     : [...current, day];
                                                                                 updateSchedule(index, { day_configuration: updated.length > 0 ? updated : null });
                                                                             }}
-                                                                            className={`px-3 py-1.5 rounded-md border text-sm font-medium transition ${
-                                                                                isSelected
-                                                                                    ? `bg-${fullColor} text-white border-${themeColor}-500`
-                                                                                    : 'bg-white border-gray-300 text-gray-700 hover:border-gray-400'
-                                                                            }`}
                                                                         >
                                                                             {day.charAt(0).toUpperCase() + day.slice(1)}
-                                                                        </button>
+                                                                        </StandardButton>
                                                                     );
                                                                 })}
                                                             </div>
@@ -1089,14 +1085,16 @@ const EditPackage: React.FC = () => {
                                     </div>
                                 )}
                                 
-                                <button
-                                    type="button"
+                                <StandardButton
+                                    variant="secondary"
+                                    size="lg"
+                                    fullWidth
                                     onClick={addNewSchedule}
-                                    className={`w-full px-4 py-3 rounded-lg border-2 border-dashed border-${themeColor}-300 text-${fullColor} hover:bg-${themeColor}-50 transition-colors flex items-center justify-center gap-2`}
+                                    icon={Plus}
+                                    className="border-2 border-dashed"
                                 >
-                                    <Plus className="w-5 h-5" />
                                     Add New Schedule
-                                </button>
+                                </StandardButton>
                             </div>
                         </div>
                         
@@ -1109,8 +1107,9 @@ const EditPackage: React.FC = () => {
                                     <Info className={`w-5 h-5 text-${themeColor}-600`} /> Attractions
                                 </h3>
                                 {attractions.length > 0 && (
-                                    <button
-                                        type="button"
+                                    <StandardButton
+                                        variant="secondary"
+                                        size="sm"
                                         onClick={() => {
                                             if (form.attractions.length === attractions.length) {
                                                 setForm(prev => ({ ...prev, attractions: [] }));
@@ -1118,10 +1117,9 @@ const EditPackage: React.FC = () => {
                                                 setForm(prev => ({ ...prev, attractions: attractions.map(a => a.name) }));
                                             }
                                         }}
-                                        className={`text-sm px-3 py-1.5 rounded-md bg-${themeColor}-50 text-${fullColor} hover:bg-${themeColor}-100 transition-colors font-medium`}
                                     >
                                         {form.attractions.length === attractions.length ? 'Deselect All' : 'Select All'}
-                                    </button>
+                                    </StandardButton>
                                 )}
                             </div>
                             {attractions.length === 0 ? (
@@ -1138,14 +1136,15 @@ const EditPackage: React.FC = () => {
                             ) : (
                                 <div className="flex flex-wrap gap-2 mb-2">
                                     {attractions.map((act) => (
-                                        <button
-                                            type="button"
+                                        <StandardButton
                                             key={act.name}
-                                            className={`px-3 py-1 rounded-full border text-sm font-medium transition-all duration-150 hover:bg-${themeColor}-50 hover:border-${themeColor}-400 focus:outline-none focus:ring-2 focus:ring-${themeColor}-200 ${form.attractions.includes(act.name) ? `bg-${themeColor}-50 border-${themeColor}-500 text-${fullColor}` : "bg-white border-gray-200 text-neutral-800"}`}
+                                            variant={form.attractions.includes(act.name) ? "primary" : "secondary"}
+                                            size="sm"
+                                            className="rounded-full"
                                             onClick={() => handleMultiSelect("attractions", act.name)}
                                         >
-                                            {act.name} <span className="text-xs text-gray-400 ml-1">${act.price}</span>
-                                        </button>
+                                            {act.name} <span className="text-xs opacity-70 ml-1">${act.price}</span>
+                                        </StandardButton>
                                     ))}
                                 </div>
                             )}
@@ -1158,8 +1157,9 @@ const EditPackage: React.FC = () => {
                                     <Home className={`w-5 h-5 text-${themeColor}-600`} /> Rooms
                                 </h3>
                                 {rooms.length > 0 && (
-                                    <button
-                                        type="button"
+                                    <StandardButton
+                                        variant="secondary"
+                                        size="sm"
                                         onClick={() => {
                                             if (form.rooms.length === rooms.length) {
                                                 setForm(prev => ({ ...prev, rooms: [] }));
@@ -1167,10 +1167,9 @@ const EditPackage: React.FC = () => {
                                                 setForm(prev => ({ ...prev, rooms: rooms.map(r => r.name) }));
                                             }
                                         }}
-                                        className={`text-sm px-3 py-1.5 rounded-md bg-${themeColor}-50 text-${fullColor} hover:bg-${themeColor}-100 transition-colors font-medium`}
                                     >
                                         {form.rooms.length === rooms.length ? 'Deselect All' : 'Select All'}
-                                    </button>
+                                    </StandardButton>
                                 )}
                             </div>
                             <div className="flex flex-wrap gap-2 mb-2">
@@ -1182,18 +1181,15 @@ const EditPackage: React.FC = () => {
                                        })
                                      )
                                      .map((room) => (
-                                    <button
+                                    <StandardButton
                                         key={room.name}
-                                        type="button"
+                                        variant={form.rooms.includes(room.name) ? "primary" : "secondary"}
+                                        size="sm"
+                                        className="rounded-full"
                                         onClick={() => handleMultiSelect("rooms", room.name)}
-                                        className={`px-3 py-1.5 rounded-full text-sm font-semibold transition-all ${
-                                            form.rooms.includes(room.name)
-                                                ? `bg-${themeColor}-50 border border-${themeColor}-500 text-${fullColor}`
-                                                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                                        }`}
                                     >
                                         {room.name}
-                                    </button>
+                                    </StandardButton>
                                 ))}
                                 <input
                                     type="text"
@@ -1201,17 +1197,18 @@ const EditPackage: React.FC = () => {
                                     className="rounded-md border border-gray-200 px-2 py-1 w-24 bg-white text-sm transition-all placeholder:text-gray-400"
                                     id="room-name"
                                 />
-                                <button
-                                    type="button"
+                                <StandardButton
+                                    variant="secondary"
+                                    size="sm"
+                                    icon={Plus}
                                     onClick={() => {
                                         const input = document.getElementById("room-name") as HTMLInputElement;
                                         handleAddOption("room", input?.value || "");
                                         if (input) input.value = "";
                                     }}
-                                    className={`px-3 py-1.5 bg-${themeColor}-50 text-${fullColor} rounded-md text-sm font-semibold hover:bg-${themeColor}-100 transition-all flex items-center gap-1`}
                                 >
-                                    <Plus className="w-4 h-4" /> Add
-                                </button>
+                                    Add
+                                </StandardButton>
                             </div>
                         </div>
                         
@@ -1222,8 +1219,9 @@ const EditPackage: React.FC = () => {
                                     <Info className={`w-5 h-5 text-${themeColor}-600`} /> Add-ons
                                 </h3>
                                 {addOns.length > 0 && (
-                                    <button
-                                        type="button"
+                                    <StandardButton
+                                        variant="secondary"
+                                        size="sm"
                                         onClick={() => {
                                             if (form.addOns.length === addOns.length) {
                                                 setForm(prev => ({ ...prev, addOns: [] }));
@@ -1231,26 +1229,22 @@ const EditPackage: React.FC = () => {
                                                 setForm(prev => ({ ...prev, addOns: addOns.map(a => a.name) }));
                                             }
                                         }}
-                                        className={`text-sm px-3 py-1.5 rounded-md bg-${themeColor}-50 text-${fullColor} hover:bg-${themeColor}-100 transition-colors font-medium`}
                                     >
                                         {form.addOns.length === addOns.length ? 'Deselect All' : 'Select All'}
-                                    </button>
+                                    </StandardButton>
                                 )}
                             </div>
                             <div className="flex flex-wrap gap-2 mb-2">
                                 {addOns.map((addon) => (
-                                    <button
+                                    <StandardButton
                                         key={addon.name}
-                                        type="button"
+                                        variant={form.addOns.includes(addon.name) ? "primary" : "secondary"}
+                                        size="sm"
+                                        className="rounded-full"
                                         onClick={() => handleMultiSelect("addOns", addon.name)}
-                                        className={`px-3 py-1.5 rounded-full text-sm font-semibold transition-all ${
-                                            form.addOns.includes(addon.name)
-                                                ? `bg-${themeColor}-50 border border-${themeColor}-500 text-${fullColor}`
-                                                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                                        }`}
                                     >
                                         {addon.name}
-                                    </button>
+                                    </StandardButton>
                                 ))}
                                 <input
                                     type="text"
@@ -1265,8 +1259,10 @@ const EditPackage: React.FC = () => {
                                     id="addon-price"
                                     min="0"
                                 />
-                                <button
-                                    type="button"
+                                <StandardButton
+                                    variant="secondary"
+                                    size="sm"
+                                    icon={Plus}
                                     onClick={() => {
                                         const nameInput = document.getElementById("addon-name") as HTMLInputElement;
                                         const priceInput = document.getElementById("addon-price") as HTMLInputElement;
@@ -1274,10 +1270,9 @@ const EditPackage: React.FC = () => {
                                         if (nameInput) nameInput.value = "";
                                         if (priceInput) priceInput.value = "";
                                     }}
-                                    className={`px-3 py-1.5 bg-${themeColor}-50 text-${fullColor} rounded-md text-sm font-semibold hover:bg-${themeColor}-100 transition-all flex items-center gap-1`}
                                 >
-                                    <Plus className="w-4 h-4" /> Add
-                                </button>
+                                    Add
+                                </StandardButton>
                             </div>
                         </div>
                         
@@ -1288,8 +1283,9 @@ const EditPackage: React.FC = () => {
                                     <Tag className={`w-5 h-5 text-${themeColor}-600`} /> Promos
                                 </h3>
                                 {promos.length > 0 && (
-                                    <button
-                                        type="button"
+                                    <StandardButton
+                                        variant="secondary"
+                                        size="sm"
                                         onClick={() => {
                                             if (form.promos.length === promos.length) {
                                                 setForm(prev => ({ ...prev, promos: [] }));
@@ -1297,10 +1293,9 @@ const EditPackage: React.FC = () => {
                                                 setForm(prev => ({ ...prev, promos: promos.map(p => p.code) }));
                                             }
                                         }}
-                                        className={`text-sm px-3 py-1.5 rounded-md bg-${themeColor}-50 text-${fullColor} hover:bg-${themeColor}-100 transition-colors font-medium`}
                                     >
                                         {form.promos.length === promos.length ? 'Deselect All' : 'Select All'}
-                                    </button>
+                                    </StandardButton>
                                 )}
                             </div>
                             {promos.length === 0 ? (
@@ -1340,8 +1335,9 @@ const EditPackage: React.FC = () => {
                                     <Gift className={`w-5 h-5 text-${themeColor}-600`} /> Gift Cards
                                 </h3>
                                 {giftCards.length > 0 && (
-                                    <button
-                                        type="button"
+                                    <StandardButton
+                                        variant="secondary"
+                                        size="sm"
                                         onClick={() => {
                                             if (form.giftCards.length === giftCards.length) {
                                                 setForm(prev => ({ ...prev, giftCards: [] }));
@@ -1349,10 +1345,9 @@ const EditPackage: React.FC = () => {
                                                 setForm(prev => ({ ...prev, giftCards: giftCards.map(g => g.code) }));
                                             }
                                         }}
-                                        className={`text-sm px-3 py-1.5 rounded-md bg-${themeColor}-50 text-${fullColor} hover:bg-${themeColor}-100 transition-colors font-medium`}
                                     >
                                         {form.giftCards.length === giftCards.length ? 'Deselect All' : 'Select All'}
-                                    </button>
+                                    </StandardButton>
                                 )}
                             </div>
                             {giftCards.length === 0 ? (
@@ -1462,13 +1457,17 @@ const EditPackage: React.FC = () => {
                         </div>
                         
                         <div className="flex gap-2 mt-6">
-                            <button
+                            <StandardButton
                                 type="submit"
+                                variant="primary"
+                                size="lg"
                                 disabled={submitting || loading}
-                                className={`flex-1 bg-${fullColor} hover:bg-${themeColor}-900 text-white font-semibold py-2 rounded-md transition text-base flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed`}
+                                loading={submitting}
+                                icon={Save}
+                                className="flex-1"
                             >
-                                <Save className="w-5 h-5" /> {submitting ? 'Updating...' : 'Update Package'}
-                            </button>
+                                {submitting ? 'Updating...' : 'Update Package'}
+                            </StandardButton>
                             <Link
                                 to="/packages"
                                 className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-800 font-semibold py-2 rounded-md transition text-base flex items-center justify-center gap-2"

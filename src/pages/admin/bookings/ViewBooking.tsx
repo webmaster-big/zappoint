@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import bookingService, { type Booking } from '../../../services/bookingService';
+import StandardButton from '../../../components/ui/StandardButton';
 
 const ViewBooking: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
@@ -99,12 +100,12 @@ const ViewBooking: React.FC = () => {
             <AlertCircle className="h-12 w-12 text-red-600 mx-auto mb-4" />
             <h2 className="text-xl font-semibold text-red-800 mb-2">Booking Not Found</h2>
             <p className="text-red-600 mb-4">The booking you're looking for doesn't exist.</p>
-            <button
+            <StandardButton
+              variant="primary"
               onClick={() => navigate('/bookings')}
-              className={`px-4 py-2 bg-${themeColor}-600 text-white rounded-lg hover:bg-${themeColor}-700`}
             >
               Back to Bookings
-            </button>
+            </StandardButton>
           </div>
         </div>
       </div>
@@ -155,26 +156,28 @@ const ViewBooking: React.FC = () => {
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
-            <button
+            <StandardButton
+              variant="ghost"
+              size="sm"
+              icon={ArrowLeft}
               onClick={() => navigate('/bookings')}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
             >
-              <ArrowLeft className="h-5 w-5 text-gray-600" />
-            </button>
+              {''}
+            </StandardButton>
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Booking Details</h1>
               <p className="text-gray-600 mt-1">Reference: #{booking.reference_number}</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <button
+            <StandardButton
+              variant="primary"
+              icon={QrCode}
               onClick={() => setShowQRModal(true)}
-              className={`flex items-center gap-2 px-4 py-2 bg-${themeColor}-600 text-white rounded-lg hover:bg-${themeColor}-700`}
               disabled={!qrCodeData}
             >
-              <QrCode className="h-4 w-4" />
               View QR Code
-            </button>
+            </StandardButton>
             <Link
               to={`/bookings/edit/${booking.id}?ref=${booking.reference_number}`}
               className={`flex items-center gap-2 px-4 py-2 bg-${themeColor}-600 text-white rounded-lg hover:bg-${themeColor}-700`}
@@ -585,12 +588,14 @@ const ViewBooking: React.FC = () => {
             <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 p-6" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-xl font-bold text-gray-900">Booking QR Code</h3>
-                <button
+                <StandardButton
+                  variant="ghost"
+                  size="sm"
+                  icon={AlertCircle}
                   onClick={() => setShowQRModal(false)}
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
                 >
-                  <AlertCircle className="h-5 w-5 text-gray-600" />
-                </button>
+                  {''}
+                </StandardButton>
               </div>
               
               <div className="flex flex-col items-center">
@@ -602,13 +607,14 @@ const ViewBooking: React.FC = () => {
                 <p className="text-sm text-gray-600 mb-4 text-center">
                   Reference: <span className="font-semibold">#{booking.reference_number}</span>
                 </p>
-                <button
+                <StandardButton
+                  variant="primary"
+                  icon={Download}
                   onClick={handleDownloadQRCode}
-                  className={`flex items-center gap-2 px-4 py-2 bg-${themeColor}-600 text-white rounded-lg hover:bg-${themeColor}-700 w-full justify-center`}
+                  fullWidth
                 >
-                  <Download className="h-4 w-4" />
                   Download QR Code
-                </button>
+                </StandardButton>
               </div>
             </div>
           </div>

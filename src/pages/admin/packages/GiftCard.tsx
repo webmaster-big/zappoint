@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Plus, X, Edit2, Trash2, Eye, EyeOff, Copy } from "lucide-react";
+import StandardButton from '../../../components/ui/StandardButton';
 import type { GiftCardStatus, GiftCardType, GiftCardItem } from '../../../types/GiftCard.types';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { giftCardService } from '../../../services';
@@ -244,12 +245,14 @@ const GiftCard: React.FC = () => {
           <h1 className="text-2xl font-bold text-gray-900">Gift Cards</h1>
           <p className="text-gray-600 mt-1">Create and manage gift cards for your customers</p>
         </div>
-        <button
-          className={`bg-${fullColor} text-white rounded-lg px-5 py-2 flex items-center gap-2 hover:bg-${themeColor}-900 transition-colors font-semibold`}
+        <StandardButton
+          variant="primary"
+          size="md"
           onClick={() => setShowModal(true)}
+          icon={Plus}
         >
-          <Plus className="w-5 h-5" /> Create Gift Card
-        </button>
+          Create Gift Card
+        </StandardButton>
       </div>
 
       {/* Main Content */}
@@ -258,30 +261,38 @@ const GiftCard: React.FC = () => {
         {/* Filter Section */}
         <div className="mb-6 space-y-4">
             <div className="flex flex-wrap gap-2">
-              <button 
-                className={`px-3 py-1.5 rounded-full text-sm transition-colors ${filterStatus === "all" ? `bg-${fullColor} text-white` : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+              <StandardButton 
+                variant={filterStatus === "all" ? "primary" : "secondary"}
+                size="sm"
+                className="rounded-full"
                 onClick={() => setFilterStatus("all")}
               >
                 All
-              </button>
-              <button 
-                className={`px-3 py-1.5 rounded-full text-sm transition-colors ${filterStatus === "active" ? `bg-${fullColor} text-white` : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+              </StandardButton>
+              <StandardButton 
+                variant={filterStatus === "active" ? "primary" : "secondary"}
+                size="sm"
+                className="rounded-full"
                 onClick={() => setFilterStatus("active")}
               >
                 Active
-              </button>
-              <button 
-                className={`px-3 py-1.5 rounded-full text-sm transition-colors ${filterStatus === "inactive" ? `bg-${fullColor} text-white` : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+              </StandardButton>
+              <StandardButton 
+                variant={filterStatus === "inactive" ? "primary" : "secondary"}
+                size="sm"
+                className="rounded-full"
                 onClick={() => setFilterStatus("inactive")}
               >
                 Inactive
-              </button>
-              <button 
-                className={`px-3 py-1.5 rounded-full text-sm transition-colors ${filterStatus === "expired" ? `bg-${fullColor} text-white` : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+              </StandardButton>
+              <StandardButton 
+                variant={filterStatus === "expired" ? "primary" : "secondary"}
+                size="sm"
+                className="rounded-full"
                 onClick={() => setFilterStatus("expired")}
               >
                 Expired
-              </button>
+              </StandardButton>
             </div>
             <div className="text-sm text-gray-500">
               Showing {filteredGiftCards.length} gift card{filteredGiftCards.length !== 1 ? 's' : ''}
@@ -310,49 +321,53 @@ const GiftCard: React.FC = () => {
                         {isExpired && <span className="text-xs text-red-500">Expired</span>}
                       </div>
                       <div className="flex gap-1">
-                        <button 
-                          className={`p-1.5 text-gray-500 hover:text-${fullColor} hover:bg-${themeColor}-50 rounded-md`}
+                        <StandardButton 
                           onClick={() => openEditModal(originalIndex)}
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
+                          variant="ghost"
+                          size="sm"
+                          className="p-1.5"
+                          icon={Edit2}
+                        />
                         {status === 'active' ? (
-                          <button 
-                            className="p-1.5 text-gray-500 hover:text-yellow-800 hover:bg-yellow-50 rounded-md"
+                          <StandardButton 
                             onClick={() => handleDeactivate(originalIndex)}
+                            variant="ghost"
+                            size="sm"
+                            className="p-1.5 text-yellow-600 hover:bg-yellow-50"
+                            icon={EyeOff}
                             title="Deactivate"
-                          >
-                            <EyeOff className="w-4 h-4" />
-                          </button>
+                          />
                         ) : (
-                          <button 
-                            className="p-1.5 text-gray-500 hover:text-green-800 hover:bg-green-50 rounded-md"
+                          <StandardButton 
                             onClick={() => handleActivate(originalIndex)}
+                            variant="ghost"
+                            size="sm"
+                            className="p-1.5 text-green-600 hover:bg-green-50"
+                            icon={Eye}
                             title="Activate"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
+                          />
                         )}
-                        <button 
-                          className="p-1.5 text-gray-500 hover:text-red-800 hover:bg-red-50 rounded-md"
+                        <StandardButton 
                           onClick={() => handleDelete(originalIndex)}
+                          variant="danger"
+                          size="sm"
+                          className="p-1.5"
+                          icon={Trash2}
                           title="Delete"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        />
                       </div>
                     </div>
 
                     <div className="mb-4">
                       <div className="flex justify-between items-center mb-2">
                         <h3 className="font-semibold text-gray-900">Gift Card Code</h3>
-                        <button 
+                        <StandardButton 
                           onClick={() => copyToClipboard(gc.code)}
-                          className={`text-${fullColor} hover:text-${themeColor}-900`}
+                          variant="secondary"
+                          size="sm"
+                          icon={Copy}
                           title="Copy code"
-                        >
-                          <Copy className="w-4 h-4" />
-                        </button>
+                        />
                       </div>
                       <div className="font-mono bg-gray-50 p-2.5 rounded-lg text-sm">
                         {gc.code}
@@ -403,12 +418,14 @@ const GiftCard: React.FC = () => {
               </div>
               <h3 className="text-lg font-semibold text-gray-900 mb-2">No gift cards found</h3>
               <p className="text-gray-600 text-sm mb-6 text-center max-w-sm">Create your first gift card to get started</p>
-              <button
-                className={`bg-${fullColor} text-white rounded-lg px-6 py-2.5 flex items-center gap-2 hover:bg-${themeColor}-700 transition-colors font-semibold`}
+              <StandardButton
+                variant="primary"
+                size="md"
                 onClick={() => setShowModal(true)}
+                icon={Plus}
               >
-                <Plus className="w-5 h-5" /> Create Gift Card
-              </button>
+                Create Gift Card
+              </StandardButton>
           </div>
         )}
       </div>
@@ -417,9 +434,13 @@ const GiftCard: React.FC = () => {
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-md relative border border-gray-200 m-4">
-            <button className="absolute top-4 right-4 p-1 rounded-lg hover:bg-gray-100" onClick={() => setShowModal(false)}>
-              <X className="w-5 h-5 text-gray-500" />
-            </button>
+            <StandardButton 
+              className="absolute top-4 right-4" 
+              variant="ghost" 
+              size="sm" 
+              icon={X} 
+              onClick={() => setShowModal(false)}
+            />
             <h3 className="text-xl font-semibold mb-4 text-gray-900">Create Gift Card</h3>
             <form className="space-y-4" onSubmit={handleAdd}>
                 <div>
@@ -497,13 +518,15 @@ const GiftCard: React.FC = () => {
                     placeholder="Optional description"
                   />
                 </div>
-                <button 
+                <StandardButton 
                   type="submit"
+                  variant="primary"
+                  size="md"
                   disabled={loading}
-                  className={`w-full bg-${fullColor} text-white py-2.5 rounded-lg font-medium mt-2 hover:bg-${themeColor}-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed`}
+                  className="w-full mt-2"
                 >
                   {loading ? 'Creating...' : 'Create Gift Card'}
-              </button>
+                </StandardButton>
             </form>
           </div>
         </div>
@@ -513,9 +536,13 @@ const GiftCard: React.FC = () => {
       {editIndex !== null && editForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-md relative border border-gray-200 m-4">
-            <button className="absolute top-4 right-4 p-1 rounded-lg hover:bg-gray-100" onClick={closeEditModal}>
-              <X className="w-5 h-5 text-gray-500" />
-            </button>
+            <StandardButton 
+              className="absolute top-4 right-4" 
+              variant="ghost" 
+              size="sm" 
+              icon={X} 
+              onClick={closeEditModal}
+            />
             <h3 className="text-xl font-semibold mb-4 text-gray-900">Edit Gift Card</h3>
             <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -608,18 +635,22 @@ const GiftCard: React.FC = () => {
                   </select>
                 </div>
                 <div className="flex gap-3 mt-6">
-                  <button 
+                  <StandardButton 
                     onClick={handleEditSave} 
-                    className={`flex-1 bg-${fullColor} hover:bg-${themeColor}-900 text-white font-medium py-2.5 rounded-lg transition text-base`}
+                    variant="primary"
+                    size="md"
+                    className="flex-1"
                   >
                     Save Changes
-                  </button>
-                  <button 
+                  </StandardButton>
+                  <StandardButton 
                     onClick={closeEditModal} 
-                    className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium py-2.5 rounded-lg transition text-base"
+                    variant="secondary"
+                    size="md"
+                    className="flex-1"
                   >
                     Cancel
-                  </button>
+                  </StandardButton>
               </div>
             </div>
           </div>

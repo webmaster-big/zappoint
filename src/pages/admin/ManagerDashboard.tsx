@@ -21,6 +21,7 @@ import {
 import { Link } from 'react-router-dom';
 import { useThemeColor } from '../../hooks/useThemeColor';
 import CounterAnimation from '../../components/ui/CounterAnimation';
+import StandardButton from '../../components/ui/StandardButton';
 import { getStoredUser } from '../../utils/storage';
 import bookingService from '../../services/bookingService';
 import { locationService } from '../../services/LocationService';
@@ -338,25 +339,30 @@ const LocationManagerDashboard: React.FC = () => {
             <Calendar className={`w-5 h-5 text-${fullColor}`} /> Weekly Calendar
           </h2>
           <div className="flex items-center space-x-2 mt-4 md:mt-0">
-            <button 
+            <StandardButton 
               onClick={goToPreviousWeek}
-              className="p-2 rounded-lg border border-gray-200 hover:bg-gray-100"
-            >
-              <ChevronLeft size={18} />
-            </button>
+              variant="secondary"
+              size="sm"
+              icon={ChevronLeft}
+            />
             <span className="text-sm font-medium text-gray-800">
               {weekDates[0].toLocaleDateString('en-US', { month: 'long', day: 'numeric' })} - 
               {weekDates[6].toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
             </span>
-            <button 
+            <StandardButton 
               onClick={goToNextWeek}
-              className="p-2 rounded-lg border border-gray-200 hover:bg-gray-100"
+              variant="secondary"
+              size="sm"
+              icon={ChevronRight}
+            />
+            <StandardButton 
+              className="ml-2"
+              variant="secondary"
+              size="sm"
+              onClick={() => setCurrentWeek(new Date())}
             >
-              <ChevronRight size={18} />
-            </button>
-            <button className={`ml-2 px-3 py-2 text-sm bg-${themeColor}-100 text-${fullColor} rounded-lg hover:bg-${themeColor}-200`} onClick={() => setCurrentWeek(new Date())}>
               Today
-            </button>
+            </StandardButton>
           </div>
         </div>
         
@@ -456,9 +462,11 @@ const LocationManagerDashboard: React.FC = () => {
                                 
                                 {/* View more button */}
                                 {bookingsForCell.length > 1 && (
-                                  <button
+                                  <StandardButton
                                     onClick={() => setSelectedTimeSlot({ date, hour, minute, bookings: bookingsForCell })}
-                                    className={`w-full mt-2 pt-2 border-t text-xs font-medium hover:underline ${
+                                    variant="ghost"
+                                    size="sm"
+                                    className={`w-full mt-2 pt-2 border-t text-xs font-medium ${
                                       bookingsForCell.some(b => b.status === 'confirmed' || b.status === 'Confirmed')
                                         ? 'border-emerald-200 text-emerald-700'
                                         : bookingsForCell.some(b => b.status === 'pending' || b.status === 'Pending')
@@ -467,14 +475,16 @@ const LocationManagerDashboard: React.FC = () => {
                                     }`}
                                   >
                                     +{bookingsForCell.length - 1} more
-                                  </button>
+                                  </StandardButton>
                                 )}
                                 
                                 {/* Single booking - click to view details */}
                                 {bookingsForCell.length === 1 && (
-                                  <button
+                                  <StandardButton
                                     onClick={() => setSelectedBooking(bookingsForCell[0])}
-                                    className={`w-full mt-2 pt-2 border-t text-xs font-medium hover:underline ${
+                                    variant="ghost"
+                                    size="sm"
+                                    className={`w-full mt-2 pt-2 border-t text-xs font-medium ${
                                       bookingsForCell[0].status === 'confirmed' || bookingsForCell[0].status === 'Confirmed'
                                         ? 'border-emerald-200 text-emerald-700'
                                         : bookingsForCell[0].status === 'pending' || bookingsForCell[0].status === 'Pending'
@@ -483,7 +493,7 @@ const LocationManagerDashboard: React.FC = () => {
                                     }`}
                                   >
                                     View details
-                                  </button>
+                                  </StandardButton>
                                 )}
                               </div>
                             ) : (
@@ -681,12 +691,12 @@ const LocationManagerDashboard: React.FC = () => {
                     })()} - {selectedTimeSlot.bookings.length} Booking{selectedTimeSlot.bookings.length > 1 ? 's' : ''}
                   </p>
                 </div>
-                <button
+                <StandardButton
                   onClick={() => setSelectedTimeSlot(null)}
-                  className="text-gray-500 hover:text-gray-800"
-                >
-                  <X className="h-6 w-6" />
-                </button>
+                  variant="ghost"
+                  size="sm"
+                  icon={X}
+                />
               </div>
 
               <div className="space-y-3">
@@ -753,12 +763,14 @@ const LocationManagerDashboard: React.FC = () => {
 
               {/* Bottom Close Button */}
               <div className="mt-6 pt-4 border-t border-gray-200">
-                <button
+                <StandardButton
                   onClick={() => setSelectedTimeSlot(null)}
-                  className="w-full px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium rounded-lg transition-colors"
+                  variant="secondary"
+                  size="md"
+                  className="w-full"
                 >
                   Close
-                </button>
+                </StandardButton>
               </div>
             </div>
           </div>
@@ -774,12 +786,12 @@ const LocationManagerDashboard: React.FC = () => {
                 <h3 className="text-xl font-semibold text-gray-900">
                   Booking Details
                 </h3>
-                <button
+                <StandardButton
                   onClick={() => setSelectedBooking(null)}
-                  className="text-gray-500 hover:text-gray-800"
-                >
-                  <X className="h-6 w-6" />
-                </button>
+                  variant="ghost"
+                  size="sm"
+                  icon={X}
+                />
               </div>
 
               {/* Customer Information */}
@@ -1022,12 +1034,14 @@ const LocationManagerDashboard: React.FC = () => {
 
               {/* Bottom Close Button */}
               <div className="mt-6 pt-4 border-t border-gray-200">
-                <button
+                <StandardButton
                   onClick={() => setSelectedBooking(null)}
-                  className="w-full px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium rounded-lg transition-colors"
+                  variant="secondary"
+                  size="md"
+                  className="w-full"
                 >
                   Close
-                </button>
+                </StandardButton>
               </div>
             </div>
           </div>

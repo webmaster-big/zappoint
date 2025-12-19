@@ -21,6 +21,7 @@ import { locationService } from '../../../services/LocationService';
 import type { Booking } from '../../../services/bookingService';
 import type { CalendarViewFilterOptions } from '../../../types/calendarView.types';
 import Toast from '../../../components/ui/Toast';
+import StandardButton from '../../../components/ui/StandardButton';
 import type { ToastMessage } from './../../../types/Toast';
 import { getStoredUser } from '../../../utils/storage';
 
@@ -632,14 +633,15 @@ const CalendarView: React.FC = () => {
             </p>
           </div>
           <div className="flex gap-2 mt-4 sm:mt-0">
-            <button
+            <StandardButton
+              variant="secondary"
+              icon={RefreshCw}
               onClick={loadBookings}
               disabled={loading}
-              className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-gray-800 hover:bg-gray-50 disabled:opacity-50"
-              title="Refresh bookings"
+              loading={loading}
             >
-              <RefreshCw className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} />
-            </button>
+              {''}
+            </StandardButton>
             <Link
               to="/bookings"
               className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-gray-800 hover:bg-gray-50"
@@ -660,30 +662,36 @@ const CalendarView: React.FC = () => {
         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 mb-6">
           <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
             <div className="flex items-center gap-2">
-              <button
+              <StandardButton
+                variant="ghost"
+                size="sm"
+                icon={ChevronLeft}
                 onClick={() => navigateDate('prev')}
-                className="p-2 rounded-lg hover:bg-gray-100"
               >
-                <ChevronLeft className="h-5 w-5" />
-              </button>
+                {''}
+              </StandardButton>
               
               <h2 className="text-xl font-semibold min-w-[250px] text-center">
                 {getHeaderText()}
               </h2>
               
-              <button
+              <StandardButton
+                variant="ghost"
+                size="sm"
+                icon={ChevronRight}
                 onClick={() => navigateDate('next')}
-                className="p-2 rounded-lg hover:bg-gray-100"
               >
-                <ChevronRight className="h-5 w-5" />
-              </button>
+                {''}
+              </StandardButton>
               
-              <button
+              <StandardButton
+                variant="secondary"
+                size="sm"
                 onClick={goToToday}
-                className="ml-2 px-3 py-1 border border-gray-300 rounded-lg text-sm hover:bg-gray-50"
+                className="ml-2"
               >
                 Today
-              </button>
+              </StandardButton>
             </div>
             
             <div className="flex gap-2">
@@ -698,13 +706,14 @@ const CalendarView: React.FC = () => {
                 <option value="range">Date Range</option>
               </select>
               
-              <button
+              <StandardButton
+                variant="secondary"
+                size="sm"
+                icon={Filter}
                 onClick={() => setShowFilters(!showFilters)}
-                className="flex items-center px-3 py-1 border border-gray-300 rounded-lg text-sm hover:bg-gray-50"
               >
-                <Filter className="h-4 w-4 mr-1" />
                 Filters
-              </button>
+              </StandardButton>
             </div>
           </div>
         </div>
@@ -714,12 +723,14 @@ const CalendarView: React.FC = () => {
           <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100 mb-6">
             <div className="flex justify-between items-center mb-4">
               <h3 className="font-medium text-lg">Filter Bookings</h3>
-              <button
+              <StandardButton
+                variant="ghost"
+                size="sm"
+                icon={X}
                 onClick={() => setShowFilters(false)}
-                className="text-gray-500 hover:text-gray-800"
               >
-                <X className="h-5 w-5" />
-              </button>
+                {''}
+              </StandardButton>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -790,28 +801,26 @@ const CalendarView: React.FC = () => {
               <label className="block text-sm font-medium text-gray-800 mb-2">Packages</label>
               <div className="flex flex-wrap gap-2">
                 {getUniquePackages().map(pkg => (
-                  <button
+                  <StandardButton
                     key={pkg}
+                    variant={filters.packages.includes(pkg) ? 'primary' : 'secondary'}
+                    size="sm"
                     onClick={() => handlePackageToggle(pkg)}
-                    className={`px-3 py-1 rounded-full text-xs ${
-                      filters.packages.includes(pkg)
-                        ? `bg-${themeColor}-100 text-${fullColor}`
-                        : 'bg-gray-100 text-gray-800'
-                    }`}
                   >
                     {pkg}
-                  </button>
+                  </StandardButton>
                 ))}
               </div>
             </div>
             
             <div className="mt-6 flex justify-end">
-              <button
+              <StandardButton
+                variant="ghost"
+                size="sm"
                 onClick={clearFilters}
-                className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800"
               >
                 Clear All Filters
-              </button>
+              </StandardButton>
             </div>
           </div>
         )}
@@ -825,12 +834,13 @@ const CalendarView: React.FC = () => {
               <p className="mt-2 text-gray-500">
                 There are no package bookings in the selected date range.
               </p>
-              <button
+              <StandardButton
+                variant="secondary"
                 onClick={() => setCurrentDate(new Date())}
-                className="mt-4 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+                className="mt-4"
               >
                 Go to Today
-              </button>
+              </StandardButton>
             </div>
           ) : filteredBookings.length === 0 && filters.search ? (
             <div className="bg-white rounded-lg shadow-sm p-8 text-center">
@@ -839,12 +849,13 @@ const CalendarView: React.FC = () => {
               <p className="mt-2 text-gray-500">
                 Try adjusting your search or filters.
               </p>
-              <button
+              <StandardButton
+                variant="secondary"
                 onClick={clearFilters}
-                className="mt-4 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+                className="mt-4"
               >
                 Clear Filters
-              </button>
+              </StandardButton>
             </div>
           ) : (
             renderView()
@@ -860,12 +871,14 @@ const CalendarView: React.FC = () => {
                   <h3 className="text-xl font-semibold text-gray-900">
                     Bookings for {new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
                   </h3>
-                  <button
+                  <StandardButton
+                    variant="ghost"
+                    size="sm"
+                    icon={X}
                     onClick={() => setSelectedDate(null)}
-                    className="text-gray-500 hover:text-gray-800"
                   >
-                    <X className="h-6 w-6" />
-                  </button>
+                    {''}
+                  </StandardButton>
                 </div>
                 {getBookingsForDate(new Date(selectedDate)).length === 0 ? (
                   <div className="text-center text-gray-500 py-8">
@@ -971,12 +984,13 @@ const CalendarView: React.FC = () => {
                 
                 {/* Bottom Close Button */}
                 <div className="mt-6 pt-4 border-t border-gray-200">
-                  <button
+                  <StandardButton
+                    variant="secondary"
+                    fullWidth
                     onClick={() => setSelectedDate(null)}
-                    className="w-full px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium rounded-lg transition-colors"
                   >
                     Close
-                  </button>
+                  </StandardButton>
                 </div>
               </div>
             </div>
@@ -991,12 +1005,14 @@ const CalendarView: React.FC = () => {
                   <h3 className="text-xl font-semibold text-gray-900">
                     Booking Details
                   </h3>
-                  <button
+                  <StandardButton
+                    variant="ghost"
+                    size="sm"
+                    icon={X}
                     onClick={() => setSelectedBooking(null)}
-                    className="text-gray-500 hover:text-gray-800"
                   >
-                    <X className="h-6 w-6" />
-                  </button>
+                    {''}
+                  </StandardButton>
                 </div>
 
                 {/* Customer Information */}
@@ -1273,12 +1289,13 @@ const CalendarView: React.FC = () => {
                 
                 {/* Bottom Close Button */}
                 <div className="mt-6 pt-4 border-t border-gray-200">
-                  <button
+                  <StandardButton
+                    variant="secondary"
+                    fullWidth
                     onClick={() => setSelectedBooking(null)}
-                    className="w-full px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium rounded-lg transition-colors"
                   >
                     Close
-                  </button>
+                  </StandardButton>
                 </div>
               </div>
             </div>

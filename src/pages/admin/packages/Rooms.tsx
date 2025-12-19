@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Edit2, Trash2, Users, MapPin, CheckSquare, Square, Plus, X } from 'lucide-react';
+import StandardButton from '../../../components/ui/StandardButton';
 import Toast from '../../../components/ui/Toast';
 import { roomService, locationService } from '../../../services';
 import LocationSelector from '../../../components/admin/LocationSelector';
@@ -338,28 +339,26 @@ const Rooms: React.FC = () => {
                 </div>
                 <div className="flex items-center gap-2">
                     {rooms.length > 0 && (
-                        <button
+                        <StandardButton
                             onClick={toggleSelectionMode}
-                            className={`${
-                                selectionMode 
-                                    ? 'bg-gray-500 hover:bg-gray-600' 
-                                    : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
-                            } text-white px-4 py-2 rounded-lg font-semibold whitespace-nowrap transition-colors flex items-center gap-2`}
+                            variant={selectionMode ? "secondary" : "secondary"}
+                            size="md"
+                            icon={selectionMode ? X : CheckSquare}
                         >
-                            {selectionMode ? <X className="w-4 h-4" /> : <CheckSquare className="w-4 h-4" />}
                             {selectionMode ? 'Cancel' : 'Select Spaces'}
-                        </button>
+                        </StandardButton>
                     )}
-                    <button
+                    <StandardButton
                         onClick={() => {
                             resetForm();
                             setShowCreateModal(true);
                         }}
-                        className={`bg-${fullColor} hover:bg-${themeColor}-900 text-white px-5 py-2 rounded-lg font-semibold whitespace-nowrap transition-colors flex items-center gap-2`}
+                        variant="primary"
+                        size="md"
+                        icon={Plus}
                     >
-                        <Plus className="w-5 h-5" />
                         Create Room
-                    </button>
+                    </StandardButton>
                 </div>
             </div>
 
@@ -384,13 +383,14 @@ const Rooms: React.FC = () => {
                                 {selectedRoomIds.size} Space{selectedRoomIds.size !== 1 ? 's' : ''} selected
                             </span>
                             {selectedRoomIds.size > 0 && (
-                                <button
+                                <StandardButton
                                     onClick={handleBulkDelete}
-                                    className="text-sm text-red-600 hover:text-red-700 font-medium flex items-center gap-1"
+                                    variant="danger"
+                                    size="sm"
+                                    icon={Trash2}
                                 >
-                                    <Trash2 className="w-4 h-4" />
                                     Delete {selectedRoomIds.size} Space{selectedRoomIds.size !== 1 ? 's' : ''}
-                                </button>
+                                </StandardButton>
                             )}
                         </div>
                     </div>
@@ -442,36 +442,27 @@ const Rooms: React.FC = () => {
                                 {/* Status Filter */}
                                 <div className="flex items-center gap-2 flex-wrap">
                                     <span className="text-sm font-medium text-gray-700">Status:</span>
-                                    <button 
-                                        className={`px-3 py-1.5 rounded-full text-sm transition-colors ${
-                                            filters.is_available === undefined 
-                                                ? `bg-${fullColor} text-white` 
-                                                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                                        }`}
+                                    <StandardButton
+                                        variant={filters.is_available === undefined ? "primary" : "secondary"}
+                                        size="sm"
                                         onClick={() => handleFilterChange('is_available', undefined)}
                                     >
                                         All
-                                    </button>
-                                    <button 
-                                        className={`px-3 py-1.5 rounded-full text-sm transition-colors ${
-                                            filters.is_available === true 
-                                                ? `bg-${fullColor} text-white` 
-                                                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                                        }`}
+                                    </StandardButton>
+                                    <StandardButton
+                                        variant={filters.is_available === true ? "primary" : "secondary"}
+                                        size="sm"
                                         onClick={() => handleFilterChange('is_available', true)}
                                     >
                                         Available
-                                    </button>
-                                    <button 
-                                        className={`px-3 py-1.5 rounded-full text-sm transition-colors ${
-                                            filters.is_available === false 
-                                                ? `bg-${fullColor} text-white` 
-                                                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                                        }`}
+                                    </StandardButton>
+                                    <StandardButton
+                                        variant={filters.is_available === false ? "primary" : "secondary"}
+                                        size="sm"
                                         onClick={() => handleFilterChange('is_available', false)}
                                     >
                                         Unavailable
-                                    </button>
+                                    </StandardButton>
                                 </div>
 
                                 {/* Sort Controls */}
@@ -486,12 +477,13 @@ const Rooms: React.FC = () => {
                                         <option value="capacity">Capacity</option>
                                         <option value="created_at">Date</option>
                                     </select>
-                                    <button
+                                    <StandardButton
                                         onClick={() => handleFilterChange('sort_order', filters.sort_order === 'asc' ? 'desc' : 'asc')}
-                                        className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm hover:bg-gray-50 transition-colors"
+                                        variant="secondary"
+                                        size="sm"
                                     >
                                         {filters.sort_order === 'asc' ? '↑ Asc' : '↓ Desc'}
-                                    </button>
+                                    </StandardButton>
                                 </div>
                             </div>
 
@@ -556,20 +548,22 @@ const Rooms: React.FC = () => {
                                             </div>
                                             {!selectionMode && (
                                                 <div className="flex gap-1 ml-2">
-                                                    <button
+                                                    <StandardButton
                                                         onClick={() => handleEditClick(room)}
-                                                        className={`p-1.5 text-${fullColor} hover:bg-${themeColor}-100 rounded transition-colors`}
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="p-1.5"
+                                                        icon={Edit2}
                                                         title="Edit Space"
-                                                    >
-                                                        <Edit2 className="w-4 h-4" />
-                                                    </button>
-                                                    <button
+                                                    />
+                                                    <StandardButton
                                                         onClick={() => handleDeleteRoom(room.id, room.name)}
-                                                        className="p-1.5 text-red-500 hover:bg-red-50 rounded transition-colors"
+                                                        variant="danger"
+                                                        size="sm"
+                                                        className="p-1.5"
+                                                        icon={Trash2}
                                                         title="Delete Space"
-                                                    >
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </button>
+                                                    />
                                                 </div>
                                             )}
                                         </div>
@@ -601,53 +595,53 @@ const Rooms: React.FC = () => {
                                 ? 'No rooms match your search criteria. Try adjusting your filters.'
                                 : 'Get started by creating your first Space for package bookings'}
                         </p>
-                        <button
+                        <StandardButton
                             onClick={() => {
                                 resetForm();
                                 setShowCreateModal(true);
                             }}
-                            className={`bg-${fullColor} hover:bg-${themeColor}-700 text-white px-6 py-2.5 rounded-lg font-semibold transition-colors`}
+                            variant="primary"
+                            size="md"
                         >
                             Create Room
-                        </button>
+                        </StandardButton>
                     </div>
                 )}
 
                 {/* Pagination */}
                 {!loading && totalPages > 1 && (
                             <div className="flex items-center justify-center space-x-2 mt-6">
-                                <button
+                                <StandardButton
                                     onClick={() => handlePageChange(currentPage - 1)}
                                     disabled={currentPage === 1}
-                                    className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    variant="secondary"
+                                    size="sm"
                                 >
                                     Previous
-                                </button>
+                                </StandardButton>
                                 
                                 {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                                     const page = i + 1;
                                     return (
-                                        <button
+                                        <StandardButton
                                             key={page}
                                             onClick={() => handlePageChange(page)}
-                                            className={`px-3 py-2 text-sm font-medium rounded-md ${
-                                                page === currentPage
-                                                    ? `bg-${fullColor} text-white`
-                                                    : 'text-gray-500 bg-white border border-gray-300 hover:bg-gray-50'
-                                            }`}
+                                            variant={page === currentPage ? "primary" : "secondary"}
+                                            size="sm"
                                         >
                                             {page}
-                                        </button>
+                                        </StandardButton>
                                     );
                                 })}
                                 
-                                <button
+                                <StandardButton
                                     onClick={() => handlePageChange(currentPage + 1)}
                                     disabled={currentPage === totalPages}
-                                    className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    variant="secondary"
+                                    size="sm"
                                 >
                                     Next
-                                </button>
+                                </StandardButton>
                             </div>
                         )}
             </div>
@@ -661,28 +655,24 @@ const Rooms: React.FC = () => {
                             
                             {/* Creation Mode Toggle */}
                             <div className="flex gap-2 mb-6 bg-gray-100 p-1 rounded-lg">
-                                <button
+                                <StandardButton
                                     type="button"
                                     onClick={() => setCreationMode('single')}
-                                    className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all ${
-                                        creationMode === 'single'
-                                            ? `bg-${fullColor} text-white shadow-sm`
-                                            : 'text-gray-600 hover:text-gray-900'
-                                    }`}
+                                    variant={creationMode === 'single' ? "primary" : "secondary"}
+                                    size="sm"
+                                    className="flex-1"
                                 >
                                     Single Room
-                                </button>
-                                <button
+                                </StandardButton>
+                                <StandardButton
                                     type="button"
                                     onClick={() => setCreationMode('multiple')}
-                                    className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all ${
-                                        creationMode === 'multiple'
-                                            ? `bg-${fullColor} text-white shadow-sm`
-                                            : 'text-gray-600 hover:text-gray-900'
-                                    }`}
+                                    variant={creationMode === 'multiple' ? "primary" : "secondary"}
+                                    size="sm"
+                                    className="flex-1"
                                 >
                                     Multiple Rooms
-                                </button>
+                                </StandardButton>
                             </div>
 
                             <form onSubmit={handleCreateRoom} className="space-y-4">
@@ -891,33 +881,39 @@ const Rooms: React.FC = () => {
                                 )}
 
                                 <div className="flex gap-3 pt-4">
-                                    <button
+                                    <StandardButton
                                         type="submit"
-                                        className={`flex-1 bg-${fullColor} hover:bg-${themeColor}-700 text-white py-2 px-4 rounded-lg transition-colors`}
+                                        variant="primary"
+                                        size="md"
+                                        className="flex-1"
                                     >
                                         {creationMode === 'single' ? 'Create Room' : `Create ${generateRoomPreview().length} Rooms`}
-                                    </button>
-                                    <button
+                                    </StandardButton>
+                                    <StandardButton
                                         type="button"
                                         onClick={() => {
                                             setShowCreateModal(false);
                                             resetForm();
                                         }}
-                                        className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-700 py-2 px-4 rounded-lg transition-colors"
+                                        variant="secondary"
+                                        size="md"
+                                        className="flex-1"
                                     >
                                         Cancel
-                                    </button>
+                                    </StandardButton>
                                 </div>
                             </form>
 
                             {/* Bottom Close Button */}
                             <div className="mt-6 pt-4 border-t border-gray-200">
-                                <button
+                                <StandardButton
                                     onClick={() => setShowCreateModal(false)}
-                                    className="w-full px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium rounded-lg transition-colors"
+                                    variant="ghost"
+                                    size="md"
+                                    className="w-full"
                                 >
                                     Close
-                                </button>
+                                </StandardButton>
                             </div>
                         </div>
                     </div>
@@ -975,33 +971,39 @@ const Rooms: React.FC = () => {
                                 </div>
 
                                 <div className="flex gap-3 pt-4">
-                                    <button
+                                    <StandardButton
                                         type="submit"
-                                        className={`flex-1 bg-${fullColor} hover:bg-${themeColor}-700 text-white py-2 px-4 rounded-lg transition-colors`}
+                                        variant="primary"
+                                        size="md"
+                                        className="flex-1"
                                     >
                                         Update Room
-                                    </button>
-                                    <button
+                                    </StandardButton>
+                                    <StandardButton
                                         type="button"
                                         onClick={() => {
                                             setShowEditModal(false);
                                             resetForm();
                                         }}
-                                        className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-700 py-2 px-4 rounded-lg transition-colors"
+                                        variant="secondary"
+                                        size="md"
+                                        className="flex-1"
                                     >
                                         Cancel
-                                    </button>
+                                    </StandardButton>
                                 </div>
                             </form>
 
                             {/* Bottom Close Button */}
                             <div className="mt-6 pt-4 border-t border-gray-200">
-                                <button
+                                <StandardButton
                                     onClick={() => setShowEditModal(false)}
-                                    className="w-full px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium rounded-lg transition-colors"
+                                    variant="ghost"
+                                    size="md"
+                                    className="w-full"
                                 >
                                     Close
-                                </button>
+                                </StandardButton>
                             </div>
                         </div>
                     </div>

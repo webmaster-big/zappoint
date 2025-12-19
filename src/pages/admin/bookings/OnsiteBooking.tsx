@@ -1,12 +1,13 @@
 // src/pages/onsite-booking/OnsiteBooking.tsx
 import React, { useState, useEffect } from 'react';
-import { Calendar, Clock, Users, CreditCard, Gift, Tag, Plus, Minus, DollarSign } from 'lucide-react';
+import { Calendar, Clock, Users, CreditCard, Gift, Tag, Plus, Minus, DollarSign, X } from 'lucide-react';
 import QRCode from 'qrcode';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import Toast from '../../../components/ui/Toast';
 import EmptyStateModal from '../../../components/ui/EmptyStateModal';
 import DatePicker from '../../../components/ui/DatePicker';
 import LocationSelector from '../../../components/admin/LocationSelector';
+import StandardButton from '../../../components/ui/StandardButton';
 import type { 
   OnsiteBookingPackage, 
   OnsiteBookingData 
@@ -1250,14 +1251,15 @@ const OnsiteBooking: React.FC = () => {
                   className={`w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-${themeColor}-400 focus:border-${themeColor}-500 transition-colors`}
                 />
                 {searchQuery && (
-                  <button
+                  <StandardButton
+                    variant="ghost"
+                    size="sm"
+                    icon={X}
                     onClick={() => setSearchQuery('')}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    className="absolute right-3 top-1/2 -translate-y-1/2"
                   >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
+                    {''}
+                  </StandardButton>
                 )}
               </div>
               {searchQuery && (
@@ -1382,16 +1384,17 @@ const OnsiteBooking: React.FC = () => {
               Number of Participants
             </label>
             <div className="flex items-center gap-3">
-              <button
+              <StandardButton
                 type="button"
+                variant="secondary"
+                size="md"
                 onClick={() => setBookingData(prev => ({ 
                   ...prev, 
                   participants: Math.max(1, prev.participants - 1) 
                 }))}
-                className="w-10 h-10 rounded-lg bg-gray-100 border border-gray-300 text-gray-800 flex items-center justify-center hover:bg-gray-200 transition-colors text-lg font-semibold"
               >
                 -
-              </button>
+              </StandardButton>
               <input
                 type="number"
                 name="participants"
@@ -1408,16 +1411,17 @@ const OnsiteBooking: React.FC = () => {
                 className={`w-20 text-center border-2 border-gray-200 rounded-lg px-4 py-2 focus:ring-2 focus:ring-${themeColor}-400 focus:border-${themeColor}-500 transition-colors font-semibold text-lg`}
                 required
               />
-              <button
+              <StandardButton
                 type="button"
+                variant="secondary"
+                size="md"
                 onClick={() => setBookingData(prev => ({ 
                   ...prev, 
                   participants: Math.min(selectedPackage?.maxParticipants || 999, prev.participants + 1) 
                 }))}
-                className="w-10 h-10 rounded-lg bg-gray-100 border border-gray-300 text-gray-800 flex items-center justify-center hover:bg-gray-200 transition-colors text-lg font-semibold"
               >
                 +
-              </button>
+              </StandardButton>
               <span className="text-sm text-gray-600">
                 {selectedPackage?.minParticipants && `${selectedPackage.minParticipants} included`}
                 {selectedPackage?.minParticipants && selectedPackage?.maxParticipants && ' • '}
@@ -1493,20 +1497,22 @@ const OnsiteBooking: React.FC = () => {
       </div>
 
       <div className="flex gap-3 pt-4">
-        <button
+        <StandardButton
           type="button"
+          variant="secondary"
           onClick={() => setStep(1)}
-          className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium transition-colors"
+          className="flex-1"
         >
           Back to Packages
-        </button>
-        <button
+        </StandardButton>
+        <StandardButton
           type="button"
+          variant="primary"
           onClick={() => setStep(3)}
-          className={`flex-2 px-8 py-3 rounded-lg font-semibold transition-colors bg-${fullColor} text-white hover:bg-${themeColor}-700 shadow-sm`}
+          className="flex-2"
         >
           Continue to Attractions & Add-ons
-        </button>
+        </StandardButton>
       </div>
       </div>
       
@@ -1560,38 +1566,39 @@ const OnsiteBooking: React.FC = () => {
                       <span className="text-xs text-gray-500">{attraction.pricingType === 'per_person' ? 'per person' : 'per unit'}</span>
                     </div>
                   </div>
-                  <button
+                  <StandardButton
                     type="button"
+                    variant={isSelected ? 'danger' : 'primary'}
+                    size="sm"
                     onClick={() => handleAttractionToggle(String(attraction.id))}
-                    className={`ml-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      isSelected
-                        ? 'bg-red-100 text-red-700 hover:bg-red-200'
-                        : `bg-${themeColor}-100 text-${themeColor}-700 hover:bg-${themeColor}-200`
-                    }`}
                   >
                     {isSelected ? 'Remove' : 'Add'}
-                  </button>
+                  </StandardButton>
                 </div>
                 
                 {isSelected && (
                   <div className={`mt-3 pt-3 border-t border-${themeColor}-200 flex items-center justify-between`}>
                     <span className="text-sm font-medium text-gray-700">Quantity:</span>
                     <div className="flex items-center gap-3">
-                      <button
+                      <StandardButton
                         type="button"
+                        variant="secondary"
+                        size="sm"
+                        icon={Minus}
                         onClick={() => handleAttractionQuantityChange(String(attraction.id), selectedQty - 1)}
-                        className={`p-2 rounded-lg bg-white border-2 border-gray-300 hover:border-${themeColor}-400 transition-colors`}
                       >
-                        <Minus size={16} className="text-gray-600" />
-                      </button>
+                        {''}
+                      </StandardButton>
                       <span className="font-bold text-lg text-gray-900 w-8 text-center">{selectedQty}</span>
-                      <button
+                      <StandardButton
                         type="button"
+                        variant="secondary"
+                        size="sm"
+                        icon={Plus}
                         onClick={() => handleAttractionQuantityChange(String(attraction.id), selectedQty + 1)}
-                        className={`p-2 rounded-lg bg-white border-2 border-gray-300 hover:border-${themeColor}-400 transition-colors`}
                       >
-                        <Plus size={16} className="text-gray-600" />
-                      </button>
+                        {''}
+                      </StandardButton>
                     </div>
                   </div>
                 )}
@@ -1633,37 +1640,38 @@ const OnsiteBooking: React.FC = () => {
                         <h4 className="font-semibold text-gray-900">{addOn.name}</h4>
                         <p className={`text-lg font-bold text-${fullColor} mt-1`}>${addOn.price}</p>
                       </div>
-                      <button
+                      <StandardButton
                         type="button"
+                        variant={isSelected ? 'danger' : 'primary'}
+                        size="sm"
                         onClick={() => handleAddOnToggle(addOn.name)}
-                        className={`ml-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                          isSelected
-                            ? 'bg-red-100 text-red-700 hover:bg-red-200'
-                            : `bg-${themeColor}-100 text-${themeColor}-700 hover:bg-${themeColor}-200`
-                        }`}
                       >
                         {isSelected ? 'Remove' : 'Add'}
-                      </button>
+                      </StandardButton>
                     </div>
                     {isSelected && (
                       <div className={`mt-3 pt-3 border-t border-${themeColor}-200 flex items-center justify-between`}>
                         <span className="text-sm font-medium text-gray-700">Quantity:</span>
                         <div className="flex items-center gap-3">
-                          <button
+                          <StandardButton
                             type="button"
+                            variant="secondary"
+                            size="sm"
+                            icon={Minus}
                             onClick={() => handleAddOnQuantityChange(addOn.name, selectedQty - 1)}
-                            className={`p-2 rounded-lg bg-white border-2 border-gray-300 hover:border-${themeColor}-400 transition-colors`}
                           >
-                            <Minus size={16} className="text-gray-600" />
-                          </button>
+                            {''}
+                          </StandardButton>
                           <span className="font-bold text-lg text-gray-900 w-8 text-center">{selectedQty}</span>
-                          <button
+                          <StandardButton
                             type="button"
+                            variant="secondary"
+                            size="sm"
+                            icon={Plus}
                             onClick={() => handleAddOnQuantityChange(addOn.name, selectedQty + 1)}
-                            className={`p-2 rounded-lg bg-white border-2 border-gray-300 hover:border-${themeColor}-400 transition-colors`}
                           >
-                            <Plus size={16} className="text-gray-600" />
-                          </button>
+                            {''}
+                          </StandardButton>
                         </div>
                       </div>
                     )}
@@ -1676,20 +1684,22 @@ const OnsiteBooking: React.FC = () => {
       )}
       
       <div className="flex gap-3 pt-4">
-        <button
+        <StandardButton
           type="button"
+          variant="secondary"
           onClick={() => setStep(2)}
-          className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium transition-colors"
+          className="flex-1"
         >
           Back to Date & Time
-        </button>
-        <button
+        </StandardButton>
+        <StandardButton
           type="button"
+          variant="primary"
           onClick={() => setStep(4)}
-          className={`flex-2 px-8 py-3 rounded-lg font-semibold transition-colors bg-${fullColor} text-white hover:bg-${themeColor}-700 shadow-sm`}
+          className="flex-2"
         >
           Continue to Customer Details
-        </button>
+        </StandardButton>
       </div>
       </div>
       
@@ -1881,20 +1891,22 @@ const OnsiteBooking: React.FC = () => {
       </div>
       
       <div className="flex gap-3 pt-4">
-        <button
+        <StandardButton
           type="button"
+          variant="secondary"
           onClick={() => setStep(3)}
-          className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium transition-colors"
+          className="flex-1"
         >
           Back
-        </button>
-        <button
+        </StandardButton>
+        <StandardButton
           type="button"
+          variant="primary"
           onClick={() => setStep(5)}
-          className={`flex-2 px-8 py-3 rounded-lg font-semibold transition-colors bg-${fullColor} text-white hover:bg-${themeColor}-700 shadow-sm`}
+          className="flex-2"
         >
           Continue to Payment
-        </button>
+        </StandardButton>
       </div>
       </div>
       
@@ -2065,46 +2077,34 @@ const OnsiteBooking: React.FC = () => {
           <div className="mb-4">
             <h3 className="text-sm font-medium text-gray-700 mb-3">Payment Method</h3>
             <div className="grid grid-cols-3 gap-2">
-              <button
+              <StandardButton
                 type="button"
+                variant={bookingData.paymentMethod === 'cash' ? 'primary' : 'secondary'}
                 onClick={() => setBookingData(prev => ({ ...prev, paymentMethod: 'cash' }))}
-                className={`p-3 border rounded-lg text-center transition-colors ${
-                  bookingData.paymentMethod === 'cash'
-                    ? `border-${themeColor}-500 bg-${themeColor}-50 text-${themeColor}-700`
-                    : 'border-gray-300 hover:border-gray-400'
-                }`}
               >
                 <DollarSign className="h-5 w-5 mx-auto mb-1" />
                 <span className="text-sm font-medium">Cash</span>
-              </button>
+              </StandardButton>
               
-              <button
+              <StandardButton
                 type="button"
+                variant={bookingData.paymentMethod === 'card' ? 'primary' : 'secondary'}
                 onClick={() => setBookingData(prev => ({ ...prev, paymentMethod: 'card' }))}
-                className={`p-3 border rounded-lg text-center transition-colors ${
-                  bookingData.paymentMethod === 'card'
-                    ? `border-${themeColor}-500 bg-${themeColor}-50 text-${themeColor}-700`
-                    : 'border-gray-300 hover:border-gray-400'
-                }`}
               >
                 <CreditCard className="h-5 w-5 mx-auto mb-1" />
                 <span className="text-sm font-medium">Card</span>
-              </button>
+              </StandardButton>
               
-              <button
+              <StandardButton
                 type="button"
+                variant={bookingData.paymentMethod === 'paylater' ? 'primary' : 'secondary'}
                 onClick={() => setBookingData(prev => ({ ...prev, paymentMethod: 'paylater' }))}
-                className={`p-3 border rounded-lg text-center transition-colors ${
-                  bookingData.paymentMethod === 'paylater'
-                    ? `border-${themeColor}-500 bg-${themeColor}-50 text-${themeColor}-700`
-                    : 'border-gray-300 hover:border-gray-400'
-                }`}
               >
                 <svg className="h-5 w-5 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 <span className="text-sm font-medium">Pay Later</span>
-              </button>
+              </StandardButton>
             </div>
           </div>
       
@@ -2129,20 +2129,24 @@ const OnsiteBooking: React.FC = () => {
           <div className="mb-4">
             <h3 className="text-sm font-medium text-gray-700 mb-3">Card Payment Type</h3>
             <div className="flex gap-2">
-              <button
+              <StandardButton
                 type="button"
+                variant={!useAuthorizeNet ? 'primary' : 'secondary'}
+                size="sm"
                 onClick={() => setUseAuthorizeNet(false)}
-                className={`flex-1 px-3 py-2 text-xs rounded-lg border transition-colors ${!useAuthorizeNet ? `border-${themeColor}-500 bg-${themeColor}-50 text-${themeColor}-700 font-medium` : 'border-gray-300 text-gray-600 hover:border-gray-400'}`}
+                className="flex-1"
               >
                 Manual Card
-              </button>
-              <button
+              </StandardButton>
+              <StandardButton
                 type="button"
+                variant={useAuthorizeNet ? 'primary' : 'secondary'}
+                size="sm"
                 onClick={() => setUseAuthorizeNet(true)}
-                className={`flex-1 px-3 py-2 text-xs rounded-lg border transition-colors ${useAuthorizeNet ? `border-${themeColor}-500 bg-${themeColor}-50 text-${themeColor}-700 font-medium` : 'border-gray-300 text-gray-600 hover:border-gray-400'}`}
+                className="flex-1"
               >
                 Process with Authorize.Net
-              </button>
+              </StandardButton>
             </div>
             <p className="text-xs text-gray-500 mt-2">
               {useAuthorizeNet ? 'Process payment online with Authorize.Net' : 'Customer paid by card - no online processing'}
@@ -2369,34 +2373,24 @@ const OnsiteBooking: React.FC = () => {
       
       {/* Action Buttons */}
       <div className="flex gap-3">
-        <button
+        <StandardButton
           type="button"
+          variant="secondary"
           onClick={() => setStep(4)}
-          className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium"
+          className="flex-1"
         >
           Back
-        </button>
-        <button
+        </StandardButton>
+        <StandardButton
           type="submit"
+          variant="primary"
+          icon={CreditCard}
           disabled={!isBookingValid() || isProcessingPayment || submitting}
-          className={`flex-2 px-6 py-3 rounded-lg font-semibold transition-colors flex items-center justify-center ${
-            !isBookingValid() || isProcessingPayment || submitting
-              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-              : `bg-${themeColor}-600 text-white hover:bg-${themeColor}-700`
-          }`}
+          loading={isProcessingPayment || submitting}
+          className="flex-2"
         >
-          {isProcessingPayment || submitting ? (
-            <>
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-              Processing...
-            </>
-          ) : (
-            <>
-              <CreditCard className="h-5 w-5 mr-2" />
-              Confirm Booking
-            </>
-          )}
-        </button>
+          {isProcessingPayment || submitting ? 'Processing...' : 'Confirm Booking'}
+        </StandardButton>
       </div>
         </div>
       </div>
@@ -2442,12 +2436,13 @@ const OnsiteBooking: React.FC = () => {
                 </p>
               </div>
               
-              <button
+              <StandardButton
+                variant="primary"
+                fullWidth
                 onClick={() => setShowNoAuthAccountModal(false)}
-                className={`w-full px-6 py-3 bg-${fullColor} text-white rounded-lg hover:bg-${fullColor} font-semibold shadow-lg`}
               >
                 I Understand
-              </button>
+              </StandardButton>
             </div>
           </div>
         </div>

@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useThemeColor } from '../../hooks/useThemeColor';
 import CounterAnimation from '../../components/ui/CounterAnimation';
+import StandardButton from '../../components/ui/StandardButton';
 import { getStoredUser } from '../../utils/storage';
 import bookingService from '../../services/bookingService';
 import MetricsService from '../../services/MetricsService';
@@ -290,28 +291,30 @@ const AttendantDashboard: React.FC = () => {
                <Calendar className={`w-6 h-6 text-${fullColor}`} /> Weekly Calendar
              </h2>
              <div className="flex items-center space-x-2 mt-4 md:mt-0">
-               <button 
+               <StandardButton 
                  onClick={goToPreviousWeek}
-                 className="p-2 rounded-lg border border-gray-200 hover:bg-gray-100"
-               >
-                 <ChevronLeft size={18} />
-               </button>
+                 variant="secondary"
+                 size="sm"
+                 icon={ChevronLeft}
+               />
                <span className="text-sm font-medium text-gray-800">
                  {weekDates[0].toLocaleDateString('en-US', { month: 'long', day: 'numeric' })} - 
                  {weekDates[6].toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
                </span>
-               <button 
+               <StandardButton 
                  onClick={goToNextWeek}
-                 className="p-2 rounded-lg border border-gray-200 hover:bg-gray-100"
-               >
-                 <ChevronRight size={18} />
-               </button>
-               <button 
-                 className={`ml-2 px-3 py-2 text-sm bg-${themeColor}-100 text-${fullColor} rounded-lg hover:bg-${themeColor}-200`}
+                 variant="secondary"
+                 size="sm"
+                 icon={ChevronRight}
+               />
+               <StandardButton 
+                 className="ml-2"
+                 variant="primary"
+                 size="sm"
                  onClick={() => setCurrentWeek(new Date())}
                >
                  Today
-               </button>
+               </StandardButton>
              </div>
            </div>
            
@@ -411,8 +414,10 @@ const AttendantDashboard: React.FC = () => {
                                    
                                    {/* View more button */}
                                    {bookingsForCell.length > 1 && (
-                                     <button
+                                     <StandardButton
                                        onClick={() => console.log('View more:', bookingsForCell)}
+                                       variant="ghost"
+                                       size="sm"
                                        className={`w-full mt-2 pt-2 border-t text-xs font-medium hover:underline ${
                                          bookingsForCell.some(b => b.status === 'confirmed' || b.status === 'Confirmed')
                                            ? 'border-emerald-200 text-emerald-700'
@@ -422,13 +427,15 @@ const AttendantDashboard: React.FC = () => {
                                        }`}
                                      >
                                        +{bookingsForCell.length - 1} more
-                                     </button>
+                                     </StandardButton>
                                    )}
                                    
                                    {/* Single booking - click to view details */}
                                    {bookingsForCell.length === 1 && (
-                                     <button
+                                     <StandardButton
                                        onClick={() => console.log('View booking:', bookingsForCell[0])}
+                                       variant="ghost"
+                                       size="sm"
                                        className={`w-full mt-2 pt-2 border-t text-xs font-medium hover:underline ${
                                          bookingsForCell[0].status === 'confirmed' || bookingsForCell[0].status === 'Confirmed'
                                            ? 'border-emerald-200 text-emerald-700'
@@ -438,7 +445,7 @@ const AttendantDashboard: React.FC = () => {
                                        }`}
                                      >
                                        View details
-                                     </button>
+                                     </StandardButton>
                                    )}
                                  </div>
                                ) : (

@@ -20,6 +20,7 @@ import {
   Building,
   X
 } from 'lucide-react';
+import StandardButton from '../../components/ui/StandardButton';
 import type { 
   LocationActivityLogsActivityLog, 
   LocationActivityLogsFilterOptions, 
@@ -665,20 +666,22 @@ const LocationActivityLogs = () => {
         </div>
         
         <div className="flex gap-2 mt-4 sm:mt-0">
-          <button
+          <StandardButton
+            variant="primary"
+            size="md"
             onClick={() => setShowExportModal(true)}
-            className={`inline-flex items-center px-4 py-2 border bg-${fullColor} text-white border-gray-200 rounded-lg hover:bg-${themeColor}-600`}
+            icon={Download}
           >
-            <Download className="h-4 w-4 mr-2" />
             Export CSV
-          </button>
-          <button
+          </StandardButton>
+          <StandardButton
+            variant="secondary"
+            size="md"
             onClick={loadLogs}
-            className="inline-flex items-center px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50"
             disabled={isRefreshing}
-          >
-            <RefreshCcw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-          </button>
+            icon={RefreshCcw}
+            className={isRefreshing ? '[&_svg]:animate-spin' : ''}
+          />
         </div>
       </div>
 
@@ -688,12 +691,12 @@ const LocationActivityLogs = () => {
           <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto animate-slideUp">
             <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
               <h2 className="text-xl font-bold text-gray-900">Export Activity Logs</h2>
-              <button
+              <StandardButton
+                variant="ghost"
+                size="sm"
                 onClick={() => setShowExportModal(false)}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <X className="h-5 w-5 text-gray-500" />
-              </button>
+                icon={X}
+              />
             </div>
 
             <div className="p-6">
@@ -752,21 +755,25 @@ const LocationActivityLogs = () => {
                         </div>
 
                         {hasMore && selectedCount > 3 && (
-                          <button
+                          <StandardButton
+                            variant="ghost"
+                            size="sm"
                             onClick={() => setShowAllLocations(!showAllLocations)}
-                            className={`mt-2 w-full text-sm text-${fullColor} hover:underline py-1`}
+                            className="mt-2 w-full"
                           >
                             View More ({locations.length - 3} hidden)
-                          </button>
+                          </StandardButton>
                         )}
 
                         {showAllLocations && locations.length > 3 && (
-                          <button
+                          <StandardButton
+                            variant="ghost"
+                            size="sm"
                             onClick={() => setShowAllLocations(false)}
-                            className={`mt-2 w-full text-sm text-${fullColor} hover:underline py-1`}
+                            className="mt-2 w-full"
                           >
                             Show Less
-                          </button>
+                          </StandardButton>
                         )}
 
                         {locations.length === 0 && (
@@ -871,12 +878,14 @@ const LocationActivityLogs = () => {
                         </div>
 
                         {hasMore && (
-                          <button
+                          <StandardButton
+                            variant="ghost"
+                            size="sm"
                             onClick={() => setShowAllUsers(!showAllUsers)}
-                            className={`mt-2 w-full text-sm text-${fullColor} hover:underline py-1`}
+                            className="mt-2 w-full"
                           >
                             {showAllUsers ? 'Show Less' : `Show ${filteredUsers.length - displayedUsers.length} More`}
-                          </button>
+                          </StandardButton>
                         )}
                       </>
                     );
@@ -974,30 +983,24 @@ const LocationActivityLogs = () => {
 
               {/* Action Buttons */}
               <div className="flex gap-3 justify-end pt-4 border-t border-gray-200">
-                <button
+                <StandardButton
+                  variant="secondary"
+                  size="md"
                   onClick={() => setShowExportModal(false)}
-                  className="px-4 py-2 border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50"
                   disabled={isExporting}
                 >
                   Cancel
-                </button>
-                <button
+                </StandardButton>
+                <StandardButton
+                  variant="primary"
+                  size="md"
                   onClick={handleExportWithFilters}
                   disabled={isExporting}
-                  className={`px-4 py-2 bg-${fullColor} text-white rounded-lg hover:opacity-90 disabled:opacity-50 flex items-center gap-2`}
+                  icon={isExporting ? RefreshCcw : Download}
+                  className={isExporting ? '[&_svg]:animate-spin' : ''}
                 >
-                  {isExporting ? (
-                    <>
-                      <RefreshCcw className="h-4 w-4 animate-spin" />
-                      Exporting...
-                    </>
-                  ) : (
-                    <>
-                      <Download className="h-4 w-4" />
-                      Export CSV
-                    </>
-                  )}
-                </button>
+                  {isExporting ? 'Exporting...' : 'Export CSV'}
+                </StandardButton>
               </div>
             </div>
           </div>
@@ -1008,39 +1011,33 @@ const LocationActivityLogs = () => {
       {!isCompanyAdmin && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-1 mb-6">
           <div className="flex flex-wrap gap-1">
-            <button
+            <StandardButton
+              variant={selectedLocation === 'all' ? 'primary' : 'secondary'}
+              size="sm"
               onClick={() => setSelectedLocation('all')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-              selectedLocation === 'all'
-                ? `bg-${fullColor} text-white`
-                : 'text-gray-700 hover:bg-gray-100'
-            }`}
-          >
-            All Locations
-          </button>
-          {locations.map(location => (
-            <button
-              key={location.name}
-              onClick={() => setSelectedLocation(location.name)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2 ${
-                selectedLocation === location.name
-                  ? `bg-${fullColor} text-white`
-                  : 'text-gray-700 hover:bg-gray-100'
-              }`}
             >
-              <MapPin size={14} />
-              {location.name}
-              <span className={`px-1.5 py-0.5 rounded-full text-xs ${
-                selectedLocation === location.name
-                  ? `bg-${themeColor}-600 text-white`
-                  : 'bg-gray-200 text-gray-700'
-              }`}>
-                {location.recentActivity}
-              </span>
-            </button>
-          ))}
+              All Locations
+            </StandardButton>
+            {locations.map(location => (
+              <StandardButton
+                key={location.name}
+                variant={selectedLocation === location.name ? 'primary' : 'secondary'}
+                size="sm"
+                onClick={() => setSelectedLocation(location.name)}
+                icon={MapPin}
+              >
+                {location.name}
+                <span className={`px-1.5 py-0.5 rounded-full text-xs ${
+                  selectedLocation === location.name
+                    ? `bg-${themeColor}-600 text-white`
+                    : 'bg-gray-200 text-gray-700'
+                }`}>
+                  {location.recentActivity}
+                </span>
+              </StandardButton>
+            ))}
+          </div>
         </div>
-      </div>
       )}
 
       {/* Metrics Grid */}
@@ -1083,13 +1080,14 @@ const LocationActivityLogs = () => {
             />
           </div>
           <div className="flex gap-2">
-            <button
+            <StandardButton
+              variant="secondary"
+              size="md"
               onClick={() => setShowFilters(!showFilters)}
-              className="flex items-center px-3 py-2 border border-gray-200 rounded-lg hover:bg-gray-50"
+              icon={Filter}
             >
-              <Filter className="h-4 w-4 mr-1" />
               Filters
-            </button>
+            </StandardButton>
           </div>
         </div>
 
@@ -1171,12 +1169,13 @@ const LocationActivityLogs = () => {
               </div>
             </div>
             <div className="mt-4 flex justify-end">
-              <button
+              <StandardButton
+                variant="ghost"
+                size="sm"
                 onClick={clearFilters}
-                className="px-3 py-2 text-sm text-gray-600 hover:text-gray-800"
               >
                 Clear Filters
-              </button>
+              </StandardButton>
             </div>
           </div>
         )}
@@ -1265,13 +1264,14 @@ const LocationActivityLogs = () => {
                 of <span className="font-medium">{totalLogs}</span> activities
               </div>
               <div className="flex items-center gap-2">
-                <button
+                <StandardButton
+                  variant="secondary"
+                  size="sm"
                   onClick={() => paginate(Math.max(1, currentPage - 1))}
                   disabled={currentPage === 1}
-                  className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50"
                 >
                   Previous
-                </button>
+                </StandardButton>
                 
                 {/* Pagination buttons limited to 3 */}
                 {(() => {
@@ -1290,27 +1290,25 @@ const LocationActivityLogs = () => {
                     }
                   }
                   return Array.from({ length: end - start + 1 }, (_, i) => start + i).map((page) => (
-                    <button
+                    <StandardButton
                       key={page}
+                      variant={currentPage === page ? 'primary' : 'secondary'}
+                      size="sm"
                       onClick={() => paginate(page)}
-                      className={`px-3 py-2 border rounded-lg text-sm font-medium ${
-                        currentPage === page
-                          ? `border-${fullColor} bg-${fullColor} text-white`
-                          : 'border-gray-200 text-gray-800 hover:bg-gray-50'
-                      }`}
                     >
                       {page}
-                    </button>
+                    </StandardButton>
                   ));
                 })()}
                 
-                <button
+                <StandardButton
+                  variant="secondary"
+                  size="sm"
                   onClick={() => paginate(Math.min(totalPages, currentPage + 1))}
                   disabled={currentPage === totalPages}
-                  className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50"
                 >
                   Next
-                </button>
+                </StandardButton>
               </div>
             </div>
           </div>

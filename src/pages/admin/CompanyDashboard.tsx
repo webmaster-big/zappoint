@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useThemeColor } from '../../hooks/useThemeColor';
+import StandardButton from '../../components/ui/StandardButton';
 import CounterAnimation from '../../components/ui/CounterAnimation';
 import LocationSelector from '../../components/admin/LocationSelector';
 import bookingService from '../../services/bookingService';
@@ -702,12 +703,13 @@ const CompanyDashboard: React.FC = () => {
                 </div>
                 {sortedLocations.length > 4 && (
                   <div className="flex justify-center mt-4">
-                    <button
-                      className={`px-4 py-2 text-sm rounded-lg font-medium hover:opacity-90 transition bg-${themeColor}-100 text-${fullColor}`}
+                    <StandardButton
+                      variant="secondary"
+                      size="sm"
                       onClick={() => setShowAllLocations(v => !v)}
                     >
                       {showAllLocations ? 'Show Less' : `Show All (${sortedLocations.length})`}
-                    </button>
+                    </StandardButton>
                   </div>
                 )}
               </>
@@ -728,43 +730,46 @@ const CompanyDashboard: React.FC = () => {
             <Calendar className="w-5 h-5 md:w-6 md:h-6 text-${fullColor}" /> Weekly Calendar
           </h2>
           <div className="flex items-center space-x-2 mt-4 md:mt-0">
-            <button 
+            <StandardButton 
+              variant="secondary"
+              size="sm"
+              icon={ChevronLeft}
               onClick={goToPreviousWeek}
-              className="p-2 rounded-lg border border-gray-200 hover:bg-gray-100"
-            >
-              <ChevronLeft size={16} className="md:size-5" />
-            </button>
+            />
             <span className="text-sm font-medium text-gray-800">
               {weekDates[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - 
               {weekDates[6].toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
             </span>
-            <button 
+            <StandardButton 
+              variant="secondary"
+              size="sm"
+              icon={ChevronRight}
               onClick={goToNextWeek}
-              className="p-2 rounded-lg border border-gray-200 hover:bg-gray-100"
+            />
+            <StandardButton 
+              variant="secondary" 
+              size="sm" 
+              className="ml-2"
+              onClick={() => setCurrentWeek(new Date())}
             >
-              <ChevronRight size={16} className="md:size-5" />
-            </button>
-            <button className="ml-2 px-3 py-2 text-sm bg-${themeColor}-100 text-${fullColor} rounded-lg hover:bg-${themeColor}-200" onClick={() => setCurrentWeek(new Date())}>
               Today
-            </button>
+            </StandardButton>
             
             {/* Calendar Filter Toggle */}
-            <button 
+            <StandardButton 
+              variant={calendarFilter.type !== 'all' ? 'primary' : 'secondary'}
+              size="sm"
+              className="ml-2"
               onClick={() => setShowFilterPanel(!showFilterPanel)}
-              className={`ml-2 px-3 py-2 text-sm rounded-lg flex items-center ${
-                calendarFilter.type !== 'all' 
-                  ? 'bg-${themeColor}-100 text-${fullColor} border border-${themeColor}-300' 
-                  : 'bg-gray-100 text-gray-800 border border-gray-200'
-              }`}
             >
               <Filter size={16} className="mr-1" />
               Filter
               {calendarFilter.type !== 'all' && (
-                <span className="ml-1 bg-${themeColor}-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs">
+                <span className="ml-1 bg-white text-gray-800 rounded-full w-4 h-4 flex items-center justify-center text-xs">
                   !
                 </span>
               )}
-            </button>
+            </StandardButton>
           </div>
         </div>
         
@@ -773,12 +778,12 @@ const CompanyDashboard: React.FC = () => {
           <div className="mb-4 md:mb-6 p-3 md:p-4 bg-gray-50 rounded-lg border border-gray-200">
             <div className="flex justify-between items-center mb-3">
               <h3 className="font-medium text-gray-800 text-sm md:text-base">Filter Calendar</h3>
-              <button 
+              <StandardButton 
+                variant="ghost"
+                size="sm"
+                icon={X}
                 onClick={() => setShowFilterPanel(false)}
-                className="text-gray-500 hover:text-gray-800"
-              >
-                <X size={16} className="md:size-5" />
-              </button>
+              />
             </div>
             
             <div className="flex flex-wrap gap-3 md:gap-4">
@@ -875,13 +880,15 @@ const CompanyDashboard: React.FC = () => {
               </div>
               
               {calendarFilter.type !== 'all' && (
-                <button
+                <StandardButton
+                  variant="ghost"
+                  size="sm"
+                  className="ml-auto"
                   onClick={clearCalendarFilter}
-                  className="ml-auto text-sm text-${fullColor} hover:text-${fullColor} flex items-center"
                 >
                   <X size={14} className="mr-1" />
                   Clear Filter
-                </button>
+                </StandardButton>
               )}
             </div>
             
@@ -956,34 +963,38 @@ const CompanyDashboard: React.FC = () => {
                               
                               {/* View more button */}
                               {bookingsForCell.length > 1 && (
-                                <button
-                                  onClick={() => setSelectedTimeSlot({ date, time, bookings: bookingsForCell })}
-                                  className={`w-full mt-2 pt-2 border-t text-xs font-medium hover:underline ${
+                                <StandardButton
+                                  variant="ghost"
+                                  size="sm"
+                                  className={`w-full mt-2 pt-2 border-t text-xs font-medium ${
                                     bookingsForCell.some(b => b.status === 'confirmed')
                                       ? 'border-emerald-200 text-emerald-700'
                                       : bookingsForCell.some(b => b.status === 'pending')
                                       ? 'border-amber-200 text-amber-700'
                                       : 'border-rose-200 text-rose-700'
                                   }`}
+                                  onClick={() => setSelectedTimeSlot({ date, time, bookings: bookingsForCell })}
                                 >
                                   +{bookingsForCell.length - 1} more
-                                </button>
+                                </StandardButton>
                               )}
                               
                               {/* Single booking - click to view details */}
                               {bookingsForCell.length === 1 && (
-                                <button
-                                  onClick={() => setSelectedBooking(bookingsForCell[0])}
-                                  className={`w-full mt-2 pt-2 border-t text-xs font-medium hover:underline ${
+                                <StandardButton
+                                  variant="ghost"
+                                  size="sm"
+                                  className={`w-full mt-2 pt-2 border-t text-xs font-medium ${
                                     bookingsForCell[0].status === 'confirmed'
                                       ? 'border-emerald-200 text-emerald-700'
                                       : bookingsForCell[0].status === 'pending'
                                       ? 'border-amber-200 text-amber-700'
                                       : 'border-rose-200 text-rose-700'
                                   }`}
+                                  onClick={() => setSelectedBooking(bookingsForCell[0])}
                                 >
                                   View details
-                                </button>
+                                </StandardButton>
                               )}
                             </div>
                           ) : (
@@ -1081,10 +1092,13 @@ const CompanyDashboard: React.FC = () => {
                 showAllOption={true}
               />
             </div>
-            <button className="px-3 py-2 border border-gray-200 rounded-lg text-sm flex items-center">
+            <StandardButton 
+              variant="secondary" 
+              size="sm"
+            >
               <Filter size={16} className="mr-1" />
               Filter
-            </button>
+            </StandardButton>
           </div>
         </div>
       
@@ -1172,13 +1186,14 @@ const CompanyDashboard: React.FC = () => {
               Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, filteredBookings.length)} of {filteredBookings.length} results
             </div>
             <div className="flex space-x-2">
-              <button
+              <StandardButton
+                variant="secondary"
+                size="sm"
                 onClick={prevPage}
                 disabled={currentPage === 1}
-                className="px-3 py-1 border border-gray-300 rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Previous
-              </button>
+              </StandardButton>
               {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                 // Show pages around current page
                 let pageNum;
@@ -1193,26 +1208,24 @@ const CompanyDashboard: React.FC = () => {
                 }
                 
                 return (
-                  <button
+                  <StandardButton
                     key={pageNum}
+                    variant={currentPage === pageNum ? 'primary' : 'secondary'}
+                    size="sm"
                     onClick={() => paginate(pageNum)}
-                    className={`px-3 py-1 border rounded-md text-sm ${
-                      currentPage === pageNum
-                        ? 'bg-${fullColor} text-white border-${fullColor}'
-                        : 'border-gray-300'
-                    }`}
                   >
                     {pageNum}
-                  </button>
+                  </StandardButton>
                 );
               })}
-              <button
+              <StandardButton
+                variant="secondary"
+                size="sm"
                 onClick={nextPage}
                 disabled={currentPage === totalPages}
-                className="px-3 py-1 border border-gray-300 rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Next
-              </button>
+              </StandardButton>
             </div>
           </div>
         )}
@@ -1232,12 +1245,12 @@ const CompanyDashboard: React.FC = () => {
                     {selectedTimeSlot.time} - {selectedTimeSlot.bookings.length} Booking{selectedTimeSlot.bookings.length > 1 ? 's' : ''}
                   </p>
                 </div>
-                <button
+                <StandardButton
+                  variant="ghost"
+                  size="sm"
+                  icon={X}
                   onClick={() => setSelectedTimeSlot(null)}
-                  className="text-gray-500 hover:text-gray-800"
-                >
-                  <X className="h-6 w-6" />
-                </button>
+                />
               </div>
 
               <div className="space-y-3">
@@ -1296,12 +1309,14 @@ const CompanyDashboard: React.FC = () => {
 
               {/* Bottom Close Button */}
               <div className="mt-6 pt-4 border-t border-gray-200">
-                <button
+                <StandardButton
+                  variant="secondary"
+                  size="md"
+                  className="w-full"
                   onClick={() => setSelectedTimeSlot(null)}
-                  className="w-full px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium rounded-lg transition-colors"
                 >
                   Close
-                </button>
+                </StandardButton>
               </div>
             </div>
           </div>
@@ -1317,12 +1332,12 @@ const CompanyDashboard: React.FC = () => {
                 <h3 className="text-xl font-semibold text-gray-900">
                   Booking Details
                 </h3>
-                <button
+                <StandardButton
+                  variant="ghost"
+                  size="sm"
+                  icon={X}
                   onClick={() => setSelectedBooking(null)}
-                  className="text-gray-500 hover:text-gray-800"
-                >
-                  <X className="h-6 w-6" />
-                </button>
+                />
               </div>
 
               {/* Customer Information */}
@@ -1577,12 +1592,14 @@ const CompanyDashboard: React.FC = () => {
 
               {/* Bottom Close Button */}
               <div className="mt-6 pt-4 border-t border-gray-200">
-                <button
+                <StandardButton
+                  variant="secondary"
+                  size="md"
+                  className="w-full"
                   onClick={() => setSelectedBooking(null)}
-                  className="w-full px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium rounded-lg transition-colors"
                 >
                   Close
-                </button>
+                </StandardButton>
               </div>
             </div>
           </div>

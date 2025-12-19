@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
+import StandardButton from '../../../components/ui/StandardButton';
 import { customerService } from '../../../services/CustomerService';
 import { locationService } from '../../../services/LocationService';
 import LocationSelector from '../../../components/admin/LocationSelector';
@@ -247,13 +248,14 @@ const CustomerAnalytics: React.FC = () => {
               <option value="90d">Last 90 days</option>
               <option value="1y">Last year</option>
             </select>
-            <button 
+            <StandardButton 
+              variant="primary"
+              size="md"
               onClick={() => setShowExportModal(true)}
-              className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm flex items-center gap-2 hover:bg-gray-50"
+              icon={Download}
             >
-              <Download className="w-4 h-4" />
               Export
-            </button>
+            </StandardButton>
           </div>
       </div>
 
@@ -634,9 +636,9 @@ const CustomerAnalytics: React.FC = () => {
               </div>
             </div>
           </div>
-          <button className={`text-sm text-${themeColor}-600 hover:text-${themeColor}-700 flex items-center gap-1`}>
-            View All <ChevronDown className="w-4 h-4" />
-          </button>
+          <StandardButton variant="ghost" size="sm" icon={ChevronDown}>
+            View All
+          </StandardButton>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -700,12 +702,12 @@ const CustomerAnalytics: React.FC = () => {
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 p-6">
             <div className="flex items-center justify-between mb-5">
               <h3 className="text-lg font-semibold text-gray-900">Export Analytics</h3>
-              <button
+              <StandardButton
+                variant="ghost"
+                size="sm"
                 onClick={() => setShowExportModal(false)}
-                className="p-1 hover:bg-gray-100 rounded transition-colors"
-              >
-                <X className="w-5 h-5 text-gray-400" />
-              </button>
+                icon={X}
+              />
             </div>
             
             {/* Format Selection */}
@@ -807,30 +809,26 @@ const CustomerAnalytics: React.FC = () => {
 
             {/* Actions */}
             <div className="flex gap-3 pt-2">
-              <button
+              <StandardButton
+                variant="secondary"
+                size="md"
                 onClick={() => setShowExportModal(false)}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
                 disabled={isExporting}
+                className="flex-1"
               >
                 Cancel
-              </button>
-              <button
+              </StandardButton>
+              <StandardButton
+                variant="primary"
+                size="md"
                 onClick={handleExport}
                 disabled={isExporting || exportSections.length === 0}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                loading={isExporting}
+                icon={Download}
+                className="flex-1"
               >
-                {isExporting ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    Exporting...
-                  </>
-                ) : (
-                  <>
-                    <Download className="w-4 h-4" />
-                    Export
-                  </>
-                )}
-              </button>
+                {isExporting ? 'Exporting...' : 'Export'}
+              </StandardButton>
             </div>
           </div>
         </div>

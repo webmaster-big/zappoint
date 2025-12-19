@@ -24,6 +24,7 @@ import { ASSET_URL } from '../../../utils/storage';
 import { loadAcceptJS, processCardPayment, validateCardNumber, formatCardNumber, getCardType } from '../../../services/PaymentService';
 import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
 import { extractIdFromSlug } from '../../../utils/slug';
+import StandardButton from '../../../components/ui/StandardButton';
 
 const countries = [
   'United States', 'Canada', 'United Kingdom', 'Afghanistan', 'Albania', 'Algeria', 'Andorra', 'Angola',
@@ -559,12 +560,13 @@ const PurchaseAttraction = () => {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <h2 className="text-2xl font-bold text-gray-900">Attraction not found</h2>
-          <button 
+          <StandardButton 
+            variant="ghost"
+            size="md"
             onClick={() => navigate('/')}
-            className="mt-4 text-blue-800 hover:text-blue-800"
           >
             Back to Attractions
-          </button>
+          </StandardButton>
         </div>
       </div>
     );
@@ -589,18 +591,22 @@ const PurchaseAttraction = () => {
               <p className="text-sm text-gray-600">Sign up for faster checkout and track your purchases.</p>
             </div>
             <div className="flex flex-col gap-2.5">
-              <button
+              <StandardButton
+                variant="primary"
+                size="md"
                 onClick={() => navigate('/customer/register')}
-                className="w-full px-4 py-2.5 bg-blue-800 text-white text-sm font-medium hover:bg-blue-900 transition-all duration-200 active:scale-95"
+                fullWidth
               >
                 Create Account
-              </button>
-              <button
+              </StandardButton>
+              <StandardButton
+                variant="secondary"
+                size="md"
                 onClick={() => setShowAccountModal(false)}
-                className="w-full px-4 py-2.5 bg-white text-gray-700 text-sm font-medium border border-gray-300 hover:bg-gray-50 transition-all duration-200 active:scale-95"
+                fullWidth
               >
                 Continue as Guest
-              </button>
+              </StandardButton>
             </div>
           </div>
         </div>
@@ -699,15 +705,16 @@ const PurchaseAttraction = () => {
                   </div>
                   
                   <div className="flex justify-end">
-                    <button
+                    <StandardButton
+                      variant="primary"
+                      size="md"
                       onClick={() => {
                         setCurrentStep(2);
                         window.scrollTo({ top: 0, behavior: 'smooth' });
                       }}
-                      className="py-2.5 md:py-3 px-6 md:px-8 rounded-lg bg-blue-800 text-white font-medium hover:bg-blue-900 transition shadow-sm hover:shadow-md text-sm md:text-base"
                     >
                       Continue →
-                    </button>
+                    </StandardButton>
                   </div>
                 </div>
               )}
@@ -968,26 +975,28 @@ const PurchaseAttraction = () => {
                   </div>
                   
                   <div className="flex justify-between gap-2 pt-4">
-                    <button
+                    <StandardButton
+                      variant="secondary"
+                      size="md"
                       onClick={() => {
                         setCurrentStep(1);
                         window.scrollTo({ top: 0, behavior: 'smooth' });
                       }}
-                      className="py-2.5 md:py-3 px-4 md:px-6 rounded-lg bg-gray-100 text-gray-700 font-medium hover:bg-gray-200 transition text-sm md:text-base"
                     >
                       <span className="sm:hidden">←</span>
                       <span className="hidden sm:inline">← Back</span>
-                    </button>
-                    <button
+                    </StandardButton>
+                    <StandardButton
+                      variant="primary"
+                      size="md"
                       onClick={() => {
                         setCurrentStep(3);
                         window.scrollTo({ top: 0, behavior: 'smooth' });
                       }}
                       disabled={!customerInfo.firstName || !customerInfo.lastName || !customerInfo.email || !customerInfo.address || !customerInfo.city || !customerInfo.state || !customerInfo.zip || !customerInfo.country}
-                      className="py-2.5 md:py-3 px-6 md:px-8 rounded-lg bg-blue-800 text-white font-medium hover:bg-blue-900 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md text-sm md:text-base"
                     >
                       Continue to Payment →
-                    </button>
+                    </StandardButton>
                   </div>
                 </div>
               )}
@@ -1116,17 +1125,18 @@ const PurchaseAttraction = () => {
                   </div>
                   
                   <div className="flex justify-between gap-2 pt-2">
-                    <button
+                    <StandardButton
+                      variant="secondary"
+                      size="md"
                       onClick={() => {
                         setCurrentStep(2);
                         window.scrollTo({ top: 0, behavior: 'smooth' });
                       }}
                       disabled={submitting}
-                      className="py-2.5 md:py-3 px-3 md:px-6 rounded-lg bg-gray-200 text-gray-800 font-medium hover:bg-gray-300 transition disabled:opacity-50 disabled:cursor-not-allowed text-xs md:text-base"
                     >
                       <span className="sm:hidden">←</span>
                       <span className="hidden sm:inline">← Back</span>
-                    </button>
+                    </StandardButton>
                     <button
                       onClick={handlePurchase}
                       disabled={submitting || !cardNumber || !cardMonth || !cardYear || !cardCVV || !validateCardNumber(cardNumber)}
@@ -1250,18 +1260,20 @@ const PurchaseAttraction = () => {
                   </div>
                   
                   <div className="flex flex-col sm:flex-row justify-center gap-3">
-                    <button
+                    <StandardButton
+                      variant="secondary"
+                      size="md"
                       onClick={() => navigate('/')}
-                      className="px-6 py-2.5 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition font-medium"
                     >
                       Back to Home
-                    </button>
-                    <button
+                    </StandardButton>
+                    <StandardButton
+                      variant="primary"
+                      size="md"
                       onClick={() => navigate('/my-purchases')}
-                      className="px-6 py-2.5 bg-blue-800 text-white rounded-lg hover:bg-blue-900 transition font-medium"
                     >
                       View My Purchases
-                    </button>
+                    </StandardButton>
                   </div>
                 </div>
               )}
@@ -1575,15 +1587,16 @@ const PurchaseAttraction = () => {
             </div>
 
             <div className="flex justify-center">
-              <button
+              <StandardButton
+                variant="primary"
+                size="md"
                 onClick={() => {
                   setShowQRModal(false);
                   navigate('/');
                 }}
-                className="w-full sm:w-auto px-6 py-2.5 bg-blue-800 text-white rounded-lg hover:bg-blue-900 font-medium transition shadow-md hover:shadow-lg"
               >
                 Done
-              </button>
+              </StandardButton>
             </div>
           </div>
         </div>

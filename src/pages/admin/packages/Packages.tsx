@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Users, Tag, Search, Download, Upload, X, CheckSquare, Square, Pencil, Trash2, MapPin, Eye } from "lucide-react";
+import StandardButton from '../../../components/ui/StandardButton';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { packageService, type Package } from '../../../services';
 import { getStoredUser } from "../../../utils/storage";
@@ -346,12 +347,13 @@ const Packages: React.FC = () => {
       <div className="w-full mx-auto px-4 pb-6 flex flex-col items-center justify-center min-h-96">
         <div className="text-center">
           <p className="text-red-500 text-lg mb-4">{error}</p>
-          <button 
+          <StandardButton 
             onClick={() => window.location.reload()} 
-            className={`px-6 py-2 bg-${fullColor} text-white rounded-lg hover:bg-${themeColor}-900`}
+            variant="primary"
+            size="md"
           >
             Retry
-          </button>
+          </StandardButton>
         </div>
       </div>
     );
@@ -366,21 +368,23 @@ const Packages: React.FC = () => {
           <p className="text-gray-600 mt-1">Manage and view all your packages</p>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg font-semibold whitespace-nowrap flex items-center gap-2 transition-colors"
+          <StandardButton
+            variant="secondary"
+            size="md"
+            icon={Upload}
             onClick={() => setShowImportModal(true)}
           >
-            <Upload size={18} />
             Import
-          </button>
-          <button
-            className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg font-semibold whitespace-nowrap flex items-center gap-2 transition-colors"
+          </StandardButton>
+          <StandardButton
+            variant="secondary"
+            size="md"
+            icon={Download}
             onClick={handleOpenExportModal}
             disabled={packages.length === 0}
           >
-            <Download size={18} />
             Export
-          </button>
+          </StandardButton>
           <Link
             to="/packages/create"
             className={`bg-${fullColor} hover:bg-${themeColor}-900 text-white px-5 py-2 rounded-lg font-semibold whitespace-nowrap flex items-center gap-2 transition-colors`}
@@ -449,17 +453,15 @@ const Packages: React.FC = () => {
             {categories.length > 1 && (
               <div className="flex items-center gap-2 flex-wrap">
                 {categories.map((category) => (
-                  <button 
+                  <StandardButton 
                     key={category}
-                    className={`px-3 py-1.5 rounded-full text-sm transition-colors ${
-                      filterCategory === category 
-                        ? `bg-${fullColor} text-white` 
-                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                    }`}
+                    variant={filterCategory === category ? "primary" : "secondary"}
+                    size="sm"
                     onClick={() => setFilterCategory(category)}
+                    className="rounded-full"
                   >
                     {category === "all" ? "All Categories" : category}
-                  </button>
+                  </StandardButton>
                 ))}
               </div>
             )}
@@ -476,12 +478,13 @@ const Packages: React.FC = () => {
                 <option value="price">Price</option>
                 <option value="category">Category</option>
               </select>
-              <button
+              <StandardButton
                 onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-                className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm hover:bg-gray-50 transition-colors"
+                variant="secondary"
+                size="sm"
               >
                 {sortOrder === 'asc' ? '↑ Asc' : '↓ Desc'}
-              </button>
+              </StandardButton>
             </div>
           </div>
 
@@ -544,13 +547,15 @@ const Packages: React.FC = () => {
                       >
                         <Pencil className="w-4 h-4" />
                       </Link>
-                      <button
+                      <StandardButton
                         onClick={() => handleDelete(pkg.id)}
-                        className="flex-1 p-1.5 text-red-500 hover:bg-red-50 rounded transition-colors flex items-center justify-center"
-                        title="Delete package"
+                        variant="danger"
+                        size="sm"
+                        icon={Trash2}
+                        className="flex-1"
                       >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                        {""}
+                      </StandardButton>
                     </div>
                   </div>
                 </div>
@@ -574,8 +579,10 @@ const Packages: React.FC = () => {
               }
             </p>
             {(searchTerm || filterCategory !== "all" || filterLocation !== "all") && (
-              <button
-                className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-6 py-2.5 rounded-lg font-semibold mr-2 transition-colors"
+              <StandardButton
+                variant="secondary"
+                size="md"
+                className="mr-2"
                 onClick={() => {
                   setSearchTerm("");
                   setFilterCategory("all");
@@ -583,7 +590,7 @@ const Packages: React.FC = () => {
                 }}
               >
                 Clear Filters
-              </button>
+              </StandardButton>
             )}
             <Link
               to="/packages/create"
@@ -607,28 +614,27 @@ const Packages: React.FC = () => {
                   <h3 className="text-xl font-bold text-gray-900">Export Packages</h3>
                   <p className="text-sm text-gray-500 mt-1">Select packages to export as JSON</p>
                 </div>
-                <button
+                <StandardButton
                   onClick={() => setShowExportModal(false)}
-                  className="p-2 hover:bg-gray-100 rounded-lg"
+                  variant="ghost"
+                  size="sm"
+                  icon={X}
                 >
-                  <X size={20} />
-                </button>
+                  {""}
+                </StandardButton>
               </div>
             </div>
 
             <div className="p-6 overflow-y-auto flex-1">
               <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-200">
-                <button
+                <StandardButton
                   onClick={handleSelectAllForExport}
-                  className={`flex items-center gap-2 text-sm font-medium text-${fullColor} hover:text-${themeColor}-900`}
+                  variant="ghost"
+                  size="sm"
+                  icon={selectedForExport.length === packages.length ? CheckSquare : Square}
                 >
-                  {selectedForExport.length === packages.length ? (
-                    <CheckSquare size={18} />
-                  ) : (
-                    <Square size={18} />
-                  )}
                   {selectedForExport.length === packages.length ? 'Deselect All' : 'Select All'}
-                </button>
+                </StandardButton>
                 <span className="text-sm text-gray-600">
                   {selectedForExport.length} of {packages.length} selected
                 </span>
@@ -667,20 +673,22 @@ const Packages: React.FC = () => {
             </div>
 
             <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
-              <button
+              <StandardButton
                 onClick={() => setShowExportModal(false)}
-                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                variant="secondary"
+                size="md"
               >
                 Cancel
-              </button>
-              <button
+              </StandardButton>
+              <StandardButton
                 onClick={handleExport}
                 disabled={selectedForExport.length === 0}
-                className={`px-4 py-2 bg-${fullColor} text-white rounded-lg hover:bg-${themeColor}-900 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2`}
+                variant="primary"
+                size="md"
+                icon={Download}
               >
-                <Download size={18} />
                 Export {selectedForExport.length} Package{selectedForExport.length !== 1 ? 's' : ''}
-              </button>
+              </StandardButton>
             </div>
           </div>
         </div>
@@ -696,15 +704,17 @@ const Packages: React.FC = () => {
                   <h3 className="text-xl font-bold text-gray-900">Import Packages</h3>
                   <p className="text-sm text-gray-500 mt-1">Upload or paste JSON data to import packages</p>
                 </div>
-                <button
+                <StandardButton
                   onClick={() => {
                     setShowImportModal(false);
                     setImportData('');
                   }}
-                  className="p-2 hover:bg-gray-100 rounded-lg"
+                  variant="ghost"
+                  size="sm"
+                  icon={X}
                 >
-                  <X size={20} />
-                </button>
+                  {""}
+                </StandardButton>
               </div>
             </div>
 
@@ -727,12 +737,13 @@ const Packages: React.FC = () => {
                     Or Paste JSON Data
                   </label>
                   {importData && (
-                    <button
+                    <StandardButton
                       onClick={() => setImportData('')}
-                      className="text-xs text-gray-500 hover:text-gray-700"
+                      variant="ghost"
+                      size="sm"
                     >
                       Clear
-                    </button>
+                    </StandardButton>
                   )}
                 </div>
                 <textarea
@@ -757,23 +768,25 @@ const Packages: React.FC = () => {
             </div>
 
             <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
-              <button
+              <StandardButton
                 onClick={() => {
                   setShowImportModal(false);
                   setImportData('');
                 }}
-                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                variant="secondary"
+                size="md"
               >
                 Cancel
-              </button>
-              <button
+              </StandardButton>
+              <StandardButton
                 onClick={handleImport}
                 disabled={!importData.trim()}
-                className={`px-4 py-2 bg-${fullColor} text-white rounded-lg hover:bg-${themeColor}-900 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2`}
+                variant="primary"
+                size="md"
+                icon={Upload}
               >
-                <Upload size={18} />
                 Import Packages
-              </button>
+              </StandardButton>
             </div>
           </div>
         </div>

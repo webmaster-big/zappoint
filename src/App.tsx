@@ -36,11 +36,11 @@ import CompanyAdminRegistration from "./pages/auth/Register";
 import CompanyAdminProfile from "./pages/admin/profile/CompanyAdminProfile";
 import LocationManagerProfile from "./pages/admin/profile/LocationManagerProfile";
 import AttendantProfile from "./pages/admin/profile/AttendantProfile";
-import CreateAttendant from "./pages/admin/users/CreateAttendant";
+// import CreateAttendant from "./pages/admin/users/CreateAttendant"; // TODO: File missing
 import Notifications from "./pages/admin/Notifications";
 import LocationActivityLogs from "./pages/admin/LocationActivityLogs";
 import ManageAccounts from "./pages/admin/users/ManageAccounts";
-import CreateAccount from "./pages/admin/users/CreateAccounts";
+// import CreateAccount from "./pages/admin/users/CreateAccounts"; // TODO: File missing
 import EntertainmentLandingPage from "./pages/customer/Home";
 import CustomerLogin from "./pages/customer/CustomerLogin";
 import CustomerRegister from "./pages/customer/CustomerRegister";
@@ -134,7 +134,7 @@ function App() {
           <Route path="/attendant/profile" element={<ProtectedRoute allowedRoles={['attendant']}><AttendantProfile /></ProtectedRoute>} />
           
           {/* Manager-only Routes */}
-          <Route path="/manager/attendant/create" element={<ProtectedRoute allowedRoles={['location_manager']}><CreateAttendant /></ProtectedRoute>} />
+          {/* <Route path="/manager/attendant/create" element={<ProtectedRoute allowedRoles={['location_manager']}><CreateAttendant /></ProtectedRoute>} /> */}
           <Route path="/manager/attendants" element={<ProtectedRoute allowedRoles={['location_manager']}><ManageAttendants /></ProtectedRoute>} />
           <Route path="/manager/attendants/activity" element={<ProtectedRoute allowedRoles={['location_manager']}><AttendantActivityLogs /></ProtectedRoute>} />
           <Route path="/manager/analytics" element={<ProtectedRoute allowedRoles={['location_manager']}><LocationAnalytics /></ProtectedRoute>} />
@@ -143,7 +143,7 @@ function App() {
           <Route path="/admin/analytics" element={<ProtectedRoute allowedRoles={['company_admin']}><CompanyAnalytics /></ProtectedRoute>} />
           <Route path="/admin/activity" element={<ProtectedRoute allowedRoles={['company_admin']}><LocationActivityLogs /></ProtectedRoute>} />
           <Route path="/admin/users" element={<ProtectedRoute allowedRoles={['company_admin']}><ManageAccounts /></ProtectedRoute>} />
-          <Route path="/admin/users/create" element={<ProtectedRoute allowedRoles={['company_admin']}><CreateAccount /></ProtectedRoute>} />
+          {/* <Route path="/admin/users/create" element={<ProtectedRoute allowedRoles={['company_admin']}><CreateAccount /></ProtectedRoute>} /> */}
           
           {/* Shared Routes - All authenticated users */}
           <Route path="/notifications" element={<Notifications />} />

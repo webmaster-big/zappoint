@@ -16,6 +16,7 @@ import {
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { attractionPurchaseService } from '../../../services/AttractionPurchaseService';
 import Toast from '../../../components/ui/Toast';
+import StandardButton from '../../../components/ui/StandardButton';
 
 const PurchaseDetails = () => {
   const { id } = useParams<{ id: string }>();
@@ -91,12 +92,13 @@ const PurchaseDetails = () => {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <h2 className="text-2xl font-bold text-gray-900 mb-4">Purchase not found</h2>
-          <button
+          <StandardButton
+            variant="ghost"
+            size="md"
             onClick={() => navigate('/attractions/purchases')}
-            className={`text-${fullColor} hover:underline`}
           >
             Back to Purchases
-          </button>
+          </StandardButton>
         </div>
       </div>
     );
@@ -125,12 +127,14 @@ const PurchaseDetails = () => {
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
-            <button
+            <StandardButton
+              variant="ghost"
+              size="sm"
               onClick={() => navigate('/attractions/purchases')}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              icon={ArrowLeft}
             >
-              <ArrowLeft className="h-5 w-5 text-gray-600" />
-            </button>
+              {''}
+            </StandardButton>
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Purchase Details</h1>
               <p className="text-gray-600 mt-1">Purchase ID: #{purchase.id}</p>

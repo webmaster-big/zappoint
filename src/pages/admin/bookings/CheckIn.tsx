@@ -25,6 +25,7 @@ import { useThemeColor } from '../../../hooks/useThemeColor';
 import bookingService, { type Booking } from '../../../services/bookingService';
 import { createPayment } from '../../../services/PaymentService';
 import Toast from '../../../components/ui/Toast';
+import StandardButton from '../../../components/ui/StandardButton';
 import { getStoredUser } from '../../../utils/storage';
 
 interface ScanResult {
@@ -602,15 +603,14 @@ const CheckIn: React.FC = () => {
                 </p>
                 
                 <div className="flex flex-col sm:flex-row gap-4">
-                  <button
+                  <StandardButton
+                    variant="primary"
+                    icon={Camera}
                     onClick={startScanning}
                     disabled={processing}
-                    className={`px-6 py-3 bg-${themeColor}-600 text-white rounded-lg hover:bg-${themeColor}-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed`}
-                    title="Start camera to scan QR codes in real-time"
                   >
-                    <Camera className="h-5 w-5" />
                     Start Camera
-                  </button>
+                  </StandardButton>
 
                   <label className="px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors flex items-center gap-2 cursor-pointer" title="Upload a QR code image from your device">
                     <Upload className="h-5 w-5" />
@@ -639,12 +639,12 @@ const CheckIn: React.FC = () => {
           {/* Scanner Controls */}
           {scanning && !processing && (
             <div className="mt-4 flex justify-center">
-              <button
+              <StandardButton
+                variant="danger"
                 onClick={stopScanning}
-                className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
               >
                 Stop Camera
-              </button>
+              </StandardButton>
             </div>
           )}
 
@@ -769,24 +769,24 @@ const CheckIn: React.FC = () => {
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                           <div className="flex items-center space-x-2">
                             {booking.status === 'confirmed' && (
-                              <button
+                              <StandardButton
+                                variant="success"
+                                size="sm"
+                                icon={CheckCircle}
                                 onClick={() => handleCheckIn(booking)}
                                 disabled={processing}
-                                className="text-green-600 hover:text-green-800 flex items-center disabled:opacity-50"
-                                title="Check In"
                               >
-                                <CheckCircle className="h-5 w-5 mr-1" />
                                 Check In
-                              </button>
+                              </StandardButton>
                             )}
-                            <button
+                            <StandardButton
+                              variant="primary"
+                              size="sm"
+                              icon={Eye}
                               onClick={() => viewDetails(booking)}
-                              className={`text-${themeColor}-600 hover:text-${fullColor} flex items-center`}
-                              title="View Details"
                             >
-                              <Eye className="h-5 w-5 mr-1" />
                               Details
-                            </button>
+                            </StandardButton>
                           </div>
                         </td>
                       </tr>
@@ -805,12 +805,14 @@ const CheckIn: React.FC = () => {
               {/* Modal Header */}
               <div className="sticky top-0 bg-white border-b border-gray-200 p-3 sm:p-6 flex items-center justify-between">
                 <h2 className="text-base sm:text-xl font-bold text-gray-800">Verify Booking Details</h2>
-                <button
+                <StandardButton
+                  variant="ghost"
+                  size="sm"
+                  icon={X}
                   onClick={handleCancelCheckIn}
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
                 >
-                  <X className="h-5 w-5 text-gray-600" />
-                </button>
+                  {''}
+                </StandardButton>
               </div>
 
               {/* Modal Body */}
@@ -1174,47 +1176,39 @@ const CheckIn: React.FC = () => {
 
               {/* Modal Footer */}
               <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 p-6 flex gap-4">
-                <button
+                <StandardButton
+                  variant="secondary"
                   onClick={handleCancelCheckIn}
-                  className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors font-medium"
+                  className="flex-1"
                 >
                   Cancel
-                </button>
+                </StandardButton>
                 
                 {/* Show payment button if not fully paid */}
                 {verifiedBooking.payment_status !== 'paid' && (
-                  <button
+                  <StandardButton
+                    variant="primary"
+                    icon={DollarSign}
                     onClick={() => handleOpenPaymentModal(verifiedBooking)}
                     disabled={processing || processingPayment}
-                    className={`flex-1 px-3 sm:px-6 py-2 sm:py-3 text-sm sm:text-base bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors font-medium flex items-center justify-center gap-1 sm:gap-2 disabled:opacity-50 disabled:cursor-not-allowed`}
+                    className="flex-1"
                   >
-                    <DollarSign className="h-4 w-4 sm:h-5 sm:w-5" />
-                    <span className="hidden sm:inline">Add Payment</span>
-                    <span className="sm:hidden">Pay</span>
-                  </button>
+                    Add Payment
+                  </StandardButton>
                 )}
                 
                 {/* Check-in button - only show if paid */}
                 {verifiedBooking.payment_status === 'paid' && (
-                  <button
+                  <StandardButton
+                    variant="success"
+                    icon={processing ? RefreshCw : CheckCircle}
                     onClick={handleConfirmCheckIn}
                     disabled={processing}
-                    className={`flex-1 px-3 sm:px-6 py-2 sm:py-3 text-sm sm:text-base bg-${themeColor}-600 text-white rounded-lg hover:bg-${themeColor}-700 transition-colors font-medium flex items-center justify-center gap-1 sm:gap-2 disabled:opacity-50 disabled:cursor-not-allowed`}
+                    loading={processing}
+                    className="flex-1"
                   >
-                    {processing ? (
-                      <>
-                        <RefreshCw className="h-4 w-4 sm:h-5 sm:w-5 animate-spin" />
-                        <span className="hidden sm:inline">Checking In...</span>
-                        <span className="sm:hidden">Wait...</span>
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5" />
-                        <span className="hidden sm:inline">Confirm Check-In</span>
-                        <span className="sm:hidden">Check-In</span>
-                      </>
-                    )}
-                  </button>
+                    {processing ? 'Checking In...' : 'Confirm Check-In'}
+                  </StandardButton>
                 )}
               </div>
             </div>
@@ -1251,23 +1245,24 @@ const CheckIn: React.FC = () => {
 
             {/* Actions */}
             <div className="flex gap-4">
-              <button
+              <StandardButton
+                variant="primary"
+                icon={Camera}
                 onClick={() => {
                   resetScan();
                   startScanning();
                 }}
-                className={`flex-1 px-6 py-3 bg-${themeColor}-600 text-white rounded-lg hover:bg-${themeColor}-700 transition-colors flex items-center justify-center gap-2`}
+                className="flex-1"
               >
-                <Camera className="h-5 w-5" />
                 Scan Next Booking
-              </button>
+              </StandardButton>
               
-              <button
+              <StandardButton
+                variant="secondary"
                 onClick={resetScan}
-                className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
               >
                 Reset
-              </button>
+              </StandardButton>
             </div>
           </div>
         )}
@@ -1279,12 +1274,14 @@ const CheckIn: React.FC = () => {
               {/* Modal Header */}
               <div className="sticky top-0 bg-white border-b border-gray-200 p-3 sm:p-6 flex items-center justify-between">
                 <h2 className="text-base sm:text-xl font-bold text-gray-800">Booking Details</h2>
-                <button
+                <StandardButton
+                  variant="ghost"
+                  size="sm"
+                  icon={X}
                   onClick={closeModal}
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
                 >
-                  <X className="h-5 w-5 text-gray-600" />
-                </button>
+                  {''}
+                </StandardButton>
               </div>
 
               {/* Modal Body */}
@@ -1627,53 +1624,45 @@ const CheckIn: React.FC = () => {
 
               {/* Modal Footer */}
               <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 p-3 sm:p-6 flex gap-2 sm:gap-4">
-                <button
+                <StandardButton
+                  variant="secondary"
                   onClick={closeModal}
-                  className="flex-1 px-3 sm:px-6 py-2 sm:py-3 text-sm sm:text-base border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors font-medium"
+                  className="flex-1"
                 >
                   Close
-                </button>
+                </StandardButton>
                 
                 {/* Payment button - shown if not fully paid */}
                 {selectedBooking.payment_status !== 'paid' && (
-                  <button
+                  <StandardButton
+                    variant="primary"
+                    icon={DollarSign}
                     onClick={() => {
                       handleOpenPaymentModal(selectedBooking);
                       closeModal();
                     }}
                     disabled={processing || processingPayment}
-                    className={`flex-1 px-3 sm:px-6 py-2 sm:py-3 text-sm sm:text-base bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors font-medium flex items-center justify-center gap-1 sm:gap-2 disabled:opacity-50 disabled:cursor-not-allowed`}
+                    className="flex-1"
                   >
-                    <DollarSign className="h-4 w-4 sm:h-5 sm:w-5" />
-                    <span className="hidden sm:inline">Add Payment</span>
-                    <span className="sm:hidden">Pay</span>
-                  </button>
+                    Add Payment
+                  </StandardButton>
                 )}
                 
                 {/* Check-in button - only show if paid */}
                 {selectedBooking.payment_status === 'paid' && (
-                  <button
+                  <StandardButton
+                    variant="success"
+                    icon={processing ? RefreshCw : CheckCircle}
                     onClick={() => {
                       handleCheckIn(selectedBooking);
                       closeModal();
                     }}
                     disabled={processing}
-                    className={`flex-1 px-3 sm:px-6 py-2 sm:py-3 text-sm sm:text-base bg-${themeColor}-600 text-white rounded-lg hover:bg-${themeColor}-700 transition-colors font-medium flex items-center justify-center gap-1 sm:gap-2 disabled:opacity-50 disabled:cursor-not-allowed`}
+                    loading={processing}
+                    className="flex-1"
                   >
-                    {processing ? (
-                      <>
-                        <RefreshCw className="h-4 w-4 sm:h-5 sm:w-5 animate-spin" />
-                        <span className="hidden sm:inline">Checking In...</span>
-                        <span className="sm:hidden">Wait...</span>
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5" />
-                        <span className="hidden sm:inline">Check In Now</span>
-                        <span className="sm:hidden">Check-In</span>
-                      </>
-                    )}
-                  </button>
+                    {processing ? 'Checking In...' : 'Check In Now'}
+                  </StandardButton>
                 )}
               </div>
             </div>
@@ -1791,27 +1780,21 @@ const CheckIn: React.FC = () => {
               </div>
 
               <div className="p-6 border-t border-gray-100 flex gap-3 justify-end">
-                <button
+                <StandardButton
+                  variant="secondary"
                   onClick={handleClosePaymentModal}
                   disabled={processingPayment}
-                  className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50"
                 >
                   Cancel
-                </button>
-                <button
+                </StandardButton>
+                <StandardButton
+                  variant="primary"
                   onClick={handleSubmitPayment}
                   disabled={processingPayment || !paymentAmount || parseFloat(paymentAmount) <= 0}
-                  className={`px-4 py-2 bg-${fullColor} text-white rounded-lg hover:bg-${themeColor}-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2`}
+                  loading={processingPayment}
                 >
-                  {processingPayment ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-                      Processing...
-                    </>
-                  ) : (
-                    'Process Payment'
-                  )}
-                </button>
+                  {processingPayment ? 'Processing...' : 'Process Payment'}
+                </StandardButton>
               </div>
             </div>
           </div>

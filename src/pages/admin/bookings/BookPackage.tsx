@@ -10,6 +10,7 @@ import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
 import customerService from '../../../services/CustomerService';
 import DatePicker from '../../../components/ui/DatePicker';
 import { extractIdFromSlug } from '../../../utils/slug';
+import StandardButton from '../../../components/ui/StandardButton';
 
 const countries = [
   'United States', 'Canada', 'United Kingdom', 'Afghanistan', 'Albania', 'Algeria', 'Andorra', 'Angola',
@@ -959,15 +960,16 @@ const BookPackage: React.FC = () => {
             
             {/* Action Button */}
             <div className="flex justify-center">
-              <button
+              <StandardButton
+                variant="primary"
+                size="lg"
                 onClick={resetForm}
-                className="py-2.5 sm:py-3 px-6 sm:px-8 rounded-lg bg-blue-800 text-white font-medium hover:bg-blue-900 transition flex items-center justify-center text-sm sm:text-base shadow-md hover:shadow-lg"
               >
                 <svg className="w-4 h-4 sm:w-5 sm:h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
                 </svg>
                 New Booking
-              </button>
+              </StandardButton>
             </div>
           </div>
         </div>
@@ -991,12 +993,14 @@ const BookPackage: React.FC = () => {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <p className="text-red-500 text-lg">{error || 'Package not found'}</p>
-          <button 
-            onClick={() => window.history.back()} 
-            className="mt-4 px-6 py-2 bg-blue-800 text-white rounded-lg"
+          <StandardButton
+            variant="primary"
+            size="md"
+            onClick={() => window.history.back()}
+            className="mt-4"
           >
             Go Back
-          </button>
+          </StandardButton>
         </div>
       </div>
     );
@@ -1023,18 +1027,22 @@ const BookPackage: React.FC = () => {
               <p className="text-sm text-gray-600">Sign up for faster checkout and track your bookings.</p>
             </div>
             <div className="flex flex-col gap-2.5">
-              <button
+              <StandardButton
+                variant="primary"
+                size="md"
+                fullWidth
                 onClick={() => window.location.href = '/customer/register'}
-                className="w-full px-4 py-2.5 bg-blue-800 text-white text-sm font-medium hover:bg-blue-900 transition-all duration-200 active:scale-95"
               >
                 Create Account
-              </button>
-              <button
+              </StandardButton>
+              <StandardButton
+                variant="secondary"
+                size="md"
+                fullWidth
                 onClick={() => setShowAccountModal(false)}
-                className="w-full px-4 py-2.5 bg-white text-gray-700 text-sm font-medium border border-gray-300 hover:bg-gray-50 transition-all duration-200 active:scale-95"
               >
                 Continue as Guest
-              </button>
+              </StandardButton>
             </div>
           </div>
         </div>
@@ -1198,12 +1206,13 @@ const BookPackage: React.FC = () => {
                 <div className="bg-blue-50 p-4 md:p-5 rounded-xl">
                   <label className="block font-medium mb-3 text-gray-800 text-xs md:text-sm uppercase tracking-wide">Participants</label>
                   <div className="flex items-center flex-wrap gap-2">
-                    <button 
-                      className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-white border border-gray-300 text-gray-800 flex items-center justify-center shadow-sm text-base md:text-lg font-semibold"
+                    <StandardButton
+                      variant="secondary"
+                      size="md"
                       onClick={() => setParticipants(Math.max(1, participants - 1))}
                     >
                       -
-                    </button>
+                    </StandardButton>
                     <input 
                       type="number" 
                       min={1} 
@@ -1213,12 +1222,13 @@ const BookPackage: React.FC = () => {
                       onWheel={(e) => e.currentTarget.blur()}
                       className="w-12 md:w-16 text-center rounded-lg border border-gray-300 px-1 md:px-2 py-1.5 md:py-2 text-sm md:text-base font-medium text-gray-800" 
                     />
-                    <button 
-                      className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-white border border-gray-300 text-gray-800 flex items-center justify-center shadow-sm text-base md:text-lg font-semibold"
+                    <StandardButton
+                      variant="secondary"
+                      size="md"
                       onClick={() => setParticipants(Math.min(Number(pkg.max_participants), participants + 1))}
                     >
                       +
-                    </button>
+                    </StandardButton>
                     <span className="text-xs text-gray-500 w-full sm:w-auto mt-1 sm:mt-0">
                       {pkg.min_participants} included, +${pkg.price_per_additional} per additional (Max: {pkg.max_participants})
                     </span>
@@ -1331,13 +1341,14 @@ const BookPackage: React.FC = () => {
                           className="flex-1 rounded-lg border border-gray-300 px-4 py-2.5 text-sm" 
                           placeholder="Enter code" 
                         />
-                        <button 
-                          type="button" 
+                        <StandardButton 
+                          type="button"
+                          variant="primary"
+                          size="md"
                           onClick={() => handleApplyCode("promo")}
-                          className="px-4 py-2.5 rounded-lg bg-blue-800 text-white font-medium hover:bg-blue-800 transition text-sm shadow-sm"
                         >
                           Apply
-                        </button>
+                        </StandardButton>
                       </div>
                       {appliedPromo && (
                         <div className="mt-3 p-2 bg-blue-80 text-blue-800 rounded-md text-xs border border-blue-800">
@@ -1358,13 +1369,14 @@ const BookPackage: React.FC = () => {
                           className="flex-1 rounded-lg border border-gray-300 px-4 py-2.5 text-sm" 
                           placeholder="Enter code" 
                         />
-                        <button 
-                          type="button" 
+                        <StandardButton 
+                          type="button"
+                          variant="primary"
+                          size="md"
                           onClick={() => handleApplyCode("giftcard")}
-                          className="px-4 py-2.5 rounded-lg bg-blue-800 text-white font-medium hover:bg-blue-800 transition text-sm shadow-sm"
                         >
                           Apply
-                        </button>
+                        </StandardButton>
                       </div>
                       {appliedGiftCard && (
                         <div className="mt-3 p-2 bg-blue-80 text-blue-800 rounded-md text-xs border border-blue-800">
@@ -1376,19 +1388,21 @@ const BookPackage: React.FC = () => {
                 </div>
                 
                 <div className="flex justify-end pt-4">
-                  <button 
-                    className={`py-2.5 md:py-3 px-4 md:px-6 rounded-lg font-medium transition shadow-sm flex items-center text-sm md:text-base ${!selectedTime ? 'bg-gray-300 text-gray-400 cursor-not-allowed' : 'bg-blue-800 text-white hover:bg-blue-800'}`}
+                  <StandardButton 
+                    variant="primary"
+                    size="md"
                     onClick={() => {
                       setCurrentStep(2);
                       window.scrollTo({ top: 0, behavior: 'smooth' });
                     }}
                     disabled={!selectedTime}
+                    className="flex items-center"
                   >
                     Continue to Personal Info
                     <svg className="ml-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path>
                     </svg>
-                  </button>
+                  </StandardButton>
                 </div>
               </>
             ) : currentStep === 2 ? (
@@ -1633,31 +1647,35 @@ const BookPackage: React.FC = () => {
                 </div>
                 
                 <div className="flex justify-between pt-6 gap-2">
-                  <button 
-                    className="py-2.5 md:py-3 px-4 md:px-6 rounded-lg bg-gray-200 text-gray-800 font-medium hover:bg-gray-300 transition flex items-center text-sm md:text-base"
+                  <StandardButton 
+                    variant="secondary"
+                    size="md"
                     onClick={() => {
                       setCurrentStep(1);
                       window.scrollTo({ top: 0, behavior: 'smooth' });
                     }}
+                    className="flex items-center"
                   >
                     <svg className="mr-1 md:mr-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"></path>
                     </svg>
                     <span className="hidden sm:inline">Back</span>
-                  </button>
-                  <button 
-                    className={`py-2.5 md:py-3 px-4 md:px-6 rounded-lg font-medium transition shadow-sm flex items-center text-sm md:text-base ${(!form.firstName || !form.lastName || !form.email || !form.phone || !form.address || !form.city || !form.state || !form.zip || !form.country) ? 'bg-gray-300 text-gray-400 cursor-not-allowed' : 'bg-blue-800 text-white hover:bg-blue-800'}`}
+                  </StandardButton>
+                  <StandardButton 
+                    variant="primary"
+                    size="md"
                     onClick={() => {
                       setCurrentStep(3);
                       window.scrollTo({ top: 0, behavior: 'smooth' });
                     }}
                     disabled={!form.firstName || !form.lastName || !form.email || !form.phone || !form.address || !form.city || !form.state || !form.zip || !form.country}
+                    className="flex items-center"
                   >
                     Continue to Payment
                     <svg className="ml-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path>
                     </svg>
-                  </button>
+                  </StandardButton>
                 </div>
               </>
             ) : (
@@ -1826,18 +1844,20 @@ const BookPackage: React.FC = () => {
                 </div>
                 
                 <div className="flex justify-between pt-6 gap-2">
-                  <button 
-                    className="py-2.5 md:py-3 px-4 md:px-6 rounded-lg bg-gray-200 text-gray-800 font-medium hover:bg-gray-300 transition flex items-center text-sm md:text-base"
+                  <StandardButton 
+                    variant="secondary"
+                    size="md"
                     onClick={() => {
                       setCurrentStep(2);
                       window.scrollTo({ top: 0, behavior: 'smooth' });
                     }}
+                    className="flex items-center"
                   >
                     <svg className="mr-1 md:mr-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"></path>
                     </svg>
                     <span className="hidden sm:inline">Back</span>
-                  </button>
+                  </StandardButton>
                 </div>
                 
                 <div className="mt-6">

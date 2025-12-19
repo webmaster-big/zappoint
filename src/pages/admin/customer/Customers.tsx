@@ -16,6 +16,7 @@ import {
   X,
   RefreshCcw,
 } from 'lucide-react';
+import StandardButton from '../../../components/ui/StandardButton';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import type { CustomersCustomer } from '../../../types/Customers.types';
 import { customerService, type CustomerListItem } from '../../../services/CustomerService';
@@ -306,13 +307,14 @@ const CustomerListing: React.FC = () => {
           <p className="text-gray-600 mt-2">Manage and view all customer information</p>
         </div>
         <div className="flex gap-2 mt-4 sm:mt-0">
-          <button 
+          <StandardButton 
+            variant="primary"
+            size="md"
             onClick={() => setShowExportModal(true)}
-            className={`inline-flex items-center px-4 py-2 bg-${fullColor} text-white rounded-lg hover:bg-${themeColor}-900 transition-colors`}
+            icon={Download}
           >
-            <Download className="h-5 w-5 mr-2" />
             Export
-          </button>
+          </StandardButton>
         </div>
       </div>
 
@@ -370,12 +372,12 @@ const CustomerListing: React.FC = () => {
               <option value="bookings-desc">Most Bookings</option>
               <option value="bookings-asc">Fewest Bookings</option>
             </select>
-            <button
+            <StandardButton
+              variant="secondary"
+              size="md"
               onClick={fetchCustomers}
-              className="flex items-center px-3 py-2 border border-gray-200 rounded-lg hover:bg-gray-50"
-            >
-              <RefreshCcw className="h-4 w-4" />
-            </button>
+              icon={RefreshCcw}
+            />
           </div>
         </div>
         
@@ -474,24 +476,24 @@ const CustomerListing: React.FC = () => {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-1">
-                        <button 
-                          className={`p-2 text-${themeColor}-600 hover:bg-${themeColor}-50 rounded-lg transition-colors`} 
+                        <StandardButton 
+                          variant="ghost"
+                          size="sm"
+                          icon={Eye}
                           title="View Customer"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        <button 
-                          className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors" 
+                        />
+                        <StandardButton 
+                          variant="ghost"
+                          size="sm"
+                          icon={Edit}
                           title="Edit Customer"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        <button 
-                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors" 
+                        />
+                        <StandardButton 
+                          variant="danger"
+                          size="sm"
+                          icon={Trash2}
                           title="Delete Customer"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        />
                       </div>
                     </td>
                   </tr>
@@ -508,13 +510,13 @@ const CustomerListing: React.FC = () => {
               Page <span className="font-medium">{currentPage}</span> of <span className="font-medium">{totalPages}</span>
             </div>
             <div className="flex gap-2">
-              <button
+              <StandardButton
+                variant="secondary"
+                size="md"
                 onClick={() => goToPage(currentPage - 1)}
                 disabled={currentPage === 1}
-                className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
+                icon={ChevronLeft}
+              />
 
               {/* Page numbers */}
               {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
@@ -530,27 +532,24 @@ const CustomerListing: React.FC = () => {
                 }
 
                 return (
-                  <button
+                  <StandardButton
                     key={pageNum}
+                    variant={currentPage === pageNum ? "primary" : "secondary"}
+                    size="md"
                     onClick={() => goToPage(pageNum)}
-                    className={`px-3 py-2 border rounded-lg text-sm font-medium transition-colors ${
-                      currentPage === pageNum
-                        ? `border-${themeColor}-700 bg-${themeColor}-700 text-white`
-                        : 'border-gray-200 text-gray-700 hover:bg-gray-50'
-                    }`}
                   >
                     {pageNum}
-                  </button>
+                  </StandardButton>
                 );
               })}
 
-              <button
+              <StandardButton
+                variant="secondary"
+                size="md"
                 onClick={() => goToPage(currentPage + 1)}
                 disabled={currentPage === totalPages}
-                className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
+                icon={ChevronRight}
+              />
             </div>
           </div>
         )}
@@ -568,7 +567,9 @@ const CustomerListing: React.FC = () => {
                     Configure filters to export customer data
                   </p>
                 </div>
-                <button
+                <StandardButton
+                  variant="ghost"
+                  size="md"
                   onClick={() => {
                     setShowExportModal(false);
                     setExportFilters({
@@ -581,10 +582,8 @@ const CustomerListing: React.FC = () => {
                       maxBookings: ''
                     });
                   }}
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                >
-                  <X className="h-5 w-5 text-gray-500" />
-                </button>
+                  icon={X}
+                />
               </div>
             </div>
 
@@ -728,7 +727,9 @@ const CustomerListing: React.FC = () => {
             </div>
 
             <div className="p-6 border-t border-gray-100 flex gap-3 justify-end sticky bottom-0 bg-white">
-              <button
+              <StandardButton
+                variant="secondary"
+                size="md"
                 onClick={() => {
                   setShowExportModal(false);
                   setExportFilters({
@@ -742,14 +743,15 @@ const CustomerListing: React.FC = () => {
                   });
                 }}
                 disabled={exporting}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50"
               >
                 Cancel
-              </button>
-              <button
+              </StandardButton>
+              <StandardButton
+                variant="primary"
+                size="md"
                 onClick={handleExport}
                 disabled={exporting}
-                className={`px-6 py-2 bg-${fullColor} text-white rounded-lg hover:bg-${themeColor}-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2`}
+                icon={exporting ? undefined : Download}
               >
                 {exporting ? (
                   <>
@@ -757,12 +759,9 @@ const CustomerListing: React.FC = () => {
                     Exporting...
                   </>
                 ) : (
-                  <>
-                    <Download className="h-4 w-4" />
-                    Export to CSV
-                  </>
+                  'Export to CSV'
                 )}
-              </button>
+              </StandardButton>
             </div>
           </div>
         </div>

@@ -12,6 +12,7 @@ import type { Location } from '../../../services/LocationService';
 import type { Category } from '../../../services/CategoryService';
 import LocationSelector from '../../../components/admin/LocationSelector';
 import { Plus, Trash2, Info, Tag, Calendar, Clock } from 'lucide-react';
+import StandardButton from '../../../components/ui/StandardButton';
 
 const CreateAttraction = () => {
   const navigate = useNavigate();
@@ -453,17 +454,18 @@ const CreateAttraction = () => {
                         ))}
                       </select>
                       {formData.category && (
-                        <button
-                          type="button"
+                        <StandardButton
+                          variant="ghost"
+                          size="sm"
                           onClick={() => {
                             const category = categories.find(c => c.name === formData.category);
                             if (category) handleDeleteCategory(category);
                           }}
-                          className="p-2 rounded-md hover:bg-red-50 text-red-600 transition"
-                          title="Delete category"
+                          icon={Trash2}
+                          className="text-red-600 hover:bg-red-50"
                         >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                          {''}
+                        </StandardButton>
                       )}
                     </div>
                     <div className="flex gap-1 items-center">
@@ -479,10 +481,9 @@ const CreateAttraction = () => {
                           }
                         }}
                       />
-                      <button 
-                        type="button" 
-                        className="p-2 rounded-md hover:bg-gray-100 transition"
-                        title="Add category"
+                      <StandardButton 
+                        variant="ghost"
+                        size="sm"
                         onClick={() => {
                           const input = document.querySelector('input[placeholder="Add category"]') as HTMLInputElement;
                           if (input?.value) {
@@ -490,9 +491,10 @@ const CreateAttraction = () => {
                             input.value = '';
                           }
                         }}
+                        icon={Plus}
                       >
-                        <Plus className="w-4 h-4 text-primary" />
-                      </button>
+                        {''}
+                      </StandardButton>
                     </div>
                   </div>
                 </div>
@@ -592,14 +594,15 @@ const CreateAttraction = () => {
                     <div className="flex justify-between items-center">
                       <h4 className="font-semibold text-neutral-800">Schedule {index + 1}</h4>
                       {formData.availability.length > 1 && (
-                        <button
-                          type="button"
+                        <StandardButton
+                          variant="ghost"
+                          size="sm"
                           onClick={() => removeSchedule(index)}
-                          className="text-red-600 hover:bg-red-50 p-2 rounded-md transition"
-                          title="Remove schedule"
+                          icon={Trash2}
+                          className="text-red-600 hover:bg-red-50"
                         >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                          {''}
+                        </StandardButton>
                       )}
                     </div>
                     
@@ -650,13 +653,15 @@ const CreateAttraction = () => {
                   </div>
                 ))}
                 
-                <button
-                  type="button"
+                <StandardButton
+                  variant="secondary"
+                  size="md"
                   onClick={addSchedule}
-                  className={`w-full px-4 py-2 border-2 border-dashed border-gray-300 rounded-md text-sm font-medium text-gray-600 hover:border-${themeColor}-500 hover:text-${fullColor} transition-all flex items-center justify-center gap-2`}
+                  icon={Plus}
+                  fullWidth
                 >
-                  <Plus className="w-4 h-4" /> Add Another Schedule
-                </button>
+                  Add Another Schedule
+                </StandardButton>
               </div>
             </div>
 
@@ -703,21 +708,25 @@ const CreateAttraction = () => {
 
             {/* Form Actions */}
             <div className="flex gap-3 pt-6 border-t border-gray-200">
-              <button
-                type="button"
+              <StandardButton
+                variant="secondary"
+                size="lg"
                 onClick={() => navigate('/manage-attractions')}
                 disabled={isSubmitting}
-                className={`flex-1 px-6 py-2.5 border border-gray-300 rounded-md text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed`}
+                fullWidth
               >
                 Cancel
-              </button>
-              <button
+              </StandardButton>
+              <StandardButton
                 type="submit"
+                variant="primary"
+                size="lg"
                 disabled={isSubmitting}
-                className={`flex-1 px-6 py-2.5 bg-${fullColor} border border-transparent rounded-md text-sm font-semibold text-white hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed`}
+                loading={isSubmitting}
+                fullWidth
               >
                 {isSubmitting ? 'Creating...' : 'Create Attraction'}
-              </button>
+              </StandardButton>
             </div>
           </form>
         </div>

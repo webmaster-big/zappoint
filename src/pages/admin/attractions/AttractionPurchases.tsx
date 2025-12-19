@@ -24,6 +24,7 @@ import { getStoredUser } from '../../../utils/storage';
 import { locationService } from '../../../services';
 import type { Location } from '../../../services/LocationService';
 import LocationSelector from '../../../components/admin/LocationSelector';
+import StandardButton from '../../../components/ui/StandardButton';
 
 const ManagePurchases = () => {
   const { themeColor, fullColor } = useThemeColor();
@@ -517,13 +518,14 @@ const ManagePurchases = () => {
               showAllOption={true}
             />
           )}
-          <button
+          <StandardButton
+            variant="primary"
+            size="md"
             onClick={exportToCSV}
-            className={`inline-flex items-center px-4 py-2 bg-${themeColor}-600 text-white rounded-lg hover:bg-${themeColor}-700 transition-colors`}
+            icon={Download}
           >
-            <Download className="h-5 w-5 mr-2" />
             Export CSV
-          </button>
+          </StandardButton>
         </div>
       </div>
 
@@ -567,19 +569,22 @@ const ManagePurchases = () => {
             />
           </div>
           <div className="flex gap-2">
-            <button
+            <StandardButton
+              variant="secondary"
+              size="md"
               onClick={() => setShowFilters(!showFilters)}
-              className="flex items-center px-3 py-2 border border-gray-200 rounded-lg hover:bg-gray-50"
+              icon={Filter}
             >
-              <Filter className="h-4 w-4 mr-1" />
               Filters
-            </button>
-            <button
+            </StandardButton>
+            <StandardButton
+              variant="secondary"
+              size="md"
               onClick={loadPurchases}
-              className="flex items-center px-3 py-2 border border-gray-200 rounded-lg hover:bg-gray-50"
+              icon={RefreshCcw}
             >
-              <RefreshCcw className="h-4 w-4" />
-            </button>
+              {''}
+            </StandardButton>
           </div>
         </div>
 
@@ -628,12 +633,13 @@ const ManagePurchases = () => {
               </div>
             </div>
             <div className="mt-4 flex justify-end">
-              <button
+              <StandardButton
+                variant="ghost"
+                size="sm"
                 onClick={clearFilters}
-                className="px-3 py-2 text-sm text-gray-600 hover:text-gray-800"
               >
                 Clear Filters
-              </button>
+              </StandardButton>
             </div>
           </div>
         )}
@@ -655,13 +661,14 @@ const ManagePurchases = () => {
               <option value="cancelled">Cancel</option>
               <option value="refunded">Refund</option>
             </select>
-            <button
+            <StandardButton
+              variant="danger"
+              size="md"
               onClick={handleBulkDelete}
-              className="flex items-center px-3 py-2 bg-red-100 text-red-800 rounded-lg hover:bg-red-200"
+              icon={Trash2}
             >
-              <Trash2 className="h-4 w-4 mr-1" />
               Delete
-            </button>
+            </StandardButton>
           </div>
         </div>
       )}
@@ -752,13 +759,14 @@ const ManagePurchases = () => {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-3">
                           {purchase.status === 'pending' && (
-                            <button
+                            <StandardButton
+                              variant="ghost"
+                              size="sm"
                               onClick={() => handleOpenPaymentModal(purchase)}
-                              className={`text-${fullColor} hover:text-${themeColor}-900`}
-                              title="Process Payment"
+                              icon={DollarSign}
                             >
-                              <DollarSign className="h-4 w-4" />
-                            </button>
+                              {''}
+                            </StandardButton>
                           )}
                           <Link
                             to={`/attractions/purchases/${purchase.id}`}
@@ -767,13 +775,15 @@ const ManagePurchases = () => {
                           >
                             <Eye className="h-4 w-4" />
                           </Link>
-                          <button
+                          <StandardButton
+                            variant="ghost"
+                            size="sm"
                             onClick={() => handleDeletePurchase(purchase.id)}
+                            icon={Trash2}
                             className="text-red-600 hover:text-red-800"
-                            title="Delete"
                           >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
+                            {''}
+                          </StandardButton>
                         </div>
                       </td>
                     </tr>
@@ -796,33 +806,32 @@ const ManagePurchases = () => {
                 of <span className="font-medium">{filteredPurchases.length}</span> results
               </div>
               <div className="flex gap-2">
-                <button
+                <StandardButton
+                  variant="secondary"
+                  size="md"
                   onClick={() => paginate(Math.max(1, currentPage - 1))}
                   disabled={currentPage === 1}
-                  className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50"
                 >
                   Previous
-                </button>
+                </StandardButton>
                 {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                  <button
+                  <StandardButton
                     key={page}
+                    variant={currentPage === page ? 'primary' : 'secondary'}
+                    size="md"
                     onClick={() => paginate(page)}
-                    className={`px-3 py-2 border rounded-lg text-sm font-medium ${
-                      currentPage === page
-                        ? `border-${fullColor} bg-${fullColor} text-white`
-                        : 'border-gray-200 text-gray-800 hover:bg-gray-50'
-                    }`}
                   >
                     {page}
-                  </button>
+                  </StandardButton>
                 ))}
-                <button
+                <StandardButton
+                  variant="secondary"
+                  size="md"
                   onClick={() => paginate(Math.min(totalPages, currentPage + 1))}
                   disabled={currentPage === totalPages}
-                  className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50"
                 >
                   Next
-                </button>
+                </StandardButton>
               </div>
             </div>
           </div>
@@ -925,27 +934,23 @@ const ManagePurchases = () => {
             </div>
 
             <div className="p-6 border-t border-gray-100 flex gap-3 justify-end">
-              <button
+              <StandardButton
+                variant="secondary"
+                size="md"
                 onClick={handleClosePaymentModal}
                 disabled={processingPayment}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50"
               >
                 Cancel
-              </button>
-              <button
+              </StandardButton>
+              <StandardButton
+                variant="primary"
+                size="md"
                 onClick={handleSubmitPayment}
                 disabled={processingPayment || !paymentAmount || parseFloat(paymentAmount) <= 0}
-                className={`px-4 py-2 bg-${fullColor} text-white rounded-lg hover:bg-${themeColor}-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2`}
+                loading={processingPayment}
               >
-                {processingPayment ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-                    Processing...
-                  </>
-                ) : (
-                  'Process Payment'
-                )}
-              </button>
+                Process Payment
+              </StandardButton>
             </div>
           </div>
         </div>

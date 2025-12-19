@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 
 import CounterAnimation from '../../../components/ui/CounterAnimation';
+import StandardButton from '../../../components/ui/StandardButton';
 import type {
   AttendantActivityLogsLog,
   AttendantActivityLogsFilterOptions,
@@ -540,20 +541,22 @@ const AttendantActivityLogs = () => {
         </div>
         
         <div className="flex gap-2 mt-4 sm:mt-0">
-          <button
+          <StandardButton
             onClick={() => setShowExportModal(true)}
-            className={`inline-flex items-center px-4 py-2 border bg-${fullColor} text-white border-gray-200 rounded-lg hover:bg-${themeColor}-600`}
+            variant="primary"
+            size="md"
+            icon={Download}
           >
-            <Download className="h-4 w-4 mr-2" />
             Export CSV
-          </button>
-          <button
+          </StandardButton>
+          <StandardButton
             onClick={loadLogs}
-            className="inline-flex items-center px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50"
+            variant="secondary"
+            size="md"
+            icon={RefreshCcw}
             disabled={isRefreshing}
-          >
-            <RefreshCcw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-          </button>
+            className={isRefreshing ? '[&_svg]:animate-spin' : ''}
+          />
         </div>
       </div>
 
@@ -563,12 +566,12 @@ const AttendantActivityLogs = () => {
           <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto animate-slideUp">
             <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
               <h2 className="text-xl font-bold text-gray-900">Export Activity Logs</h2>
-              <button
+              <StandardButton
                 onClick={() => setShowExportModal(false)}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <X className="h-5 w-5 text-gray-500" />
-              </button>
+                variant="ghost"
+                size="sm"
+                icon={X}
+              />
             </div>
 
             <div className="p-6">
@@ -664,12 +667,14 @@ const AttendantActivityLogs = () => {
                         </div>
 
                         {hasMore && (
-                          <button
+                          <StandardButton
                             onClick={() => setShowAllUsers(!showAllUsers)}
-                            className={`mt-2 w-full text-sm text-${fullColor} hover:underline py-1`}
+                            variant="ghost"
+                            size="sm"
+                            className="mt-2 w-full"
                           >
                             {showAllUsers ? 'Show Less' : `Show ${filteredUsers.length - displayedUsers.length} More`}
-                          </button>
+                          </StandardButton>
                         )}
                       </>
                     );
@@ -753,30 +758,24 @@ const AttendantActivityLogs = () => {
 
               {/* Action Buttons */}
               <div className="flex gap-3 justify-end pt-4 border-t border-gray-200">
-                <button
+                <StandardButton
                   onClick={() => setShowExportModal(false)}
-                  className="px-4 py-2 border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50"
+                  variant="secondary"
+                  size="md"
                   disabled={isExporting}
                 >
                   Cancel
-                </button>
-                <button
+                </StandardButton>
+                <StandardButton
                   onClick={handleExportWithFilters}
                   disabled={isExporting}
-                  className={`px-4 py-2 bg-${fullColor} text-white rounded-lg hover:opacity-90 disabled:opacity-50 flex items-center gap-2`}
+                  variant="primary"
+                  size="md"
+                  icon={isExporting ? RefreshCcw : Download}
+                  className={isExporting ? '[&_svg]:animate-spin' : ''}
                 >
-                  {isExporting ? (
-                    <>
-                      <RefreshCcw className="h-4 w-4 animate-spin" />
-                      Exporting...
-                    </>
-                  ) : (
-                    <>
-                      <Download className="h-4 w-4" />
-                      Export CSV
-                    </>
-                  )}
-                </button>
+                  {isExporting ? 'Exporting...' : 'Export CSV'}
+                </StandardButton>
               </div>
             </div>
           </div>
@@ -823,13 +822,14 @@ const AttendantActivityLogs = () => {
             />
           </div>
           <div className="flex gap-2">
-            <button
+            <StandardButton
               onClick={() => setShowFilters(!showFilters)}
-              className="flex items-center px-3 py-2 border border-gray-200 rounded-lg hover:bg-gray-50"
+              variant="secondary"
+              size="md"
+              icon={Filter}
             >
-              <Filter className="h-4 w-4 mr-1" />
               Filters
-            </button>
+            </StandardButton>
           </div>
         </div>
 
@@ -898,12 +898,13 @@ const AttendantActivityLogs = () => {
               </div>
             </div>
             <div className="mt-4 flex justify-end">
-              <button
+              <StandardButton
                 onClick={clearFilters}
-                className="px-3 py-2 text-sm text-gray-600 hover:text-gray-800"
+                variant="ghost"
+                size="sm"
               >
                 Clear Filters
-              </button>
+              </StandardButton>
             </div>
           </div>
         )}
@@ -982,13 +983,14 @@ const AttendantActivityLogs = () => {
                 of <span className="font-medium">{totalLogs}</span> activities
               </div>
               <div className="flex gap-2">
-                <button
+                <StandardButton
                   onClick={() => paginate(Math.max(1, currentPage - 1))}
                   disabled={currentPage === 1}
-                  className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50"
+                  variant="secondary"
+                  size="sm"
                 >
                   Previous
-                </button>
+                </StandardButton>
                 
                 {/* Pagination buttons limited to 3 */}
                 {(() => {
@@ -1007,27 +1009,25 @@ const AttendantActivityLogs = () => {
                     }
                   }
                   return Array.from({ length: end - start + 1 }, (_, i) => start + i).map((page) => (
-                    <button
+                    <StandardButton
                       key={page}
                       onClick={() => paginate(page)}
-                      className={`px-3 py-2 border rounded-lg text-sm font-medium ${
-                        currentPage === page
-                          ? `border-${fullColor} bg-${fullColor} text-white`
-                          : 'border-gray-200 text-gray-800 hover:bg-gray-50'
-                      }`}
+                      variant={currentPage === page ? 'primary' : 'secondary'}
+                      size="sm"
                     >
                       {page}
-                    </button>
+                    </StandardButton>
                   ));
                 })()}
                 
-                <button
+                <StandardButton
                   onClick={() => paginate(Math.min(totalPages, currentPage + 1))}
                   disabled={currentPage === totalPages}
-                  className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50"
+                  variant="secondary"
+                  size="sm"
                 >
                   Next
-                </button>
+                </StandardButton>
               </div>
             </div>
           </div>

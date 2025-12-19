@@ -21,6 +21,7 @@ import { ASSET_URL, getStoredUser } from '../../../utils/storage';
 import { loadAcceptJS, processCardPayment, validateCardNumber, formatCardNumber, getCardType } from '../../../services/PaymentService';
 import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
 import { generatePurchaseQRCode } from '../../../utils/qrcode';
+import StandardButton from '../../../components/ui/StandardButton';
 
 const CreatePurchase = () => {
   const { themeColor, fullColor } = useThemeColor();
@@ -633,12 +634,14 @@ const CreatePurchase = () => {
                   <div className="mb-6 p-4 bg-gray-50 rounded-lg">
                     <div className="flex justify-between items-start mb-2">
                       <h3 className="font-semibold text-gray-800">{selectedAttraction.name}</h3>
-                      <button
+                      <StandardButton
+                        variant="ghost"
+                        size="sm"
                         onClick={() => setSelectedAttraction(null)}
-                        className="text-gray-400 hover:text-gray-600"
+                        icon={X}
                       >
-                        <X className="h-4 w-4" />
-                      </button>
+                        {''}
+                      </StandardButton>
                     </div>
                     {/* Attraction Image */}
                     <div className="mb-3 w-full flex justify-center">
@@ -653,19 +656,23 @@ const CreatePurchase = () => {
                     <div className="mb-4">
                       <label className="block text-sm font-medium text-gray-700 mb-2">Quantity</label>
                       <div className="flex items-center">
-                        <button
+                        <StandardButton
+                          variant="ghost"
+                          size="sm"
                           onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                          className="w-8 h-8 rounded-lg bg-gray-100 text-gray-700 flex items-center justify-center hover:bg-gray-200 transition-colors"
+                          icon={Minus}
                         >
-                          <Minus className="h-4 w-4" />
-                        </button>
+                          {''}
+                        </StandardButton>
                         <span className="mx-3 font-semibold transition-all duration-300">{quantity}</span>
-                        <button
+                        <StandardButton
+                          variant="ghost"
+                          size="sm"
                           onClick={() => setQuantity(quantity + 1)}
-                          className="w-8 h-8 rounded-lg bg-gray-100 text-gray-700 flex items-center justify-center hover:bg-gray-200 transition-colors"
+                          icon={Plus}
                         >
-                          <Plus className="h-4 w-4" />
-                        </button>
+                          {''}
+                        </StandardButton>
                       </div>
                       {/* Live subtotal preview */}
                       <div className="mt-2 text-sm text-gray-600">
@@ -720,29 +727,23 @@ const CreatePurchase = () => {
                   <div className="mb-6">
                     <h3 className="text-sm font-medium text-gray-700 mb-3">Payment Method</h3>
                     <div className="grid grid-cols-3 gap-2">
-                      <button
+                      <StandardButton
+                        variant={paymentMethod === 'cash' ? 'primary' : 'secondary'}
+                        size="md"
                         onClick={() => setPaymentMethod('cash')}
-                        className={`p-3 border rounded-lg text-center transition-colors ${
-                          paymentMethod === 'cash'
-                            ? `border-${themeColor}-500 bg-${themeColor}-50 text-${themeColor}-700`
-                            : 'border-gray-300 hover:border-gray-400'
-                        }`}
+                        icon={DollarSign}
                       >
-                        <DollarSign className="h-5 w-5 mx-auto mb-1" />
-                        <span className="text-sm">Cash</span>
-                      </button>
+                        Cash
+                      </StandardButton>
                    
-                      <button
+                      <StandardButton
+                        variant={paymentMethod === 'card' ? 'primary' : 'secondary'}
+                        size="md"
                         onClick={() => setPaymentMethod('card')}
-                        className={`p-3 border rounded-lg text-center transition-colors ${
-                          paymentMethod === 'card'
-                            ? `border-${themeColor}-500 bg-${themeColor}-50 text-${themeColor}-700`
-                            : 'border-gray-300 hover:border-gray-400'
-                        }`}
+                        icon={CreditCard}
                       >
-                        <CreditCard className="h-5 w-5 mx-auto mb-1" />
-                        <span className="text-sm">Card</span>
-                      </button>
+                        Card
+                      </StandardButton>
                       
                       <button
                         onClick={() => setPaymentMethod('paylater')}
@@ -781,26 +782,22 @@ const CreatePurchase = () => {
                       <div className="mb-4">
                         <h3 className="text-sm font-medium text-gray-700 mb-3">Card Payment Type</h3>
                         <div className="flex gap-2">
-                          <button
+                          <StandardButton
+                            variant={!useAuthorizeNet ? 'primary' : 'secondary'}
+                            size="sm"
                             onClick={() => setUseAuthorizeNet(false)}
-                            className={`flex-1 px-3 py-2 text-xs rounded-lg border transition-colors ${
-                              !useAuthorizeNet
-                                ? `border-${themeColor}-500 bg-${themeColor}-50 text-${themeColor}-700 font-medium`
-                                : 'border-gray-300 text-gray-600 hover:border-gray-400'
-                            }`}
+                            fullWidth
                           >
                             Manual Card
-                          </button>
-                          <button
+                          </StandardButton>
+                          <StandardButton
+                            variant={useAuthorizeNet ? 'primary' : 'secondary'}
+                            size="sm"
                             onClick={() => setUseAuthorizeNet(true)}
-                            className={`flex-1 px-3 py-2 text-xs rounded-lg border transition-colors ${
-                              useAuthorizeNet
-                                ? `border-${themeColor}-500 bg-${themeColor}-50 text-${themeColor}-700 font-medium`
-                                : 'border-gray-300 text-gray-600 hover:border-gray-400'
-                            }`}
+                            fullWidth
                           >
                             Process with Authorize.Net
-                          </button>
+                          </StandardButton>
                         </div>
                         <p className="text-xs text-gray-500 mt-2">
                           {useAuthorizeNet 
@@ -961,14 +958,17 @@ const CreatePurchase = () => {
                   </div>
 
                   {/* Complete Purchase Button */}
-                  <button
+                  <StandardButton
+                    variant="primary"
+                    size="lg"
                     onClick={handleCompletePurchase}
                     disabled={submitting}
-                    className={`w-full bg-${fullColor} text-white py-3 rounded-lg font-semibold hover:bg-${themeColor}-700 transition-colors flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed`}
+                    loading={submitting}
+                    icon={ShoppingCart}
+                    fullWidth
                   >
-                    <ShoppingCart className="h-5 w-5 mr-2" />
                     {submitting ? 'Processing...' : 'Complete Purchase'}
-                  </button>
+                  </StandardButton>
                 </>
               ) : (
                 <div className="text-center py-8 text-gray-500">
@@ -1007,12 +1007,14 @@ const CreatePurchase = () => {
                 </p>
               </div>
               
-              <button
+              <StandardButton
+                variant="primary"
+                size="lg"
                 onClick={() => setShowNoAuthAccountModal(false)}
-                className={`w-full px-6 py-3 bg-${fullColor} text-white rounded-lg hover:bg-${fullColor} font-semibold shadow-lg`}
+                fullWidth
               >
                 I Understand
-              </button>
+              </StandardButton>
             </div>
           </div>
         </div>

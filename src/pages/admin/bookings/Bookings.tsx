@@ -17,6 +17,7 @@ import {
   Plus
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
+import StandardButton from '../../../components/ui/StandardButton';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
 import type { BookingsPageBooking, BookingsPageFilterOptions } from '../../../types/Bookings.types';
 import bookingService from '../../../services/bookingService';
@@ -846,20 +847,22 @@ const Bookings: React.FC = () => {
                 showAllOption={true}
               />
             )}
-            <button
+            <StandardButton
+              variant="primary"
+              size="md"
+              icon={Plus}
               onClick={() => navigate('/bookings/manual')}
-              className={`flex items-center px-4 py-2 bg-${fullColor} text-white rounded-lg hover:bg-${themeColor}-700 shadow-sm transition-colors`}
             >
-              <Plus className="h-4 w-4 mr-2" />
               Record Past Booking
-            </button>
-            <button
+            </StandardButton>
+            <StandardButton
+              variant="primary"
+              size="md"
+              icon={Download}
               onClick={() => setShowExportModal(true)}
-              className={`flex items-center px-4 py-2 bg-${fullColor} text-white rounded-lg hover:bg-${themeColor}-700 shadow-sm transition-colors`}
             >
-              <Download className="h-4 w-4 mr-2" />
               Export Bookings
-            </button>
+            </StandardButton>
           </div>
         </div>
 
@@ -901,19 +904,22 @@ const Bookings: React.FC = () => {
               />
             </div>
             <div className="flex gap-1">
-              <button
+              <StandardButton
+                variant="secondary"
+                size="sm"
+                icon={Filter}
                 onClick={() => setShowFilters(!showFilters)}
-                className="flex items-center px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 text-sm"
               >
-                <Filter className="h-4 w-4 mr-1" />
                 Filters
-              </button>
-              <button
+              </StandardButton>
+              <StandardButton
+                variant="secondary"
+                size="sm"
+                icon={RefreshCcw}
                 onClick={loadBookings}
-                className="flex items-center px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 text-sm"
               >
-                <RefreshCcw className="h-4 w-4" />
-              </button>
+                {''}
+              </StandardButton>
             </div>
           </div>
 
@@ -968,12 +974,13 @@ const Bookings: React.FC = () => {
                 </div>
               </div>
               <div className="mt-3 flex justify-end">
-                <button
+                <StandardButton
+                  variant="ghost"
+                  size="sm"
                   onClick={clearFilters}
-                  className="px-3 py-1.5 text-sm text-gray-800 hover:text-gray-800"
                 >
                   Clear Filters
-                </button>
+                </StandardButton>
               </div>
             </div>
           )}
@@ -996,13 +1003,14 @@ const Bookings: React.FC = () => {
                 <option value="completed">Mark Complete</option>
                 <option value="cancelled">Cancel</option>
               </select>
-              <button
+              <StandardButton
+                variant="danger"
+                size="sm"
+                icon={Trash2}
                 onClick={handleBulkDelete}
-                className="flex items-center px-3 py-1 bg-red-100 text-red-800 rounded-lg hover:bg-red-200"
               >
-                <Trash2 className="h-4 w-4 mr-1" />
                 Delete
-              </button>
+              </StandardButton>
             </div>
           </div>
         )}
@@ -1166,22 +1174,24 @@ const Bookings: React.FC = () => {
                       <td className="px-4 py-3 whitespace-nowrap text-sm font-medium">
                         <div className="flex items-center gap-2">
                           {booking.paymentStatus !== 'paid' && (
-                            <button
+                            <StandardButton
+                              variant="ghost"
+                              size="sm"
+                              icon={DollarSign}
                               onClick={() => handleOpenPaymentModal(booking)}
-                              className={`p-1 text-${fullColor} hover:text-${themeColor}-800`}
-                              title="Add Payment"
                             >
-                              <DollarSign className="h-4 w-4" />
-                            </button>
+                              {''}
+                            </StandardButton>
                           )}
                           {booking.status !== 'checked-in' && booking.status !== 'completed' && booking.paymentStatus === 'paid' && (
-                            <button
+                            <StandardButton
+                              variant="success"
+                              size="sm"
+                              icon={CheckCircle2}
                               onClick={() => handleCheckIn(booking.referenceNumber, 'checked-in')}
-                              className="p-1 text-green-800 hover:text-green-800"
-                              title="Check-in"
                             >
-                              <CheckCircle2 className="h-4 w-4" />
-                            </button>
+                              {''}
+                            </StandardButton>
                           )}
                           <Link
                             to={`/bookings/${booking.id}?ref=${booking.referenceNumber}`}
@@ -1197,13 +1207,14 @@ const Bookings: React.FC = () => {
                           >
                             <Pencil className="h-4 w-4" />
                           </Link>
-                          <button
+                          <StandardButton
+                            variant="danger"
+                            size="sm"
+                            icon={Trash2}
                             onClick={() => handleDeleteBooking(booking.id, booking.referenceNumber)}
-                            className="p-1 text-red-600 hover:text-red-800"
-                            title="Delete"
                           >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
+                            {''}
+                          </StandardButton>
                         </div>
                       </td>
                     </tr>
@@ -1225,35 +1236,34 @@ const Bookings: React.FC = () => {
                   of <span className="font-medium">{filteredBookings.length}</span> results
                 </div>
                 <div className="flex gap-2">
-                  <button
+                  <StandardButton
+                    variant="secondary"
+                    size="sm"
                     onClick={() => paginate(Math.max(1, currentPage - 1))}
                     disabled={currentPage === 1}
-                    className="px-3 py-1 border border-gray-200 rounded-lg text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50"
                   >
                     Previous
-                  </button>
+                  </StandardButton>
                   
                   {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                    <button
+                    <StandardButton
                       key={page}
+                      variant={currentPage === page ? 'primary' : 'secondary'}
+                      size="sm"
                       onClick={() => paginate(page)}
-                      className={`px-3 py-1 border rounded-lg text-sm font-medium ${
-                        currentPage === page
-                          ? `border-${themeColor}-500 bg-${themeColor}-500 text-white`
-                          : 'border-gray-200 text-gray-800 hover:bg-gray-50'
-                      }`}
                     >
                       {page}
-                    </button>
+                    </StandardButton>
                   ))}
                   
-                  <button
+                  <StandardButton
+                    variant="secondary"
+                    size="sm"
                     onClick={() => paginate(Math.min(totalPages, currentPage + 1))}
                     disabled={currentPage === totalPages}
-                    className="px-3 py-1 border border-gray-200 rounded-lg text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50"
                   >
                     Next
-                  </button>
+                  </StandardButton>
                 </div>
               </div>
             </div>
@@ -1360,34 +1370,34 @@ const Bookings: React.FC = () => {
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="text-sm font-semibold text-gray-900">Date Range</h3>
                     <div className="flex gap-2">
-                      <button
-                        type="button"
+                      <StandardButton
+                        variant="secondary"
+                        size="sm"
                         onClick={() => setQuickDateRange('today')}
-                        className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50"
                       >
                         Today
-                      </button>
-                      <button
-                        type="button"
+                      </StandardButton>
+                      <StandardButton
+                        variant="secondary"
+                        size="sm"
                         onClick={() => setQuickDateRange('7days')}
-                        className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50"
                       >
                         7 Days
-                      </button>
-                      <button
-                        type="button"
+                      </StandardButton>
+                      <StandardButton
+                        variant="secondary"
+                        size="sm"
                         onClick={() => setQuickDateRange('30days')}
-                        className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50"
                       >
                         30 Days
-                      </button>
-                      <button
-                        type="button"
+                      </StandardButton>
+                      <StandardButton
+                        variant="secondary"
+                        size="sm"
                         onClick={() => setQuickDateRange('year')}
-                        className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50"
                       >
                         1 Year
-                      </button>
+                      </StandardButton>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
@@ -1495,7 +1505,9 @@ const Bookings: React.FC = () => {
               </div>
 
               <div className="p-6 border-t border-gray-100 flex gap-3 justify-end">
-                <button
+                <StandardButton
+                  variant="secondary"
+                  size="md"
                   onClick={() => {
                     setShowExportModal(false);
                     setExportFilters({
@@ -1514,27 +1526,19 @@ const Bookings: React.FC = () => {
                     }
                   }}
                   disabled={exporting}
-                  className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50"
                 >
                   Cancel
-                </button>
-                <button
+                </StandardButton>
+                <StandardButton
+                  variant="primary"
+                  size="md"
+                  icon={Download}
                   onClick={handleExport}
                   disabled={exporting}
-                  className={`px-6 py-2 bg-${fullColor} text-white rounded-lg hover:bg-${themeColor}-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2`}
+                  loading={exporting}
                 >
-                  {exporting ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-                      Exporting...
-                    </>
-                  ) : (
-                    <>
-                      <Download className="h-4 w-4" />
-                      Export to CSV
-                    </>
-                  )}
-                </button>
+                  {exporting ? 'Exporting...' : 'Export to CSV'}
+                </StandardButton>
               </div>
             </div>
           </div>
@@ -1621,37 +1625,35 @@ const Bookings: React.FC = () => {
               </div>
 
               <div className="p-6 border-t border-gray-100 flex gap-3 justify-end">
-                <button
+                <StandardButton
+                  variant="secondary"
+                  size="md"
                   onClick={handleClosePaymentModal}
                   disabled={processingPayment}
-                  className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50"
                 >
                   Cancel
-                </button>
-                <button
+                </StandardButton>
+                <StandardButton
+                  variant="primary"
+                  size="md"
                   onClick={handleSubmitPayment}
                   disabled={processingPayment || !paymentAmount || parseFloat(paymentAmount) <= 0}
-                  className={`px-4 py-2 bg-${fullColor} text-white rounded-lg hover:bg-${themeColor}-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2`}
+                  loading={processingPayment}
                 >
-                  {processingPayment ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-                      Processing...
-                    </>
-                  ) : (
-                    'Process Payment'
-                  )}
-                </button>
+                  {processingPayment ? 'Processing...' : 'Process Payment'}
+                </StandardButton>
               </div>
 
               {/* Bottom Close Button */}
               <div className="mt-6 pt-4 border-t border-gray-200">
-                <button
+                <StandardButton
+                  variant="secondary"
+                  size="md"
+                  fullWidth
                   onClick={() => handleClosePaymentModal()}
-                  className="w-full px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium rounded-lg transition-colors"
                 >
                   Close
-                </button>
+                </StandardButton>
               </div>
             </div>
           </div>

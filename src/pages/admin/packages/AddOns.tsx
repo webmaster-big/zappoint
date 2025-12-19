@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Search, Edit, Trash2, Utensils, Download, Upload, X, CheckSquare, Square } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
+import StandardButton from '../../../components/ui/StandardButton';
 import { addOnService, locationService } from '../../../services';
 import LocationSelector from '../../../components/admin/LocationSelector';
 import Toast from '../../../components/ui/Toast';
@@ -441,28 +442,31 @@ const ManageAddons = () => {
           <p className="text-gray-600 mt-1">Food, beverage and other items for your attractions</p>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg font-semibold whitespace-nowrap flex items-center gap-2 transition-colors"
+          <StandardButton
             onClick={() => setShowImportModal(true)}
+            variant="secondary"
+            size="md"
+            icon={Upload}
           >
-            <Upload size={18} />
             Import
-          </button>
-          <button
-            className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg font-semibold whitespace-nowrap flex items-center gap-2 transition-colors"
+          </StandardButton>
+          <StandardButton
             onClick={handleOpenExportModal}
             disabled={addons.length === 0}
+            variant="secondary"
+            size="md"
+            icon={Download}
           >
-            <Download size={18} />
             Export
-          </button>
-          <button
+          </StandardButton>
+          <StandardButton
             onClick={() => setShowModal(true)}
-            className={`bg-${fullColor} hover:bg-${themeColor}-900 text-white px-5 py-2 rounded-lg font-semibold whitespace-nowrap inline-flex items-center gap-2 transition-colors`}
+            variant="primary"
+            size="md"
+            icon={Plus}
           >
-            <Plus className="h-5 w-5" />
             Create Add-on
-          </button>
+          </StandardButton>
         </div>
       </div>
 
@@ -529,19 +533,22 @@ const ManageAddons = () => {
               {searchTerm ? `No add-ons match "${searchTerm}"` : 'Get started by creating your first add-on'}
             </p>
             {searchTerm && (
-              <button
-                className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-6 py-2.5 rounded-lg font-semibold mr-2 transition-colors"
+              <StandardButton
                 onClick={() => setSearchTerm("")}
+                variant="secondary"
+                size="md"
+                className="mr-2"
               >
                 Clear Search
-              </button>
+              </StandardButton>
             )}
-            <button
+            <StandardButton
               onClick={() => setShowModal(true)}
-              className={`bg-${fullColor} hover:bg-${themeColor}-700 text-white px-6 py-2.5 rounded-lg font-semibold transition-colors`}
+              variant="primary"
+              size="md"
             >
               Create Add-on
-            </button>
+            </StandardButton>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -581,20 +588,22 @@ const ManageAddons = () => {
                       </span>
                     </div>
                     <div className="flex gap-1">
-                      <button
+                      <StandardButton
                         onClick={() => handleEdit(addon)}
-                        className={`p-1.5 text-${fullColor} hover:bg-${themeColor}-100 rounded transition-colors`}
+                        variant="ghost"
+                        size="sm"
+                        className="p-1.5"
+                        icon={Edit}
                         title="Edit add-on"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button
+                      />
+                      <StandardButton
                         onClick={() => handleDelete(addon.id)}
-                        className="p-1.5 text-red-500 hover:bg-red-50 rounded transition-colors"
+                        variant="danger"
+                        size="sm"
+                        className="p-1.5"
+                        icon={Trash2}
                         title="Delete add-on"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      />
                     </div>
                   </div>
                 </div>
@@ -614,17 +623,14 @@ const ManageAddons = () => {
               of <span className="font-medium">{filteredAddons.length}</span> results
             </div>
             <div className="flex gap-2">
-              <button
+              <StandardButton
                 onClick={() => paginate(Math.max(1, currentPage - 1))}
                 disabled={currentPage === 1}
-                className={`px-4 py-2 border rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-                  currentPage === 1
-                    ? 'border-gray-200 text-gray-400 bg-gray-50'
-                    : `border-${themeColor}-200 text-${fullColor} hover:bg-${themeColor}-50`
-                }`}
+                variant="secondary"
+                size="sm"
               >
                 Previous
-              </button>
+              </StandardButton>
               
               {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
                 // Show first, last, current, and adjacent pages
@@ -647,31 +653,25 @@ const ManageAddons = () => {
                 }
                 
                 return (
-                  <button
+                  <StandardButton
                     key={page}
                     onClick={() => paginate(page)}
-                    className={`px-3 py-2 border rounded-lg text-sm font-medium transition-colors ${
-                      currentPage === page
-                        ? `border-${fullColor} bg-${fullColor} text-white shadow-sm`
-                        : `border-gray-200 text-gray-700 hover:border-${themeColor}-300 hover:bg-${themeColor}-50`
-                    }`}
+                    variant={currentPage === page ? "primary" : "secondary"}
+                    size="sm"
                   >
                     {page}
-                  </button>
+                  </StandardButton>
                 );
               })}
               
-              <button
+              <StandardButton
                 onClick={() => paginate(Math.min(totalPages, currentPage + 1))}
                 disabled={currentPage === totalPages}
-                className={`px-4 py-2 border rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-                  currentPage === totalPages
-                    ? 'border-gray-200 text-gray-400 bg-gray-50'
-                    : `border-${themeColor}-200 text-${fullColor} hover:bg-${themeColor}-50`
-                }`}
+                variant="secondary"
+                size="sm"
               >
                 Next
-              </button>
+              </StandardButton>
             </div>
           </div>
         )}
@@ -791,20 +791,24 @@ const ManageAddons = () => {
 
                 {/* Action Buttons */}
                 <div className="flex gap-3 pt-2">
-                  <button
-                    type="button"
+                  <StandardButton
                     onClick={handleModalClose}
-                    className="flex-1 px-4 py-2.5 border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                    variant="secondary"
+                    size="md"
+                    fullWidth
                   >
                     Cancel
-                  </button>
-                  <button
+                  </StandardButton>
+                  <StandardButton
                     type="submit"
                     disabled={loading}
-                    className={`flex-1 px-4 py-2.5 bg-${fullColor} text-white rounded-lg hover:bg-${themeColor}-900 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed`}
+                    variant="primary"
+                    size="md"
+                    loading={loading}
+                    fullWidth
                   >
                     {loading ? 'Saving...' : (editingAddon ? 'Update Add-on' : 'Create Add-on')}
-                  </button>
+                  </StandardButton>
                 </div>
               </form>
             </div>
@@ -821,28 +825,25 @@ const ManageAddons = () => {
                     <h3 className="text-xl font-bold text-gray-900">Export Add-ons</h3>
                     <p className="text-sm text-gray-500 mt-1">Select add-ons to export as JSON</p>
                   </div>
-                  <button
+                  <StandardButton
                     onClick={() => setShowExportModal(false)}
-                    className="p-2 hover:bg-gray-100 rounded-lg"
-                  >
-                    <X size={20} />
-                  </button>
+                    variant="ghost"
+                    size="sm"
+                    icon={X}
+                  />
                 </div>
               </div>
 
               <div className="p-6 overflow-y-auto flex-1">
                 <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-200">
-                  <button
+                  <StandardButton
                     onClick={handleSelectAllForExport}
-                    className={`flex items-center gap-2 text-sm font-medium text-${fullColor} hover:text-${themeColor}-900`}
+                    variant="ghost"
+                    size="sm"
+                    icon={selectedForExport.length === addons.length ? CheckSquare : Square}
                   >
-                    {selectedForExport.length === addons.length ? (
-                      <CheckSquare size={18} />
-                    ) : (
-                      <Square size={18} />
-                    )}
                     {selectedForExport.length === addons.length ? 'Deselect All' : 'Select All'}
-                  </button>
+                  </StandardButton>
                   <span className="text-sm text-gray-600">
                     {selectedForExport.length} of {addons.length} selected
                   </span>
@@ -891,20 +892,22 @@ const ManageAddons = () => {
               </div>
 
               <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
-                <button
+                <StandardButton
                   onClick={() => setShowExportModal(false)}
-                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                  variant="secondary"
+                  size="md"
                 >
                   Cancel
-                </button>
-                <button
+                </StandardButton>
+                <StandardButton
                   onClick={handleExport}
                   disabled={selectedForExport.length === 0}
-                  className={`px-4 py-2 bg-${fullColor} text-white rounded-lg hover:bg-${themeColor}-900 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2`}
+                  variant="primary"
+                  size="md"
+                  icon={Download}
                 >
-                  <Download size={18} />
                   Export {selectedForExport.length} Add-on{selectedForExport.length !== 1 ? 's' : ''}
-                </button>
+                </StandardButton>
               </div>
             </div>
           </div>
@@ -920,15 +923,15 @@ const ManageAddons = () => {
                     <h3 className="text-xl font-bold text-gray-900">Import Add-ons</h3>
                     <p className="text-sm text-gray-500 mt-1">Upload or paste JSON data to import add-ons</p>
                   </div>
-                  <button
+                  <StandardButton
                     onClick={() => {
                       setShowImportModal(false);
                       setImportData('');
                     }}
-                    className="p-2 hover:bg-gray-100 rounded-lg"
-                  >
-                    <X size={20} />
-                  </button>
+                    variant="ghost"
+                    size="sm"
+                    icon={X}
+                  />
                 </div>
               </div>
 
@@ -951,12 +954,13 @@ const ManageAddons = () => {
                       Or Paste JSON Data
                     </label>
                     {importData && (
-                      <button
+                      <StandardButton
                         onClick={() => setImportData('')}
-                        className="text-xs text-gray-500 hover:text-gray-700"
+                        variant="ghost"
+                        size="sm"
                       >
                         Clear
-                      </button>
+                      </StandardButton>
                     )}
                   </div>
                   <textarea
@@ -981,23 +985,25 @@ const ManageAddons = () => {
               </div>
 
               <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
-                <button
+                <StandardButton
                   onClick={() => {
                     setShowImportModal(false);
                     setImportData('');
                   }}
-                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                  variant="secondary"
+                  size="md"
                 >
                   Cancel
-                </button>
-                <button
+                </StandardButton>
+                <StandardButton
                   onClick={handleImport}
                   disabled={!importData.trim()}
-                  className={`px-4 py-2 bg-${fullColor} text-white rounded-lg hover:bg-${themeColor}-900 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2`}
+                  variant="primary"
+                  size="md"
+                  icon={Upload}
                 >
-                  <Upload size={18} />
                   Import Add-ons
-                </button>
+                </StandardButton>
               </div>
             </div>
           </div>

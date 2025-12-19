@@ -11,6 +11,7 @@ import { categoryService } from '../../../services';
 import type { Category } from '../../../services/CategoryService';
 import { Plus, Trash2, Info, Tag, Calendar, Clock } from 'lucide-react';
 import { formatTimeRange } from '../../../utils/timeFormat';
+import StandardButton from '../../../components/ui/StandardButton';
 
 const EditAttraction = () => {
   const navigate = useNavigate();
@@ -419,12 +420,13 @@ const EditAttraction = () => {
         <div className="text-center">
           <h1 className="text-3xl font-bold text-gray-800 mb-4">Attraction Not Found</h1>
           <p className="text-gray-600 mb-6">The attraction you're looking for doesn't exist.</p>
-          <button
+          <StandardButton
+            variant="primary"
+            size="md"
             onClick={() => navigate('/manage-attractions')}
-            className={`px-6 py-2 bg-${fullColor} text-white rounded-lg hover:bg-${themeColor}-900`}
           >
             Back to Manage Attractions
-          </button>
+          </StandardButton>
         </div>
       </div>
     );
@@ -490,17 +492,18 @@ const EditAttraction = () => {
                         ))}
                       </select>
                       {formData.category && (
-                        <button
-                          type="button"
+                        <StandardButton
+                          variant="ghost"
+                          size="sm"
                           onClick={() => {
                             const category = categories.find(c => c.name === formData.category);
                             if (category) handleDeleteCategory(category);
                           }}
-                          className="p-2 rounded-md hover:bg-red-50 text-red-600 transition"
-                          title="Delete category"
+                          icon={Trash2}
+                          className="text-red-600 hover:bg-red-50"
                         >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                          {''}
+                        </StandardButton>
                       )}
                     </div>
                     <div className="flex gap-1 items-center">
@@ -516,10 +519,9 @@ const EditAttraction = () => {
                           }
                         }}
                       />
-                      <button 
-                        type="button" 
-                        className="p-2 rounded-md hover:bg-gray-100 transition"
-                        title="Add category"
+                      <StandardButton 
+                        variant="ghost"
+                        size="sm"
                         onClick={() => {
                           const input = document.querySelector('input[placeholder="Add category"]') as HTMLInputElement;
                           if (input?.value) {
@@ -527,9 +529,10 @@ const EditAttraction = () => {
                             input.value = '';
                           }
                         }}
+                        icon={Plus}
                       >
-                        <Plus className="w-4 h-4 text-primary" />
-                      </button>
+                        {''}
+                      </StandardButton>
                     </div>
                   </div>
                 </div>
@@ -629,14 +632,15 @@ const EditAttraction = () => {
                     <div className="flex justify-between items-center">
                       <h4 className="font-semibold text-neutral-800">Schedule {index + 1}</h4>
                       {formData.availability.length > 1 && (
-                        <button
-                          type="button"
+                        <StandardButton
+                          variant="ghost"
+                          size="sm"
                           onClick={() => removeSchedule(index)}
-                          className="text-red-600 hover:bg-red-50 p-2 rounded-md transition"
-                          title="Remove schedule"
+                          icon={Trash2}
+                          className="text-red-600 hover:bg-red-50"
                         >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                          {''}
+                        </StandardButton>
                       )}
                     </div>
                     
@@ -687,13 +691,15 @@ const EditAttraction = () => {
                   </div>
                 ))}
                 
-                <button
-                  type="button"
+                <StandardButton
+                  variant="secondary"
+                  size="md"
                   onClick={addSchedule}
-                  className={`w-full px-4 py-2 border-2 border-dashed border-gray-300 rounded-md text-sm font-medium text-gray-600 hover:border-${themeColor}-500 hover:text-${fullColor} transition-all flex items-center justify-center gap-2`}
+                  icon={Plus}
+                  fullWidth
                 >
-                  <Plus className="w-4 h-4" /> Add Another Schedule
-                </button>
+                  Add Another Schedule
+                </StandardButton>
               </div>
             </div>
 
@@ -740,21 +746,25 @@ const EditAttraction = () => {
 
             {/* Form Actions */}
             <div className="flex gap-3 pt-6 border-t border-gray-200">
-              <button
-                type="button"
+              <StandardButton
+                variant="secondary"
+                size="lg"
                 onClick={() => navigate('/attractions')}
                 disabled={isSubmitting}
-                className={`flex-1 px-6 py-2.5 border border-gray-300 rounded-md text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed`}
+                fullWidth
               >
                 Cancel
-              </button>
-              <button
+              </StandardButton>
+              <StandardButton
                 type="submit"
+                variant="primary"
+                size="lg"
                 disabled={isSubmitting}
-                className={`flex-1 px-6 py-2.5 bg-${fullColor} border border-transparent rounded-md text-sm font-semibold text-white hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed`}
+                loading={isSubmitting}
+                fullWidth
               >
                 {isSubmitting ? 'Updating...' : 'Update Attraction'}
-              </button>
+              </StandardButton>
             </div>
           </form>
         </div>

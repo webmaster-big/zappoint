@@ -4,6 +4,7 @@ import { ArrowLeft, Save, Plus, Minus } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import bookingService from '../../../services/bookingService';
 import EmptyStateModal from '../../../components/ui/EmptyStateModal';
+import StandardButton from '../../../components/ui/StandardButton';
 import roomService from '../../../services/RoomService';
 import { locationService } from '../../../services/LocationService';
 import LocationSelector from '../../../components/admin/LocationSelector';
@@ -372,13 +373,13 @@ const ManualBooking: React.FC = () => {
       {/* Header */}
       <div className="">
         <div className="max-w-7xl mx-auto px-6 py-4">
-          <button
+          <StandardButton
+            variant="secondary"
+            icon={ArrowLeft}
             onClick={() => navigate('/bookings')}
-            className="flex items-center text-gray-600 hover:text-gray-900 mb-3 transition-colors"
           >
-            <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Bookings
-          </button>
+          </StandardButton>
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Record Past Booking</h1>
@@ -430,19 +431,18 @@ const ManualBooking: React.FC = () => {
                   </p>
                 </div>
                 {form.packageId && (
-                  <button
-                    type="button"
+                  <StandardButton
+                    variant="secondary"
+                    icon={ArrowLeft}
                     onClick={() => {
                       setForm(prev => ({ ...prev, packageId: '', roomId: '' }));
                       setPkg(null);
                       setSelectedAddOns({});
                       setSelectedAttractions({});
                     }}
-                    className={`px-4 py-2 bg-white border-2 border-${themeColor}-500 text-${themeColor}-700 font-medium rounded-lg hover:bg-${themeColor}-50 transition-all flex items-center gap-2`}
                   >
-                    <ArrowLeft className="h-4 w-4" />
                     Change Package
-                  </button>
+                  </StandardButton>
                 )}
               </div>
               <div className="grid grid-cols-1 gap-4">
@@ -641,23 +641,20 @@ const ManualBooking: React.FC = () => {
                           </h3>
                           <div className="flex flex-wrap gap-2">
                             {Array.isArray(pkg.rooms) && pkg.rooms.map((room: any) => (
-                              <button
+                              <StandardButton
                                 type="button"
                                 key={room.id}
+                                variant={form.roomId === room.id.toString() ? 'primary' : 'secondary'}
+                                size="sm"
                                 onClick={() => {
                                   const event = {
                                     target: { name: 'roomId', value: room.id.toString() }
                                   } as any;
                                   handleInputChange(event);
                                 }}
-                                className={`px-4 py-2 rounded-lg border-2 text-sm font-medium transition-all ${
-                                  form.roomId === room.id.toString()
-                                    ? `border-${themeColor}-500 bg-${themeColor}-50 text-${fullColor}`
-                                    : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-300'
-                                }`}
                               >
                                 {room.name}
-                              </button>
+                              </StandardButton>
                             ))}
                             <input
                               type="text"
@@ -673,11 +670,13 @@ const ManualBooking: React.FC = () => {
                                 }
                               }}
                             />
-                            <button
+                            <StandardButton
                               type="button"
-                              className={`p-2 rounded-lg transition-colors ${creatingRoom ? 'opacity-50 cursor-not-allowed' : 'hover:bg-${themeColor}-50'}`}
-                              title="Add new Space"
+                              variant="ghost"
+                              size="sm"
+                              icon={Plus}
                               disabled={creatingRoom}
+                              loading={creatingRoom}
                               onClick={() => {
                                 const input = document.getElementById('new-room-name') as HTMLInputElement;
                                 if (input?.value) {
@@ -686,12 +685,8 @@ const ManualBooking: React.FC = () => {
                                 }
                               }}
                             >
-                              {creatingRoom ? (
-                                <div className="animate-spin rounded-full h-4 w-4 border-2 border-gray-400 border-t-transparent"></div>
-                              ) : (
-                                <Plus className={`w-4 h-4 text-${themeColor}-600`} />
-                              )}
-                            </button>
+                              {''}
+                            </StandardButton>
                           </div>
                         </div>
                       </>
@@ -736,22 +731,26 @@ const ManualBooking: React.FC = () => {
                                 </div>
                                 
                                 <div className="flex items-center gap-2">
-                                  <button
+                                  <StandardButton
                                     type="button"
+                                    variant="secondary"
+                                    size="sm"
+                                    icon={Minus}
                                     onClick={() => handleAddOnChange(addOn.id, -1)}
                                     disabled={!isSelected}
-                                    className="p-1.5 rounded-lg bg-gray-100 border border-gray-300 hover:bg-gray-200 disabled:opacity-40 transition-colors"
                                   >
-                                    <Minus className="h-3.5 w-3.5 text-gray-600" />
-                                  </button>
+                                    {''}
+                                  </StandardButton>
                                   <span className="font-bold text-sm text-gray-900 min-w-[30px] text-center">{quantity}</span>
-                                  <button
+                                  <StandardButton
                                     type="button"
+                                    variant="primary"
+                                    size="sm"
+                                    icon={Plus}
                                     onClick={() => handleAddOnChange(addOn.id, 1)}
-                                    className={`p-1.5 rounded-lg text-white transition-colors bg-${themeColor}-600 hover:bg-${themeColor}-700`}
                                   >
-                                    <Plus className="h-3.5 w-3.5" />
-                                  </button>
+                                    {''}
+                                  </StandardButton>
                                 </div>
                               </div>
                             </div>
@@ -786,22 +785,26 @@ const ManualBooking: React.FC = () => {
                                 </div>
                                 
                                 <div className="flex items-center gap-2">
-                                  <button
+                                  <StandardButton
                                     type="button"
+                                    variant="secondary"
+                                    size="sm"
+                                    icon={Minus}
                                     onClick={() => handleAttractionChange(attraction.id, -1)}
                                     disabled={!isSelected}
-                                    className="p-1.5 rounded-lg bg-gray-100 border border-gray-300 hover:bg-gray-200 disabled:opacity-40 transition-colors"
                                   >
-                                    <Minus className="h-3.5 w-3.5 text-gray-600" />
-                                  </button>
+                                    {''}
+                                  </StandardButton>
                                   <span className="font-bold text-sm text-gray-900 min-w-[30px] text-center">{quantity}</span>
-                                  <button
+                                  <StandardButton
                                     type="button"
+                                    variant="primary"
+                                    size="sm"
+                                    icon={Plus}
                                     onClick={() => handleAttractionChange(attraction.id, 1)}
-                                    className={`p-1.5 rounded-lg text-white transition-colors bg-${themeColor}-600 hover:bg-${themeColor}-700`}
                                   >
-                                    <Plus className="h-3.5 w-3.5" />
-                                  </button>
+                                    {''}
+                                  </StandardButton>
                                 </div>
                               </div>
                             </div>
@@ -1089,31 +1092,27 @@ const ManualBooking: React.FC = () => {
               {pkg && (
                 <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-5">
                   <div className="flex flex-col gap-3">
-                    <button
+                    <StandardButton
                       type="submit"
+                      variant="primary"
+                      icon={Save}
                       disabled={loading || !form.packageId}
-                      className={`w-full px-6 py-3 text-white font-semibold rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all shadow-lg bg-${themeColor}-600 hover:bg-${themeColor}-700`}
+                      loading={loading}
+                      fullWidth
+                      size="lg"
                     >
-                      {loading ? (
-                        <>
-                          <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
-                          Processing...
-                        </>
-                      ) : (
-                        <>
-                          <Save className="h-5 w-5" />
-                          Record Booking
-                        </>
-                      )}
-                    </button>
-                    <button
+                      {loading ? 'Processing...' : 'Record Booking'}
+                    </StandardButton>
+                    <StandardButton
                       type="button"
+                      variant="secondary"
                       onClick={() => navigate('/bookings')}
                       disabled={loading}
-                      className="w-full px-6 py-3 bg-white border-2 border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-all"
+                      fullWidth
+                      size="lg"
                     >
                       Cancel
-                    </button>
+                    </StandardButton>
                   </div>
                 </div>
               )}

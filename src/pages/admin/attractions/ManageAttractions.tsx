@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
+import StandardButton from '../../../components/ui/StandardButton';
 import type {
   ManageAttractionsAttraction,
   ManageAttractionsFilterOptions,
@@ -496,27 +497,30 @@ const ManageAttractions = () => {
               showAllOption={true}
             />
           )}
-          <button
-            className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-semibold whitespace-nowrap flex items-center gap-2"
+          <StandardButton
             onClick={() => setShowImportModal(true)}
+            variant="secondary"
+            size="md"
+            icon={Upload}
           >
-            <Upload size={18} />
             Import
-          </button>
-          <button
-            className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-semibold whitespace-nowrap flex items-center gap-2"
+          </StandardButton>
+          <StandardButton
             onClick={handleOpenExportModal}
             disabled={attractions.length === 0}
+            variant="secondary"
+            size="md"
+            icon={Download}
           >
-            <Download size={18} />
             Export
-          </button>
-          <button
-            className={`bg-${fullColor} hover:bg-${themeColor}-900 text-white px-6 py-2 rounded-lg font-semibold whitespace-nowrap`}
+          </StandardButton>
+          <StandardButton
             onClick={() => window.location.href = "/attractions/create"}
+            variant="primary"
+            size="md"
           >
             New Attraction
-          </button>
+          </StandardButton>
         </div>
       </div>
 
@@ -560,19 +564,20 @@ const ManageAttractions = () => {
             />
           </div>
           <div className="flex gap-2">
-            <button
+            <StandardButton
               onClick={() => setShowFilters(!showFilters)}
-              className="flex items-center px-3 py-2 border border-gray-200 rounded-lg hover:bg-gray-50"
+              variant="secondary"
+              size="md"
+              icon={Filter}
             >
-              <Filter className="h-4 w-4 mr-1" />
               Filters
-            </button>
-            <button
+            </StandardButton>
+            <StandardButton
               onClick={loadAttractions}
-              className="flex items-center px-3 py-2 border border-gray-200 rounded-lg hover:bg-gray-50"
-            >
-              <RefreshCcw className="h-4 w-4" />
-            </button>
+              variant="secondary"
+              size="md"
+              icon={RefreshCcw}
+            />
           </div>
         </div>
 
@@ -607,12 +612,13 @@ const ManageAttractions = () => {
               </div>
             </div>
             <div className="mt-4 flex justify-end">
-              <button
+              <StandardButton
                 onClick={clearFilters}
-                className="px-3 py-2 text-sm text-gray-600 hover:text-gray-800"
+                variant="ghost"
+                size="sm"
               >
                 Clear Filters
-              </button>
+              </StandardButton>
             </div>
           </div>
         )}
@@ -633,13 +639,14 @@ const ManageAttractions = () => {
               <option value="active">Activate</option>
               <option value="inactive">Deactivate</option>
             </select>
-            <button
+            <StandardButton
               onClick={handleBulkDelete}
-              className="flex items-center px-3 py-2 bg-red-100 text-red-800 rounded-lg hover:bg-red-200"
+              variant="danger"
+              size="md"
+              icon={Trash2}
             >
-              <Trash2 className="h-4 w-4 mr-1" />
               Delete
-            </button>
+            </StandardButton>
           </div>
         </div>
       )}
@@ -722,14 +729,16 @@ const ManageAttractions = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-2">
-                        <button
+                        <StandardButton
                           onClick={() => copyPurchaseLink(attraction)}
-                          className={`flex items-center px-3 py-1 bg-${themeColor}-100 text-${fullColor} rounded-lg hover:bg-${themeColor}-200 transition-colors text-xs`}
+                          variant="ghost"
+                          size="sm"
+                          icon={ShoppingCart}
+                          className={`bg-${themeColor}-100 text-${fullColor} hover:bg-${themeColor}-200 text-xs`}
                           title="Copy purchase link"
                         >
-                          <ShoppingCart className="h-3 w-3 mr-1" />
                           {copiedLink === attraction.id ? 'Copied!' : 'Copy Link'}
-                        </button>
+                        </StandardButton>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -756,13 +765,14 @@ const ManageAttractions = () => {
                         >
                           <Pencil className="h-4 w-4" />
                         </Link>
-                        <button
+                        <StandardButton
                           onClick={() => handleDeleteAttraction(attraction.id)}
-                          className="text-red-600 hover:text-red-800"
+                          variant="danger"
+                          size="sm"
+                          icon={Trash2}
+                          className="text-red-600 hover:text-red-800 p-1"
                           title="Delete"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        />
                       </div>
                     </td>
                   </tr>
@@ -784,35 +794,34 @@ const ManageAttractions = () => {
                 of <span className="font-medium">{filteredAttractions.length}</span> results
               </div>
               <div className="flex gap-2">
-                <button
+                <StandardButton
                   onClick={() => paginate(Math.max(1, currentPage - 1))}
                   disabled={currentPage === 1}
-                  className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50"
+                  variant="secondary"
+                  size="sm"
                 >
                   Previous
-                </button>
+                </StandardButton>
                 
                 {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                  <button
+                  <StandardButton
                     key={page}
                     onClick={() => paginate(page)}
-                    className={`px-3 py-2 border rounded-lg text-sm font-medium ${
-                      currentPage === page
-                        ? `border-${fullColor} bg-${fullColor} text-white`
-                        : 'border-gray-200 text-gray-800 hover:bg-gray-50'
-                    }`}
+                    variant={currentPage === page ? 'primary' : 'secondary'}
+                    size="sm"
                   >
                     {page}
-                  </button>
+                  </StandardButton>
                 ))}
                 
-                <button
+                <StandardButton
                   onClick={() => paginate(Math.min(totalPages, currentPage + 1))}
                   disabled={currentPage === totalPages}
-                  className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50"
+                  variant="secondary"
+                  size="sm"
                 >
                   Next
-                </button>
+                </StandardButton>
               </div>
             </div>
           </div>
@@ -829,28 +838,26 @@ const ManageAttractions = () => {
                   <h3 className="text-xl font-bold text-gray-900">Export Attractions</h3>
                   <p className="text-sm text-gray-500 mt-1">Select attractions to export as JSON</p>
                 </div>
-                <button
+                <StandardButton
                   onClick={() => setShowExportModal(false)}
-                  className="p-2 hover:bg-gray-100 rounded-lg"
-                >
-                  <X size={20} />
-                </button>
+                  variant="ghost"
+                  size="md"
+                  icon={X}
+                  className="p-2"
+                />
               </div>
             </div>
 
             <div className="p-6 overflow-y-auto flex-1">
               <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-200">
-                <button
+                <StandardButton
                   onClick={handleSelectAllForExport}
-                  className={`flex items-center gap-2 text-sm font-medium text-${themeColor}-700 hover:text-${fullColor}`}
+                  variant="ghost"
+                  size="sm"
+                  icon={selectedForExport.length === attractions.length ? CheckSquare : Square}
                 >
-                  {selectedForExport.length === attractions.length ? (
-                    <CheckSquare size={18} />
-                  ) : (
-                    <Square size={18} />
-                  )}
                   {selectedForExport.length === attractions.length ? 'Deselect All' : 'Select All'}
-                </button>
+                </StandardButton>
                 <span className="text-sm text-gray-600">
                   {selectedForExport.length} of {attractions.length} selected
                 </span>
@@ -894,20 +901,22 @@ const ManageAttractions = () => {
             </div>
 
             <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
-              <button
+              <StandardButton
                 onClick={() => setShowExportModal(false)}
-                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                variant="secondary"
+                size="md"
               >
                 Cancel
-              </button>
-              <button
+              </StandardButton>
+              <StandardButton
                 onClick={handleExport}
                 disabled={selectedForExport.length === 0}
-                className={`px-4 py-2 bg-${fullColor} text-white rounded-lg hover:bg-${fullColor} disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2`}
+                variant="primary"
+                size="md"
+                icon={Download}
               >
-                <Download size={18} />
                 Export {selectedForExport.length} Attraction{selectedForExport.length !== 1 ? 's' : ''}
-              </button>
+              </StandardButton>
             </div>
           </div>
         </div>
@@ -923,15 +932,15 @@ const ManageAttractions = () => {
                   <h3 className="text-xl font-bold text-gray-900">Import Attractions</h3>
                   <p className="text-sm text-gray-500 mt-1">Upload or paste JSON data to import attractions</p>
                 </div>
-                <button
+                <StandardButton
                   onClick={() => {
                     setShowImportModal(false);
                     setImportData('');
                   }}
-                  className="p-2 hover:bg-gray-100 rounded-lg"
-                >
-                  <X size={20} />
-                </button>
+                  variant="ghost"
+                  size="sm"
+                  icon={X}
+                />
               </div>
             </div>
 
@@ -963,12 +972,13 @@ const ManageAttractions = () => {
                     Or Paste JSON Data
                   </label>
                   {importData && (
-                    <button
+                    <StandardButton
                       onClick={() => setImportData('')}
-                      className="text-xs text-gray-500 hover:text-gray-700"
+                      variant="ghost"
+                      size="sm"
                     >
                       Clear
-                    </button>
+                    </StandardButton>
                   )}
                 </div>
                 <textarea
@@ -992,23 +1002,23 @@ const ManageAttractions = () => {
             </div>
 
             <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
-              <button
+              <StandardButton
                 onClick={() => {
                   setShowImportModal(false);
                   setImportData('');
                 }}
-                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                variant="secondary"
               >
                 Cancel
-              </button>
-              <button
+              </StandardButton>
+              <StandardButton
                 onClick={handleImport}
                 disabled={!importData.trim()}
-                className={`px-4 py-2 bg-${fullColor} text-white rounded-lg hover:bg-${fullColor} disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2`}
+                variant="primary"
+                icon={Upload}
               >
-                <Upload size={18} />
                 Import Attractions
-              </button>
+              </StandardButton>
             </div>
           </div>
         </div>

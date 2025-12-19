@@ -1,6 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
-  BarChart3,
   Download,
   Users,
   DollarSign,
@@ -8,475 +7,658 @@ import {
   Ticket,
   MapPin,
   TrendingUp,
-  TrendingDown,
+  Clock,
+  X,
+  Filter,
+  Info,
+  Activity,
+  Loader2,
+  Building2,
+  Boxes,
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
-import type {
-  CompanyAnalyticsBooking,
-  CompanyAnalyticsTicketPurchase,
-  CompanyAnalyticsLocationData,
-  CompanyAnalyticsLocationMetrics,
-  CompanyAnalyticsMetrics,
-  CompanyAnalyticsMetricCardProps,
-} from '../../../types/CompanyAnalytics.types';
+import CounterAnimation from '../../../components/ui/CounterAnimation';
+import StandardButton from '../../../components/ui/StandardButton';
+import AnalyticsService from '../../../services/AnalyticsService';
+import type { CompanyAnalyticsResponse } from '../../../services/AnalyticsService';
+import {
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  Cell,
+} from 'recharts';
 
 const CompanyAnalytics: React.FC = () => {
-  const { themeColor, fullColor } = useThemeColor();
-  const [timeRange, setTimeRange] = useState<string>('30d');
-  const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
-  const [reportType, setReportType] = useState<string>('overview');
-  const [isGenerating, setIsGenerating] = useState<boolean>(false);
-  const [data, setData] = useState<Record<string, CompanyAnalyticsLocationData> | null>(null);
+  const { themeColor } = useThemeColor();
+  const [dateRange, setDateRange] = useState<'7d' | '30d' | '90d' | '1y'>('30d');
+  const [selectedLocations, setSelectedLocations] = useState<number[]>([]);
+  const [showFilters, setShowFilters] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [analyticsData, setAnalyticsData] = useState<CompanyAnalyticsResponse | null>(null);
+  const [exportFormat, setExportFormat] = useState<'json' | 'csv'>('json');
+  
+  // TODO: Get company_id from authenticated user's company
+  const companyId = 1; // Replace with actual company ID from user context
 
-  const locations: string[] = [
-    'Brighton', 'Canton', 'Farmington', 'Lansing', 'Taylor', 
-    'Waterford', 'Sterling Heights', 'Battle Creek', 'Ypsilanti', 'Escape Room Zone'
-  ];
-
-  // Initialize or load data from localStorage
-  useEffect(() => {
-    const savedData = localStorage.getItem('zapzone_analytics_data');
-    if (savedData) {
-      setData(JSON.parse(savedData));
-    } else {
-      // Generate sample data if none exists
-      const sampleData = generateSampleData();
-      setData(sampleData);
-      localStorage.setItem('zapzone_analytics_data', JSON.stringify(sampleData));
+  const fetchAnalytics = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const data = await AnalyticsService.getCompanyAnalytics({
+        company_id: companyId,
+        date_range: dateRange,
+        location_ids: selectedLocations.length > 0 ? selectedLocations : undefined
+      });
+      console.log('Fetched Company Analytics:', data);
+      setAnalyticsData(data);
+    } catch (error) {
+      console.error('Failed to fetch analytics:', error);
+    } finally {
+      setIsLoading(false);
     }
-  }, []);
+  }, [companyId, dateRange, selectedLocations]);
 
-  // Generate comprehensive sample data
-  const generateSampleData = (): Record<string, CompanyAnalyticsLocationData> => {
-    const packages: string[] = ['Adventure Package', 'Birthday Package', 'Corporate Package', 'Family Package', 'Group Package'];
-    const attractions: string[] = ['Laser Tag', 'Bowling', 'VR Experience', 'Arcade', 'Escape Room', 'Mini Golf'];
-    
-    const locationData: Record<string, CompanyAnalyticsLocationData> = {};
-    const today = new Date();
-    
-    locations.forEach(location => {
-      // Bookings data
-      const bookings: CompanyAnalyticsBooking[] = Array.from({ length: 50 }, (_, i) => {
-        const date = new Date();
-        date.setDate(today.getDate() - Math.floor(Math.random() * 30));
-        return {
-          id: `booking_${location}_${i}`,
-          date: date.toISOString(),
-          package: packages[Math.floor(Math.random() * packages.length)],
-          participants: Math.floor(Math.random() * 20) + 2,
-          amount: Math.floor(Math.random() * 500) + 50,
-          status: ['Confirmed', 'Pending', 'Cancelled'][Math.floor(Math.random() * 3)] as 'Confirmed' | 'Pending' | 'Cancelled',
-          location
-        };
-      });
-
-      // Ticket purchases data
-      const ticketPurchases: CompanyAnalyticsTicketPurchase[] = Array.from({ length: 100 }, (_, i) => {
-        const date = new Date();
-        date.setDate(today.getDate() - Math.floor(Math.random() * 30));
-        return {
-          id: `ticket_${location}_${i}`,
-          date: date.toISOString(),
-          attraction: attractions[Math.floor(Math.random() * attractions.length)],
-          quantity: Math.floor(Math.random() * 6) + 1,
-          amount: Math.floor(Math.random() * 100) + 10,
-          status: ['Completed', 'Pending', 'Cancelled'][Math.floor(Math.random() * 3)] as 'Completed' | 'Pending' | 'Cancelled',
-          location
-        };
-      });
-
-      locationData[location] = { bookings, ticketPurchases };
-    });
-
-    return locationData;
-  };
-
-  // Filter data based on selected time range and locations
-  const getFilteredData = (): Record<string, CompanyAnalyticsLocationData> | null => {
-    if (!data) return null;
-
-    const filteredData: Record<string, CompanyAnalyticsLocationData> = {};
-    const days = parseInt(timeRange);
-    const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.getDate() - days);
-
-    const selectedLocs = selectedLocations.length > 0 ? selectedLocations : locations;
-
-    selectedLocs.forEach(location => {
-      const locationData = data[location];
-      if (locationData) {
-        filteredData[location] = {
-          bookings: locationData.bookings.filter((booking: CompanyAnalyticsBooking) =>
-            new Date(booking.date) >= cutoffDate
-          ),
-          ticketPurchases: locationData.ticketPurchases.filter((ticket: CompanyAnalyticsTicketPurchase) =>
-            new Date(ticket.date) >= cutoffDate
-          )
-        };
-      }
-    });
-
-    return filteredData;
-  };
-
-  const filteredData = getFilteredData();
-
-  // Calculate metrics
-  const calculateMetrics = (): CompanyAnalyticsMetrics | null => {
-    if (!filteredData) return null;
-
-    let totalRevenue = 0;
-    let totalBookings = 0;
-    let totalTickets = 0;
-    let totalParticipants = 0;
-    const locationMetrics: Record<string, CompanyAnalyticsLocationMetrics> = {};
-    const packageRevenue: Record<string, number> = {};
-    const attractionRevenue: Record<string, number> = {};
-
-    Object.entries(filteredData).forEach(([location, locationData]: [string, CompanyAnalyticsLocationData]) => {
-      const locationBookings = locationData.bookings.length;
-      const locationTickets = locationData.ticketPurchases.length;
-      const locationRevenue = 
-        locationData.bookings.reduce((sum: number, b: CompanyAnalyticsBooking) => sum + b.amount, 0) +
-        locationData.ticketPurchases.reduce((sum: number, t: CompanyAnalyticsTicketPurchase) => sum + t.amount, 0);
-      const locationParticipants = locationData.bookings.reduce((sum: number, b: CompanyAnalyticsBooking) => sum + b.participants, 0);
-
-      totalRevenue += locationRevenue;
-      totalBookings += locationBookings;
-      totalTickets += locationTickets;
-      totalParticipants += locationParticipants;
-
-      locationMetrics[location] = {
-        revenue: locationRevenue,
-        bookings: locationBookings,
-        tickets: locationTickets,
-        participants: locationParticipants
-      };
-
-      // Package revenue breakdown
-      locationData.bookings.forEach((booking: CompanyAnalyticsBooking) => {
-        packageRevenue[booking.package] = (packageRevenue[booking.package] || 0) + booking.amount;
-      });
-
-      // Attraction revenue breakdown
-      locationData.ticketPurchases.forEach((ticket: CompanyAnalyticsTicketPurchase) => {
-        attractionRevenue[ticket.attraction] = (attractionRevenue[ticket.attraction] || 0) + ticket.amount;
-      });
-    });
-
-    return {
-      totalRevenue,
-      totalBookings,
-      totalTickets,
-      totalParticipants,
-      locationMetrics,
-      packageRevenue,
-      attractionRevenue
-    };
-  };
-
-  const metrics = calculateMetrics();
-
-  // Generate PDF Report
-  const generatePDFReport = async (): Promise<void> => {
-    setIsGenerating(true);
-    
-    // Simulate PDF generation
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    // Create a simple PDF-like download
-    const reportData = {
-      generatedAt: new Date().toLocaleString(),
-      timeRange,
-      locations: selectedLocations.length > 0 ? selectedLocations : locations,
-      metrics,
-      filteredData
-    };
-
-    const blob = new Blob([JSON.stringify(reportData, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `zapzone-report-${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-
-    setIsGenerating(false);
-  };
-
-  // Toggle location selection
-  const toggleLocation = (location: string): void => {
+  useEffect(() => {
+    fetchAnalytics();
+  }, [fetchAnalytics]);
+  
+  const toggleLocation = (locationId: number) => {
     setSelectedLocations(prev =>
-      prev.includes(location)
-        ? prev.filter(l => l !== location)
-        : [...prev, location]
+      prev.includes(locationId) ? prev.filter(l => l !== locationId) : [...prev, locationId]
     );
   };
+  
+  const handleExport = async () => {
+    if (!analyticsData) return;
+    
+    setIsExporting(true);
+    try {
+      const exportData = await AnalyticsService.exportCompanyAnalytics({
+        company_id: companyId,
+        date_range: dateRange,
+        location_ids: selectedLocations.length > 0 ? selectedLocations : undefined,
+        format: exportFormat,
+      });
+      
+      AnalyticsService.downloadExportedFile(
+        exportData,
+        exportFormat,
+        analyticsData.company.name
+      );
+      
+      setShowExportModal(false);
+    } catch (error) {
+      console.error('Failed to export analytics:', error);
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
-  // Quick metrics cards
-  const MetricCard: React.FC<CompanyAnalyticsMetricCardProps> = ({ title, value, change, icon: Icon, trend }) => (
-    <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm font-medium text-gray-600">{title}</p>
-          <p className="text-2xl font-bold text-gray-900 mt-1">{value}</p>
-          {change && (
-            <p className={`text-sm flex items-center mt-1 ${
-              trend === 'up' ? 'text-green-600' : 'text-red-600'
-            }`}>
-              {trend === 'up' ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
-              <span className="ml-1">{change}</span>
-            </p>
-          )}
-        </div>
-        <div className={`p-3 bg-${themeColor}-100 rounded-lg`}>
-          <Icon size={24} className={`text-${fullColor}`} />
+  if (isLoading || !analyticsData) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 text-gray-400 animate-spin mx-auto mb-4" />
+          <p className="text-gray-600">Loading analytics...</p>
         </div>
       </div>
-    </div>
-  );
-
-  if (!data || !metrics) {
-    return <div className="min-h-screen bg-gray-50 flex items-center justify-center">Loading...</div>;
+    );
   }
 
+  const { company, key_metrics, revenue_trend, location_performance, package_distribution, peak_hours, daily_performance, booking_status, top_attractions } = analyticsData;
+  
+  // All available locations for filter
+  const allLocations = location_performance.map(loc => ({
+    id: loc.location_id,
+    name: loc.location,
+  }));
+
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-                <BarChart3 className={`w-8 h-8 text-${fullColor}`} />
-                Analytics & Reports
-              </h1>
-              <p className="text-gray-600 mt-2">Comprehensive insights across all locations</p>
-            </div>
-            <button
-              onClick={generatePDFReport}
-              disabled={isGenerating}
-              className={`mt-4 md:mt-0 px-6 py-3 bg-${fullColor} text-white rounded-xl hover:bg-${themeColor}-900 transition flex items-center gap-2 disabled:opacity-50`}
+    <div className="min-h-screen bg-gray-50 p-2 sm:p-4 md:p-6 space-y-6">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 flex items-center gap-2 mb-1">
+            Company Analytics
+          </h1>
+          <p className="text-sm md:text-base text-gray-600">
+            {selectedLocations.length > 0
+              ? `${selectedLocations.length} location${selectedLocations.length !== 1 ? 's' : ''} selected`
+              : `All ${company.total_locations} locations`}
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-3 mt-4 md:mt-0">
+          <select
+            value={dateRange}
+            onChange={(e) => setDateRange(e.target.value as '7d' | '30d' | '90d' | '1y')}
+            className={`px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-${themeColor}-500`}
+          >
+            <option value="7d">Last 7 days</option>
+            <option value="30d">Last 30 days</option>
+            <option value="90d">Last 90 days</option>
+            <option value="1y">Last year</option>
+          </select>
+          <StandardButton
+            onClick={() => setShowFilters(!showFilters)}
+            variant={showFilters ? "primary" : "secondary"}
+            size="sm"
+            icon={Filter}
+          >
+            Locations
+            {selectedLocations.length > 0 && (
+              <span className="ml-1 px-2 py-0.5 rounded-full text-xs bg-white text-gray-900">
+                {selectedLocations.length}
+              </span>
+            )}
+          </StandardButton>
+          <StandardButton
+            onClick={() => setShowExportModal(true)}
+            variant="secondary"
+            size="sm"
+            icon={Download}
+          >
+            Export
+          </StandardButton>
+        </div>
+      </div>
+
+      {/* Location Filter */}
+      {showFilters && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+          <div className="flex items-center justify-between mb-3">
+            <label className="text-sm font-medium text-gray-700">Select Locations</label>
+            <StandardButton
+              onClick={() => setSelectedLocations([])}
+              variant="ghost"
+              size="sm"
             >
-              <Download size={20} />
-              {isGenerating ? 'Generating Report...' : 'Export Report'}
-            </button>
+              Clear All
+            </StandardButton>
           </div>
-        </div>
-
-        {/* Filters */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Time Range</label>
-              <select
-                value={timeRange}
-                onChange={(e) => setTimeRange(e.target.value)}
-                className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${fullColor} focus:border-${fullColor}`}
+          <div className="flex flex-wrap gap-2">
+            {allLocations.map(location => (
+              <StandardButton
+                key={location.id}
+                onClick={() => toggleLocation(location.id)}
+                variant={selectedLocations.includes(location.id) ? "primary" : "ghost"}
+                size="sm"
               >
-                <option value="7">Last 7 days</option>
-                <option value="30">Last 30 days</option>
-                <option value="90">Last 90 days</option>
-                <option value="365">Last 365 days</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Report Type</label>
-              <select
-                value={reportType}
-                onChange={(e) => setReportType(e.target.value)}
-                className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${fullColor} focus:border-${fullColor}`}
-              >
-                <option value="overview">Overview</option>
-                <option value="bookings">Bookings Analysis</option>
-                <option value="tickets">Ticket Sales</option>
-                <option value="locations">Location Performance</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Quick Actions</label>
-              <div className="flex space-x-2">
-                <button
-                  onClick={() => setSelectedLocations([])}
-                  className="px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
-                >
-                  All Locations
-                </button>
-                <button
-                  onClick={() => setSelectedLocations(['Escape Room Zone'])}
-                  className="px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
-                >
-                  Escape Rooms Only
-                </button>
-              </div>
-            </div>
+                {location.name}
+              </StandardButton>
+            ))}
           </div>
+        </div>
+      )}
 
-          {/* Location Filter */}
-          <div className="mt-6">
-            <label className="block text-sm font-medium text-gray-700 mb-3 flex items-center">
-              <MapPin size={16} className="mr-2" />
-              Filter Locations
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {locations.map(location => (
-                <button
-                  key={location}
-                  onClick={() => toggleLocation(location)}
-                  className={`px-3 py-2 rounded-lg text-sm font-medium transition ${
-                    selectedLocations.includes(location)
-                      ? `bg-${fullColor} text-white`
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  {location}
-                </button>
-              ))}
+      {/* Key Metrics - 6 columns like CustomerAnalytics */}
+      <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2 sm:gap-4">
+        <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <p className="text-sm font-medium text-gray-600">Total Revenue</p>
+              <div className="text-2xl font-bold text-gray-900 mt-1">
+                $<CounterAnimation
+                  value={key_metrics.total_revenue.value}
+                  className="text-2xl font-bold text-gray-900"
+                />
+              </div>
+              <p className={`text-xs mt-1 ${
+                key_metrics.total_revenue.change.includes('+') ? 'text-green-600' : 'text-red-600'
+              }`}>
+                {key_metrics.total_revenue.change}
+              </p>
+            </div>
+            <div className={`p-2 bg-${themeColor}-50 rounded-lg`}>
+              <DollarSign className={`w-5 h-5 text-${themeColor}-600`} />
             </div>
           </div>
         </div>
-
-        {/* Metrics Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <MetricCard
-            title="Total Revenue"
-            value={`$${metrics.totalRevenue.toLocaleString()}`}
-            change="+12.5%"
-            trend="up"
-            icon={DollarSign}
-          />
-          <MetricCard
-            title="Package Bookings"
-            value={metrics.totalBookings.toLocaleString()}
-            change="+8.2%"
-            trend="up"
-            icon={Package}
-          />
-          <MetricCard
-            title="Ticket Sales"
-            value={metrics.totalTickets.toLocaleString()}
-            change="+15.3%"
-            trend="up"
-            icon={Ticket}
-          />
-          <MetricCard
-            title="Total Participants"
-            value={metrics.totalParticipants.toLocaleString()}
-            change="+10.7%"
-            trend="up"
-            icon={Users}
-          />
-        </div>
-
-        {/* Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Location Performance */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Location Revenue Chart */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                <BarChart3 className={`w-5 h-5 text-${fullColor} mr-2`} />
-                Location Revenue Performance
-              </h3>
-              <div className="space-y-4">
-                {Object.entries(metrics.locationMetrics)
-                  .sort(([,a], [,b]) => (b as CompanyAnalyticsLocationMetrics).revenue - (a as CompanyAnalyticsLocationMetrics).revenue)
-                  .map(([location, locationMetrics]: [string, CompanyAnalyticsLocationMetrics]) => (
-                    <div key={location} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <div className="flex items-center space-x-3">
-                        <MapPin size={16} className={`text-${fullColor}`} />
-                        <span className="font-medium text-gray-900">{location}</span>
-                      </div>
-                      <div className="text-right">
-                        <div className="font-bold text-gray-900">${locationMetrics.revenue.toLocaleString()}</div>
-                        <div className="text-sm text-gray-600">
-                          {locationMetrics.bookings} bookings • {locationMetrics.tickets} tickets
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+        <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <p className="text-sm font-medium text-gray-600">Total Locations</p>
+              <div className="text-2xl font-bold text-gray-900 mt-1">
+                <CounterAnimation
+                  value={key_metrics.total_locations.value}
+                  className="text-2xl font-bold text-gray-900"
+                />
               </div>
+              <p className="text-xs mt-1 text-gray-600">
+                {key_metrics.total_locations.info}
+              </p>
             </div>
-
-            {/* Package Performance */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                <Package className={`w-5 h-5 text-${fullColor} mr-2`} />
-                Package Performance
-              </h3>
-              <div className="space-y-3">
-                {Object.entries(metrics.packageRevenue)
-                  .sort(([,a], [,b]) => (b as number) - (a as number))
-                  .map(([pkg, revenue]) => (
-                    <div key={pkg} className="flex justify-between items-center">
-                      <span className="text-gray-700">{pkg}</span>
-                      <span className={`font-semibold text-${fullColor}`}>${(revenue as number).toLocaleString()}</span>
-                    </div>
-                  ))}
-              </div>
+            <div className={`p-2 bg-${themeColor}-50 rounded-lg`}>
+              <Building2 className={`w-5 h-5 text-${themeColor}-600`} />
             </div>
           </div>
-
-          {/* Right Sidebar */}
-          <div className="space-y-6">
-            {/* Attraction Performance */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                <Ticket className={`w-5 h-5 text-${fullColor} mr-2`} />
-                Top Attractions
-              </h3>
-              <div className="space-y-3">
-                {Object.entries(metrics.attractionRevenue)
-                  .sort(([,a], [,b]) => (b as number) - (a as number))
-                  .slice(0, 5)
-                  .map(([attraction, revenue]) => (
-                    <div key={attraction} className="flex justify-between items-center">
-                      <span className="text-gray-700">{attraction}</span>
-                      <span className={`font-semibold text-${fullColor}`}>${(revenue as number).toLocaleString()}</span>
-                    </div>
-                  ))}
+        </div>
+        <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <p className="text-sm font-medium text-gray-600">Package Bookings</p>
+              <div className="text-2xl font-bold text-gray-900 mt-1">
+                <CounterAnimation
+                  value={key_metrics.package_bookings.value}
+                  className="text-2xl font-bold text-gray-900"
+                />
               </div>
+              <p className={`text-xs mt-1 ${
+                key_metrics.package_bookings.change.includes('+') ? 'text-green-600' : 'text-red-600'
+              }`}>
+                {key_metrics.package_bookings.change}
+              </p>
             </div>
-
-            {/* Quick Stats */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                <TrendingUp className={`w-5 h-5 text-${fullColor} mr-2`} />
-                Performance Highlights
-              </h3>
-              <div className="space-y-3 text-sm">
-                <div className="flex justify-between items-center p-2 bg-green-50 rounded">
-                  <span className="text-green-800">Best Performing Location</span>
-                  <span className="font-semibold">Brighton</span>
-                </div>
-                <div className={`flex justify-between items-center p-2 bg-${themeColor}-50 rounded`}>
-                  <span className={`text-${fullColor}`}>Most Popular Package</span>
-                  <span className="font-semibold">Corporate Package</span>
-                </div>
-                <div className="flex justify-between items-center p-2 bg-purple-50 rounded">
-                  <span className="text-purple-800">Top Attraction</span>
-                  <span className="font-semibold">Laser Tag</span>
-                </div>
-              </div>
+            <div className={`p-2 bg-${themeColor}-50 rounded-lg`}>
+              <Package className={`w-5 h-5 text-${themeColor}-600`} />
             </div>
-
-            {/* Report Summary */}
-            <div className={`bg-${themeColor}-50 rounded-xl border border-${themeColor}-200 p-6`}>
-              <h3 className={`text-lg font-semibold text-${themeColor}-900 mb-2`}>Report Summary</h3>
-              <div className={`text-sm text-${fullColor} space-y-2`}>
-                <div>Time Period: {timeRange} days</div>
-                <div>Locations: {selectedLocations.length || 'All'} locations</div>
-                <div>Total Data Points: {(metrics.totalBookings + metrics.totalTickets).toLocaleString()}</div>
-                <div>Generated: {new Date().toLocaleDateString()}</div>
+          </div>
+        </div>
+        <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <p className="text-sm font-medium text-gray-600">Ticket Purchases</p>
+              <div className="text-2xl font-bold text-gray-900 mt-1">
+                <CounterAnimation
+                  value={key_metrics.ticket_purchases.value}
+                  className="text-2xl font-bold text-gray-900"
+                />
               </div>
+              <p className={`text-xs mt-1 ${
+                key_metrics.ticket_purchases.change.includes('+') ? 'text-green-600' : 'text-red-600'
+              }`}>
+                {key_metrics.ticket_purchases.change}
+              </p>
+            </div>
+            <div className={`p-2 bg-${themeColor}-50 rounded-lg`}>
+              <Ticket className={`w-5 h-5 text-${themeColor}-600`} />
+            </div>
+          </div>
+        </div>
+        <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <p className="text-sm font-medium text-gray-600">Total Participants</p>
+              <div className="text-2xl font-bold text-gray-900 mt-1">
+                <CounterAnimation
+                  value={key_metrics.total_participants.value}
+                  className="text-2xl font-bold text-gray-900"
+                />
+              </div>
+              <p className={`text-xs mt-1 ${
+                key_metrics.total_participants.change.includes('+') ? 'text-green-600' : 'text-red-600'
+              }`}>
+                {key_metrics.total_participants.change}
+              </p>
+            </div>
+            <div className={`p-2 bg-${themeColor}-50 rounded-lg`}>
+              <Users className={`w-5 h-5 text-${themeColor}-600`} />
+            </div>
+          </div>
+        </div>
+        <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <p className="text-sm font-medium text-gray-600">Active Packages</p>
+              <div className="text-2xl font-bold text-gray-900 mt-1">
+                <CounterAnimation
+                  value={key_metrics.active_packages.value}
+                  className="text-2xl font-bold text-gray-900"
+                />
+              </div>
+              <p className="text-xs mt-1 text-gray-600">
+                {key_metrics.active_packages.info}
+              </p>
+            </div>
+            <div className={`p-2 bg-${themeColor}-50 rounded-lg`}>
+              <Boxes className={`w-5 h-5 text-${themeColor}-600`} />
             </div>
           </div>
         </div>
       </div>
+
+      {/* Charts Grid - 2 columns */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* Revenue & Bookings Trend */}
+        <div className="bg-white rounded-xl p-3 sm:p-4 shadow-sm border border-gray-100">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-2">
+              <h3 className="text-lg font-semibold text-gray-900">Revenue & Package Bookings</h3>
+              <div className="group relative">
+                <Info className="w-4 h-4 text-gray-400 cursor-help" />
+                <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
+                  Total revenue and package booking trends across all locations. Revenue includes both packages and attraction tickets.
+                </div>
+              </div>
+            </div>
+            <TrendingUp className="w-4 h-4 text-gray-400" />
+          </div>
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart data={revenue_trend}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+              <XAxis dataKey="month" stroke="#6b7280" />
+              <YAxis yAxisId="left" stroke={`var(--color-${themeColor}-500)`} />
+              <YAxis yAxisId="right" orientation="right" stroke="#10b981" />
+              <Tooltip />
+              <Legend />
+              <Line yAxisId="left" type="monotone" dataKey="revenue" stroke={`var(--color-${themeColor}-500)`} strokeWidth={2} name="Revenue ($)" />
+              <Line yAxisId="right" type="monotone" dataKey="bookings" stroke="#10b981" strokeWidth={2} name="Bookings" />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Top Locations Performance */}
+        <div className="bg-white rounded-xl p-3 sm:p-4 shadow-sm border border-gray-100">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-2">
+              <h3 className="text-lg font-semibold text-gray-900">Location Performance</h3>
+              <div className="group relative">
+                <Info className="w-4 h-4 text-gray-400 cursor-help" />
+                <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
+                  Revenue comparison across all locations
+                </div>
+              </div>
+            </div>
+            <MapPin className="w-4 h-4 text-gray-400" />
+          </div>
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={location_performance.slice(0, 8)}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+              <XAxis dataKey="location" stroke="#6b7280" />
+              <YAxis stroke="#6b7280" />
+              <Tooltip />
+              <Bar dataKey="revenue" fill={`var(--color-${themeColor}-500)`} radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Package Distribution */}
+        <div className="bg-white rounded-xl p-3 sm:p-4 shadow-sm border border-gray-100">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-2">
+              <h3 className="text-lg font-semibold text-gray-900">Package Distribution</h3>
+              <div className="group relative">
+                <Info className="w-4 h-4 text-gray-400 cursor-help" />
+                <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
+                  Distribution of package bookings by type. Packages are group experiences that can be reserved in advance.
+                </div>
+              </div>
+            </div>
+            <Package className="w-4 h-4 text-gray-400" />
+          </div>
+          <ResponsiveContainer width="100%" height={300}>
+            <PieChart>
+              <Pie
+                data={package_distribution}
+                cx="50%"
+                cy="50%"
+                labelLine={false}
+                outerRadius={80}
+                fill="#8884d8"
+                dataKey="value"
+                label={({ name, value }) => `${name}: ${value}%`}
+              >
+                {package_distribution.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={entry.color} />
+                ))}
+              </Pie>
+              <Tooltip />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Peak Hours */}
+        <div className="bg-white rounded-xl p-3 sm:p-4 shadow-sm border border-gray-100">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-2">
+              <h3 className="text-lg font-semibold text-gray-900">Peak Activity Hours</h3>
+              <div className="group relative">
+                <Info className="w-4 h-4 text-gray-400 cursor-help" />
+                <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
+                  Hourly activity patterns for package bookings and ticket purchases across all locations
+                </div>
+              </div>
+            </div>
+            <Clock className="w-4 h-4 text-gray-400" />
+          </div>
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={peak_hours}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+              <XAxis dataKey="hour" stroke="#6b7280" />
+              <YAxis stroke="#6b7280" />
+              <Tooltip />
+              <Bar dataKey="bookings" fill={`var(--color-${themeColor}-500)`} radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Daily Performance */}
+        <div className="bg-white rounded-xl p-3 sm:p-4 shadow-sm border border-gray-100">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-2">
+              <h3 className="text-lg font-semibold text-gray-900">Daily Performance (7 Days)</h3>
+              <div className="group relative">
+                <Info className="w-4 h-4 text-gray-400 cursor-help" />
+                <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
+                  Revenue and participant trends over the last week
+                </div>
+              </div>
+            </div>
+            <Activity className="w-4 h-4 text-gray-400" />
+          </div>
+          <ResponsiveContainer width="100%" height={300}>
+            <AreaChart data={daily_performance}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+              <XAxis dataKey="day" stroke="#6b7280" />
+              <YAxis stroke="#6b7280" />
+              <Tooltip />
+              <Legend />
+              <Area type="monotone" dataKey="revenue" stroke={`var(--color-${themeColor}-500)`} fill={`var(--color-${themeColor}-500)`} fillOpacity={0.1} name="Revenue ($)" />
+              <Area type="monotone" dataKey="participants" stroke="#10b981" fill="#10b981" fillOpacity={0.1} name="Participants" />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Booking Status */}
+        <div className="bg-white rounded-xl p-3 sm:p-4 shadow-sm border border-gray-100">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-2">
+              <h3 className="text-lg font-semibold text-gray-900">Booking Status</h3>
+              <div className="group relative">
+                <Info className="w-4 h-4 text-gray-400 cursor-help" />
+                <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
+                  Current status of all bookings
+                </div>
+              </div>
+            </div>
+            <Activity className="w-4 h-4 text-gray-400" />
+          </div>
+          <ResponsiveContainer width="100%" height={300}>
+            <PieChart>
+              <Pie
+                data={booking_status}
+                cx="50%"
+                cy="50%"
+                labelLine={false}
+                outerRadius={80}
+                fill="#8884d8"
+                dataKey="count"
+                label={({ status, count }) => `${status}: ${count}`}
+              >
+                {booking_status.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={entry.color} />
+                ))}
+              </Pie>
+              <Tooltip />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* Tables - 2 columns */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* Top Locations Table */}
+        <div className="bg-white rounded-xl shadow-sm p-3 sm:p-6 border border-gray-100">
+          <div className="flex items-center gap-2 mb-4">
+            <MapPin className={`w-5 h-5 text-${themeColor}-600`} />
+            <h3 className="text-lg font-semibold text-gray-900">Top Locations by Revenue</h3>
+          </div>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-200">
+                <th className="text-left py-3 font-medium text-gray-600">Location</th>
+                <th className="text-left py-3 font-medium text-gray-600">Revenue</th>
+                <th className="text-left py-3 font-medium text-gray-600">Packages</th>
+              </tr>
+            </thead>
+            <tbody>
+              {location_performance.slice(0, 6).map((location, index) => (
+                <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
+                  <td className="py-3 font-medium">{location.location}</td>
+                  <td className="py-3">${location.revenue.toLocaleString()}</td>
+                  <td className="py-3">{location.bookings}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Top Attractions Table */}
+        <div className="bg-white rounded-xl shadow-sm p-3 sm:p-6 border border-gray-100">
+          <div className="flex items-center gap-2 mb-4">
+            <Ticket className={`w-5 h-5 text-${themeColor}-600`} />
+            <h3 className="text-lg font-semibold text-gray-900">Top Attractions (Ticket Sales)</h3>
+          </div>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-200">
+                <th className="text-left py-3 font-medium text-gray-600">Attraction</th>
+                <th className="text-left py-3 font-medium text-gray-600">Tickets Sold</th>
+                <th className="text-left py-3 font-medium text-gray-600">Revenue</th>
+              </tr>
+            </thead>
+            <tbody>
+              {top_attractions.map((attraction, index) => (
+                <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
+                  <td className="py-3 font-medium">{attraction.name}</td>
+                  <td className="py-3">{attraction.tickets_sold}</td>
+                  <td className="py-3">${attraction.revenue.toLocaleString()}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Export Modal */}
+      {showExportModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full mx-4 p-6">
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-lg font-semibold text-gray-900">Export Analytics</h3>
+              <StandardButton
+                onClick={() => setShowExportModal(false)}
+                variant="ghost"
+                size="sm"
+                icon={X}
+              />
+            </div>
+            <div className="space-y-6">
+              {/* Date Range Filter */}
+              <div>
+                <label className="text-sm font-medium text-gray-700 mb-2 block">Time Period</label>
+                <select
+                  value={dateRange}
+                  onChange={(e) => setDateRange(e.target.value as '7d' | '30d' | '90d' | '1y')}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-${themeColor}-500"
+                >
+                  <option value="7d">Last 7 days</option>
+                  <option value="30d">Last 30 days</option>
+                  <option value="90d">Last 90 days</option>
+                  <option value="1y">Last year</option>
+                </select>
+              </div>
+
+              {/* Location Filter */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-sm font-medium text-gray-700">Locations</label>
+                  <StandardButton
+                    onClick={() => setSelectedLocations([])}
+                    variant="ghost"
+                    size="sm"
+                  >
+                    Clear All
+                  </StandardButton>
+                </div>
+                <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-3">
+                  <div className="space-y-2">
+                    {allLocations.map(location => (
+                      <label key={location.id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded">
+                        <input
+                          type="checkbox"
+                          checked={selectedLocations.includes(location.id)}
+                          onChange={() => toggleLocation(location.id)}
+                          className="w-4 h-4 text-${themeColor}-600 focus:ring-${themeColor}-500 border-gray-300 rounded"
+                        />
+                        <span className="text-sm text-gray-700">{location.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  {selectedLocations.length > 0 ? `${selectedLocations.length} location(s) selected` : 'All locations selected'}
+                </p>
+              </div>
+
+              {/* Export Format */}
+              <div>
+                <label className="text-sm font-medium text-gray-700 mb-2 block">Export Format</label>
+                <select
+                  value={exportFormat}
+                  onChange={(e) => setExportFormat(e.target.value as 'json' | 'csv')}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-${themeColor}-500"
+                >
+                  <option value="json">JSON (.json)</option>
+                  <option value="csv">CSV (.csv)</option>
+                </select>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 pt-4 border-t border-gray-200">
+                <StandardButton
+                  onClick={() => setShowExportModal(false)}
+                  variant="secondary"
+                  fullWidth
+                >
+                  Cancel
+                </StandardButton>
+                <StandardButton
+                  onClick={handleExport}
+                  variant="primary"
+                  fullWidth
+                  disabled={isExporting}
+                  loading={isExporting}
+                  icon={!isExporting ? Download : undefined}
+                >
+                  Export Data
+                </StandardButton>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

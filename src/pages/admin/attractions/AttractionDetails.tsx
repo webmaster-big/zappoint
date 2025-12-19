@@ -11,6 +11,7 @@ import {
   Calendar,
   Tag
 } from 'lucide-react';
+import StandardButton from '../../../components/ui/StandardButton';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { attractionService } from '../../../services/AttractionService';
 import { ASSET_URL } from '../../../utils/storage';
@@ -98,12 +99,13 @@ const AttractionDetails = () => {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <h2 className="text-2xl font-bold text-gray-900 mb-4">Attraction not found</h2>
-          <button
+          <StandardButton
+            variant="ghost"
+            size="md"
             onClick={() => navigate('/attractions')}
-            className={`text-${fullColor} hover:underline`}
           >
             Back to Attractions
-          </button>
+          </StandardButton>
         </div>
       </div>
     );
@@ -115,12 +117,14 @@ const AttractionDetails = () => {
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-4">
-            <button
+            <StandardButton
+              variant="ghost"
+              size="sm"
               onClick={() => navigate('/attractions')}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              icon={ArrowLeft}
             >
-              <ArrowLeft className="h-5 w-5 text-gray-600" />
-            </button>
+              {''}
+            </StandardButton>
           </div>
           <div className="flex justify-between items-start">
             <div>
@@ -135,20 +139,22 @@ const AttractionDetails = () => {
               }`}>
                 {attraction.is_active ? 'Active' : 'Inactive'}
               </span>
-              <button
+              <StandardButton
+                variant="primary"
+                size="md"
                 onClick={() => navigate(`/attractions/edit/${attractionId}`)}
-                className={`flex items-center px-4 py-2 bg-${themeColor}-600 text-white rounded-lg hover:bg-${themeColor}-700 transition-colors`}
+                icon={Edit}
               >
-                <Edit className="h-4 w-4 mr-2" />
                 Edit
-              </button>
-              <button
+              </StandardButton>
+              <StandardButton
+                variant="danger"
+                size="md"
                 onClick={handleDelete}
-                className="flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                icon={Trash2}
               >
-                <Trash2 className="h-4 w-4 mr-2" />
                 Delete
-              </button>
+              </StandardButton>
             </div>
           </div>
         </div>

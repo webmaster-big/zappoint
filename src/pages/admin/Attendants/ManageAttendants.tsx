@@ -18,6 +18,7 @@ import {
   Copy,
   CheckCircle
 } from 'lucide-react';
+import StandardButton from '../../../components/ui/StandardButton';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
 import { API_BASE_URL } from '../../../utils/storage';
@@ -38,7 +39,7 @@ const InvitationModal: React.FC<InvitationModalProps> = ({
   onClose, 
   onSendInvitation
 }) => {
-  const { themeColor, fullColor } = useThemeColor();
+  const { themeColor } = useThemeColor();
   const [email, setEmail] = useState('');
   const [userType, setUserType] = useState<'attendant' | 'manager'>('attendant');
   const [generatedLink, setGeneratedLink] = useState('');
@@ -142,13 +143,13 @@ const InvitationModal: React.FC<InvitationModalProps> = ({
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <h3 className="text-lg font-semibold text-gray-900">Send Account Invitation</h3>
-          <button
+          <StandardButton
+            variant="ghost"
+            size="sm"
+            icon={X}
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
             disabled={isSending}
-          >
-            <X className="h-5 w-5" />
-          </button>
+          />
         </div>
 
         {/* Content */}
@@ -213,13 +214,13 @@ const InvitationModal: React.FC<InvitationModalProps> = ({
                   readOnly
                   className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm text-gray-600"
                 />
-                <button
+                <StandardButton
+                  variant="secondary"
+                  size="md"
+                  icon={Copy}
                   onClick={copyToClipboard}
-                  className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
                   title="Copy to clipboard"
-                >
-                  <Copy className="h-4 w-4" />
-                </button>
+                />
               </div>
               <p className="text-xs text-gray-500 mt-1">
                 This link will expire once the account is created
@@ -230,31 +231,27 @@ const InvitationModal: React.FC<InvitationModalProps> = ({
 
         {/* Footer */}
         <div className="flex gap-3 p-6 border-t border-gray-200">
-          <button
+          <StandardButton
+            variant="secondary"
+            size="md"
             onClick={onClose}
             disabled={isSending}
-            className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+            className="flex-1"
           >
             {success ? 'Close' : 'Cancel'}
-          </button>
+          </StandardButton>
           {!success && (
-            <button
+            <StandardButton
+              variant="primary"
+              size="md"
+              icon={Send}
               onClick={handleSend}
               disabled={!email || isSending}
-              className={`flex-1 px-4 py-2 bg-${fullColor} text-white rounded-lg hover:bg-${themeColor}-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2`}
+              loading={isSending}
+              className="flex-1"
             >
-              {isSending ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  Sending...
-                </>
-              ) : (
-                <>
-                  <Send className="h-4 w-4" />
-                  Send Invitation
-                </>
-              )}
-            </button>
+              {isSending ? 'Sending...' : 'Send Invitation'}
+            </StandardButton>
           )}
         </div>
       </div>
@@ -660,13 +657,14 @@ const ManageAttendants = () => {
           <p className="text-gray-600 mt-2">View and manage all staff members in your facility</p>
         </div>
         <div className="flex gap-2 mt-4 sm:mt-0">
-          <button
+          <StandardButton
+            variant="primary"
+            size="md"
+            icon={Send}
             onClick={() => handleInviteAttendant()}
-            className={`inline-flex items-center px-4 py-2 bg-${fullColor} text-white rounded-lg hover:bg-${themeColor}-900 transition-colors`}
           >
-            <Send className="h-5 w-5 mr-2" />
             Send Invitation
-          </button>
+          </StandardButton>
           {/* <Link
             to="/manager/attendants/create"
             className={`inline-flex items-center px-4 py-2 bg-${fullColor} text-white rounded-lg hover:bg-${themeColor}-900 transition-colors`}
@@ -717,19 +715,20 @@ const ManageAttendants = () => {
             />
           </div>
           <div className="flex gap-2">
-            <button
+            <StandardButton
+              variant="secondary"
+              size="md"
+              icon={Filter}
               onClick={() => setShowFilters(!showFilters)}
-              className="flex items-center px-3 py-2 border border-gray-200 rounded-lg hover:bg-gray-50"
             >
-              <Filter className="h-4 w-4 mr-1" />
               Filters
-            </button>
-            <button
+            </StandardButton>
+            <StandardButton
+              variant="secondary"
+              size="md"
+              icon={RefreshCcw}
               onClick={loadAttendants}
-              className="flex items-center px-3 py-2 border border-gray-200 rounded-lg hover:bg-gray-50"
-            >
-              <RefreshCcw className="h-4 w-4" />
-            </button>
+            />
           </div>
         </div>
 
@@ -764,12 +763,13 @@ const ManageAttendants = () => {
               </div>
             </div>
             <div className="mt-4 flex justify-end">
-              <button
+              <StandardButton
+                variant="ghost"
+                size="sm"
                 onClick={clearFilters}
-                className="px-3 py-2 text-sm text-gray-600 hover:text-gray-800"
               >
                 Clear Filters
-              </button>
+              </StandardButton>
             </div>
           </div>
         )}
@@ -790,13 +790,14 @@ const ManageAttendants = () => {
               <option value="active">Activate</option>
               <option value="inactive">Deactivate</option>
             </select>
-            <button
+            <StandardButton
+              variant="danger"
+              size="md"
+              icon={Trash2}
               onClick={handleBulkDelete}
-              className="flex items-center px-3 py-2 bg-red-100 text-red-800 rounded-lg hover:bg-red-200"
             >
-              <Trash2 className="h-4 w-4 mr-1" />
               Delete
-            </button>
+            </StandardButton>
           </div>
         </div>
       )}
@@ -904,13 +905,14 @@ const ManageAttendants = () => {
                         >
                           <Pencil className="h-4 w-4" />
                         </Link>
-                        <button
+                        <StandardButton
+                          variant="danger"
+                          size="sm"
+                          icon={Trash2}
                           onClick={() => handleDeleteAttendant(attendant.id)}
-                          className="text-red-600 hover:text-red-800"
                           title="Delete"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                          className="!p-1 !bg-transparent hover:!bg-red-50"
+                        />
                       </div>
                     </td>
                   </tr>
@@ -932,35 +934,34 @@ const ManageAttendants = () => {
                 of <span className="font-medium">{filteredAttendants.length}</span> results
               </div>
               <div className="flex gap-2">
-                <button
+                <StandardButton
+                  variant="secondary"
+                  size="sm"
                   onClick={() => paginate(Math.max(1, currentPage - 1))}
                   disabled={currentPage === 1}
-                  className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50"
                 >
                   Previous
-                </button>
+                </StandardButton>
                 
                 {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                  <button
+                  <StandardButton
                     key={page}
+                    variant={currentPage === page ? 'primary' : 'secondary'}
+                    size="sm"
                     onClick={() => paginate(page)}
-                    className={`px-3 py-2 border rounded-lg text-sm font-medium ${
-                      currentPage === page
-                        ? `border-${fullColor} bg-${fullColor} text-white`
-                        : 'border-gray-200 text-gray-800 hover:bg-gray-50'
-                    }`}
                   >
                     {page}
-                  </button>
+                  </StandardButton>
                 ))}
                 
-                <button
+                <StandardButton
+                  variant="secondary"
+                  size="sm"
                   onClick={() => paginate(Math.min(totalPages, currentPage + 1))}
                   disabled={currentPage === totalPages}
-                  className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50"
                 >
                   Next
-                </button>
+                </StandardButton>
               </div>
             </div>
           </div>
