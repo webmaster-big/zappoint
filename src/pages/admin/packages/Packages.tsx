@@ -332,7 +332,7 @@ const Packages: React.FC = () => {
     }
   };
 
-  const handleToggleStatus = async (id: number, currentStatus: boolean) => {
+  const handleToggleStatus = async (id: number) => {
     try {
       const response = await packageService.toggleStatus(id);
       
@@ -531,7 +531,7 @@ const Packages: React.FC = () => {
                       )}
                     </div>
                     <button
-                      onClick={() => handleToggleStatus(pkg.id, pkg.is_active)}
+                      onClick={() => handleToggleStatus(pkg.id)}
                       className={`ml-2 p-1.5 rounded-lg transition-colors ${
                         pkg.is_active
                           ? `bg-green-100 text-green-600 hover:bg-green-200`

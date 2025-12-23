@@ -28,15 +28,13 @@ import type {
 } from '../../types/LocationActivityLogs.types';
 import { useThemeColor } from '../../hooks/useThemeColor';
 import CounterAnimation from '../../components/ui/CounterAnimation';
-import { API_BASE_URL, getStoredUser } from '../../utils/storage';
+import { API_BASE_URL } from '../../utils/storage';
 import { locationService } from '../../services';
 import type { Location } from '../../services/LocationService';
 import { getAuthToken } from '../../services';
 
 const LocationActivityLogs = () => {
   const { themeColor, fullColor } = useThemeColor();
-  const currentUser = getStoredUser();
-  const isCompanyAdmin = currentUser?.role === 'company_admin';
   
   const [filteredLogs, setFilteredLogs] = useState<LocationActivityLogsActivityLog[]>([]);
   const [allLogs, setAllLogs] = useState<LocationActivityLogsActivityLog[]>([]); // For client-side pagination
@@ -57,7 +55,6 @@ const LocationActivityLogs = () => {
   const [showAllUsers, setShowAllUsers] = useState(false);
   const [userSearchQuery, setUserSearchQuery] = useState('');
   const [isExporting, setIsExporting] = useState(false);
-  const [showAllLocationTabs, setShowAllLocationTabs] = useState(false);
   const [filters, setFilters] = useState<LocationActivityLogsFilterOptions>({
     action: 'all',
     resourceType: 'all',

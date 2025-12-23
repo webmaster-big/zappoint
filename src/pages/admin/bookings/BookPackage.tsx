@@ -503,7 +503,7 @@ const BookPackage: React.FC = () => {
     const found = pkg && pkg.attractions.find((a) => a.id === id);
     if (!found) return sum;
     const price = Number(found.price);
-    const isPerPerson = found.pricing_type === 'per_person';
+    const isPerPerson = (found as any).pricing_type === 'per_person';
     return sum + price * qty * (isPerPerson ? participants : 1);
   }, 0);
   
@@ -2039,7 +2039,7 @@ const BookPackage: React.FC = () => {
                     const attraction = pkg.attractions.find((a) => a.id === id);
                     if (!attraction) return null;
                     const price = Number(attraction.price);
-                    const isPerPerson = attraction.pricing_type === 'per_person';
+                    const isPerPerson = (attraction as any).pricing_type === 'per_person';
                     const lineTotal = price * qty * (isPerPerson ? participants : 1);
                     
                     return (
