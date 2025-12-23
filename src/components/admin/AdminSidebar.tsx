@@ -307,7 +307,6 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
       }
       return 0;
     } catch (error) {
-      console.error('Error fetching unread count:', error);
       return 0;
     }
   };
@@ -319,7 +318,6 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
     const initializeCount = async () => {
       const count = await getUnreadCount();
       notificationCountRef.current = count;
-      console.log('[AdminSidebar] 🔄 Initialized notification count from backend:', count);
     };
     
     initializeCount();
@@ -359,7 +357,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
           userId = userId || parsedUser.id;
         }
       } catch (error) {
-        console.error('[AdminSidebar] Error parsing localStorage zapzone_user:', error);
+        // Error parsing localStorage
       }
     }
     
@@ -374,23 +372,10 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
 
     // Handle incoming notifications
     const handleNotification = async (notification: NotificationObject) => {
-      console.log('[AdminSidebar] 📬 Notification received:', {
-        id: notification.id,
-        type: notification.type,
-        title: notification.title,
-        notification_user_id: notification.user_id,
-        notification_location_id: notification.location_id,
-        current_user_id: userId,
-        current_location_id: locationId,
-        user_role: user.role,
-        currentCount: notificationCountRef.current
-      });
-
       // RULE 1: Never notify the user who created the notification
       // If notification.user_id exists and matches the current logged-in user's id, skip it
       // This means the current user created this notification, so don't show it to them
       if (notification.user_id !== null && notification.user_id !== undefined && notification.user_id === userId) {
-        console.log('[AdminSidebar] ⏭️ Skipping - you created this notification (user_id:', notification.user_id, '=== current:', userId, ')');
         return;
       }
 
@@ -400,7 +385,6 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
       if (user.role !== 'company_admin') {
         // If notification has a location_id and it doesn't match user's location, skip
         if (notification.location_id !== null && notification.location_id !== undefined && notification.location_id !== locationId) {
-          console.log('[AdminSidebar] ⏭️ Skipping - notification from different location (notification_location:', notification.location_id, '!== user_location:', locationId, ')');
           return;
         }
         
@@ -409,11 +393,9 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
       }
       
       // Company admins see all notifications from all locations
-      console.log('[AdminSidebar] ✅ Notification passed filters, processing...');
-
+      
       // Get new count from backend
       const newCount = await getUnreadCount();
-      console.log('[AdminSidebar] 📊 Count check - Old:', notificationCountRef.current, 'New:', newCount);
       
       // CRITICAL: Only show toast if count increased (meaning this is a genuinely NEW notification)
       const countIncreased = newCount > notificationCountRef.current;
@@ -426,8 +408,6 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
       
       // Only show toast if count increased
       if (countIncreased) {
-        console.log('[AdminSidebar] 🎉 Count increased! Showing toast for notification:', notification.id);
-        
         // Show toast for this new notification
         if (toastTimeoutRef.current) {
           clearTimeout(toastTimeoutRef.current);
@@ -452,14 +432,12 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
             tag: notification.id
           });
         }
-      } else {
-        console.log('[AdminSidebar] 🔕 Count did not increase, skipping toast (old notification re-sent via SSE)');
       }
     };
 
     // Handle connection errors
-    const handleError = (error: Event) => {
-      console.error('[AdminSidebar] ❌ Stream connection error:', error);
+    const handleError = () => {
+      // Stream connection error
     };
 
     // Connect to the notification stream
