@@ -19,7 +19,9 @@ import {
   Target,
   Clock,
   PackageIcon,
-  House
+  House,
+  Grid,
+  List
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useThemeColor } from '../../hooks/useThemeColor';
@@ -33,6 +35,8 @@ import { metricsService } from '../../services/MetricsService';
 const CompanyDashboard: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
   const [currentWeek, setCurrentWeek] = useState(new Date());
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [calendarView, setCalendarView] = useState<'week' | 'month'>('week');
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [selectedLocation, setSelectedLocation] = useState<number | 'all'>('all');
   const [calendarFilter, setCalendarFilter] = useState({
@@ -46,6 +50,8 @@ const CompanyDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<{ date: Date; time: string; bookings: any[] } | null>(null);
   const [selectedBooking, setSelectedBooking] = useState<any | null>(null);
+  const [selectedDayBookings, setSelectedDayBookings] = useState<{ date: Date; bookings: any[] } | null>(null);
+  const [monthlyBookings, setMonthlyBookings] = useState<any[]>([]);
 
   // Data states
   const [locations, setLocations] = useState<Location[]>([]);
@@ -98,6 +104,83 @@ const CompanyDashboard: React.FC = () => {
     const newDate = new Date(currentWeek);
     newDate.setDate(newDate.getDate() + 7);
     setCurrentWeek(newDate);
+  };
+
+  // Navigate to previous/next month
+  const goToPreviousMonth = () => {
+    const newDate = new Date(currentMonth);
+    newDate.setMonth(newDate.getMonth() - 1);
+    setCurrentMonth(newDate);
+  };
+
+  const goToNextMonth = () => {
+    const newDate = new Date(currentMonth);
+    newDate.setMonth(newDate.getMonth() + 1);
+    setCurrentMonth(newDate);
+  };
+
+  // Get all days in the current month for calendar grid
+  const getMonthDays = (date: Date) => {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    const startDayOfWeek = firstDay.getDay();
+    
+    const days: (Date | null)[] = [];
+    
+    // Add empty slots for days before the first of the month
+    for (let i = 0; i < startDayOfWeek; i++) {
+      days.push(null);
+    }
+    
+    // Add all days of the month
+    for (let i = 1; i <= daysInMonth; i++) {
+      days.push(new Date(year, month, i));
+    }
+    
+    return days;
+  };
+
+  const monthDays = getMonthDays(currentMonth);
+
+  // Fetch monthly calendar data (changes when month changes)
+  useEffect(() => {
+    const fetchMonthlyData = async () => {
+      if (calendarView !== 'month') return;
+      
+      try {
+        const year = currentMonth.getFullYear();
+        const month = currentMonth.getMonth();
+        const monthStart = new Date(year, month, 1);
+        const monthEnd = new Date(year, month + 1, 0);
+        
+        // Fetch bookings for the selected month
+        const bookingsResponse = await bookingService.getBookings({
+          location_id: selectedLocation === 'all' ? undefined : selectedLocation,
+          date_from: monthStart.toISOString().split('T')[0],
+          date_to: monthEnd.toISOString().split('T')[0],
+          per_page: 500,
+        });
+        
+        const bookings = bookingsResponse.data.bookings || [];
+        setMonthlyBookings(bookings);
+        
+      } catch (error) {
+        console.error('Error fetching monthly data:', error);
+      }
+    };
+    
+    fetchMonthlyData();
+  }, [currentMonth, calendarView, selectedLocation]);
+
+  // Get bookings for a specific day
+  const getBookingsForDay = (date: Date) => {
+    return monthlyBookings.filter(booking => {
+      const bookingDate = new Date(booking.booking_date);
+      return bookingDate.toDateString() === date.toDateString();
+    });
   };
 
   // Fetch all locations on mount
@@ -574,8 +657,6 @@ const CompanyDashboard: React.FC = () => {
               setSelectedLocation(locationId === '' ? 'all' : parseInt(locationId));
               setCurrentPage(1);
             }}
-            themeColor={themeColor}
-            fullColor={fullColor}
             variant="compact"
             showAllOption={true}
           />
@@ -723,39 +804,75 @@ const CompanyDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Weekly Calendar */}
+      {/* Calendar */}
       <div className="bg-white rounded-xl shadow-sm p-4 md:p-6 border border-gray-100">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 md:mb-6">
-          <h2 className="text-xl md:text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <Calendar className="w-5 h-5 md:w-6 md:h-6 text-${fullColor}" /> Weekly Calendar
-          </h2>
+          <div className="flex items-center gap-4">
+            <h2 className="text-xl md:text-2xl font-bold text-gray-900 flex items-center gap-2">
+              <Calendar className={`w-5 h-5 md:w-6 md:h-6 text-${fullColor}`} /> Calendar
+            </h2>
+            {/* View Toggle */}
+            <div className="flex items-center bg-gray-100 rounded-lg p-1">
+              <button
+                onClick={() => setCalendarView('week')}
+                className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                  calendarView === 'week' 
+                    ? `bg-white text-${fullColor} shadow-sm` 
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <List size={14} />
+                Week
+              </button>
+              <button
+                onClick={() => setCalendarView('month')}
+                className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                  calendarView === 'month' 
+                    ? `bg-white text-${fullColor} shadow-sm` 
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <Grid size={14} />
+                Month
+              </button>
+            </div>
+          </div>
           <div className="flex items-center space-x-2 mt-4 md:mt-0">
             <StandardButton 
               variant="secondary"
               size="sm"
               icon={ChevronLeft}
-              onClick={goToPreviousWeek}
+              onClick={calendarView === 'week' ? goToPreviousWeek : goToPreviousMonth}
             />
-            <span className="text-sm font-medium text-gray-800">
-              {weekDates[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - 
-              {weekDates[6].toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+            <span className="text-sm font-medium text-gray-800 min-w-[200px] text-center">
+              {calendarView === 'week' 
+                ? `${weekDates[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${weekDates[6].toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`
+                : currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+              }
             </span>
             <StandardButton 
               variant="secondary"
               size="sm"
               icon={ChevronRight}
-              onClick={goToNextWeek}
+              onClick={calendarView === 'week' ? goToNextWeek : goToNextMonth}
             />
             <StandardButton 
               variant="secondary" 
               size="sm" 
               className="ml-2"
-              onClick={() => setCurrentWeek(new Date())}
+              onClick={() => {
+                if (calendarView === 'week') {
+                  setCurrentWeek(new Date());
+                } else {
+                  setCurrentMonth(new Date());
+                }
+              }}
             >
               Today
             </StandardButton>
             
-            {/* Calendar Filter Toggle */}
+            {/* Calendar Filter Toggle - Only show for week view */}
+            {calendarView === 'week' && (
             <StandardButton 
               variant={calendarFilter.type !== 'all' ? 'primary' : 'secondary'}
               size="sm"
@@ -770,11 +887,12 @@ const CompanyDashboard: React.FC = () => {
                 </span>
               )}
             </StandardButton>
+            )}
           </div>
         </div>
         
-        {/* Filter Panel */}
-        {showFilterPanel && (
+        {/* Filter Panel - Only for week view */}
+        {showFilterPanel && calendarView === 'week' && (
           <div className="mb-4 md:mb-6 p-3 md:p-4 bg-gray-50 rounded-lg border border-gray-200">
             <div className="flex justify-between items-center mb-3">
               <h3 className="font-medium text-gray-800 text-sm md:text-base">Filter Calendar</h3>
@@ -904,7 +1022,8 @@ const CompanyDashboard: React.FC = () => {
           </div>
         )}
         
-        {/* Table-based calendar */}
+        {/* Week View - Table-based calendar */}
+        {calendarView === 'week' && (
         <div className="overflow-x-auto rounded-lg border border-gray-200">
           <table className="w-full">
             <thead className="bg-gray-50">
@@ -1015,6 +1134,81 @@ const CompanyDashboard: React.FC = () => {
             </tbody>
           </table>
         </div>
+        )}
+
+        {/* Month View */}
+        {calendarView === 'month' && (
+          <div className="rounded-lg border border-gray-200">
+            {/* Days of week header */}
+            <div className="grid grid-cols-7 bg-gray-50 border-b border-gray-200">
+              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+                <div key={day} className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  {day}
+                </div>
+              ))}
+            </div>
+            
+            {/* Calendar grid */}
+            <div className="grid grid-cols-7">
+              {monthDays.map((day, index) => {
+                if (!day) {
+                  return (
+                    <div key={`empty-${index}`} className="min-h-[100px] bg-gray-50 border-b border-r border-gray-200" />
+                  );
+                }
+                
+                const dayBookings = getBookingsForDay(day);
+                const isToday = day.toDateString() === new Date().toDateString();
+                const hasBookings = dayBookings.length > 0;
+                
+                // Count by status
+                const confirmedCount = dayBookings.filter(b => b.status === 'confirmed' || b.status === 'Confirmed').length;
+                const pendingCount = dayBookings.filter(b => b.status === 'pending' || b.status === 'Pending').length;
+                const cancelledCount = dayBookings.filter(b => b.status === 'cancelled' || b.status === 'Cancelled').length;
+                
+                return (
+                  <div
+                    key={day.toISOString()}
+                    onClick={() => hasBookings && setSelectedDayBookings({ date: day, bookings: dayBookings })}
+                    className={`min-h-[100px] p-2 border-b border-r border-gray-200 transition-all ${
+                      hasBookings ? 'cursor-pointer hover:bg-gray-50' : ''
+                    } ${isToday ? `bg-${themeColor}-50` : 'bg-white'}`}
+                  >
+                    <div className={`text-sm font-medium mb-2 ${isToday ? `text-${fullColor}` : 'text-gray-900'}`}>
+                      {day.getDate()}
+                    </div>
+                    
+                    {hasBookings && (
+                      <div className="space-y-1">
+                        {confirmedCount > 0 && (
+                          <div className="flex items-center gap-1 text-xs">
+                            <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                            <span className="text-gray-600">{confirmedCount} confirmed</span>
+                          </div>
+                        )}
+                        {pendingCount > 0 && (
+                          <div className="flex items-center gap-1 text-xs">
+                            <div className="w-2 h-2 rounded-full bg-amber-500" />
+                            <span className="text-gray-600">{pendingCount} pending</span>
+                          </div>
+                        )}
+                        {cancelledCount > 0 && (
+                          <div className="flex items-center gap-1 text-xs">
+                            <div className="w-2 h-2 rounded-full bg-rose-500" />
+                            <span className="text-gray-600">{cancelledCount} cancelled</span>
+                          </div>
+                        )}
+                        <div className={`text-xs font-medium text-${fullColor} mt-1`}>
+                          {dayBookings.length} total
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Quick Actions */}
@@ -1055,7 +1249,7 @@ const CompanyDashboard: React.FC = () => {
                   setSearchQuery(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-${themeColor}-500 w-full md:w-auto"
+                className="pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-full md:w-auto"
               />
             </div>
             <select 
@@ -1064,7 +1258,7 @@ const CompanyDashboard: React.FC = () => {
                 setSelectedStatus(e.target.value);
                 setCurrentPage(1);
               }}
-              className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-${themeColor}-500"
+              className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="all">All Statuses</option>
               <option value="confirmed">Confirmed</option>
@@ -1086,8 +1280,6 @@ const CompanyDashboard: React.FC = () => {
                   setSelectedLocation(locationId === '' ? 'all' : parseInt(locationId));
                   setCurrentPage(1);
                 }}
-                themeColor={themeColor}
-                fullColor={fullColor}
                 variant="compact"
                 showAllOption={true}
               />
@@ -1291,7 +1483,7 @@ const CompanyDashboard: React.FC = () => {
                           booking.status === 'confirmed'
                             ? 'bg-emerald-100 text-emerald-800'
                             : booking.status === 'pending'
-                            ? `bg-${themeColor}-100 text-${fullColor}`
+                            ? 'bg-amber-100 text-amber-800'
                             : booking.status === 'completed'
                             ? 'bg-blue-100 text-blue-800'
                             : 'bg-rose-100 text-rose-800'
@@ -1314,6 +1506,117 @@ const CompanyDashboard: React.FC = () => {
                   size="md"
                   className="w-full"
                   onClick={() => setSelectedTimeSlot(null)}
+                >
+                  Close
+                </StandardButton>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Day Bookings Modal - Shows all bookings for a specific day (Month View) */}
+      {selectedDayBookings && (
+        <div 
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-in fade-in duration-200" 
+          onClick={() => setSelectedDayBookings(null)}
+        >
+          <div 
+            className="bg-white rounded-xl shadow-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto transform transition-all duration-300"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <div>
+                  <h3 className="text-xl font-semibold text-gray-900">
+                    {selectedDayBookings.date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+                  </h3>
+                  <p className="text-sm text-gray-500 mt-1">
+                    {selectedDayBookings.bookings.length} booking{selectedDayBookings.bookings.length !== 1 ? 's' : ''}
+                  </p>
+                </div>
+                <StandardButton
+                  onClick={() => setSelectedDayBookings(null)}
+                  variant="ghost"
+                  size="sm"
+                  icon={X}
+                />
+              </div>
+
+              <div className="space-y-3">
+                {selectedDayBookings.bookings
+                  .sort((a, b) => a.booking_time.localeCompare(b.booking_time))
+                  .map((booking, index) => {
+                    const [hourStr, minuteStr] = booking.booking_time.split(':');
+                    const hour = parseInt(hourStr);
+                    const isPM = hour >= 12;
+                    const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
+                    const timeDisplay = `${displayHour}:${minuteStr} ${isPM ? 'PM' : 'AM'}`;
+                    
+                    return (
+                      <div 
+                        key={index}
+                        onClick={() => {
+                          setSelectedBooking(booking);
+                          setSelectedDayBookings(null);
+                        }}
+                        className={`p-4 rounded-lg border transition-all cursor-pointer hover:shadow-md ${
+                          booking.status === 'confirmed' || booking.status === 'Confirmed'
+                            ? 'bg-emerald-50 border-emerald-200 hover:border-emerald-300'
+                            : booking.status === 'pending' || booking.status === 'Pending'
+                            ? 'bg-amber-50 border-amber-200 hover:border-amber-300'
+                            : 'bg-rose-50 border-rose-200 hover:border-rose-300'
+                        }`}
+                      >
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <Clock size={14} className="text-gray-400" />
+                              <span className="text-sm font-medium text-gray-900">{timeDisplay}</span>
+                            </div>
+                            <h4 className="font-semibold text-gray-900 mt-2">
+                              {booking.package?.name || 'Package Booking'}
+                            </h4>
+                            <p className="text-sm text-gray-600 mt-1">
+                              {booking.guest_name || (booking.customer ? `${booking.customer.first_name} ${booking.customer.last_name}` : 'Guest')}
+                            </p>
+                            <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
+                              <span className="flex items-center gap-1">
+                                <MapPin size={14} />
+                                {booking.location?.name || 'N/A'}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <Users size={14} />
+                                {booking.participants} participants
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex flex-col items-end gap-2">
+                            <span className={`px-3 py-1 text-xs font-medium rounded-full ${
+                              booking.status === 'confirmed' || booking.status === 'Confirmed'
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : booking.status === 'pending' || booking.status === 'Pending'
+                                ? 'bg-amber-100 text-amber-800'
+                                : 'bg-rose-100 text-rose-800'
+                            }`}>
+                              {booking.status}
+                            </span>
+                            <span className="text-sm font-semibold text-gray-900">
+                              ${parseFloat(booking.total_amount).toFixed(2)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+
+              <div className="mt-6 pt-4 border-t border-gray-200">
+                <StandardButton
+                  onClick={() => setSelectedDayBookings(null)}
+                  variant="secondary"
+                  size="md"
+                  className="w-full"
                 >
                   Close
                 </StandardButton>
@@ -1369,7 +1672,7 @@ const CompanyDashboard: React.FC = () => {
                       selectedBooking.status === 'confirmed'
                         ? 'bg-emerald-100 text-emerald-800'
                         : selectedBooking.status === 'pending'
-                        ? `bg-${themeColor}-100 text-${fullColor}`
+                        ? 'bg-amber-100 text-amber-800'
                         : selectedBooking.status === 'completed'
                         ? 'bg-blue-100 text-blue-800'
                         : 'bg-rose-100 text-rose-800'
@@ -1379,7 +1682,7 @@ const CompanyDashboard: React.FC = () => {
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-gray-600">Type</span>
-                    <span className={`px-3 py-1 text-xs font-medium rounded-full bg-${themeColor}-100 text-${fullColor}`}>
+                    <span className="px-3 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
                       {selectedBooking.package ? 'Package Booking' : 'Activity Booking'}
                     </span>
                   </div>
@@ -1559,7 +1862,7 @@ const CompanyDashboard: React.FC = () => {
                       selectedBooking.payment_status === 'paid'
                         ? 'bg-emerald-100 text-emerald-800'
                         : selectedBooking.payment_status === 'partial'
-                        ? `bg-${themeColor}-100 text-${fullColor}`
+                        ? 'bg-amber-100 text-amber-800'
                         : 'bg-rose-100 text-rose-800'
                     }`}>
                       {selectedBooking.payment_status ? selectedBooking.payment_status.charAt(0).toUpperCase() + selectedBooking.payment_status.slice(1) : 'Pending'}

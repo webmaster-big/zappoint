@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Users, Tag, Search, Download, Upload, X, CheckSquare, Square, Pencil, Trash2, MapPin, Eye, Power } from "lucide-react";
+import { Users, Tag, Search, Download, Upload, X, CheckSquare, Square, Pencil, Trash2, MapPin, Eye, Power, Plus } from "lucide-react";
 import StandardButton from '../../../components/ui/StandardButton';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { packageService, type Package } from '../../../services';
@@ -402,11 +402,14 @@ const Packages: React.FC = () => {
           >
             Export
           </StandardButton>
-          <Link
-            to="/packages/create"
-            className={`bg-${fullColor} hover:bg-${themeColor}-900 text-white px-5 py-2 rounded-lg font-semibold whitespace-nowrap flex items-center gap-2 transition-colors`}
-          >
-            Create Package
+          <Link to="/packages/create">
+            <StandardButton
+              variant="primary"
+              size="md"
+              icon={Plus}
+            >
+              Create Package
+            </StandardButton>
           </Link>
         </div>
       </div>
@@ -420,11 +423,14 @@ const Packages: React.FC = () => {
             </div>
             <h3 className="text-lg font-semibold text-gray-900 mb-2">No packages found</h3>
             <p className="text-gray-600 text-sm mb-6 text-center max-w-sm">Create your first package to get started</p>
-            <Link
-              to="/packages/create"
-              className={`bg-${fullColor} hover:bg-${themeColor}-700 text-white px-6 py-2.5 rounded-lg font-semibold transition-colors`}
-            >
-              Create Package
+            <Link to="/packages/create">
+              <StandardButton
+                variant="primary"
+                size="md"
+                icon={Plus}
+              >
+                Create Package
+              </StandardButton>
             </Link>
           </div>
         ) : (
@@ -620,11 +626,14 @@ const Packages: React.FC = () => {
                 Clear Filters
               </StandardButton>
             )}
-            <Link
-              to="/packages/create"
-              className={`bg-${fullColor} hover:bg-${themeColor}-700 text-white px-6 py-2.5 rounded-lg font-semibold transition-colors`}
-            >
-              Create Package
+            <Link to="/packages/create">
+              <StandardButton
+                variant="primary"
+                size="md"
+                icon={Plus}
+              >
+                Create Package
+              </StandardButton>
             </Link>
           </div>
         )}

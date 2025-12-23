@@ -378,25 +378,38 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
         id: notification.id,
         type: notification.type,
         title: notification.title,
-        user_id: notification.user_id,
-        location_id: notification.location_id,
+        notification_user_id: notification.user_id,
+        notification_location_id: notification.location_id,
         current_user_id: userId,
         current_location_id: locationId,
         user_role: user.role,
         currentCount: notificationCountRef.current
       });
 
-      // Filter: Skip if user_id matches current user (notification created by current user)
-      if (notification.user_id && notification.user_id === userId) {
-        console.log('[AdminSidebar] ⏭️ Skipping notification from current user:', notification.id);
+      // RULE 1: Never notify the user who created the notification
+      // If notification.user_id exists and matches the current logged-in user's id, skip it
+      // This means the current user created this notification, so don't show it to them
+      if (notification.user_id !== null && notification.user_id !== undefined && notification.user_id === userId) {
+        console.log('[AdminSidebar] ⏭️ Skipping - you created this notification (user_id:', notification.user_id, '=== current:', userId, ')');
         return;
       }
 
-      // Filter: Only show if location_id matches (unless user is company_admin)
-      if (user.role !== 'company_admin' && notification.location_id && notification.location_id !== locationId) {
-        console.log('[AdminSidebar] ⏭️ Skipping notification from different location:', notification.id);
-        return;
+      // RULE 2: Location-based filtering when user_id is null (broadcast/system notifications)
+      // If notification.user_id is null, it's a system or broadcast notification
+      // In this case, only show to users at the matching location (unless company_admin)
+      if (user.role !== 'company_admin') {
+        // If notification has a location_id and it doesn't match user's location, skip
+        if (notification.location_id !== null && notification.location_id !== undefined && notification.location_id !== locationId) {
+          console.log('[AdminSidebar] ⏭️ Skipping - notification from different location (notification_location:', notification.location_id, '!== user_location:', locationId, ')');
+          return;
+        }
+        
+        // If notification has no user_id and no location_id, it might be a global system notification
+        // We'll allow these through for all users
       }
+      
+      // Company admins see all notifications from all locations
+      console.log('[AdminSidebar] ✅ Notification passed filters, processing...');
 
       // Get new count from backend
       const newCount = await getUnreadCount();

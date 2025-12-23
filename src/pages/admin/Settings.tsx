@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Palette, Lock, Mail, CheckCircle, X, Eye, EyeOff, Building2, MapPin, Trash2 } from 'lucide-react';
+import { Palette, Lock, Mail, X, Eye, EyeOff, Building2, MapPin, Trash2, CheckCircle } from 'lucide-react';
 import { useThemeColor } from '../../hooks/useThemeColor';
 import StandardButton from '../../components/ui/StandardButton';
+import Toast from '../../components/ui/Toast';
 import {
   getAuthorizeNetAccount,
   getAllAuthorizeNetAccounts,
@@ -473,9 +474,8 @@ const Settings = () => {
       <div className="max-w-5xl mx-auto">
         {/* Success Toast */}
         {showSuccess && (
-          <div className="fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-2 z-50 animate-fade-in">
-            <CheckCircle size={20} />
-            <span>{successMessage}</span>
+          <div className="fixed top-6 right-6 z-50 animate-fade-in-up">
+            <Toast message={successMessage} type="success" onClose={() => setShowSuccess(false)} />
           </div>
         )}
 
