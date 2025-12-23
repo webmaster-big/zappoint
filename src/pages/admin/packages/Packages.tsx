@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Users, Tag, Search, Download, Upload, X, CheckSquare, Square, Pencil, Trash2, MapPin, Eye } from "lucide-react";
+import { Users, Tag, Search, Download, Upload, X, CheckSquare, Square, Pencil, Trash2, MapPin, Eye, Power } from "lucide-react";
 import StandardButton from '../../../components/ui/StandardButton';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { packageService, type Package } from '../../../services';
@@ -332,6 +332,23 @@ const Packages: React.FC = () => {
     }
   };
 
+  const handleToggleStatus = async (id: number, currentStatus: boolean) => {
+    try {
+      const response = await packageService.toggleStatus(id);
+      
+      // Update local state with the new status
+      setPackages(prev => prev.map(pkg => 
+        pkg.id === id ? { ...pkg, is_active: response.data.is_active } : pkg
+      ));
+      
+      const statusText = response.data.is_active ? 'activated' : 'deactivated';
+      alert(`Package ${statusText} successfully!`);
+    } catch (err) {
+      console.error('Error toggling package status:', err);
+      alert('Failed to update package status. Please try again.');
+    }
+  };
+
   if (loading) {
     return (
       <div className="w-full mx-auto px-4 pb-6 flex flex-col items-center justify-center min-h-96">
@@ -513,6 +530,17 @@ const Packages: React.FC = () => {
                         </div>
                       )}
                     </div>
+                    <button
+                      onClick={() => handleToggleStatus(pkg.id, pkg.is_active)}
+                      className={`ml-2 p-1.5 rounded-lg transition-colors ${
+                        pkg.is_active
+                          ? `bg-green-100 text-green-600 hover:bg-green-200`
+                          : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+                      }`}
+                      title={pkg.is_active ? 'Active - Click to deactivate' : 'Inactive - Click to activate'}
+                    >
+                      <Power className="w-4 h-4" />
+                    </button>
                   </div>
 
                   <div className="mb-3">

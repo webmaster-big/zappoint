@@ -39,6 +39,7 @@ const LocationActivityLogs = () => {
   const isCompanyAdmin = currentUser?.role === 'company_admin';
   
   const [filteredLogs, setFilteredLogs] = useState<LocationActivityLogsActivityLog[]>([]);
+  const [allLogs, setAllLogs] = useState<LocationActivityLogsActivityLog[]>([]); // For client-side pagination
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
@@ -56,6 +57,7 @@ const LocationActivityLogs = () => {
   const [showAllUsers, setShowAllUsers] = useState(false);
   const [userSearchQuery, setUserSearchQuery] = useState('');
   const [isExporting, setIsExporting] = useState(false);
+  const [showAllLocationTabs, setShowAllLocationTabs] = useState(false);
   const [filters, setFilters] = useState<LocationActivityLogsFilterOptions>({
     action: 'all',
     resourceType: 'all',
@@ -206,9 +208,17 @@ const LocationActivityLogs = () => {
       const token = getAuthToken();
       const params = new URLSearchParams();
       
-      // Pagination
-      params.append('per_page', itemsPerPage.toString());
-      params.append('page', currentPage.toString());
+      // Check if we need client-side filtering (userType filter requires it)
+      const needsClientSideFiltering = filters.userType !== 'all';
+      
+      // Pagination - if client-side filtering, get all data; otherwise paginate on backend
+      if (needsClientSideFiltering) {
+        params.append('per_page', '1000'); // Get all records for client-side filtering
+        params.append('page', '1');
+      } else {
+        params.append('per_page', itemsPerPage.toString());
+        params.append('page', currentPage.toString());
+      }
       
       // Location filter
       if (selectedLocation !== 'all') {
@@ -304,14 +314,32 @@ const LocationActivityLogs = () => {
           severity: determineSeverity(log.action || '')
         }));
         
+        const needsClientSideFiltering = filters.userType !== 'all';
+        
         // Apply client-side user type filter (since backend doesn't support this)
         if (filters.userType !== 'all') {
           transformedLogs = transformedLogs.filter((log: LocationActivityLogsActivityLog) => log.userType === filters.userType);
         }
         
-        setFilteredLogs(transformedLogs);
-        setTotalLogs(pagination.total || 0);
-        setTotalPages(pagination.last_page || 1);
+        if (needsClientSideFiltering) {
+          // Store all logs for client-side pagination
+          setAllLogs(transformedLogs);
+          
+          // Calculate pagination on frontend
+          const startIndex = (currentPage - 1) * itemsPerPage;
+          const endIndex = startIndex + itemsPerPage;
+          const paginatedLogs = transformedLogs.slice(startIndex, endIndex);
+          
+          setFilteredLogs(paginatedLogs);
+          setTotalLogs(transformedLogs.length);
+          setTotalPages(Math.ceil(transformedLogs.length / itemsPerPage));
+        } else {
+          // Use backend pagination
+          setAllLogs([]);
+          setFilteredLogs(transformedLogs);
+          setTotalLogs(pagination.total || 0);
+          setTotalPages(pagination.last_page || 1);
+        }
       }
     } catch (error) {
       console.error('Error loading activity logs:', error);
@@ -331,10 +359,18 @@ const LocationActivityLogs = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only run once on mount
 
-  // Reload logs when filters, location, or page change
+  // Reload logs when filters or location change (but not on page change for client-side filtering)
   useEffect(() => {
     if (locations.length > 0 || selectedLocation === 'all') {
-      loadLogs();
+      const needsClientSideFiltering = filters.userType !== 'all';
+      
+      // Only reload if not using client-side filtering, or if it's a filter/location change
+      if (!needsClientSideFiltering) {
+        loadLogs();
+      } else if (allLogs.length === 0) {
+        // First load with client-side filter
+        loadLogs();
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters, selectedLocation, currentPage, loadLogs]);
@@ -351,6 +387,11 @@ const LocationActivityLogs = () => {
       ...prev,
       [key]: value
     }));
+    setCurrentPage(1);
+  };
+
+  const handleLocationChange = (location: string) => {
+    setSelectedLocation(location);
     setCurrentPage(1);
   };
 
@@ -638,10 +679,24 @@ const LocationActivityLogs = () => {
 
   // Pagination - backend handles slicing, we just display what we get
   const currentLogs = filteredLogs;
-  const indexOfFirstItem = ((currentPage - 1) * itemsPerPage);
-  const indexOfLastItem = indexOfFirstItem + filteredLogs.length;
+  const indexOfFirstItem = filteredLogs.length > 0 ? ((currentPage - 1) * itemsPerPage) + 1 : 0;
+  const indexOfLastItem = ((currentPage - 1) * itemsPerPage) + filteredLogs.length;
 
-  const paginate = (pageNumber: number) => setCurrentPage(pageNumber);
+  const paginate = (pageNumber: number) => {
+    const needsClientSideFiltering = filters.userType !== 'all';
+    
+    if (needsClientSideFiltering && allLogs.length > 0) {
+      // Handle pagination on frontend without reloading
+      const startIndex = (pageNumber - 1) * itemsPerPage;
+      const endIndex = startIndex + itemsPerPage;
+      const paginatedLogs = allLogs.slice(startIndex, endIndex);
+      setFilteredLogs(paginatedLogs);
+      setCurrentPage(pageNumber);
+    } else {
+      // Backend pagination - will trigger reload
+      setCurrentPage(pageNumber);
+    }
+  };
 
   if (loading) {
     return (
@@ -1007,38 +1062,36 @@ const LocationActivityLogs = () => {
         </div>
       )}
 
-      {/* Location Tabs - Hidden for Company Admin */}
-      {!isCompanyAdmin && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-1 mb-6">
-          <div className="flex flex-wrap gap-1">
-            <StandardButton
-              variant={selectedLocation === 'all' ? 'primary' : 'secondary'}
-              size="sm"
-              onClick={() => setSelectedLocation('all')}
+      {/* Location Filter - Clean pill design */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-6">
+        <div className="flex items-center gap-3 overflow-x-auto scrollbar-hide">
+          <button
+            onClick={() => handleLocationChange('all')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
+              selectedLocation === 'all'
+                ? `bg-${fullColor} text-white shadow-sm`
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            <MapPin size={16} />
+            All Locations
+          
+          </button>
+          {locations.map(location => (
+            <button
+              key={location.name}
+              onClick={() => handleLocationChange(location.name)}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
+                selectedLocation === location.name
+                  ? `bg-${fullColor} text-white shadow-sm`
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
             >
-              All Locations
-            </StandardButton>
-            {locations.map(location => (
-              <StandardButton
-                key={location.name}
-                variant={selectedLocation === location.name ? 'primary' : 'secondary'}
-                size="sm"
-                onClick={() => setSelectedLocation(location.name)}
-                icon={MapPin}
-              >
-                {location.name}
-                <span className={`px-1.5 py-0.5 rounded-full text-xs ${
-                  selectedLocation === location.name
-                    ? `bg-${themeColor}-600 text-white`
-                    : 'bg-gray-200 text-gray-700'
-                }`}>
-                  {location.recentActivity}
-                </span>
-              </StandardButton>
-            ))}
-          </div>
+              {location.name}
+            </button>
+          ))}
         </div>
-      )}
+      </div>
 
       {/* Metrics Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -1257,7 +1310,7 @@ const LocationActivityLogs = () => {
           <div className="bg-white px-6 py-4 border-t border-gray-100">
             <div className="flex items-center justify-between">
               <div className="text-sm text-gray-800">
-                Showing <span className="font-medium">{indexOfFirstItem + 1}</span> to{' '}
+                Showing <span className="font-medium">{indexOfFirstItem}</span> to{' '}
                 <span className="font-medium">
                   {Math.min(indexOfLastItem, totalLogs)}
                 </span>{' '}

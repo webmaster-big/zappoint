@@ -71,7 +71,8 @@ const BookPackage: React.FC = () => {
     guestOfHonorAge: "",
     guestOfHonorGender: ""
   });
-  const [paymentType, setPaymentType] = useState<'full' | 'partial'>('full');
+  const [paymentType, setPaymentType] = useState<'full' | 'partial' | 'custom'>('full');
+  const [customPaymentAmount, setCustomPaymentAmount] = useState<number>(0);
   const [currentStep, setCurrentStep] = useState(1);
   
   // Payment card details
@@ -103,7 +104,6 @@ const BookPackage: React.FC = () => {
   const [countrySearch, setCountrySearch] = useState('');
   const [showCountrySuggestions, setShowCountrySuggestions] = useState(false);
   const [customerId, setCustomerId] = useState<number | null>(null);
-  const [countryDebounceTimer, setCountryDebounceTimer] = useState<NodeJS.Timeout | null>(null);
   const [showAccountModal, setShowAccountModal] = useState(false);
 
   // Show account modal for non-logged-in users
@@ -454,6 +454,7 @@ const BookPackage: React.FC = () => {
       guestOfHonorGender: ""
     });
     setPaymentType('full');
+    setCustomPaymentAmount(0);
     setCurrentStep(1);
     setSelectedTime("");
     setShowConfirmation(false);
@@ -500,8 +501,10 @@ const BookPackage: React.FC = () => {
   const attractionsTotal = Object.entries(selectedAttractions).reduce((sum, [idStr, qty]) => {
     const id = Number(idStr);
     const found = pkg && pkg.attractions.find((a) => a.id === id);
-    const price = found ? Number(found.price) : 0;
-    return sum + price * qty;
+    if (!found) return sum;
+    const price = Number(found.price);
+    const isPerPerson = found.pricing_type === 'per_person';
+    return sum + price * qty * (isPerPerson ? participants : 1);
   }, 0);
   
   // Promo and gift card discounts
@@ -553,6 +556,12 @@ const BookPackage: React.FC = () => {
       return;
     }
     
+    // Validate custom payment amount if selected
+    if (paymentType === 'custom' && (!customPaymentAmount || customPaymentAmount <= 0)) {
+      setPaymentError('Please enter a valid custom payment amount');
+      return;
+    }
+    
     if (!authorizeApiLoginId) {
       setPaymentError('Payment system not initialized. Please refresh the page.');
       return;
@@ -563,7 +572,12 @@ const BookPackage: React.FC = () => {
     
     try {
       // Calculate payment amount
-      const amountToPay = paymentType === 'full' ? total : partialAmount;
+      let amountToPay = total;
+      if (paymentType === 'custom' && customPaymentAmount > 0) {
+        amountToPay = Math.min(customPaymentAmount, total);
+      } else if (paymentType === 'partial') {
+        amountToPay = partialAmount;
+      }
       
       // Step 1: Process payment first
       console.log('💳 Processing payment...');
@@ -657,7 +671,7 @@ const BookPackage: React.FC = () => {
         total_amount: total,
         amount_paid: amountToPay,
         payment_method: 'card' as const,
-        payment_status: (paymentType === 'full' ? 'paid' : 'partial') as 'paid' | 'partial',
+        payment_status: (paymentType === 'full' || (paymentType === 'custom' && customPaymentAmount >= total) ? 'paid' : 'partial') as 'paid' | 'partial',
         status: 'confirmed' as const,
         additional_attractions: additionalAttractions.length > 0 ? additionalAttractions : undefined,
         additional_addons: additionalAddons.length > 0 ? additionalAddons : undefined,
@@ -926,12 +940,18 @@ const BookPackage: React.FC = () => {
                 </div>
                 <div className="flex justify-between text-sm sm:text-base">
                   <span className="text-gray-600">Amount Paid:</span>
-                  <span className="font-medium text-green-600">${(paymentType === 'full' ? total : partialAmount).toFixed(2)}</span>
+                  <span className="font-medium text-green-600">${(
+                    paymentType === 'full' ? total : 
+                    paymentType === 'custom' ? Math.min(customPaymentAmount, total) : 
+                    partialAmount
+                  ).toFixed(2)}</span>
                 </div>
-                {paymentType === 'partial' && (
+                {(paymentType === 'partial' || (paymentType === 'custom' && customPaymentAmount < total)) && (
                   <div className="flex justify-between text-sm sm:text-base">
                     <span className="text-gray-600">Remaining Balance:</span>
-                    <span className="font-medium text-orange-600">${(total - partialAmount).toFixed(2)}</span>
+                    <span className="font-medium text-orange-600">${(
+                      paymentType === 'custom' ? total - customPaymentAmount : total - partialAmount
+                    ).toFixed(2)}</span>
                   </div>
                 )}
                 <div className="flex justify-between text-sm">
@@ -1568,65 +1588,61 @@ const BookPackage: React.FC = () => {
                       <label className="block font-medium mb-2 text-gray-800 text-sm">Country</label>
                       <input
                         type="text"
-                        value={countrySearch || form.country}
+                        value={countrySearch}
                         onChange={(e) => {
                           const value = e.target.value;
                           setCountrySearch(value);
+                          setShowCountrySuggestions(true);
                           
-                          // Clear existing timer
-                          if (countryDebounceTimer) {
-                            clearTimeout(countryDebounceTimer);
+                          // If exact match, auto-select it
+                          const exactMatch = countries.find(c => c.toLowerCase() === value.toLowerCase());
+                          if (exactMatch) {
+                            setForm(f => ({ ...f, country: exactMatch }));
                           }
-                          
-                          // Set new timer to show suggestions after 300ms
-                          const timer = setTimeout(() => {
-                            setShowCountrySuggestions(true);
-                          }, 300);
-                          setCountryDebounceTimer(timer);
                         }}
                         onFocus={() => {
-                          // Clear the input to allow typing when focused
-                          if (form.country && !countrySearch) {
-                            setCountrySearch('');
+                          // If input is empty but country is selected, show the country name
+                          if (!countrySearch && form.country) {
+                            setCountrySearch(form.country);
                           }
-                          // Show suggestions after debounce
-                          if (countryDebounceTimer) {
-                            clearTimeout(countryDebounceTimer);
-                          }
-                          const timer = setTimeout(() => {
-                            setShowCountrySuggestions(true);
-                          }, 300);
-                          setCountryDebounceTimer(timer);
+                          setShowCountrySuggestions(true);
                         }}
                         onBlur={() => {
                           setTimeout(() => {
                             setShowCountrySuggestions(false);
-                            // If nothing typed, keep the selected country
-                            if (!countrySearch && form.country) {
-                              setCountrySearch('');
+                            // If the typed value doesn't match any country, reset to selected country
+                            const matchedCountry = countries.find(c => c.toLowerCase() === countrySearch.toLowerCase());
+                            if (matchedCountry) {
+                              setForm(f => ({ ...f, country: matchedCountry }));
+                              setCountrySearch(matchedCountry);
+                            } else if (form.country) {
+                              setCountrySearch(form.country);
                             }
                           }, 200);
                         }}
-                        placeholder="Start typing country name..."
+                        placeholder="Type to search countries..."
                         className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
                         autoComplete="off"
                       />
                       {/* Country Suggestions Dropdown */}
-                      {showCountrySuggestions && (countrySearch || form.country) && (
+                      {showCountrySuggestions && countrySearch && (
                         <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                           {countries
                             .filter(country => 
-                              country.toLowerCase().includes((countrySearch || form.country || '').toLowerCase())
+                              country.toLowerCase().includes(countrySearch.toLowerCase())
                             )
                             .slice(0, 10)
                             .map(country => (
                               <button
                                 key={country}
                                 type="button"
-                                className="w-full text-left px-4 py-2 hover:bg-blue-50 transition-colors text-sm"
-                                onClick={() => {
+                                className={`w-full text-left px-4 py-2 hover:bg-blue-50 transition-colors text-sm ${
+                                  country === form.country ? 'bg-blue-50 font-medium' : ''
+                                }`}
+                                onMouseDown={(e) => {
+                                  e.preventDefault(); // Prevent blur from firing first
                                   setForm(f => ({ ...f, country }));
-                                  setCountrySearch('');
+                                  setCountrySearch(country);
                                   setShowCountrySuggestions(false);
                                 }}
                               >
@@ -1634,7 +1650,7 @@ const BookPackage: React.FC = () => {
                               </button>
                             ))}
                           {countries.filter(country => 
-                            country.toLowerCase().includes((countrySearch || form.country || '').toLowerCase())
+                            country.toLowerCase().includes(countrySearch.toLowerCase())
                           ).length === 0 && (
                             <div className="px-4 py-2 text-sm text-gray-500">
                               No countries found
@@ -1840,10 +1856,58 @@ const BookPackage: React.FC = () => {
                         </div>
                       </label>
                     )}
+                    
+                    {/* Custom Payment Amount Option */}
+                    <label className="flex items-start gap-3 cursor-pointer p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition">
+                      <input
+                        type="radio"
+                        name="paymentType"
+                        value="custom"
+                        checked={paymentType === 'custom'}
+                        onChange={() => setPaymentType('custom')}
+                        className="mt-1 accent-green-600"
+                      />
+                      <div className="flex-1">
+                        <div className="font-medium text-sm text-gray-900">Custom Amount</div>
+                        <div className="text-xs text-gray-600 mt-1">
+                          Enter a specific deposit amount
+                        </div>
+                      </div>
+                    </label>
+                    
+                    {/* Custom Amount Input - Show when custom is selected */}
+                    {paymentType === 'custom' && (
+                      <div className="ml-8 mt-2 p-3 bg-green-50 rounded-lg border border-green-200">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Enter Custom Amount</label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 font-medium">$</span>
+                          <input
+                            type="number"
+                            min="0.01"
+                            max={total}
+                            step="0.01"
+                            value={customPaymentAmount || ''}
+                            onChange={(e) => {
+                              const value = parseFloat(e.target.value) || 0;
+                              setCustomPaymentAmount(Math.min(Math.max(0, value), total));
+                            }}
+                            placeholder="0.00"
+                            className="w-full pl-8 pr-4 py-2.5 border border-green-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-sm"
+                          />
+                        </div>
+                        <div className="flex justify-between mt-2 text-xs text-gray-600">
+                          <span>Remaining: ${Math.max(0, total - (customPaymentAmount || 0)).toFixed(2)}</span>
+                          <span>Total: ${total.toFixed(2)}</span>
+                        </div>
+                        {customPaymentAmount > 0 && customPaymentAmount >= total && (
+                          <p className="mt-2 text-xs text-green-600 font-medium">✓ This covers the full amount</p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
                 
-                <div className="flex justify-between pt-6 gap-2">
+                <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center pt-6 gap-3">
                   <StandardButton 
                     variant="secondary"
                     size="md"
@@ -1851,24 +1915,21 @@ const BookPackage: React.FC = () => {
                       setCurrentStep(2);
                       window.scrollTo({ top: 0, behavior: 'smooth' });
                     }}
-                    className="flex items-center"
+                    className="flex items-center justify-center"
                   >
                     <svg className="mr-1 md:mr-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"></path>
                     </svg>
                     <span className="hidden sm:inline">Back</span>
+                    <span className="sm:hidden">Back to Personal Info</span>
                   </StandardButton>
-                </div>
-                
-                <div className="mt-6">
-                  <button 
-                    className={`py-2.5 md:py-3 px-4 md:px-8 rounded-lg font-medium transition shadow-sm flex items-center justify-center text-sm md:text-base ${
-                      isProcessingPayment || !cardNumber || !cardMonth || !cardYear || !cardCVV || !validateCardNumber(cardNumber)
-                        ? 'bg-gray-300 text-gray-400 cursor-not-allowed' 
-                        : 'bg-blue-800 text-white hover:bg-blue-900'
-                    }`}
+                  
+                  <StandardButton
+                    variant="primary"
+                    size="md"
                     onClick={handlePayNow}
-                    disabled={isProcessingPayment || !cardNumber || !cardMonth || !cardYear || !cardCVV || !validateCardNumber(cardNumber)}
+                    disabled={isProcessingPayment || !cardNumber || !cardMonth || !cardYear || !cardCVV || !validateCardNumber(cardNumber) || (paymentType === 'custom' && (!customPaymentAmount || customPaymentAmount <= 0))}
+                    className="flex items-center justify-center flex-1 sm:flex-initial"
                   >
                     {isProcessingPayment ? (
                       <>
@@ -1880,10 +1941,10 @@ const BookPackage: React.FC = () => {
                         <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
                         </svg>
-                        Pay ${paymentType === 'full' ? total.toFixed(2) : partialAmount.toFixed(2)}
+                        Pay ${paymentType === 'full' ? total.toFixed(2) : paymentType === 'custom' ? Math.min(customPaymentAmount || 0, total).toFixed(2) : partialAmount.toFixed(2)}
                       </>
                     )}
-                  </button>
+                  </StandardButton>
                 </div>
               </>
             )}
@@ -1927,41 +1988,85 @@ const BookPackage: React.FC = () => {
                 )}
               </div>
             
-            <div className="space-y-4 border-t pt-4 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Base Price</span>
-                <span className="font-medium">${basePrice.toFixed(2)}</span>
+            <div className="space-y-3 border-t pt-4 text-sm">
+              {/* Package Base Price - Detailed */}
+              <div className="bg-blue-50 rounded-lg p-3">
+                <div className="flex justify-between items-start mb-1">
+                  <span className="font-semibold text-gray-800">Base Package</span>
+                  <span className="font-bold text-gray-900">${Number(pkg.price).toFixed(2)}</span>
+                </div>
+                <p className="text-xs text-gray-600">{pkg.name}</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  ✓ Includes up to {pkg.min_participants || 1} participant{(pkg.min_participants || 1) > 1 ? 's' : ''}
+                </p>
+                <p className="text-xs text-gray-500">
+                  ✓ Duration: {pkg.duration} {pkg.duration_unit}
+                </p>
               </div>
               
+              {/* Additional Participants - More Detailed */}
+              {participants > (pkg.min_participants || 1) && pkg.price_per_additional && Number(pkg.price_per_additional) > 0 && (
+                <div className="bg-gray-50 rounded-lg p-3">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <span className="font-medium text-gray-800">Additional Participants</span>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Base covers {pkg.min_participants || 1}, you have {participants} total
+                      </p>
+                      <p className="text-xs text-gray-600 mt-0.5">
+                        {participants - (pkg.min_participants || 1)} extra × ${Number(pkg.price_per_additional).toFixed(2)}/person
+                      </p>
+                    </div>
+                    <span className="font-semibold text-gray-900">
+                      +${((participants - (pkg.min_participants || 1)) * Number(pkg.price_per_additional)).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              )}
+              
+              {/* Participant Count Summary */}
+              <div className="flex justify-between items-center text-xs py-2 px-1 border-b border-gray-200">
+                <span className="text-gray-600">Total Participants</span>
+                <span className="font-semibold text-gray-800">{participants} people</span>
+              </div>
+              
+              {/* Attractions - Detailed Breakdown */}
               {Object.entries(selectedAttractions).some(([, qty]) => qty > 0) && (
-                <div>
-                  <div className="font-medium text-gray-800 mb-2 text-sm">Attractions</div>
+                <div className="pt-2">
+                  <div className="font-semibold text-gray-800 mb-2 text-xs uppercase tracking-wide">Attractions</div>
                   {Object.entries(selectedAttractions).filter(([, qty]) => qty > 0).map(([idStr, qty]) => {
                     const id = Number(idStr);
                     const attraction = pkg.attractions.find((a) => a.id === id);
                     if (!attraction) return null;
                     const price = Number(attraction.price);
+                    const isPerPerson = attraction.pricing_type === 'per_person';
+                    const lineTotal = price * qty * (isPerPerson ? participants : 1);
                     
                     return (
-                      <div key={id} className="flex justify-between text-gray-600 pl-2 text-xs mb-1">
-                        <span>{attraction.name} x{qty}</span>
-                        <span>${(price * qty).toFixed(2)}</span>
+                      <div key={id} className="bg-gray-50 rounded p-2 mb-1">
+                        <div className="flex justify-between text-xs">
+                          <span className="font-medium text-gray-700">{attraction.name}</span>
+                          <span className="font-semibold text-gray-800">+${lineTotal.toFixed(2)}</span>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          {qty} × ${price.toFixed(2)}{isPerPerson ? ` × ${participants} people` : '/unit'}
+                        </p>
                       </div>
                     );
                   })}
                 </div>
               )}
               
-              <div>
-                <div className="font-medium text-gray-800 mb-2 text-sm">Room</div>
-                <div className="flex justify-between text-gray-600 pl-2 text-xs mb-1">
-                  <span>Auto-assigned</span>
-                </div>
+              {/* Room Info */}
+              <div className="flex justify-between text-xs text-gray-500 py-1 border-b border-gray-100">
+                <span>Room Assignment</span>
+                <span className="text-gray-600">Auto-assigned at booking</span>
               </div>
               
+              {/* Add-ons - Detailed Breakdown */}
               {Object.entries(selectedAddOns).some(([, qty]) => qty > 0) && (
-                <div>
-                  <div className="font-medium text-gray-800 mb-2 text-sm">Add-ons</div>
+                <div className="pt-2">
+                  <div className="font-semibold text-gray-800 mb-2 text-xs uppercase tracking-wide">Add-ons</div>
                   {Object.entries(selectedAddOns).filter(([, qty]) => qty > 0).map(([idStr, qty]) => {
                     const id = Number(idStr);
                     const addOn = pkg.add_ons.find((a) => a.id === id);
@@ -1969,9 +2074,12 @@ const BookPackage: React.FC = () => {
                     const price = Number(addOn.price);
                     
                     return (
-                      <div key={id} className="flex justify-between text-gray-600 pl-2 text-xs mb-1">
-                        <span>{addOn.name} x{qty}</span>
-                        <span>${(price * qty).toFixed(2)}</span>
+                      <div key={id} className="bg-gray-50 rounded p-2 mb-1">
+                        <div className="flex justify-between text-xs">
+                          <span className="font-medium text-gray-700">{addOn.name}</span>
+                          <span className="font-semibold text-gray-800">+${(price * qty).toFixed(2)}</span>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-0.5">{qty} × ${price.toFixed(2)}</p>
                       </div>
                     );
                   })}

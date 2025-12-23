@@ -46,7 +46,8 @@ interface BookingData extends Omit<OnsiteBookingData, 'customer'> {
     phone: string;
   };
   paymentMethod: 'card' | 'cash' | 'paylater';
-  paymentType: 'full' | 'partial';
+  paymentType: 'full' | 'partial' | 'custom';
+  customPaymentAmount: number;
   giftCardCode: string;
   promoCode: string;
   notes: string;
@@ -103,6 +104,7 @@ const OnsiteBooking: React.FC = () => {
     room: '',
     paymentMethod: 'cash',
     paymentType: 'full',
+    customPaymentAmount: 0,
     giftCardCode: '',
     promoCode: '',
     notes: '',
@@ -499,8 +501,12 @@ const OnsiteBooking: React.FC = () => {
       packageId: pkg.id,
       selectedAttractions: [],
       selectedAddOns: [],
-      participants: initialParticipants
+      participants: initialParticipants,
+      date: '', // Reset date when package changes
+      time: '', // Reset time when package changes
+      room: '' // Reset room when package changes
     }));
+    setSelectedRoomId(null); // Reset selected room ID
     setStep(2); // Move directly to step 2 (Date & Time) after selecting a package
   };
 
@@ -773,6 +779,7 @@ const OnsiteBooking: React.FC = () => {
       room: '',
       paymentMethod: 'cash',
       paymentType: 'full',
+      customPaymentAmount: 0,
       giftCardCode: '',
       promoCode: '',
       notes: '',
@@ -797,6 +804,14 @@ const OnsiteBooking: React.FC = () => {
     if (!selectedPackage) {
       setToast({ message: 'Please select a package', type: 'error' });
       return;
+    }
+    
+    // Validate custom payment amount if selected
+    if (bookingData.paymentType === 'custom' && bookingData.paymentMethod !== 'paylater') {
+      if (!bookingData.customPaymentAmount || bookingData.customPaymentAmount <= 0) {
+        setToast({ message: 'Please enter a valid custom payment amount', type: 'error' });
+        return;
+      }
     }
     
     // Validate card details if using Authorize.Net
@@ -895,11 +910,15 @@ const OnsiteBooking: React.FC = () => {
       // Calculate amount paid based on payment type and method
       const totalAmount = calculateTotal();
       const partialAmount = calculatePartialAmount();
-      const amountPaid = bookingData.paymentMethod === 'paylater' 
-        ? 0 
-        : (bookingData.paymentType === 'partial' && partialAmount > 0 
-          ? partialAmount 
-          : totalAmount);
+      let amountPaid = totalAmount;
+      
+      if (bookingData.paymentMethod === 'paylater') {
+        amountPaid = 0;
+      } else if (bookingData.paymentType === 'custom' && bookingData.customPaymentAmount > 0) {
+        amountPaid = Math.min(bookingData.customPaymentAmount, totalAmount);
+      } else if (bookingData.paymentType === 'partial' && partialAmount > 0) {
+        amountPaid = partialAmount;
+      }
       
       // Get created_by from localStorage
       const currentUser = getStoredUser();
@@ -923,8 +942,14 @@ const OnsiteBooking: React.FC = () => {
         total_amount: totalAmount,
         amount_paid: amountPaid,
         payment_method: bookingData.paymentMethod as 'cash' | 'card' | 'paylater',
-        payment_status: bookingData.paymentMethod === 'paylater' ? 'pending' as const : (bookingData.paymentType === 'partial' && partialAmount > 0 ? 'partial' as const : 'paid' as const),
-        status: bookingData.paymentMethod === 'paylater' || (bookingData.paymentType === 'partial' && partialAmount > 0) ? 'pending' as const : 'confirmed' as const,
+        payment_status: bookingData.paymentMethod === 'paylater' ? 'pending' as const : 
+          ((bookingData.paymentType === 'partial' && partialAmount > 0) || 
+           (bookingData.paymentType === 'custom' && bookingData.customPaymentAmount > 0 && bookingData.customPaymentAmount < totalAmount)) 
+            ? 'partial' as const : 'paid' as const,
+        status: bookingData.paymentMethod === 'paylater' || 
+          ((bookingData.paymentType === 'partial' && partialAmount > 0) ||
+           (bookingData.paymentType === 'custom' && bookingData.customPaymentAmount > 0 && bookingData.customPaymentAmount < totalAmount)) 
+            ? 'pending' as const : 'confirmed' as const,
         promo_id: promoId,
         gift_card_id: giftCardId,
         notes: bookingData.notes || undefined,
@@ -1195,25 +1220,116 @@ const OnsiteBooking: React.FC = () => {
             </div>
           )}
           
-          {/* Total */}
+          {/* Pricing Breakdown */}
           {selectedPackage && (
             <div className="pt-2">
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-sm font-medium text-gray-600">Subtotal</span>
-                <span className="text-sm font-semibold text-gray-900">${total.toFixed(2)}</span>
+              <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-3">Price Breakdown</h4>
+              <div className="space-y-2 text-sm">
+                {/* Base Package Price */}
+                <div className="bg-gray-50 rounded-lg p-2">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <span className="font-medium text-gray-800">Base Package</span>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {selectedPackage.name}
+                      </p>
+                      <p className="text-xs text-gray-400">
+                        Covers up to {selectedPackage.minParticipants || 1} participant{(selectedPackage.minParticipants || 1) > 1 ? 's' : ''}
+                      </p>
+                    </div>
+                    <span className="font-semibold text-gray-900">${selectedPackage.price.toFixed(2)}</span>
+                  </div>
+                </div>
+                
+                {/* Additional Participants */}
+                {bookingData.participants > (selectedPackage.minParticipants || 1) && selectedPackage.pricePerAdditional && selectedPackage.pricePerAdditional > 0 && (
+                  <div className="flex justify-between items-start py-1">
+                    <div>
+                      <span className="text-gray-700">Additional Participants</span>
+                      <p className="text-xs text-gray-500">
+                        {bookingData.participants - (selectedPackage.minParticipants || 1)} extra × ${selectedPackage.pricePerAdditional.toFixed(2)}/person
+                      </p>
+                    </div>
+                    <span className="font-medium text-gray-900">
+                      +${((bookingData.participants - (selectedPackage.minParticipants || 1)) * selectedPackage.pricePerAdditional).toFixed(2)}
+                    </span>
+                  </div>
+                )}
+                
+                {/* Participant Count Summary */}
+                <div className="flex justify-between items-center text-xs py-1 border-t border-gray-200">
+                  <span className="text-gray-500">Total Participants</span>
+                  <span className="font-medium text-gray-700">{bookingData.participants} people</span>
+                </div>
+                
+                {/* Attractions with full breakdown */}
+                {bookingData.selectedAttractions.length > 0 && (
+                  <div className="border-t border-gray-200 pt-2">
+                    <p className="text-xs font-semibold text-gray-600 uppercase mb-1">Attractions</p>
+                    {bookingData.selectedAttractions.map(({ id, quantity }) => {
+                      const attraction = selectedPackage?.attractions?.find(a => String(a.id) === String(id));
+                      if (!attraction) return null;
+                      const isPerPerson = attraction.pricingType === 'per_person';
+                      const lineTotal = attraction.price * quantity * (isPerPerson ? bookingData.participants : 1);
+                      return (
+                        <div key={id} className="flex justify-between text-xs mb-1">
+                          <div>
+                            <span className="text-gray-700">{attraction.name}</span>
+                            <span className="text-gray-400 block">
+                              {quantity}× ${attraction.price.toFixed(2)}{isPerPerson ? ` × ${bookingData.participants} people` : '/unit'}
+                            </span>
+                          </div>
+                          <span className="font-medium text-gray-800">+${lineTotal.toFixed(2)}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                
+                {/* Add-ons with full breakdown */}
+                {bookingData.selectedAddOns.length > 0 && (
+                  <div className="border-t border-gray-200 pt-2">
+                    <p className="text-xs font-semibold text-gray-600 uppercase mb-1">Add-ons</p>
+                    {bookingData.selectedAddOns.map(({ name, quantity }) => {
+                      const addOn = selectedPackage?.addOns.find(a => a.name === name);
+                      if (!addOn) return null;
+                      return (
+                        <div key={name} className="flex justify-between text-xs mb-1">
+                          <div>
+                            <span className="text-gray-700">{name}</span>
+                            <span className="text-gray-400 block">{quantity}× ${addOn.price.toFixed(2)}</span>
+                          </div>
+                          <span className="font-medium text-gray-800">+${(addOn.price * quantity).toFixed(2)}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+              
+              {/* Subtotal */}
+              <div className="flex justify-between items-center pt-3 mt-2 border-t border-gray-200 text-sm">
+                <span className="text-gray-600">Subtotal</span>
+                <span className="font-medium text-gray-800">${total.toFixed(2)}</span>
+              </div>
+              
+              {/* Total */}
+              <div className="flex justify-between items-center pt-2 mt-1 border-t-2 border-gray-300">
+                <span className="font-bold text-gray-900">Total</span>
+                <span className="text-xl font-bold text-blue-700">${total.toFixed(2)}</span>
               </div>
               
               {bookingData.paymentType === 'partial' && partialAmount > 0 && (
-                <div className={`flex justify-between items-center pt-2 mt-2 border-t border-dashed border-gray-300`}>
-                  <span className={`text-sm font-semibold text-${themeColor}-700`}>Due Now</span>
-                  <span className={`text-lg font-bold text-${fullColor}`}>${partialAmount.toFixed(2)}</span>
+                <div className="flex justify-between items-center pt-2 mt-2 bg-blue-50 rounded-lg p-2">
+                  <span className="text-sm font-semibold text-blue-700">Due Now</span>
+                  <span className="text-lg font-bold text-blue-800">${partialAmount.toFixed(2)}</span>
                 </div>
               )}
               
-              {bookingData.paymentType !== 'partial' && (
-                <div className="flex justify-between items-center pt-2 mt-2 border-t border-gray-300">
-                  <span className="font-semibold text-gray-900">Total</span>
-                  <span className={`text-xl font-bold text-${fullColor}`}>${total.toFixed(2)}</span>
+              {bookingData.paymentType === 'custom' && bookingData.customPaymentAmount > 0 && (
+                <div className="flex justify-between items-center pt-2 mt-2 bg-green-50 rounded-lg p-2">
+                  <span className="text-sm font-semibold text-green-700">Custom Amount Due Now</span>
+                  <span className="text-lg font-bold text-green-800">${Math.min(bookingData.customPaymentAmount, total).toFixed(2)}</span>
                 </div>
               )}
             </div>
@@ -2267,7 +2383,7 @@ const OnsiteBooking: React.FC = () => {
               value="full"
               checked={bookingData.paymentType === 'full'}
               onChange={() => setBookingData(prev => ({ ...prev, paymentType: 'full' }))}
-              className={`mt-1 accent-${fullColor}`}
+              className="mt-1 accent-blue-600"
             />
             <div className="flex-1">
               <div className="font-medium text-sm text-gray-900">Full Payment</div>
@@ -2282,7 +2398,7 @@ const OnsiteBooking: React.FC = () => {
                 value="partial"
                 checked={bookingData.paymentType === 'partial'}
                 onChange={() => setBookingData(prev => ({ ...prev, paymentType: 'partial' }))}
-                className={`mt-1 accent-${fullColor}`}
+                className="mt-1 accent-blue-600"
               />
               <div className="flex-1">
                 <div className="font-medium text-sm text-gray-900">Partial Payment</div>
@@ -2292,43 +2408,141 @@ const OnsiteBooking: React.FC = () => {
               </div>
             </label>
           )}
+          
+          {/* Custom Payment Amount Option */}
+          <label className="flex items-start gap-3 cursor-pointer p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition">
+            <input
+              type="radio"
+              name="paymentType"
+              value="custom"
+              checked={bookingData.paymentType === 'custom'}
+              onChange={() => setBookingData(prev => ({ ...prev, paymentType: 'custom' }))}
+              className="mt-1 accent-green-600"
+            />
+            <div className="flex-1">
+              <div className="font-medium text-sm text-gray-900">Custom Amount</div>
+              <div className="text-xs text-gray-600 mt-1">
+                Enter a specific deposit amount
+              </div>
+            </div>
+          </label>
+          
+          {/* Custom Amount Input - Show when custom is selected */}
+          {bookingData.paymentType === 'custom' && (
+            <div className="ml-8 mt-2 p-3 bg-green-50 rounded-lg border border-green-200">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Enter Custom Amount</label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 font-medium">$</span>
+                <input
+                  type="number"
+                  min="0.01"
+                  max={calculateTotal()}
+                  step="0.01"
+                  value={bookingData.customPaymentAmount || ''}
+                  onChange={(e) => {
+                    const value = parseFloat(e.target.value) || 0;
+                    const maxAmount = calculateTotal();
+                    setBookingData(prev => ({ 
+                      ...prev, 
+                      customPaymentAmount: Math.min(Math.max(0, value), maxAmount) 
+                    }));
+                  }}
+                  placeholder="0.00"
+                  className="w-full pl-8 pr-4 py-2.5 border border-green-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-sm"
+                />
+              </div>
+              <div className="flex justify-between mt-2 text-xs text-gray-600">
+                <span>Remaining: ${Math.max(0, calculateTotal() - (bookingData.customPaymentAmount || 0)).toFixed(2)}</span>
+                <span>Total: ${calculateTotal().toFixed(2)}</span>
+              </div>
+              {bookingData.customPaymentAmount > 0 && bookingData.customPaymentAmount >= calculateTotal() && (
+                <p className="mt-2 text-xs text-green-600 font-medium">✓ This covers the full amount</p>
+              )}
+            </div>
+          )}
         </div>
       </div>
       )}
       
       {/* Pricing Breakdown */}
       <div className="border-t border-gray-200 pt-4 mb-6">
-        <div className="space-y-2">
-          <div className="flex justify-between text-sm">
-            <span className="text-gray-600">Package Price</span>
-            <span className="font-medium">${selectedPackage?.price.toFixed(2)}</span>
+        <h4 className="text-sm font-semibold text-gray-800 mb-3">Price Breakdown</h4>
+        <div className="space-y-3">
+          {/* Base Package */}
+          <div className="bg-gray-50 rounded-lg p-3">
+            <div className="flex justify-between text-sm">
+              <div>
+                <span className="font-medium text-gray-800">Package: {selectedPackage?.name}</span>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Includes {selectedPackage?.minParticipants || 1} participant{(selectedPackage?.minParticipants || 1) > 1 ? 's' : ''}
+                </p>
+              </div>
+              <span className="font-semibold text-gray-900">${selectedPackage?.price.toFixed(2)}</span>
+            </div>
           </div>
-          {selectedPackage && bookingData.participants > selectedPackage.maxParticipants && selectedPackage.pricePerAdditional && (
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-600">Additional Participants ({bookingData.participants - selectedPackage.maxParticipants})</span>
-              <span className="font-medium">${((bookingData.participants - selectedPackage.maxParticipants) * selectedPackage.pricePerAdditional).toFixed(2)}</span>
+          
+          {/* Additional Participants */}
+          {selectedPackage && bookingData.participants > (selectedPackage.minParticipants || 1) && selectedPackage.pricePerAdditional && selectedPackage.pricePerAdditional > 0 && (
+            <div className="flex justify-between text-sm items-start">
+              <div>
+                <span className="text-gray-700">Additional Participants</span>
+                <p className="text-xs text-gray-500">
+                  {bookingData.participants - (selectedPackage.minParticipants || 1)} extra × ${selectedPackage.pricePerAdditional.toFixed(2)} each
+                </p>
+              </div>
+              <span className="font-medium text-gray-900">
+                ${((bookingData.participants - (selectedPackage.minParticipants || 1)) * selectedPackage.pricePerAdditional).toFixed(2)}
+              </span>
             </div>
           )}
+          
+          {/* Participants Summary */}
+          <div className="flex justify-between text-sm py-2 border-t border-gray-200">
+            <span className="text-gray-600">Total Participants</span>
+            <span className="font-medium text-gray-800">{bookingData.participants}</span>
+          </div>
+          
+          {/* Attractions */}
           {bookingData.selectedAttractions.length > 0 && (
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-600">Attractions</span>
-              <span className="font-medium">
-                ${bookingData.selectedAttractions.reduce((sum, { id, quantity }) => {
-                  const attraction = selectedPackage?.attractions?.find(a => String(a.id) === id);
-                  return sum + (attraction ? attraction.price * quantity * (attraction.pricingType === 'per_person' ? bookingData.participants : 1) : 0);
-                }, 0).toFixed(2)}
-              </span>
+            <div className="border-t border-gray-200 pt-3">
+              <p className="text-xs font-semibold text-gray-600 uppercase mb-2">Attractions</p>
+              {bookingData.selectedAttractions.map(({ id, quantity }) => {
+                const attraction = selectedPackage?.attractions?.find(a => String(a.id) === String(id));
+                if (!attraction) return null;
+                const isPerPerson = attraction.pricingType === 'per_person';
+                const lineTotal = attraction.price * quantity * (isPerPerson ? bookingData.participants : 1);
+                return (
+                  <div key={id} className="flex justify-between text-sm mb-1">
+                    <div>
+                      <span className="text-gray-700">{attraction.name}</span>
+                      <span className="text-xs text-gray-500 ml-1">
+                        ({quantity} × ${attraction.price.toFixed(2)}{isPerPerson ? ` × ${bookingData.participants} people` : ''})
+                      </span>
+                    </div>
+                    <span className="font-medium">${lineTotal.toFixed(2)}</span>
+                  </div>
+                );
+              })}
             </div>
           )}
+          
+          {/* Add-ons */}
           {bookingData.selectedAddOns.length > 0 && (
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-600">Add-ons</span>
-              <span className="font-medium">
-                ${bookingData.selectedAddOns.reduce((sum, { name, quantity }) => {
-                  const addOn = selectedPackage?.addOns.find(a => a.name === name);
-                  return sum + (addOn ? addOn.price * quantity : 0);
-                }, 0).toFixed(2)}
-              </span>
+            <div className="border-t border-gray-200 pt-3">
+              <p className="text-xs font-semibold text-gray-600 uppercase mb-2">Add-ons</p>
+              {bookingData.selectedAddOns.map(({ name, quantity }) => {
+                const addOn = selectedPackage?.addOns.find(a => a.name === name);
+                if (!addOn) return null;
+                return (
+                  <div key={name} className="flex justify-between text-sm mb-1">
+                    <div>
+                      <span className="text-gray-700">{name}</span>
+                      <span className="text-xs text-gray-500 ml-1">({quantity} × ${addOn.price.toFixed(2)})</span>
+                    </div>
+                    <span className="font-medium">${(addOn.price * quantity).toFixed(2)}</span>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
@@ -2343,10 +2557,15 @@ const OnsiteBooking: React.FC = () => {
             <span>Amount Due Now</span>
             <span>$0.00</span>
           </div>
-        ) : bookingData.paymentType === 'partial' && calculatePartialAmount() > 0 && (
-          <div className={`flex justify-between font-semibold text-md mt-2 pt-2 border-t border-dashed border-gray-300 text-${themeColor}-700`}>
+        ) : bookingData.paymentType === 'partial' && calculatePartialAmount() > 0 ? (
+          <div className="flex justify-between font-semibold text-md mt-2 pt-2 border-t border-dashed border-gray-300 text-blue-700">
             <span>Amount Due Now</span>
             <span>${calculatePartialAmount().toFixed(2)}</span>
+          </div>
+        ) : bookingData.paymentType === 'custom' && bookingData.customPaymentAmount > 0 && (
+          <div className="flex justify-between font-semibold text-md mt-2 pt-2 border-t border-dashed border-gray-300 text-green-700">
+            <span>Custom Amount Due Now</span>
+            <span>${Math.min(bookingData.customPaymentAmount, calculateTotal()).toFixed(2)}</span>
           </div>
         )}
       </div>
@@ -2358,7 +2577,7 @@ const OnsiteBooking: React.FC = () => {
             type="checkbox"
             checked={sendEmail}
             onChange={(e) => setSendEmail(e.target.checked)}
-            className={`w-4 h-4 rounded border-gray-300 text-${themeColor}-600 focus:ring-${themeColor}-500 cursor-pointer`}
+            className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
           />
           <span className="text-sm text-gray-700 group-hover:text-gray-900">
             Send confirmation email to customer

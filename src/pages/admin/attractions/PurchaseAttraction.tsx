@@ -111,7 +111,6 @@ const PurchaseAttraction = () => {
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
   const [countrySearch, setCountrySearch] = useState('');
   const [showCountrySuggestions, setShowCountrySuggestions] = useState(false);
-  const [countryDebounceTimer, setCountryDebounceTimer] = useState<NodeJS.Timeout | null>(null);
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
@@ -894,66 +893,62 @@ const PurchaseAttraction = () => {
                           <input
                             type="text"
                             name="country"
-                            value={countrySearch || customerInfo.country}
+                            value={countrySearch}
                             onChange={(e) => {
                               const value = e.target.value;
                               setCountrySearch(value);
+                              setShowCountrySuggestions(true);
                               
-                              // Clear existing timer
-                              if (countryDebounceTimer) {
-                                clearTimeout(countryDebounceTimer);
+                              // If exact match, auto-select it
+                              const exactMatch = countries.find(c => c.toLowerCase() === value.toLowerCase());
+                              if (exactMatch) {
+                                setCustomerInfo(prev => ({ ...prev, country: exactMatch }));
                               }
-                              
-                              // Set new timer to show suggestions after 300ms
-                              const timer = setTimeout(() => {
-                                setShowCountrySuggestions(true);
-                              }, 300);
-                              setCountryDebounceTimer(timer);
                             }}
                             onFocus={() => {
-                              // Clear the input to allow typing when focused
-                              if (customerInfo.country && !countrySearch) {
-                                setCountrySearch('');
+                              // If input is empty but country is selected, show the country name
+                              if (!countrySearch && customerInfo.country) {
+                                setCountrySearch(customerInfo.country);
                               }
-                              // Show suggestions after debounce
-                              if (countryDebounceTimer) {
-                                clearTimeout(countryDebounceTimer);
-                              }
-                              const timer = setTimeout(() => {
-                                setShowCountrySuggestions(true);
-                              }, 300);
-                              setCountryDebounceTimer(timer);
+                              setShowCountrySuggestions(true);
                             }}
                             onBlur={() => {
                               setTimeout(() => {
                                 setShowCountrySuggestions(false);
-                                // If nothing typed, keep the selected country
-                                if (!countrySearch && customerInfo.country) {
-                                  setCountrySearch('');
+                                // If the typed value doesn't match any country, reset to selected country
+                                const matchedCountry = countries.find(c => c.toLowerCase() === countrySearch.toLowerCase());
+                                if (matchedCountry) {
+                                  setCustomerInfo(prev => ({ ...prev, country: matchedCountry }));
+                                  setCountrySearch(matchedCountry);
+                                } else if (customerInfo.country) {
+                                  setCountrySearch(customerInfo.country);
                                 }
                               }, 200);
                             }}
-                            placeholder="Start typing country name..."
+                            placeholder="Type to search countries..."
                             className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition"
                             required
                             autoComplete="off"
                           />
                           {/* Country Suggestions Dropdown */}
-                          {showCountrySuggestions && (countrySearch || customerInfo.country) && (
+                          {showCountrySuggestions && countrySearch && (
                             <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                               {countries
                                 .filter(country => 
-                                  country.toLowerCase().includes((countrySearch || customerInfo.country || '').toLowerCase())
+                                  country.toLowerCase().includes(countrySearch.toLowerCase())
                                 )
                                 .slice(0, 10)
                                 .map(country => (
                                   <button
                                     key={country}
                                     type="button"
-                                    className="w-full text-left px-4 py-2 hover:bg-blue-50 transition-colors text-sm"
-                                    onClick={() => {
+                                    className={`w-full text-left px-4 py-2 hover:bg-blue-50 transition-colors text-sm ${
+                                      country === customerInfo.country ? 'bg-blue-50 font-medium' : ''
+                                    }`}
+                                    onMouseDown={(e) => {
+                                      e.preventDefault(); // Prevent blur from firing first
                                       setCustomerInfo(prev => ({ ...prev, country }));
-                                      setCountrySearch('');
+                                      setCountrySearch(country);
                                       setShowCountrySuggestions(false);
                                     }}
                                   >
@@ -961,7 +956,7 @@ const PurchaseAttraction = () => {
                                   </button>
                                 ))}
                               {countries.filter(country => 
-                                country.toLowerCase().includes((countrySearch || customerInfo.country || '').toLowerCase())
+                                country.toLowerCase().includes(countrySearch.toLowerCase())
                               ).length === 0 && (
                                 <div className="px-4 py-2 text-sm text-gray-500">
                                   No countries found
