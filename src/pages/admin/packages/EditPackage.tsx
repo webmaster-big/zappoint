@@ -351,6 +351,15 @@ const EditPackage: React.FC = () => {
         }));
     };
 
+    // Select all days for weekly schedule
+    const selectAllWeekDays = (index: number) => {
+        const allDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+        const schedule = form.availability_schedules[index];
+        const current = schedule.day_configuration || [];
+        const allSelected = allDays.every(day => current.includes(day));
+        updateSchedule(index, { day_configuration: allSelected ? [] : allDays });
+    };
+
     // Add option with API calls instead of localStorage
     const handleAddOption = async (type: string, value: string, code?: string, extra?: string) => {
         if (!value.trim() || ((type === 'promo' || type === 'giftcard') && !code?.trim())) return;
@@ -946,9 +955,22 @@ const EditPackage: React.FC = () => {
                                                     {/* Day Configuration for Weekly */}
                                                     {schedule.availability_type === 'weekly' && (
                                                         <div>
-                                                            <label className="block font-semibold mb-2 text-sm text-neutral-800">
-                                                                Select Days
-                                                            </label>
+                                                            <div className="flex items-center justify-between mb-2">
+                                                                <label className="block font-semibold text-sm text-neutral-800">
+                                                                    Select Days
+                                                                </label>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => selectAllWeekDays(index)}
+                                                                    className={`text-xs font-medium px-2 py-1 rounded transition-colors ${
+                                                                        ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].every(d => schedule.day_configuration?.includes(d))
+                                                                            ? 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                                                            : `bg-${themeColor}-100 text-${fullColor} hover:bg-${themeColor}-200`
+                                                                    }`}
+                                                                >
+                                                                    {['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].every(d => schedule.day_configuration?.includes(d)) ? 'Deselect All' : 'Select All'}
+                                                                </button>
+                                                            </div>
                                                             <div className="flex flex-wrap gap-2">
                                                                 {['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map(day => {
                                                                     const isSelected = schedule.day_configuration?.includes(day) || false;

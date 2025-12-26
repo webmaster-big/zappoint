@@ -55,6 +55,7 @@ import CustomerNotifications from "./pages/customer/CustomerNotifications";
 import CustomerLayout from "./layouts/CustomerLayout";
 import Settings from "./pages/admin/Settings";
 import Rooms from "./pages/admin/packages/Rooms";
+import DayOffs from "./pages/admin/dayoffs/DayOffs";
 import ViewBooking from "./pages/admin/bookings/ViewBooking";
 import AttractionDetails from "./pages/admin/attractions/AttractionDetails";
 import PurchaseDetails from "./pages/admin/attractions/PurchaseDetails";
@@ -137,11 +138,13 @@ function App() {
           {/* <Route path="/manager/attendant/create" element={<ProtectedRoute allowedRoles={['location_manager']}><CreateAttendant /></ProtectedRoute>} /> */}
           <Route path="/manager/attendants" element={<ProtectedRoute allowedRoles={['location_manager']}><ManageAttendants /></ProtectedRoute>} />
           <Route path="/manager/attendants/activity" element={<ProtectedRoute allowedRoles={['location_manager']}><AttendantActivityLogs /></ProtectedRoute>} />
+          <Route path="/manager/day-offs" element={<ProtectedRoute allowedRoles={['location_manager']}><DayOffs /></ProtectedRoute>} />
           <Route path="/manager/analytics" element={<ProtectedRoute allowedRoles={['location_manager']}><LocationAnalytics /></ProtectedRoute>} />
           
           {/* Company Admin-only Routes */}
           <Route path="/admin/analytics" element={<ProtectedRoute allowedRoles={['company_admin']}><CompanyAnalytics /></ProtectedRoute>} />
           <Route path="/admin/activity" element={<ProtectedRoute allowedRoles={['company_admin']}><LocationActivityLogs /></ProtectedRoute>} />
+          <Route path="/admin/day-offs" element={<ProtectedRoute allowedRoles={['company_admin']}><DayOffs /></ProtectedRoute>} />
           <Route path="/admin/users" element={<ProtectedRoute allowedRoles={['company_admin']}><ManageAccounts /></ProtectedRoute>} />
           {/* <Route path="/admin/users/create" element={<ProtectedRoute allowedRoles={['company_admin']}><CreateAccount /></ProtectedRoute>} /> */}
           

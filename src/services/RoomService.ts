@@ -46,11 +46,19 @@ export interface RoomFilters {
   user_id?: number;
 }
 
+// Break time type
+export interface BreakTime {
+  days: string[];
+  start_time: string;
+  end_time: string;
+}
+
 export interface CreateRoomData {
   location_id: number;
   name: string;
   capacity?: number;
   is_available?: boolean;
+  break_time?: BreakTime[];
 }
 
 export type UpdateRoomData = Partial<CreateRoomData>;

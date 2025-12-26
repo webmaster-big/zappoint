@@ -172,6 +172,17 @@ const EditAttraction = () => {
     });
   };
 
+  const selectAllScheduleDays = (scheduleIndex: number) => {
+    const allDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+    setFormData(prev => {
+      const newSchedules = [...prev.availability];
+      const schedule = newSchedules[scheduleIndex];
+      const allSelected = allDays.every(day => schedule.days.includes(day));
+      schedule.days = allSelected ? [] : [...allDays];
+      return { ...prev, availability: newSchedules };
+    });
+  };
+
   const updateScheduleTime = (scheduleIndex: number, field: 'start_time' | 'end_time', value: string) => {
     setFormData(prev => {
       const newSchedules = [...prev.availability];
@@ -645,7 +656,20 @@ const EditAttraction = () => {
                     </div>
                     
                     <div>
-                      <label className="block font-medium mb-2 text-sm text-neutral-700">Days</label>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="block font-medium text-sm text-neutral-700">Days</label>
+                        <button
+                          type="button"
+                          onClick={() => selectAllScheduleDays(index)}
+                          className={`text-xs font-medium px-2 py-1 rounded transition-colors ${
+                            daysOfWeek.every(d => schedule.days.includes(d.key))
+                              ? 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                              : `bg-${themeColor}-100 text-${fullColor} hover:bg-${themeColor}-200`
+                          }`}
+                        >
+                          {daysOfWeek.every(d => schedule.days.includes(d.key)) ? 'Deselect All' : 'Select All'}
+                        </button>
+                      </div>
                       <div className="flex flex-wrap gap-2">
                         {daysOfWeek.map(day => (
                           <button

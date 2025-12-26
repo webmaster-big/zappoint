@@ -1,5 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Edit2, Trash2, Users, MapPin, CheckSquare, Square, Plus, X } from 'lucide-react';
+import { Search, Edit2, Trash2, Users, MapPin, CheckSquare, Square, Plus, X, Clock } from 'lucide-react';
+
+// Break time type
+interface BreakTime {
+    days: string[];
+    start_time: string;
+    end_time: string;
+}
+
+const DAYS_OF_WEEK = [
+    { value: 'monday', label: 'Mon' },
+    { value: 'tuesday', label: 'Tue' },
+    { value: 'wednesday', label: 'Wed' },
+    { value: 'thursday', label: 'Thu' },
+    { value: 'friday', label: 'Fri' },
+    { value: 'saturday', label: 'Sat' },
+    { value: 'sunday', label: 'Sun' }
+];
 import StandardButton from '../../../components/ui/StandardButton';
 import Toast from '../../../components/ui/Toast';
 import { roomService, locationService } from '../../../services';
@@ -44,7 +61,8 @@ const Rooms: React.FC = () => {
     const [formData, setFormData] = useState({
         name: '',
         capacity: '',
-        is_available: true
+        is_available: true,
+        break_time: [] as BreakTime[]
     });
 
     // Bulk creation state
@@ -56,7 +74,16 @@ const Rooms: React.FC = () => {
         startNumber: 1,
         startLetter: 'A',
         capacity: '',
-        is_available: true
+        is_available: true,
+        break_time: [] as BreakTime[]
+    });
+
+    // Break time form state
+    const [showBreakTimeForm, setShowBreakTimeForm] = useState(false);
+    const [newBreakTime, setNewBreakTime] = useState<BreakTime>({
+        days: [],
+        start_time: '12:00',
+        end_time: '13:00'
     });
 
     // Generate preview of rooms to be created
@@ -156,7 +183,8 @@ const Rooms: React.FC = () => {
         setFormData({
             name: '',
             capacity: '',
-            is_available: true
+            is_available: true,
+            break_time: []
         });
         setBulkFormData({
             baseName: '',
@@ -165,10 +193,82 @@ const Rooms: React.FC = () => {
             startNumber: 1,
             startLetter: 'A',
             capacity: '',
-            is_available: true
+            is_available: true,
+            break_time: []
         });
         setCreationMode('single');
         setSelectedRoom(null);
+        setShowBreakTimeForm(false);
+        setNewBreakTime({ days: [], start_time: '12:00', end_time: '13:00' });
+    };
+
+    // Break time helpers
+    const addBreakTime = (isBulk: boolean = false) => {
+        if (newBreakTime.days.length === 0) {
+            showToast('Please select at least one day', 'error');
+            return;
+        }
+        if (!newBreakTime.start_time || !newBreakTime.end_time) {
+            showToast('Please set start and end time', 'error');
+            return;
+        }
+        if (newBreakTime.start_time >= newBreakTime.end_time) {
+            showToast('End time must be after start time', 'error');
+            return;
+        }
+
+        if (isBulk) {
+            setBulkFormData(prev => ({
+                ...prev,
+                break_time: [...prev.break_time, { ...newBreakTime }]
+            }));
+        } else {
+            setFormData(prev => ({
+                ...prev,
+                break_time: [...prev.break_time, { ...newBreakTime }]
+            }));
+        }
+        setNewBreakTime({ days: [], start_time: '12:00', end_time: '13:00' });
+        setShowBreakTimeForm(false);
+    };
+
+    const removeBreakTime = (index: number, isBulk: boolean = false) => {
+        if (isBulk) {
+            setBulkFormData(prev => ({
+                ...prev,
+                break_time: prev.break_time.filter((_, i) => i !== index)
+            }));
+        } else {
+            setFormData(prev => ({
+                ...prev,
+                break_time: prev.break_time.filter((_, i) => i !== index)
+            }));
+        }
+    };
+
+    const toggleBreakTimeDay = (day: string) => {
+        setNewBreakTime(prev => ({
+            ...prev,
+            days: prev.days.includes(day)
+                ? prev.days.filter(d => d !== day)
+                : [...prev.days, day]
+        }));
+    };
+
+    const selectAllBreakTimeDays = () => {
+        const allDays = DAYS_OF_WEEK.map(d => d.value);
+        const allSelected = allDays.every(day => newBreakTime.days.includes(day));
+        setNewBreakTime(prev => ({
+            ...prev,
+            days: allSelected ? [] : allDays
+        }));
+    };
+
+    const formatTime12Hour = (time24: string): string => {
+        const [hours, minutes] = time24.split(':').map(Number);
+        const period = hours >= 12 ? 'PM' : 'AM';
+        const hours12 = hours % 12 || 12;
+        return `${hours12}:${minutes.toString().padStart(2, '0')} ${period}`;
     };
 
     // Handle create room (single or bulk)
@@ -184,7 +284,8 @@ const Rooms: React.FC = () => {
                     location_id: locationId,
                     name: formData.name,
                     capacity: formData.capacity ? parseInt(formData.capacity) : undefined,
-                    is_available: formData.is_available
+                    is_available: formData.is_available,
+                    break_time: formData.break_time.length > 0 ? formData.break_time : undefined
                 });
                 showToast('Space created successfully!', 'success');
             } else {
@@ -198,7 +299,8 @@ const Rooms: React.FC = () => {
                         location_id: locationId,
                         name: roomName,
                         capacity: capacity,
-                        is_available: bulkFormData.is_available
+                        is_available: bulkFormData.is_available,
+                        break_time: bulkFormData.break_time.length > 0 ? bulkFormData.break_time : undefined
                     });
                 }
                 
@@ -223,7 +325,8 @@ const Rooms: React.FC = () => {
             await roomService.updateRoom(selectedRoom.id, {
                 name: formData.name,
                 capacity: formData.capacity ? parseInt(formData.capacity) : undefined,
-                is_available: formData.is_available
+                is_available: formData.is_available,
+                break_time: formData.break_time.length > 0 ? formData.break_time : undefined
             });
             
             showToast('Space updated successfully!', 'success');
@@ -307,8 +410,10 @@ const Rooms: React.FC = () => {
         setFormData({
             name: room.name,
             capacity: room.capacity?.toString() || '',
-            is_available: room.is_available
+            is_available: room.is_available,
+            break_time: (room as any).break_time || []
         });
+        setShowBreakTimeForm(false);
         setShowEditModal(true);
     };
 
@@ -649,8 +754,8 @@ const Rooms: React.FC = () => {
             {/* Create Modal */}
             {showCreateModal && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onClick={() => setShowCreateModal(false)}>
-                    <div className="bg-white rounded-lg shadow-xl w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
-                        <div className="p-6">
+                    <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+                        <div className="p-6 overflow-y-auto flex-1">
                             <h2 className="text-xl font-semibold text-gray-900 mb-4">Add New Space</h2>
                             
                             {/* Creation Mode Toggle */}
@@ -747,6 +852,121 @@ const Rooms: React.FC = () => {
                                             <label className="ml-2 block text-sm text-gray-900">
                                                 Available for booking
                                             </label>
+                                        </div>
+
+                                        {/* Break Time Section - Single Mode */}
+                                        <div className="border-t border-gray-200 pt-4">
+                                            <div className="flex items-center justify-between mb-3">
+                                                <label className="block text-sm font-medium text-gray-700">
+                                                    Break Times
+                                                </label>
+                                                <StandardButton
+                                                    type="button"
+                                                    onClick={() => setShowBreakTimeForm(!showBreakTimeForm)}
+                                                    variant="secondary"
+                                                    size="sm"
+                                                    icon={showBreakTimeForm ? X : Plus}
+                                                >
+                                                    {showBreakTimeForm ? 'Cancel' : 'Add Break Time'}
+                                                </StandardButton>
+                                            </div>
+
+                                            {/* Existing Break Times */}
+                                            {formData.break_time.length > 0 && (
+                                                <div className="space-y-2 mb-3">
+                                                    {formData.break_time.map((bt, index) => (
+                                                        <div key={index} className={`flex items-center justify-between p-3 bg-${themeColor}-50 border border-${themeColor}-200 rounded-lg`}>
+                                                            <div className="flex items-center gap-2">
+                                                                <Clock className={`w-4 h-4 text-${fullColor}`} />
+                                                                <div>
+                                                                    <div className="text-sm font-medium text-gray-900">
+                                                                        {formatTime12Hour(bt.start_time)} - {formatTime12Hour(bt.end_time)}
+                                                                    </div>
+                                                                    <div className="text-xs text-gray-500">
+                                                                        {bt.days.map(d => d.charAt(0).toUpperCase() + d.slice(0, 2)).join(', ')}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            <StandardButton
+                                                                type="button"
+                                                                onClick={() => removeBreakTime(index, false)}
+                                                                variant="danger"
+                                                                size="sm"
+                                                                icon={Trash2}
+                                                                className="p-1.5"
+                                                            />
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+
+                                            {/* Add Break Time Form */}
+                                            {showBreakTimeForm && (
+                                                <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg space-y-3">
+                                                    <div>
+                                                        <div className="flex items-center justify-between mb-2">
+                                                            <label className="block text-xs font-medium text-gray-600">Select Days</label>
+                                                            <button
+                                                                type="button"
+                                                                onClick={selectAllBreakTimeDays}
+                                                                className={`text-xs font-medium px-2 py-1 rounded transition-colors ${
+                                                                    DAYS_OF_WEEK.every(d => newBreakTime.days.includes(d.value))
+                                                                        ? 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                                                        : `bg-${themeColor}-100 text-${fullColor} hover:bg-${themeColor}-200`
+                                                                }`}
+                                                            >
+                                                                {DAYS_OF_WEEK.every(d => newBreakTime.days.includes(d.value)) ? 'Deselect All' : 'Select All'}
+                                                            </button>
+                                                        </div>
+                                                        <div className="flex flex-wrap gap-2">
+                                                            {DAYS_OF_WEEK.map(day => (
+                                                                <button
+                                                                    key={day.value}
+                                                                    type="button"
+                                                                    onClick={() => toggleBreakTimeDay(day.value)}
+                                                                    className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                                                                        newBreakTime.days.includes(day.value)
+                                                                            ? `bg-${fullColor} text-white`
+                                                                            : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-100'
+                                                                    }`}
+                                                                >
+                                                                    {day.label}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                    <div className="grid grid-cols-2 gap-3">
+                                                        <div>
+                                                            <label className="block text-xs font-medium text-gray-600 mb-1">Start Time</label>
+                                                            <input
+                                                                type="time"
+                                                                value={newBreakTime.start_time}
+                                                                onChange={(e) => setNewBreakTime(prev => ({ ...prev, start_time: e.target.value }))}
+                                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-xs font-medium text-gray-600 mb-1">End Time</label>
+                                                            <input
+                                                                type="time"
+                                                                value={newBreakTime.end_time}
+                                                                onChange={(e) => setNewBreakTime(prev => ({ ...prev, end_time: e.target.value }))}
+                                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                    <StandardButton
+                                                        type="button"
+                                                        onClick={() => addBreakTime(false)}
+                                                        variant="primary"
+                                                        size="sm"
+                                                        className="w-full"
+                                                        icon={Plus}
+                                                    >
+                                                        Add This Break Time
+                                                    </StandardButton>
+                                                </div>
+                                            )}
                                         </div>
                                     </>
                                 ) : (
@@ -854,6 +1074,121 @@ const Rooms: React.FC = () => {
                                             </label>
                                         </div>
 
+                                        {/* Break Time Section - Bulk Mode */}
+                                        <div className="border-t border-gray-200 pt-4">
+                                            <div className="flex items-center justify-between mb-3">
+                                                <label className="block text-sm font-medium text-gray-700">
+                                                    Break Times (applies to all)
+                                                </label>
+                                                <StandardButton
+                                                    type="button"
+                                                    onClick={() => setShowBreakTimeForm(!showBreakTimeForm)}
+                                                    variant="secondary"
+                                                    size="sm"
+                                                    icon={showBreakTimeForm ? X : Plus}
+                                                >
+                                                    {showBreakTimeForm ? 'Cancel' : 'Add Break Time'}
+                                                </StandardButton>
+                                            </div>
+
+                                            {/* Existing Break Times */}
+                                            {bulkFormData.break_time.length > 0 && (
+                                                <div className="space-y-2 mb-3">
+                                                    {bulkFormData.break_time.map((bt, index) => (
+                                                        <div key={index} className={`flex items-center justify-between p-3 bg-${themeColor}-50 border border-${themeColor}-200 rounded-lg`}>
+                                                            <div className="flex items-center gap-2">
+                                                                <Clock className={`w-4 h-4 text-${fullColor}`} />
+                                                                <div>
+                                                                    <div className="text-sm font-medium text-gray-900">
+                                                                        {formatTime12Hour(bt.start_time)} - {formatTime12Hour(bt.end_time)}
+                                                                    </div>
+                                                                    <div className="text-xs text-gray-500">
+                                                                        {bt.days.map(d => d.charAt(0).toUpperCase() + d.slice(0, 2)).join(', ')}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            <StandardButton
+                                                                type="button"
+                                                                onClick={() => removeBreakTime(index, true)}
+                                                                variant="danger"
+                                                                size="sm"
+                                                                icon={Trash2}
+                                                                className="p-1.5"
+                                                            />
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+
+                                            {/* Add Break Time Form */}
+                                            {showBreakTimeForm && (
+                                                <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg space-y-3">
+                                                    <div>
+                                                        <div className="flex items-center justify-between mb-2">
+                                                            <label className="block text-xs font-medium text-gray-600">Select Days</label>
+                                                            <button
+                                                                type="button"
+                                                                onClick={selectAllBreakTimeDays}
+                                                                className={`text-xs font-medium px-2 py-1 rounded transition-colors ${
+                                                                    DAYS_OF_WEEK.every(d => newBreakTime.days.includes(d.value))
+                                                                        ? 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                                                        : `bg-${themeColor}-100 text-${fullColor} hover:bg-${themeColor}-200`
+                                                                }`}
+                                                            >
+                                                                {DAYS_OF_WEEK.every(d => newBreakTime.days.includes(d.value)) ? 'Deselect All' : 'Select All'}
+                                                            </button>
+                                                        </div>
+                                                        <div className="flex flex-wrap gap-2">
+                                                            {DAYS_OF_WEEK.map(day => (
+                                                                <button
+                                                                    key={day.value}
+                                                                    type="button"
+                                                                    onClick={() => toggleBreakTimeDay(day.value)}
+                                                                    className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                                                                        newBreakTime.days.includes(day.value)
+                                                                            ? `bg-${fullColor} text-white`
+                                                                            : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-100'
+                                                                    }`}
+                                                                >
+                                                                    {day.label}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                    <div className="grid grid-cols-2 gap-3">
+                                                        <div>
+                                                            <label className="block text-xs font-medium text-gray-600 mb-1">Start Time</label>
+                                                            <input
+                                                                type="time"
+                                                                value={newBreakTime.start_time}
+                                                                onChange={(e) => setNewBreakTime(prev => ({ ...prev, start_time: e.target.value }))}
+                                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-xs font-medium text-gray-600 mb-1">End Time</label>
+                                                            <input
+                                                                type="time"
+                                                                value={newBreakTime.end_time}
+                                                                onChange={(e) => setNewBreakTime(prev => ({ ...prev, end_time: e.target.value }))}
+                                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                    <StandardButton
+                                                        type="button"
+                                                        onClick={() => addBreakTime(true)}
+                                                        variant="primary"
+                                                        size="sm"
+                                                        className="w-full"
+                                                        icon={Plus}
+                                                    >
+                                                        Add This Break Time
+                                                    </StandardButton>
+                                                </div>
+                                            )}
+                                        </div>
+
                                         {/* Preview */}
                                         {bulkFormData.baseName && generateRoomPreview().length > 0 && (
                                             <div className={`bg-${themeColor}-50 border border-${fullColor} rounded-lg p-4`}>
@@ -923,8 +1258,8 @@ const Rooms: React.FC = () => {
             {/* Edit Modal */}
             {showEditModal && selectedRoom && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onClick={() => setShowEditModal(false)}>
-                    <div className="bg-white rounded-lg shadow-xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
-                        <div className="p-6">
+                    <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+                        <div className="p-6 overflow-y-auto flex-1">
                             <h2 className="text-xl font-semibold text-gray-900 mb-4">Edit Space</h2>
                             <form onSubmit={handleUpdateRoom} className="space-y-4">
                                 <div>
@@ -968,6 +1303,121 @@ const Rooms: React.FC = () => {
                                     <label className="ml-2 block text-sm text-gray-900">
                                         Available for booking
                                     </label>
+                                </div>
+
+                                {/* Break Time Section - Edit Modal */}
+                                <div className="border-t border-gray-200 pt-4">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <label className="block text-sm font-medium text-gray-700">
+                                            Break Times
+                                        </label>
+                                        <StandardButton
+                                            type="button"
+                                            onClick={() => setShowBreakTimeForm(!showBreakTimeForm)}
+                                            variant="secondary"
+                                            size="sm"
+                                            icon={showBreakTimeForm ? X : Plus}
+                                        >
+                                            {showBreakTimeForm ? 'Cancel' : 'Add Break Time'}
+                                        </StandardButton>
+                                    </div>
+
+                                    {/* Existing Break Times */}
+                                    {formData.break_time.length > 0 && (
+                                        <div className="space-y-2 mb-3">
+                                            {formData.break_time.map((bt, index) => (
+                                                <div key={index} className={`flex items-center justify-between p-3 bg-${themeColor}-50 border border-${themeColor}-200 rounded-lg`}>
+                                                    <div className="flex items-center gap-2">
+                                                        <Clock className={`w-4 h-4 text-${fullColor}`} />
+                                                        <div>
+                                                            <div className="text-sm font-medium text-gray-900">
+                                                                {formatTime12Hour(bt.start_time)} - {formatTime12Hour(bt.end_time)}
+                                                            </div>
+                                                            <div className="text-xs text-gray-500">
+                                                                {bt.days.map(d => d.charAt(0).toUpperCase() + d.slice(0, 2)).join(', ')}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <StandardButton
+                                                        type="button"
+                                                        onClick={() => removeBreakTime(index, false)}
+                                                        variant="danger"
+                                                        size="sm"
+                                                        icon={Trash2}
+                                                        className="p-1.5"
+                                                    />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {/* Add Break Time Form */}
+                                    {showBreakTimeForm && (
+                                        <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg space-y-3">
+                                            <div>
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <label className="block text-xs font-medium text-gray-600">Select Days</label>
+                                                    <button
+                                                        type="button"
+                                                        onClick={selectAllBreakTimeDays}
+                                                        className={`text-xs font-medium px-2 py-1 rounded transition-colors ${
+                                                            DAYS_OF_WEEK.every(d => newBreakTime.days.includes(d.value))
+                                                                ? 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                                                : `bg-${themeColor}-100 text-${fullColor} hover:bg-${themeColor}-200`
+                                                        }`}
+                                                    >
+                                                        {DAYS_OF_WEEK.every(d => newBreakTime.days.includes(d.value)) ? 'Deselect All' : 'Select All'}
+                                                    </button>
+                                                </div>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {DAYS_OF_WEEK.map(day => (
+                                                        <button
+                                                            key={day.value}
+                                                            type="button"
+                                                            onClick={() => toggleBreakTimeDay(day.value)}
+                                                            className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                                                                newBreakTime.days.includes(day.value)
+                                                                    ? `bg-${fullColor} text-white`
+                                                                    : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-100'
+                                                            }`}
+                                                        >
+                                                            {day.label}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <div>
+                                                    <label className="block text-xs font-medium text-gray-600 mb-1">Start Time</label>
+                                                    <input
+                                                        type="time"
+                                                        value={newBreakTime.start_time}
+                                                        onChange={(e) => setNewBreakTime(prev => ({ ...prev, start_time: e.target.value }))}
+                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-medium text-gray-600 mb-1">End Time</label>
+                                                    <input
+                                                        type="time"
+                                                        value={newBreakTime.end_time}
+                                                        onChange={(e) => setNewBreakTime(prev => ({ ...prev, end_time: e.target.value }))}
+                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <StandardButton
+                                                type="button"
+                                                onClick={() => addBreakTime(false)}
+                                                variant="primary"
+                                                size="sm"
+                                                className="w-full"
+                                                icon={Plus}
+                                            >
+                                                Add This Break Time
+                                            </StandardButton>
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div className="flex gap-3 pt-4">

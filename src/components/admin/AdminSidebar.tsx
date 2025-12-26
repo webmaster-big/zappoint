@@ -29,7 +29,8 @@ import {
   Tag,
   Gift,
   FileText,
-  UserCog
+  UserCog,
+  CalendarOff
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -73,6 +74,7 @@ const addDescriptions = (navItems: NavItem[]): NavItem[] => {
     'Account Activity Log': 'View user activity history',
     'Analytics & Reports': 'Business intelligence and reporting',
     'Activity Logs': 'System-wide activity tracking',
+    'Day Offs': 'Manage blocked dates and holidays',
     'Notifications': 'Manage your notification preferences',
     'User Management': 'Administer user accounts and permissions',
     'Manage Accounts': 'View and edit user accounts'
@@ -177,6 +179,7 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
         { label: 'Attendants Management', icon: UserCog, section: 'Team', items: [
           { label: 'Manage Attendants', href: '/manager/attendants', icon: Users },
           { label: 'Activity Log', href: '/manager/attendants/activity', icon: FileText },
+          { label: 'Day Offs', href: '/manager/day-offs', icon: CalendarOff },
         ]},
         { label: 'Analytics & Reports', icon: BarChart3, href: '/manager/analytics', section: 'Reports' },
         { label: 'Profile', icon: User, href: '/manager/profile', section: 'Account' },
@@ -215,6 +218,7 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
         { label: 'User Management', icon: UserCog, section: 'Administration', items: [
           { label: 'Manage Accounts', href: '/admin/users', icon: Users },
           { label: 'Activity Log', href: '/admin/activity', icon: FileText },
+          { label: 'Day Offs', href: '/admin/day-offs', icon: CalendarOff },
         ]},
         { label: 'Analytics & Reports', icon: BarChart3, href: '/admin/analytics', section: 'Reports' },
         { label: 'Profile', icon: User, href: '/admin/profile', section: 'Account' },

@@ -9,6 +9,7 @@ import { notificationStreamService } from './NotificationStreamService';
 import { metricsService } from './MetricsService';
 import { userService } from './UserService';
 import { locationService } from './LocationService';
+import { dayOffService } from './DayOffService';
 
 // Service exports for easy importing
 export { packageService } from './PackageService';
@@ -22,6 +23,9 @@ export type { Attraction, AttractionFilters, CreateAttractionData, UpdateAttract
 
 export { roomService } from './RoomService';
 export type { Room, RoomFilters, CreateRoomData, UpdateRoomData } from './RoomService';
+
+export { dayOffService } from './DayOffService';
+export type { DayOff, DayOffFilters, CreateDayOffData, UpdateDayOffData, CheckDateData } from './DayOffService';
 
 export { giftCardService } from './GiftCardService';
 export type { GiftCard, GiftCardFilters, CreateGiftCardData, UpdateGiftCardData } from './GiftCardService';
@@ -84,4 +88,5 @@ export const services = {
   metrics: metricsService,
   users: userService,
   locations: locationService,
+  dayOffs: dayOffService,
 };
