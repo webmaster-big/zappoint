@@ -179,6 +179,7 @@ export interface GroupedPackage {
   locations: GroupedPackageLocation[];
   booking_links: PackageBookingLink[];
   availability_schedules?: PackageAvailabilitySchedule[];
+  package_type?: string;
 }
 
 /**

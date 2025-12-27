@@ -96,6 +96,7 @@ export interface Package {
   availableLocations: string[];
   bookingLinks?: PackageBookingLink[];
   availability_schedules?: PackageAvailabilitySchedule[];
+  package_type?: string;
 }
 
 // Reservation types

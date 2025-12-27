@@ -11,7 +11,8 @@ import {
   ChevronRight,
   X,
   CheckCircle,
-  DollarSign
+  DollarSign,
+  Sparkles
 } from 'lucide-react';
 import type { Attraction, Package as PackageType, BookingType } from '../../types/customer';
 import { customerService, type GroupedAttraction, type GroupedPackage } from '../../services/CustomerService';
@@ -117,6 +118,7 @@ const EntertainmentLandingPage = () => {
             availableLocations: pkg.locations.map(loc => loc.location_name),
             bookingLinks: pkg.booking_links,
             availability_schedules: undefined, // Will be loaded when modal opens
+            package_type: pkg.package_type || 'regular',
           };
         });
         setPackages(transformedPackages);
@@ -136,13 +138,26 @@ const EntertainmentLandingPage = () => {
     return matchesLocation && matchesSearch;
   });
 
+  // Filter regular packages only
   const filteredPackages = packages.filter(pkg => {
     const matchesLocation = selectedLocation === 'All Locations' || 
       pkg.availableLocations.includes(selectedLocation);
     const matchesSearch = pkg.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       pkg.description.toLowerCase().includes(searchQuery.toLowerCase());
+    const isRegular = !pkg.package_type || pkg.package_type === 'regular';
     
-    return matchesLocation && matchesSearch;
+    return matchesLocation && matchesSearch && isRegular;
+  });
+
+  // Filter special packages (non-regular: custom, holiday, seasonal, special)
+  const filteredSpecialPackages = packages.filter(pkg => {
+    const matchesLocation = selectedLocation === 'All Locations' || 
+      pkg.availableLocations.includes(selectedLocation);
+    const matchesSearch = pkg.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      pkg.description.toLowerCase().includes(searchQuery.toLowerCase());
+    const isSpecial = pkg.package_type && pkg.package_type !== 'regular';
+    
+    return matchesLocation && matchesSearch && isSpecial;
   });
 
   const handleAttractionClick = async (attraction: Attraction) => {
@@ -520,6 +535,101 @@ const EntertainmentLandingPage = () => {
             </div>
           )}
         </section>
+
+        {/* Special Packages Section - Only show if there are special packages */}
+        {filteredSpecialPackages.length > 0 && (
+          <section className="mb-10 md:mb-16">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 md:mb-8 gap-2">
+              <h2 className="text-xl md:text-3xl font-bold text-gray-900 flex items-center gap-2 md:gap-3" id="special-packages">
+                <Sparkles className="w-6 h-6 md:w-8 md:h-8 text-amber-500" />
+                Featured Specials
+              </h2>
+              <p className="text-gray-600 text-xs md:text-base">
+                Limited time offers
+              </p>
+            </div>
+
+            <div className={`grid gap-4 md:gap-6 ${filteredSpecialPackages.length === 1 ? 'grid-cols-1 max-w-xl mx-auto' : 'grid-cols-1 md:grid-cols-2 max-w-4xl mx-auto'}`}>
+              {filteredSpecialPackages.slice(0, 2).map(pkg => {
+                // Get display config for package type
+                const typeConfig: Record<string, { label: string; bgColor: string; borderColor: string; accentColor: string }> = {
+                  holiday: { label: 'Holiday Special', bgColor: 'bg-red-50', borderColor: 'border-red-300', accentColor: 'text-red-600' },
+                  special: { label: 'Special Offer', bgColor: 'bg-purple-50', borderColor: 'border-purple-300', accentColor: 'text-purple-600' },
+                  seasonal: { label: 'Seasonal', bgColor: 'bg-orange-50', borderColor: 'border-orange-300', accentColor: 'text-orange-600' },
+                  custom: { label: 'Exclusive', bgColor: 'bg-blue-50', borderColor: 'border-blue-300', accentColor: 'text-blue-600' },
+                };
+                const config = typeConfig[pkg.package_type || 'custom'] || typeConfig.custom;
+                
+                return (
+                  <div 
+                    key={pkg.id} 
+                    onClick={() => handlePackageClick(pkg)}
+                    className={`relative bg-white border-2 ${config.borderColor} hover:shadow-xl transition-all duration-300 cursor-pointer overflow-hidden transform hover:scale-[1.02] rounded-lg`}
+                  >
+                    {/* Special Badge */}
+                    <div className={`absolute top-3 left-3 z-10 flex items-center gap-1.5 px-2.5 py-1 md:px-3 md:py-1.5 rounded-full ${config.bgColor} ${config.accentColor} text-xs md:text-sm font-semibold shadow-sm`}>
+                      <Sparkles size={14} className="md:w-4 md:h-4" />
+                      {config.label}
+                    </div>
+
+                    <div className="h-48 md:h-56 bg-gray-200 relative">
+                      {pkg.image ? (
+                        <img 
+                          src={getImageUrl(pkg.image)} 
+                          alt={pkg.name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className={`w-full h-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white text-lg font-semibold`}>
+                          {pkg.name}
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div className="p-4 md:p-6">
+                      <h3 className="text-lg md:text-xl font-bold text-gray-900 mb-2">
+                        {pkg.name}
+                      </h3>
+                      <p className="text-sm md:text-base text-gray-600 mb-4 line-clamp-2">
+                        {pkg.description}
+                      </p>
+                      
+                      <div className="flex items-center justify-between text-xs md:text-sm text-gray-500 mb-4">
+                        <div className="flex items-center gap-1">
+                          <Clock size={14} />
+                          <span className="truncate">{pkg.duration}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Users size={14} />
+                          <span className="truncate">{pkg.participants}</span>
+                        </div>
+                      </div>
+                      
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                        <div>
+                          <span className="text-xl md:text-2xl font-bold text-gray-900">
+                            ${pkg.price}
+                          </span>
+                          <span className="text-gray-500 text-xs md:text-sm ml-1">package</span>
+                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleBookPackage(pkg);
+                          }}
+                          className={`bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 md:px-6 md:py-2 rounded font-semibold transition flex items-center justify-center gap-2 text-sm md:text-base`}
+                        >
+                          <Calendar size={16} />
+                          Book Now
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
 
         {/* Packages Section */}
         <section>
