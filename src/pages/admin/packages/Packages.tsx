@@ -55,7 +55,13 @@ const Packages: React.FC = () => {
         });
         
         const packagesData = response.data.packages || [];
-        setPackages(packagesData);
+        
+        // Filter to only show regular packages (exclude custom, holiday, seasonal, special)
+        const regularPackages = packagesData.filter(
+          (pkg: Package) => !pkg.package_type || pkg.package_type === 'regular'
+        );
+        
+        setPackages(regularPackages);
         
         // Cache packages in localStorage for offline fallback
         try {

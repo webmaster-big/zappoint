@@ -203,6 +203,17 @@ const PackageDetails = () => {
                   <p className="font-medium text-gray-900">{packageData.category || "No category"}</p>
                 </div>
               </div>
+              {packageData.package_type && (
+                <div className="flex items-start gap-3">
+                  <div className={`p-2 bg-${fullColor.replace('-600', '')}-100 rounded-lg`}>
+                    <Tag className={`h-5 w-5 text-${fullColor}`} />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Package Type</p>
+                    <p className="font-medium text-gray-900 capitalize">{packageData.package_type}</p>
+                  </div>
+                </div>
+              )}
               <div className="flex items-start gap-3">
                 <div className={`p-2 bg-${fullColor.replace('-600', '')}-100 rounded-lg`}>
                   <DollarSign className={`h-5 w-5 text-${fullColor}`} />

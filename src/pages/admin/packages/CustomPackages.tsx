@@ -363,7 +363,7 @@ const CustomPackages: React.FC = () => {
             </Link>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {filteredPackages.map((pkg) => {
               const typeDisplay = getPackageTypeDisplay(pkg.package_type);
               const TypeIcon = typeDisplay.icon;
@@ -371,106 +371,84 @@ const CustomPackages: React.FC = () => {
               return (
                 <div
                   key={pkg.id}
-                  className={`relative bg-white border rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all ${
-                    !pkg.is_active ? 'opacity-60' : ''
-                  }`}
+                  className="border-2 border-gray-200 rounded-lg overflow-hidden hover:shadow-lg hover:scale-105 hover:border-gray-300 transition-all bg-white"
                 >
-                  {/* Package Type Badge */}
-                  <div className={`absolute top-3 left-3 z-10 flex items-center gap-1 px-2 py-1 rounded-full ${typeDisplay.bgColor} ${typeDisplay.color} text-xs font-medium`}>
-                    <TypeIcon className="w-3 h-3" />
-                    {typeDisplay.label}
-                  </div>
-
-                  {/* Status Badge */}
-                  {!pkg.is_active && (
-                    <div className="absolute top-3 right-3 z-10 bg-gray-100 text-gray-600 px-2 py-1 rounded-full text-xs font-medium">
-                      Inactive
-                    </div>
-                  )}
-
-                  {/* Image */}
-                  <div className="aspect-[4/3] bg-gray-100 relative overflow-hidden">
-                    {pkg.image ? (
-                      <img
-                        src={pkg.image}
-                        alt={pkg.name}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className={`w-full h-full flex items-center justify-center bg-gradient-to-br from-${themeColor}-100 to-${themeColor}-50`}>
-                        <TypeIcon className={`w-12 h-12 ${typeDisplay.color} opacity-50`} />
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Content */}
                   <div className="p-4">
-                    <h3 className="font-semibold text-gray-900 mb-1 line-clamp-1">{pkg.name}</h3>
-                    <p className="text-sm text-gray-500 mb-2 line-clamp-2">{pkg.description}</p>
-                    
-                    <div className="flex items-center gap-2 mb-3 flex-wrap">
-                      {pkg.category && (
-                        <span className="inline-flex items-center gap-1 text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">
-                          <Tag className="w-3 h-3" />
-                          {pkg.category}
-                        </span>
-                      )}
-                      {pkg.max_participants && (
-                        <span className="inline-flex items-center gap-1 text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">
-                          <Users className="w-3 h-3" />
-                          {pkg.max_participants}
-                        </span>
-                      )}
+                    <div className="flex justify-between items-start mb-3">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-base text-gray-900 truncate mb-1">{pkg.name || "Unnamed Package"}</h3>
+                        {pkg.location && (
+                          <div className="flex items-center gap-1">
+                            <MapPin className="w-3 h-3 text-gray-400" />
+                            <span className="text-xs text-gray-500">{pkg.location.name}</span>
+                          </div>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => handleToggleStatus(pkg.id)}
+                        className={`ml-2 p-1.5 rounded-lg transition-colors ${
+                          pkg.is_active
+                            ? `bg-green-100 text-green-600 hover:bg-green-200`
+                            : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+                        }`}
+                        title={pkg.is_active ? 'Active - Click to deactivate' : 'Inactive - Click to activate'}
+                      >
+                        <Power className="w-4 h-4" />
+                      </button>
                     </div>
 
-                    <div className="flex items-center justify-between">
-                      <span className={`text-lg font-bold text-${themeColor}-600`} style={{ color: fullColor }}>
-                        ${Number(pkg.price).toFixed(2)}
-                      </span>
-                      
-                      {/* Action Buttons */}
-                      <div className="flex items-center gap-1">
-                        <Link to={`/packages/${createSlugWithId(pkg.name, pkg.id)}`}>
-                          <button className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-colors" title="View">
-                            <Eye className="w-4 h-4" />
-                          </button>
-                        </Link>
-                        <Link to={`/packages/edit/${pkg.id}`}>
-                          <button className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors" title="Edit">
-                            <Pencil className="w-4 h-4" />
-                          </button>
-                        </Link>
-                        <button
-                          onClick={() => handleToggleStatus(pkg.id)}
-                          className={`p-1.5 rounded-md transition-colors ${
-                            pkg.is_active 
-                              ? 'text-gray-400 hover:text-orange-600 hover:bg-orange-50' 
-                              : 'text-orange-600 hover:text-orange-700 hover:bg-orange-50'
-                          }`}
-                          title={pkg.is_active ? 'Deactivate' : 'Activate'}
+                    <div className="mb-3">
+                      <p className="text-sm text-gray-600 line-clamp-2 mb-2">{pkg.description || "No description"}</p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium ${typeDisplay.bgColor} ${typeDisplay.color}`}>
+                          <TypeIcon className="w-3 h-3" />
+                          {typeDisplay.label}
+                        </span>
+                        {pkg.category && (
+                          <span className={`inline-block px-2 py-1 rounded text-xs font-medium bg-${themeColor}-100 text-${fullColor}`}>
+                            {pkg.category}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="pt-3 border-t border-gray-100">
+                      <div className="flex justify-between items-center mb-3">
+                        <span className="text-lg font-bold text-gray-900">${Number(pkg.price).toFixed(2)}</span>
+                        {pkg.max_participants && (
+                          <div className="flex items-center gap-1 text-xs text-gray-500">
+                            <Users className="w-3 h-3" />
+                            <span>{pkg.max_participants}</span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex gap-1">
+                        <Link
+                          to={`/packages/${createSlugWithId(pkg.name, pkg.id)}`}
+                          className={`flex-1 p-1.5 text-${fullColor} hover:bg-${themeColor}-100 rounded transition-colors flex items-center justify-center`}
+                          title="View details"
                         >
-                          <Power className="w-4 h-4" />
-                        </button>
-                        <button
+                          <Eye className="w-4 h-4" />
+                        </Link>
+                        <Link
+                          to={`/packages/edit/${pkg.id}`}
+                          className={`flex-1 p-1.5 text-${fullColor} hover:bg-${themeColor}-100 rounded transition-colors flex items-center justify-center`}
+                          title="Edit package"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </Link>
+                        <StandardButton
                           onClick={() => handleDelete(pkg.id)}
-                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
-                          title="Delete"
+                          variant="danger"
+                          size="sm"
+                          icon={Trash2}
+                          className="flex-1"
                         >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                          {""}
+                        </StandardButton>
                       </div>
                     </div>
                   </div>
-
-                  {/* Location (if company admin) */}
-                  {isCompanyAdmin && pkg.location && (
-                    <div className="px-4 pb-3 pt-0">
-                      <div className="flex items-center gap-1 text-xs text-gray-500">
-                        <MapPin className="w-3 h-3" />
-                        {pkg.location.name}
-                      </div>
-                    </div>
-                  )}
                 </div>
               );
             })}
