@@ -424,7 +424,7 @@ const CustomPackages: React.FC = () => {
                       </div>
                       <div className="flex gap-1">
                         <Link
-                          to={`/packages/${createSlugWithId(pkg.name, pkg.id)}`}
+                          to={`/packages/details/${createSlugWithId(pkg.name, pkg.id)}`}
                           className={`flex-1 p-1.5 text-${fullColor} hover:bg-${themeColor}-100 rounded transition-colors flex items-center justify-center`}
                           title="View details"
                         >
