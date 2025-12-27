@@ -883,7 +883,7 @@ const Rooms: React.FC = () => {
                                                                         {formatTime12Hour(bt.start_time)} - {formatTime12Hour(bt.end_time)}
                                                                     </div>
                                                                     <div className="text-xs text-gray-500">
-                                                                        {bt.days.map(d => d.charAt(0).toUpperCase() + d.slice(0, 2)).join(', ')}
+                                                                        {bt.days.map(d => d.charAt(0).toUpperCase() + d.slice(1, 3)).join(', ')}
                                                                     </div>
                                                                 </div>
                                                             </div>
@@ -1103,7 +1103,7 @@ const Rooms: React.FC = () => {
                                                                         {formatTime12Hour(bt.start_time)} - {formatTime12Hour(bt.end_time)}
                                                                     </div>
                                                                     <div className="text-xs text-gray-500">
-                                                                        {bt.days.map(d => d.charAt(0).toUpperCase() + d.slice(0, 2)).join(', ')}
+                                                                        {bt.days.map(d => d.charAt(0).toUpperCase() + d.slice(1, 3)).join(', ')}
                                                                     </div>
                                                                 </div>
                                                             </div>
@@ -1322,7 +1322,7 @@ const Rooms: React.FC = () => {
                                                                 {formatTime12Hour(bt.start_time)} - {formatTime12Hour(bt.end_time)}
                                                             </div>
                                                             <div className="text-xs text-gray-500">
-                                                                {bt.days.map(d => d.charAt(0).toUpperCase() + d.slice(0, 2)).join(', ')}
+                                                                {bt.days.map(d => d.charAt(0).toUpperCase() + d.slice(1, 3)).join(', ')}
                                                             </div>
                                                         </div>
                                                     </div>

@@ -926,40 +926,43 @@ const DayOffs: React.FC = () => {
 
             {/* Bulk Create Modal */}
             {showBulkModal && (
-                <div className="fixed inset-0 z-50 overflow-y-auto">
-                    <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-                        <div className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" onClick={() => !bulkCreating && setShowBulkModal(false)} />
-                        <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-                        <div className="inline-block overflow-hidden text-left align-bottom transition-all transform bg-white rounded-lg shadow-xl sm:my-8 sm:align-middle sm:w-full sm:max-w-6xl max-h-[90vh] overflow-y-auto">
-                            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white z-10">
-                                <h3 className="text-lg font-semibold text-gray-900">Bulk Add Day Offs</h3>
-                                <div className="flex items-center gap-4">
-                                    <button
-                                        onClick={() => setBulkYear(prev => prev - 1)}
-                                        className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-                                        disabled={bulkCreating}
-                                    >
-                                        <ChevronLeft className="w-5 h-5" />
-                                    </button>
-                                    <span className="text-lg font-bold min-w-[60px] text-center">{bulkYear}</span>
-                                    <button
-                                        onClick={() => setBulkYear(prev => prev + 1)}
-                                        className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-                                        disabled={bulkCreating}
-                                    >
-                                        <ChevronRight className="w-5 h-5" />
-                                    </button>
-                                </div>
+                <div 
+                    className="fixed inset-0 bg-black/50 flex items-start justify-center p-4 z-50 overflow-y-auto" 
+                    onClick={() => !bulkCreating && setShowBulkModal(false)}
+                >
+                    <div 
+                        className="bg-white rounded-lg shadow-xl w-full max-w-6xl my-8" 
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white z-10 rounded-t-lg">
+                            <h3 className="text-lg font-semibold text-gray-900">Bulk Add Day Offs</h3>
+                            <div className="flex items-center gap-4">
                                 <button
-                                    onClick={() => !bulkCreating && setShowBulkModal(false)}
-                                    className="text-gray-400 hover:text-gray-600"
+                                    onClick={() => setBulkYear(prev => prev - 1)}
+                                    className="p-2 hover:bg-gray-100 rounded-full transition-colors"
                                     disabled={bulkCreating}
                                 >
-                                    <X className="w-5 h-5" />
+                                    <ChevronLeft className="w-5 h-5" />
+                                </button>
+                                <span className="text-lg font-bold min-w-[60px] text-center">{bulkYear}</span>
+                                <button
+                                    onClick={() => setBulkYear(prev => prev + 1)}
+                                    className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                                    disabled={bulkCreating}
+                                >
+                                    <ChevronRight className="w-5 h-5" />
                                 </button>
                             </div>
+                            <button
+                                onClick={() => !bulkCreating && setShowBulkModal(false)}
+                                className="text-gray-400 hover:text-gray-600"
+                                disabled={bulkCreating}
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
 
-                            <div className="p-6">
+                        <div className="p-6">
                                 {/* Location selector for company admin */}
                                 {isCompanyAdmin && (
                                     <div className="mb-4">
@@ -1096,7 +1099,6 @@ const DayOffs: React.FC = () => {
                             </div>
                         </div>
                     </div>
-                </div>
             )}
 
             {/* Toast */}
