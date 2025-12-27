@@ -357,39 +357,41 @@ const SpaceSchedule = () => {
             </StandardButton>
           </div>
 
-         
+          {/* Right Side Controls */}
+          <div className="flex items-center gap-2">
+            <StandardButton
+              variant="primary"
+              onClick={goToToday}
+            >
+              Today
+            </StandardButton>
 
-          {/* Legend Tooltip */}
-          <div className="relative group">
-             <StandardButton
-            variant="primary"
-            onClick={goToToday}
-          >
-            Today
-          </StandardButton>
-            <button className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition">
-              <Info className="w-5 h-5" />
-            </button>
-            <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 p-3 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20">
-              <div className="text-xs font-medium text-gray-700 mb-2">Legend</div>
-              <div className="space-y-2 text-xs">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 bg-green-100 rounded"></div>
-                  <span className="text-gray-600">Confirmed</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 bg-yellow-100 rounded"></div>
-                  <span className="text-gray-600">Pending</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 bg-blue-100 rounded"></div>
-                  <span className="text-gray-600">Checked In</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 bg-gray-200 rounded border border-dashed border-gray-400 flex items-center justify-center">
-                    <Coffee className="w-1.5 h-1.5 text-gray-500" />
+            {/* Legend Tooltip */}
+            <div className="relative group">
+              <button className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition">
+                <Info className="w-5 h-5" />
+              </button>
+              <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 p-3 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20">
+                <div className="text-xs font-medium text-gray-700 mb-2">Legend</div>
+                <div className="space-y-2 text-xs">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 bg-green-100 rounded"></div>
+                    <span className="text-gray-600">Confirmed</span>
                   </div>
-                  <span className="text-gray-600">Break Time</span>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 bg-yellow-100 rounded"></div>
+                    <span className="text-gray-600">Pending</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 bg-blue-100 rounded"></div>
+                    <span className="text-gray-600">Checked In</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 bg-gray-200 rounded border border-dashed border-gray-400 flex items-center justify-center">
+                      <Coffee className="w-1.5 h-1.5 text-gray-500" />
+                    </div>
+                    <span className="text-gray-600">Break Time</span>
+                  </div>
                 </div>
               </div>
             </div>
