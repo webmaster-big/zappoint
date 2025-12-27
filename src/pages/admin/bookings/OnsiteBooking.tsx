@@ -1679,7 +1679,7 @@ const OnsiteBooking: React.FC = () => {
         <StandardButton
           type="button"
           variant="secondary"
-          onClick={() => { setStep(1); scrollToTop(); }}
+          onClick={() => setStep(1)}
           className="flex-1"
         >
           Back to Packages
@@ -1866,7 +1866,7 @@ const OnsiteBooking: React.FC = () => {
         <StandardButton
           type="button"
           variant="secondary"
-          onClick={() => { setStep(2); scrollToTop(); }}
+          onClick={() => setStep(2)}
           className="flex-1"
         >
           Back to Date & Time
@@ -2073,7 +2073,7 @@ const OnsiteBooking: React.FC = () => {
         <StandardButton
           type="button"
           variant="secondary"
-          onClick={() => { setStep(3); scrollToTop(); }}
+          onClick={() => setStep(3)}
           className="flex-1"
         >
           Back
@@ -2658,7 +2658,7 @@ const OnsiteBooking: React.FC = () => {
         <StandardButton
           type="button"
           variant="secondary"
-          onClick={() => { setStep(4); scrollToTop(); }}
+          onClick={() => setStep(4)}
           className="flex-1"
         >
           Back

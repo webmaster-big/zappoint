@@ -973,10 +973,7 @@ const PurchaseAttraction = () => {
                     <StandardButton
                       variant="secondary"
                       size="md"
-                      onClick={() => {
-                        setCurrentStep(1);
-                        window.scrollTo({ top: 0, behavior: 'smooth' });
-                      }}
+                      onClick={() => setCurrentStep(1)}
                     >
                       <span className="sm:hidden">←</span>
                       <span className="hidden sm:inline">← Back</span>
@@ -1123,10 +1120,7 @@ const PurchaseAttraction = () => {
                     <StandardButton
                       variant="secondary"
                       size="md"
-                      onClick={() => {
-                        setCurrentStep(2);
-                        window.scrollTo({ top: 0, behavior: 'smooth' });
-                      }}
+                      onClick={() => setCurrentStep(2)}
                       disabled={submitting}
                     >
                       <span className="sm:hidden">←</span>

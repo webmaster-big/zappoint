@@ -1715,10 +1715,7 @@ const BookPackage: React.FC = () => {
                   <StandardButton 
                     variant="secondary"
                     size="md"
-                    onClick={() => {
-                      setCurrentStep(1);
-                      window.scrollTo({ top: 0, behavior: 'smooth' });
-                    }}
+                    onClick={() => setCurrentStep(1)}
                     className="flex items-center"
                   >
                     <svg className="mr-1 md:mr-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -1960,10 +1957,7 @@ const BookPackage: React.FC = () => {
                   <StandardButton 
                     variant="secondary"
                     size="md"
-                    onClick={() => {
-                      setCurrentStep(2);
-                      window.scrollTo({ top: 0, behavior: 'smooth' });
-                    }}
+                    onClick={() => setCurrentStep(2)}
                     className="flex items-center justify-center"
                   >
                     <svg className="mr-1 md:mr-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
