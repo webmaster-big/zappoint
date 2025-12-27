@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Edit2, Trash2, Calendar, MapPin, CheckSquare, Square, Plus, X, CalendarOff, RefreshCw } from 'lucide-react';
+import { Search, Edit2, Trash2, Calendar, MapPin, CheckSquare, Square, Plus, X, CalendarOff, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
 import StandardButton from '../../../components/ui/StandardButton';
 import Toast from '../../../components/ui/Toast';
 import { dayOffService, locationService } from '../../../services';
@@ -47,6 +47,14 @@ const DayOffs: React.FC = () => {
         reason: '',
         is_recurring: false
     });
+
+    // Multi-select calendar state
+    const [showBulkModal, setShowBulkModal] = useState(false);
+    const [bulkYear, setBulkYear] = useState(new Date().getFullYear());
+    const [bulkSelectedDates, setBulkSelectedDates] = useState<Set<string>>(new Set());
+    const [bulkReason, setBulkReason] = useState('');
+    const [bulkIsRecurring, setBulkIsRecurring] = useState(false);
+    const [bulkCreating, setBulkCreating] = useState(false);
 
     // Toast state
     const [toast, setToast] = useState<{ message: string; type?: "success" | "error" | "info" } | null>(null);
@@ -302,6 +310,91 @@ const DayOffs: React.FC = () => {
         return date < today;
     };
 
+    // Bulk calendar helper functions
+    const getDaysInMonth = (year: number, month: number) => {
+        return new Date(year, month + 1, 0).getDate();
+    };
+
+    const getFirstDayOfMonth = (year: number, month: number) => {
+        return new Date(year, month, 1).getDay();
+    };
+
+    const formatDateString = (year: number, month: number, day: number) => {
+        return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    };
+
+    const toggleBulkDate = (dateStr: string) => {
+        setBulkSelectedDates(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(dateStr)) {
+                newSet.delete(dateStr);
+            } else {
+                newSet.add(dateStr);
+            }
+            return newSet;
+        });
+    };
+
+    const isBulkDatePast = (dateStr: string) => {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const date = new Date(dateStr);
+        return date < today;
+    };
+
+    const handleBulkCreateDayOffs = async () => {
+        if (bulkSelectedDates.size === 0) {
+            setToast({ message: 'Please select at least one date', type: 'info' });
+            return;
+        }
+
+        setBulkCreating(true);
+        let successCount = 0;
+        let failCount = 0;
+
+        const sortedDates = Array.from(bulkSelectedDates).sort();
+
+        // Use modal location for company_admin, default to user's location_id otherwise
+        const locationId = isCompanyAdmin && modalLocationId 
+            ? modalLocationId 
+            : (currentUser?.location_id || 1);
+
+        for (const dateStr of sortedDates) {
+            try {
+                await dayOffService.createDayOff({
+                    location_id: locationId,
+                    date: dateStr,
+                    reason: bulkReason || undefined,
+                    is_recurring: bulkIsRecurring
+                });
+                successCount++;
+            } catch (error) {
+                console.error(`Failed to create day off for ${dateStr}:`, error);
+                failCount++;
+            }
+        }
+
+        setBulkCreating(false);
+
+        if (successCount > 0) {
+            setToast({ 
+                message: `Created ${successCount} day off${successCount > 1 ? 's' : ''}${failCount > 0 ? ` (${failCount} failed)` : ''}`, 
+                type: failCount > 0 ? 'info' : 'success' 
+            });
+            fetchDayOffs();
+        } else {
+            setToast({ message: 'Failed to create day offs', type: 'error' });
+        }
+
+        setShowBulkModal(false);
+        setBulkSelectedDates(new Set());
+        setBulkReason('');
+        setBulkIsRecurring(false);
+    };
+
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
+                        'July', 'August', 'September', 'October', 'November', 'December'];
+
     return (
         <div className="px-6 py-8">
             {/* Page Header with Action Buttons */}
@@ -321,6 +414,23 @@ const DayOffs: React.FC = () => {
                             {selectionMode ? 'Cancel' : 'Select'}
                         </StandardButton>
                     )}
+                    <StandardButton
+                        onClick={() => {
+                            setBulkYear(new Date().getFullYear());
+                            setBulkSelectedDates(new Set());
+                            setBulkReason('');
+                            setBulkIsRecurring(false);
+                            if (isCompanyAdmin && locations.length > 0) {
+                                setModalLocationId(locations[0].id);
+                            }
+                            setShowBulkModal(true);
+                        }}
+                        variant="secondary"
+                        size="md"
+                        icon={Calendar}
+                    >
+                        Bulk Add
+                    </StandardButton>
                     <StandardButton
                         onClick={() => {
                             resetForm();
@@ -809,6 +919,181 @@ const DayOffs: React.FC = () => {
                                     </StandardButton>
                                 </div>
                             </form>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Bulk Create Modal */}
+            {showBulkModal && (
+                <div className="fixed inset-0 z-50 overflow-y-auto">
+                    <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+                        <div className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" onClick={() => !bulkCreating && setShowBulkModal(false)} />
+                        <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+                        <div className="inline-block overflow-hidden text-left align-bottom transition-all transform bg-white rounded-lg shadow-xl sm:my-8 sm:align-middle sm:w-full sm:max-w-6xl max-h-[90vh] overflow-y-auto">
+                            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white z-10">
+                                <h3 className="text-lg font-semibold text-gray-900">Bulk Add Day Offs</h3>
+                                <div className="flex items-center gap-4">
+                                    <button
+                                        onClick={() => setBulkYear(prev => prev - 1)}
+                                        className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                                        disabled={bulkCreating}
+                                    >
+                                        <ChevronLeft className="w-5 h-5" />
+                                    </button>
+                                    <span className="text-lg font-bold min-w-[60px] text-center">{bulkYear}</span>
+                                    <button
+                                        onClick={() => setBulkYear(prev => prev + 1)}
+                                        className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                                        disabled={bulkCreating}
+                                    >
+                                        <ChevronRight className="w-5 h-5" />
+                                    </button>
+                                </div>
+                                <button
+                                    onClick={() => !bulkCreating && setShowBulkModal(false)}
+                                    className="text-gray-400 hover:text-gray-600"
+                                    disabled={bulkCreating}
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
+
+                            <div className="p-6">
+                                {/* Location selector for company admin */}
+                                {isCompanyAdmin && (
+                                    <div className="mb-4">
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
+                                        <select
+                                            value={modalLocationId || ''}
+                                            onChange={(e) => setModalLocationId(Number(e.target.value))}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                            disabled={bulkCreating}
+                                        >
+                                            {locations.map(loc => (
+                                                <option key={loc.id} value={loc.id}>{loc.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
+
+                                {/* Selected count */}
+                                <div className="mb-4 flex items-center justify-between">
+                                    <span className="text-sm text-gray-600">
+                                        {bulkSelectedDates.size} date{bulkSelectedDates.size !== 1 ? 's' : ''} selected
+                                    </span>
+                                    {bulkSelectedDates.size > 0 && (
+                                        <button
+                                            onClick={() => setBulkSelectedDates(new Set())}
+                                            className="text-sm text-red-600 hover:text-red-800"
+                                            disabled={bulkCreating}
+                                        >
+                                            Clear all
+                                        </button>
+                                    )}
+                                </div>
+
+                                {/* Calendar grid - 12 months */}
+                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
+                                    {monthNames.map((monthName, monthIndex) => (
+                                        <div key={monthIndex} className="border border-gray-200 rounded-lg p-3">
+                                            <h4 className="text-sm font-semibold text-gray-700 mb-2 text-center">{monthName}</h4>
+                                            <div className="grid grid-cols-7 gap-1 text-xs">
+                                                {/* Day headers */}
+                                                {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, i) => (
+                                                    <div key={i} className="text-center text-gray-400 font-medium py-1">{day}</div>
+                                                ))}
+                                                {/* Empty cells for first day offset */}
+                                                {Array.from({ length: getFirstDayOfMonth(bulkYear, monthIndex) }).map((_, i) => (
+                                                    <div key={`empty-${i}`} />
+                                                ))}
+                                                {/* Day cells */}
+                                                {Array.from({ length: getDaysInMonth(bulkYear, monthIndex) }).map((_, dayIndex) => {
+                                                    const day = dayIndex + 1;
+                                                    const dateStr = formatDateString(bulkYear, monthIndex, day);
+                                                    const isSelected = bulkSelectedDates.has(dateStr);
+                                                    const isPast = isBulkDatePast(dateStr);
+                                                    
+                                                    return (
+                                                        <button
+                                                            key={day}
+                                                            onClick={() => !isPast && !bulkCreating && toggleBulkDate(dateStr)}
+                                                            disabled={isPast || bulkCreating}
+                                                            className={`
+                                                                p-1 rounded text-center transition-colors
+                                                                ${isPast 
+                                                                    ? 'text-gray-300 cursor-not-allowed' 
+                                                                    : isSelected 
+                                                                        ? `bg-${themeColor}-500 text-white hover:bg-${themeColor}-600` 
+                                                                        : 'hover:bg-gray-100 text-gray-700'
+                                                                }
+                                                            `}
+                                                            style={isSelected && !isPast ? { backgroundColor: fullColor, color: 'white' } : undefined}
+                                                        >
+                                                            {day}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {/* Reason and recurring options */}
+                                <div className="space-y-4 border-t pt-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Reason (optional - applies to all selected dates)
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={bulkReason}
+                                            onChange={(e) => setBulkReason(e.target.value)}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                            placeholder="e.g., Holiday, Maintenance, etc."
+                                            disabled={bulkCreating}
+                                        />
+                                    </div>
+
+                                    <div className="flex items-center">
+                                        <input
+                                            type="checkbox"
+                                            checked={bulkIsRecurring}
+                                            onChange={(e) => setBulkIsRecurring(e.target.checked)}
+                                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                            disabled={bulkCreating}
+                                        />
+                                        <label className="ml-2 block text-sm text-gray-900">
+                                            Recurring annually
+                                        </label>
+                                    </div>
+                                </div>
+
+                                {/* Actions */}
+                                <div className="flex gap-3 pt-6">
+                                    <StandardButton
+                                        onClick={handleBulkCreateDayOffs}
+                                        variant="primary"
+                                        size="md"
+                                        className="flex-1"
+                                        disabled={bulkSelectedDates.size === 0 || bulkCreating}
+                                    >
+                                        {bulkCreating 
+                                            ? 'Creating...' 
+                                            : `Create ${bulkSelectedDates.size} Day Off${bulkSelectedDates.size !== 1 ? 's' : ''}`
+                                        }
+                                    </StandardButton>
+                                    <StandardButton
+                                        onClick={() => setShowBulkModal(false)}
+                                        variant="secondary"
+                                        size="md"
+                                        className="flex-1"
+                                        disabled={bulkCreating}
+                                    >
+                                        Cancel
+                                    </StandardButton>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
