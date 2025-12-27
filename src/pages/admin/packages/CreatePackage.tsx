@@ -144,6 +144,7 @@ const CreatePackage: React.FC = () => {
         name: "",
         description: "",
         category: "",
+        packageType: "regular", // 'regular', 'holiday', 'special', 'seasonal'
         features: [""] as string[],
         attractions: [] as string[],
         rooms: [] as string[],
@@ -435,6 +436,7 @@ const CreatePackage: React.FC = () => {
                 name: form.name,
                 description: form.description,
                 category: form.category,
+                package_type: form.packageType,
                 features: form.features.filter(f => f.trim()), // Filter out empty features
                 price: Number(price.toFixed(2)), // Ensure 2 decimal places
                 min_participants: minParticipants,
@@ -501,6 +503,7 @@ const CreatePackage: React.FC = () => {
                 name: "",
                 description: "",
                 category: "",
+                packageType: "regular",
                 features: [""],
                 attractions: [],
                 rooms: [],
@@ -780,6 +783,27 @@ const CreatePackage: React.FC = () => {
                                             </div>
                                         </div>
                                     </div>
+
+                                    {/* Package Type */}
+                                    <div>
+                                        <label className="block font-semibold mb-2 text-base text-neutral-800">Package Type</label>
+                                        <select
+                                            name="packageType"
+                                            value={form.packageType}
+                                            onChange={handleChange}
+                                            className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all`}
+                                        >
+                                            <option value="regular">Regular</option>
+                                            <option value="custom">Custom</option>
+                                            <option value="holiday">Holiday</option>
+                                            <option value="special">Special</option>
+                                            <option value="seasonal">Seasonal</option>
+                                        </select>
+                                        <p className="text-xs text-gray-500 mt-1">
+                                            Use "Regular" for standard packages. Other types will appear in the Custom Packages section.
+                                        </p>
+                                    </div>
+
                                     {/* Features input below category */}
                                     <div>
                                         <label className="block font-semibold mb-2 text-base text-neutral-800">Features</label>
@@ -1475,6 +1499,7 @@ const CreatePackage: React.FC = () => {
                                         name: "",
                                         description: "",
                                         category: "",
+                                        packageType: "regular",
                                         features: [""],
                                         attractions: [],
                                         rooms: [],

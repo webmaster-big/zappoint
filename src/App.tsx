@@ -11,6 +11,7 @@ import Login from "./pages/auth/Login"
 import CreatePackage from "./pages/admin/packages/CreatePackage"
 import EditPackage from "./pages/admin/packages/EditPackage"
 import Packages from "./pages/admin/packages/Packages"
+import CustomPackages from "./pages/admin/packages/CustomPackages"
 import BookPackage from "./pages/admin/bookings/BookPackage"
 import GiftCard from "./pages/admin/packages/GiftCard"
 import Promo from "./pages/admin/packages/Promo"
@@ -109,6 +110,7 @@ function App() {
           <Route path="/packages/create" element={<CreatePackage />} />
           <Route path="/packages/edit/:id" element={<EditPackage />} />
           <Route path="/packages" element={<Packages />} />
+          <Route path="/packages/custom" element={<CustomPackages />} />
           <Route path="/packages/details/:slug" element={<PackageDetails />} />
           <Route path="/packages/promos" element={<Promo />} />
           <Route path="/packages/rooms" element={<Rooms />} />

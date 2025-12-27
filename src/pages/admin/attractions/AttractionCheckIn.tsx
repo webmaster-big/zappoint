@@ -387,7 +387,7 @@ const AttractionCheckIn = () => {
                 <div className="flex flex-col sm:flex-row gap-4">
                   <StandardButton
                     variant="primary"
-                    size="lg"
+                    size="md"
                     onClick={startScanning}
                     disabled={processing}
                     icon={Camera}
@@ -395,17 +395,23 @@ const AttractionCheckIn = () => {
                     Start Camera
                   </StandardButton>
 
-                  <label className="px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors flex items-center gap-2 cursor-pointer" title="Upload a QR code image from your device">
-                    <Upload className="h-5 w-5" />
+                  <StandardButton
+                    variant="secondary"
+                    size="md"
+                    onClick={() => document.getElementById('attraction-qr-file-upload')?.click()}
+                    disabled={processing}
+                    icon={Upload}
+                  >
                     Upload Image
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleFileUpload}
-                      className="hidden"
-                      disabled={processing}
-                    />
-                  </label>
+                  </StandardButton>
+                  <input
+                    id="attraction-qr-file-upload"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                    disabled={processing}
+                  />
                 </div>
               </div>
             )}
@@ -629,7 +635,7 @@ const AttractionCheckIn = () => {
               <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 p-6 flex gap-4">
                 <StandardButton
                   variant="secondary"
-                  size="lg"
+                  size="md"
                   onClick={handleCancelCheckIn}
                   fullWidth
                 >
@@ -639,7 +645,7 @@ const AttractionCheckIn = () => {
                 {verifiedPurchase.status === 'pending' && (
                   <StandardButton
                     variant="primary"
-                    size="lg"
+                    size="md"
                     onClick={handleConfirmCheckIn}
                     disabled={processing}
                     loading={processing}
@@ -653,7 +659,7 @@ const AttractionCheckIn = () => {
                 {verifiedPurchase.status !== 'pending' && (
                   <StandardButton
                     variant="primary"
-                    size="lg"
+                    size="md"
                     onClick={handleCancelCheckIn}
                     fullWidth
                   >
@@ -781,7 +787,7 @@ const AttractionCheckIn = () => {
             <div className="flex gap-4">
               <StandardButton
                 variant="primary"
-                size="lg"
+                size="md"
                 onClick={() => {
                   resetScan();
                   startScanning();
@@ -794,7 +800,7 @@ const AttractionCheckIn = () => {
               
               <StandardButton
                 variant="secondary"
-                size="lg"
+                size="md"
                 onClick={resetScan}
               >
                 Reset

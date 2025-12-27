@@ -30,7 +30,8 @@ import {
   Gift,
   FileText,
   UserCog,
-  CalendarOff
+  CalendarOff,
+  Sparkles
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -137,6 +138,7 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
         ]},
         { label: 'Packages', icon: Package, section: 'Packages', items: [
           { label: 'Manage Packages', href: '/packages', icon: List },
+          { label: 'Custom Packages', href: '/packages/custom', icon: Sparkles },
           { label: 'Create Package', href: '/packages/create', icon: Plus },
           { label: 'Space', href: '/packages/rooms', icon: DoorOpen },
           { label: 'Add-ons', href: '/packages/add-ons', icon: UtensilsCrossed },
@@ -166,6 +168,7 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
         ]},
         { label: 'Packages', icon: Package, section: 'Packages', items: [
           { label: 'Manage Packages', href: '/packages', icon: List },
+          { label: 'Custom Packages', href: '/packages/custom', icon: Sparkles },
           { label: 'Create Package', href: '/packages/create', icon: Plus },
           { label: 'Space', href: '/packages/rooms', icon: DoorOpen },
           { label: 'Add-ons', href: '/packages/add-ons', icon: UtensilsCrossed },
@@ -205,6 +208,7 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
         ]},
         { label: 'Packages', icon: Package, section: 'Packages', items: [
           { label: 'Manage Packages', href: '/packages', icon: List },
+          { label: 'Custom Packages', href: '/packages/custom', icon: Sparkles },
           { label: 'Create Package', href: '/packages/create', icon: Plus },
           { label: 'Space', href: '/packages/rooms', icon: DoorOpen },
           { label: 'Add-ons', href: '/packages/add-ons', icon: UtensilsCrossed },

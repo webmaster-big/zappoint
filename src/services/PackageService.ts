@@ -31,6 +31,7 @@ export interface Package {
   name: string;
   description: string;
   category: string;
+  package_type: string; // 'regular', 'holiday', 'special', 'seasonal', etc.
   features?: string | string[]; // Support both string and array for backward compatibility
   price: number;
   price_per_additional?: number;
@@ -87,6 +88,7 @@ export interface Package {
 export interface PackageFilters {
   location_id?: number;
   category?: string;
+  package_type?: string;
   is_active?: boolean;
   search?: string;
   sort_by?: 'id' | 'name' | 'price' | 'created_at' | 'category';
@@ -111,6 +113,7 @@ export interface CreatePackageData {
   name: string;
   description: string;
   category: string;
+  package_type?: string; // 'regular', 'holiday', 'special', 'seasonal', etc.
   features?: string | string[]; // Support both string and array for backward compatibility
   price: number;
   price_per_additional?: number;

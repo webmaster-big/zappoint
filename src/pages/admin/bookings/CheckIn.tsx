@@ -605,6 +605,7 @@ const CheckIn: React.FC = () => {
                 <div className="flex flex-col sm:flex-row gap-4">
                   <StandardButton
                     variant="primary"
+                    size="md"
                     icon={Camera}
                     onClick={startScanning}
                     disabled={processing}
@@ -612,17 +613,23 @@ const CheckIn: React.FC = () => {
                     Start Camera
                   </StandardButton>
 
-                  <label className="px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors flex items-center gap-2 cursor-pointer" title="Upload a QR code image from your device">
-                    <Upload className="h-5 w-5" />
+                  <StandardButton
+                    variant="secondary"
+                    size="md"
+                    icon={Upload}
+                    onClick={() => document.getElementById('qr-file-upload')?.click()}
+                    disabled={processing}
+                  >
                     Upload Image
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleFileUpload}
-                      className="hidden"
-                      disabled={processing}
-                    />
-                  </label>
+                  </StandardButton>
+                  <input
+                    id="qr-file-upload"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                    disabled={processing}
+                  />
                 </div>
               </div>
             )}
@@ -641,6 +648,7 @@ const CheckIn: React.FC = () => {
             <div className="mt-4 flex justify-center">
               <StandardButton
                 variant="danger"
+                size="md"
                 onClick={stopScanning}
               >
                 Stop Camera
@@ -1178,6 +1186,7 @@ const CheckIn: React.FC = () => {
               <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 p-6 flex gap-4">
                 <StandardButton
                   variant="secondary"
+                  size="md"
                   onClick={handleCancelCheckIn}
                   className="flex-1"
                 >
@@ -1188,6 +1197,7 @@ const CheckIn: React.FC = () => {
                 {verifiedBooking.payment_status !== 'paid' && (
                   <StandardButton
                     variant="primary"
+                    size="md"
                     icon={DollarSign}
                     onClick={() => handleOpenPaymentModal(verifiedBooking)}
                     disabled={processing || processingPayment}
@@ -1201,6 +1211,7 @@ const CheckIn: React.FC = () => {
                 {verifiedBooking.payment_status === 'paid' && (
                   <StandardButton
                     variant="success"
+                    size="md"
                     icon={processing ? RefreshCw : CheckCircle}
                     onClick={handleConfirmCheckIn}
                     disabled={processing}
@@ -1247,6 +1258,7 @@ const CheckIn: React.FC = () => {
             <div className="flex gap-4">
               <StandardButton
                 variant="primary"
+                size="md"
                 icon={Camera}
                 onClick={() => {
                   resetScan();
@@ -1259,6 +1271,7 @@ const CheckIn: React.FC = () => {
               
               <StandardButton
                 variant="secondary"
+                size="md"
                 onClick={resetScan}
               >
                 Reset
