@@ -1238,18 +1238,6 @@ const Rooms: React.FC = () => {
                                     </StandardButton>
                                 </div>
                             </form>
-
-                            {/* Bottom Close Button */}
-                            <div className="mt-6 pt-4 border-t border-gray-200">
-                                <StandardButton
-                                    onClick={() => setShowCreateModal(false)}
-                                    variant="ghost"
-                                    size="md"
-                                    className="w-full"
-                                >
-                                    Close
-                                </StandardButton>
-                            </div>
                         </div>
                     </div>
                 </div>
