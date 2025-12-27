@@ -4,6 +4,7 @@ import QRCode from 'qrcode';
 import type { BookPackagePackage } from '../../../types/BookPackage.types';
 import bookingService from '../../../services/bookingService';
 import timeSlotService, { type TimeSlot } from '../../../services/timeSlotService';
+import { dayOffService, type DayOff } from '../../../services/DayOffService';
 import { getImageUrl, formatTimeTo12Hour } from "../../../utils/storage";
 import { loadAcceptJS, processCardPayment, validateCardNumber, formatCardNumber, getCardType, updatePayment } from '../../../services/PaymentService';
 import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
@@ -93,6 +94,7 @@ const BookPackage: React.FC = () => {
   const [availableDates, setAvailableDates] = useState<Date[]>([]);
   const [availableTimeSlots, setAvailableTimeSlots] = useState<TimeSlot[]>([]);
   const [loadingTimeSlots, setLoadingTimeSlots] = useState(false);
+  const [dayOffs, setDayOffs] = useState<Date[]>([]);
   
   // Confirmation modal state
   const [showConfirmation, setShowConfirmation] = useState(false);
@@ -266,6 +268,52 @@ const BookPackage: React.FC = () => {
     
     initializeAuthorizeNet();
   }, [authorizeEnvironment]);
+
+  // Fetch day offs for the package's location
+  useEffect(() => {
+    const fetchDayOffs = async () => {
+      if (!pkg?.location_id) return;
+      
+      try {
+        const response = await dayOffService.getDayOffsByLocation(pkg.location_id);
+        if (response.success && response.data) {
+          // Convert day off dates to Date objects
+          // Also handle recurring day offs (same month/day each year)
+          const dayOffDates: Date[] = [];
+          const today = new Date();
+          const futureLimit = new Date();
+          futureLimit.setFullYear(futureLimit.getFullYear() + 1); // Look 1 year ahead
+          
+          response.data.forEach((dayOff: DayOff) => {
+            const offDate = new Date(dayOff.date);
+            
+            if (dayOff.is_recurring) {
+              // For recurring, add for current year and next year
+              const currentYearDate = new Date(today.getFullYear(), offDate.getMonth(), offDate.getDate());
+              const nextYearDate = new Date(today.getFullYear() + 1, offDate.getMonth(), offDate.getDate());
+              
+              if (currentYearDate >= today) {
+                dayOffDates.push(currentYearDate);
+              }
+              dayOffDates.push(nextYearDate);
+            } else {
+              // Non-recurring, just add the date if it's not in the past
+              if (offDate >= today) {
+                dayOffDates.push(offDate);
+              }
+            }
+          });
+          
+          setDayOffs(dayOffDates);
+          console.log('📅 Day offs loaded:', dayOffDates.length, 'dates');
+        }
+      } catch (error) {
+        console.error('Error fetching day offs:', error);
+      }
+    };
+    
+    fetchDayOffs();
+  }, [pkg?.location_id]);
 
   // Helper function to get week of month (1-5, where 5 is last week)
   const getWeekOfMonth = (date: Date): number => {
@@ -1166,6 +1214,7 @@ const BookPackage: React.FC = () => {
                         selectedDate={selectedDate}
                         availableDates={availableDates}
                         onChange={(date) => setSelectedDate(date)}
+                        dayOffs={dayOffs}
                       />
                     </div>
                     

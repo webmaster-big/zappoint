@@ -16,6 +16,7 @@ import bookingService, { type CreateBookingData } from '../../../services/bookin
 import timeSlotService, { type TimeSlot } from '../../../services/timeSlotService';
 import customerService from '../../../services/CustomerService';
 import { locationService } from '../../../services/LocationService';
+import { dayOffService, type DayOff } from '../../../services/DayOffService';
 import { getImageUrl, getStoredUser, formatTimeTo12Hour } from '../../../utils/storage';
 import { loadAcceptJS, processCardPayment, validateCardNumber, formatCardNumber, getCardType } from '../../../services/PaymentService';
 import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
@@ -67,6 +68,7 @@ const OnsiteBooking: React.FC = () => {
   const [availableDates, setAvailableDates] = useState<Date[]>([]);
   const [availableTimeSlots, setAvailableTimeSlots] = useState<TimeSlot[]>([]);
   const [selectedRoomId, setSelectedRoomId] = useState<number | null>(null);
+  const [dayOffs, setDayOffs] = useState<Date[]>([]);
   const [loadingTimeSlots, setLoadingTimeSlots] = useState(false);
   const [loadingPackages, setLoadingPackages] = useState(true);
   const [loadingCustomer, setLoadingCustomer] = useState(false);
@@ -409,6 +411,52 @@ const OnsiteBooking: React.FC = () => {
       console.warn('⚠️ No available dates found for this package!');
     }
   }, [selectedPackage, bookingData.date]);
+
+  // Fetch day offs for the selected location
+  useEffect(() => {
+    const fetchDayOffs = async () => {
+      // For onsite booking, use the selected location
+      const locationId = selectedLocation || (isCompanyAdmin ? null : currentUser?.location_id);
+      if (!locationId) return;
+      
+      try {
+        const response = await dayOffService.getDayOffsByLocation(locationId);
+        if (response.success && response.data) {
+          // Convert day off dates to Date objects
+          // Also handle recurring day offs (same month/day each year)
+          const dayOffDates: Date[] = [];
+          const today = new Date();
+          
+          response.data.forEach((dayOff: DayOff) => {
+            const offDate = new Date(dayOff.date);
+            
+            if (dayOff.is_recurring) {
+              // For recurring, add for current year and next year
+              const currentYearDate = new Date(today.getFullYear(), offDate.getMonth(), offDate.getDate());
+              const nextYearDate = new Date(today.getFullYear() + 1, offDate.getMonth(), offDate.getDate());
+              
+              if (currentYearDate >= today) {
+                dayOffDates.push(currentYearDate);
+              }
+              dayOffDates.push(nextYearDate);
+            } else {
+              // Non-recurring, just add the date if it's not in the past
+              if (offDate >= today) {
+                dayOffDates.push(offDate);
+              }
+            }
+          });
+          
+          setDayOffs(dayOffDates);
+          console.log('📅 Day offs loaded:', dayOffDates.length, 'dates');
+        }
+      } catch (error) {
+        console.error('Error fetching day offs:', error);
+      }
+    };
+    
+    fetchDayOffs();
+  }, [selectedLocation, isCompanyAdmin, currentUser?.location_id]);
 
   // Fetch available time slots via SSE when date changes (backend auto-finds available rooms)
   useEffect(() => {
@@ -1490,6 +1538,7 @@ const OnsiteBooking: React.FC = () => {
               selectedDate={bookingData.date}
               availableDates={availableDates}
               onChange={(date) => setBookingData(prev => ({ ...prev, date }))}
+              dayOffs={dayOffs}
             />
           </div>
 
