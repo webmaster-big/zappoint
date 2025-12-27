@@ -32,6 +32,8 @@ export interface Room {
   capacity?: number;
   is_available: boolean;
   break_time?: BreakTime[];
+  area_group?: string;
+  booking_interval?: number;
   created_at: string;
   updated_at: string;
 }
@@ -60,6 +62,8 @@ export interface CreateRoomData {
   capacity?: number;
   is_available?: boolean;
   break_time?: BreakTime[];
+  area_group?: string;
+  booking_interval?: number;
 }
 
 export type UpdateRoomData = Partial<CreateRoomData>;
@@ -131,6 +135,16 @@ class RoomService {
    */
   async bulkDeleteRooms(ids: number[]): Promise<ApiResponse<{ deleted_count: number }>> {
     const response = await api.post('/rooms/bulk-delete', { ids });
+    return response.data;
+  }
+
+  /**
+   * Update booking interval for all rooms in an area group
+   */
+  async updateBookingIntervalByAreaGroup(areaGroup: string, bookingInterval: number): Promise<ApiResponse<{ updated_count: number }>> {
+    const response = await api.patch(`/rooms/area-group/${encodeURIComponent(areaGroup)}/update-booking-interval`, {
+      booking_interval: bookingInterval
+    });
     return response.data;
   }
 }

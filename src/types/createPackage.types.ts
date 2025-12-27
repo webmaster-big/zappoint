@@ -19,6 +19,7 @@ export interface CreatePackageAddOn {
 export interface CreatePackageRoom {
   id: number;
   name: string;
+  area_group?: string;
 }
 
 export interface CreatePackagePromo {

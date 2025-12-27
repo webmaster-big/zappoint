@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Edit2, Trash2, Users, MapPin, CheckSquare, Square, Plus, X, Clock } from 'lucide-react';
+import { Search, Edit2, Trash2, Users, MapPin, CheckSquare, Square, Plus, X, Clock, Layers, Timer } from 'lucide-react';
 
 // Break time type
 interface BreakTime {
@@ -62,7 +62,9 @@ const Rooms: React.FC = () => {
         name: '',
         capacity: '',
         is_available: true,
-        break_time: [] as BreakTime[]
+        break_time: [] as BreakTime[],
+        area_group: '',
+        booking_interval: '15'
     });
 
     // Bulk creation state
@@ -75,7 +77,9 @@ const Rooms: React.FC = () => {
         startLetter: 'A',
         capacity: '',
         is_available: true,
-        break_time: [] as BreakTime[]
+        break_time: [] as BreakTime[],
+        area_group: '',
+        booking_interval: '15'
     });
 
     // Break time form state
@@ -85,6 +89,11 @@ const Rooms: React.FC = () => {
         start_time: '12:00',
         end_time: '13:00'
     });
+
+    // Area group interval update modal state
+    const [showAreaGroupModal, setShowAreaGroupModal] = useState(false);
+    const [selectedAreaGroup, setSelectedAreaGroup] = useState<string>('');
+    const [areaGroupInterval, setAreaGroupInterval] = useState<string>('15');
 
     // Generate preview of rooms to be created
     const generateRoomPreview = (): string[] => {
@@ -184,7 +193,9 @@ const Rooms: React.FC = () => {
             name: '',
             capacity: '',
             is_available: true,
-            break_time: []
+            break_time: [],
+            area_group: '',
+            booking_interval: '15'
         });
         setBulkFormData({
             baseName: '',
@@ -194,7 +205,9 @@ const Rooms: React.FC = () => {
             startLetter: 'A',
             capacity: '',
             is_available: true,
-            break_time: []
+            break_time: [],
+            area_group: '',
+            booking_interval: '15'
         });
         setCreationMode('single');
         setSelectedRoom(null);
@@ -285,7 +298,9 @@ const Rooms: React.FC = () => {
                     name: formData.name,
                     capacity: formData.capacity ? parseInt(formData.capacity) : undefined,
                     is_available: formData.is_available,
-                    break_time: formData.break_time.length > 0 ? formData.break_time : undefined
+                    break_time: formData.break_time.length > 0 ? formData.break_time : undefined,
+                    area_group: formData.area_group || undefined,
+                    booking_interval: formData.booking_interval ? parseInt(formData.booking_interval) : 15
                 });
                 showToast('Space created successfully!', 'success');
             } else {
@@ -300,7 +315,9 @@ const Rooms: React.FC = () => {
                         name: roomName,
                         capacity: capacity,
                         is_available: bulkFormData.is_available,
-                        break_time: bulkFormData.break_time.length > 0 ? bulkFormData.break_time : undefined
+                        break_time: bulkFormData.break_time.length > 0 ? bulkFormData.break_time : undefined,
+                        area_group: bulkFormData.area_group || undefined,
+                        booking_interval: bulkFormData.booking_interval ? parseInt(bulkFormData.booking_interval) : 15
                     });
                 }
                 
@@ -326,7 +343,9 @@ const Rooms: React.FC = () => {
                 name: formData.name,
                 capacity: formData.capacity ? parseInt(formData.capacity) : undefined,
                 is_available: formData.is_available,
-                break_time: formData.break_time.length > 0 ? formData.break_time : undefined
+                break_time: formData.break_time.length > 0 ? formData.break_time : undefined,
+                area_group: formData.area_group || undefined,
+                booking_interval: formData.booking_interval ? parseInt(formData.booking_interval) : 15
             });
             
             showToast('Space updated successfully!', 'success');
@@ -404,6 +423,40 @@ const Rooms: React.FC = () => {
         }
     };
 
+    // Get unique area groups from rooms
+    const getUniqueAreaGroups = (): string[] => {
+        const groups = rooms
+            .map(room => room.area_group)
+            .filter((group): group is string => !!group);
+        return [...new Set(groups)].sort();
+    };
+
+    // Handle area group interval update
+    const handleAreaGroupIntervalUpdate = async () => {
+        if (!selectedAreaGroup) {
+            showToast('Please select an area group', 'error');
+            return;
+        }
+        
+        const interval = parseInt(areaGroupInterval);
+        if (isNaN(interval) || interval < 0) {
+            showToast('Please enter a valid interval', 'error');
+            return;
+        }
+
+        try {
+            const response = await roomService.updateBookingIntervalByAreaGroup(selectedAreaGroup, interval);
+            showToast(response.message || `Booking interval updated for area group "${selectedAreaGroup}"`, 'success');
+            setShowAreaGroupModal(false);
+            setSelectedAreaGroup('');
+            setAreaGroupInterval('15');
+            fetchRooms();
+        } catch (error) {
+            console.error('Error updating area group interval:', error);
+            showToast('Error updating booking interval', 'error');
+        }
+    };
+
     // Handle edit click
     const handleEditClick = (room: Room) => {
         setSelectedRoom(room);
@@ -411,7 +464,9 @@ const Rooms: React.FC = () => {
             name: room.name,
             capacity: room.capacity?.toString() || '',
             is_available: room.is_available,
-            break_time: (room as any).break_time || []
+            break_time: (room as any).break_time || [],
+            area_group: room.area_group || '',
+            booking_interval: room.booking_interval?.toString() || '15'
         });
         setShowBreakTimeForm(false);
         setShowEditModal(true);
@@ -442,7 +497,17 @@ const Rooms: React.FC = () => {
                     <h1 className="text-2xl font-bold text-gray-900">Space</h1>
                     <p className="text-gray-600 mt-1">Manage your facility Spaces and their availability</p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                    {getUniqueAreaGroups().length > 0 && (
+                        <StandardButton
+                            onClick={() => setShowAreaGroupModal(true)}
+                            variant="secondary"
+                            size="md"
+                            icon={Layers}
+                        >
+                            Area Group Settings
+                        </StandardButton>
+                    )}
                     {rooms.length > 0 && (
                         <StandardButton
                             onClick={toggleSelectionMode}
@@ -682,6 +747,16 @@ const Rooms: React.FC = () => {
                                                 </div>
                                             )}
 
+                                            {room.area_group && (
+                                                <div className="flex items-center gap-2 text-sm text-gray-700">
+                                                    <Layers className="w-4 h-4 text-gray-400" />
+                                                    <span className="font-medium">{room.area_group}</span>
+                                                    {room.booking_interval && (
+                                                        <span className="text-xs text-gray-500">({room.booking_interval}min interval)</span>
+                                                    )}
+                                                </div>
+                                            )}
+
                                             <div className="text-xs text-gray-500">
                                                 {new Date(room.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                                             </div>
@@ -852,6 +927,46 @@ const Rooms: React.FC = () => {
                                             <label className="ml-2 block text-sm text-gray-900">
                                                 Available for booking
                                             </label>
+                                        </div>
+
+                                        {/* Area Group & Booking Interval Section */}
+                                        <div className="border-t border-gray-200 pt-4">
+                                            <h4 className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
+                                                <Layers className="w-4 h-4" />
+                                                Stagger Booking Settings
+                                            </h4>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                                                        Area Group
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        name="area_group"
+                                                        value={formData.area_group}
+                                                        onChange={handleInputChange}
+                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                                        placeholder="e.g., Zone A"
+                                                    />
+                                                    <p className="text-xs text-gray-500 mt-1">Rooms in the same group share stagger rules</p>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                                                        Booking Interval (min)
+                                                    </label>
+                                                    <input
+                                                        type="number"
+                                                        name="booking_interval"
+                                                        value={formData.booking_interval}
+                                                        onChange={handleInputChange}
+                                                        min="5"
+                                                        max="120"
+                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                                        placeholder="15"
+                                                    />
+                                                    <p className="text-xs text-gray-500 mt-1">Minutes between bookings in group</p>
+                                                </div>
+                                            </div>
                                         </div>
 
                                         {/* Break Time Section - Single Mode */}
@@ -1074,6 +1189,44 @@ const Rooms: React.FC = () => {
                                             </label>
                                         </div>
 
+                                        {/* Area Group & Booking Interval Section - Bulk Mode */}
+                                        <div className="border-t border-gray-200 pt-4">
+                                            <h4 className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
+                                                <Layers className="w-4 h-4" />
+                                                Stagger Booking Settings (applies to all)
+                                            </h4>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                                                        Area Group
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        value={bulkFormData.area_group}
+                                                        onChange={(e) => setBulkFormData({ ...bulkFormData, area_group: e.target.value })}
+                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                                        placeholder="e.g., Zone A"
+                                                    />
+                                                    <p className="text-xs text-gray-500 mt-1">Rooms in the same group share stagger rules</p>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                                                        Booking Interval (min)
+                                                    </label>
+                                                    <input
+                                                        type="number"
+                                                        value={bulkFormData.booking_interval}
+                                                        onChange={(e) => setBulkFormData({ ...bulkFormData, booking_interval: e.target.value })}
+                                                        min="5"
+                                                        max="120"
+                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                                        placeholder="15"
+                                                    />
+                                                    <p className="text-xs text-gray-500 mt-1">Minutes between bookings in group</p>
+                                                </div>
+                                            </div>
+                                        </div>
+
                                         {/* Break Time Section - Bulk Mode */}
                                         <div className="border-t border-gray-200 pt-4">
                                             <div className="flex items-center justify-between mb-3">
@@ -1293,6 +1446,46 @@ const Rooms: React.FC = () => {
                                     </label>
                                 </div>
 
+                                {/* Area Group & Booking Interval Section - Edit Modal */}
+                                <div className="border-t border-gray-200 pt-4">
+                                    <h4 className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
+                                        <Layers className="w-4 h-4" />
+                                        Stagger Booking Settings
+                                    </h4>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-600 mb-1">
+                                                Area Group
+                                            </label>
+                                            <input
+                                                type="text"
+                                                name="area_group"
+                                                value={formData.area_group}
+                                                onChange={handleInputChange}
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                                placeholder="e.g., Zone A"
+                                            />
+                                            <p className="text-xs text-gray-500 mt-1">Rooms in same group share stagger rules</p>
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-600 mb-1">
+                                                Booking Interval (min)
+                                            </label>
+                                            <input
+                                                type="number"
+                                                name="booking_interval"
+                                                value={formData.booking_interval}
+                                                onChange={handleInputChange}
+                                                min="5"
+                                                max="120"
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                                placeholder="15"
+                                            />
+                                            <p className="text-xs text-gray-500 mt-1">Minutes between bookings</p>
+                                        </div>
+                                    </div>
+                                </div>
+
                                 {/* Break Time Section - Edit Modal */}
                                 <div className="border-t border-gray-200 pt-4">
                                     <div className="flex items-center justify-between mb-3">
@@ -1444,6 +1637,119 @@ const Rooms: React.FC = () => {
                         type={toast.type} 
                         onClose={() => setToast(null)} 
                     />
+                </div>
+            )}
+
+            {/* Area Group Settings Modal */}
+            {showAreaGroupModal && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onClick={() => setShowAreaGroupModal(false)}>
+                    <div className="bg-white rounded-lg shadow-xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+                        <div className="p-6">
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className={`w-10 h-10 rounded-full bg-${themeColor}-100 flex items-center justify-center`}>
+                                    <Layers className={`w-5 h-5 text-${fullColor}`} />
+                                </div>
+                                <div>
+                                    <h2 className="text-xl font-semibold text-gray-900">Area Group Settings</h2>
+                                    <p className="text-sm text-gray-500">Update booking interval for all rooms in an area group</p>
+                                </div>
+                            </div>
+
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Select Area Group
+                                    </label>
+                                    <select
+                                        value={selectedAreaGroup}
+                                        onChange={(e) => {
+                                            setSelectedAreaGroup(e.target.value);
+                                            // Set the current interval for this group
+                                            const roomInGroup = rooms.find(r => r.area_group === e.target.value);
+                                            if (roomInGroup?.booking_interval) {
+                                                setAreaGroupInterval(roomInGroup.booking_interval.toString());
+                                            }
+                                        }}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    >
+                                        <option value="">-- Select an area group --</option>
+                                        {getUniqueAreaGroups().map(group => {
+                                            const roomCount = rooms.filter(r => r.area_group === group).length;
+                                            return (
+                                                <option key={group} value={group}>
+                                                    {group} ({roomCount} room{roomCount !== 1 ? 's' : ''})
+                                                </option>
+                                            );
+                                        })}
+                                    </select>
+                                </div>
+
+                                {selectedAreaGroup && (
+                                    <>
+                                        <div className={`p-3 bg-${themeColor}-50 border border-${themeColor}-200 rounded-lg`}>
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <Timer className={`w-4 h-4 text-${fullColor}`} />
+                                                <span className="text-sm font-medium text-gray-700">Rooms in "{selectedAreaGroup}":</span>
+                                            </div>
+                                            <div className="flex flex-wrap gap-1">
+                                                {rooms
+                                                    .filter(r => r.area_group === selectedAreaGroup)
+                                                    .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }))
+                                                    .map(room => (
+                                                        <span key={room.id} className={`px-2 py-0.5 bg-${fullColor} text-white text-xs rounded`}>
+                                                            {room.name}
+                                                        </span>
+                                                    ))
+                                                }
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                Booking Interval (minutes)
+                                            </label>
+                                            <input
+                                                type="number"
+                                                value={areaGroupInterval}
+                                                onChange={(e) => setAreaGroupInterval(e.target.value)}
+                                                min="0"
+                                                max="120"
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                placeholder="15"
+                                            />
+                                            <p className="text-xs text-gray-500 mt-1">
+                                                Time gap required between bookings in this area group. Set to 0 to allow simultaneous bookings.
+                                            </p>
+                                        </div>
+                                    </>
+                                )}
+
+                                <div className="flex gap-3 pt-4">
+                                    <StandardButton
+                                        onClick={handleAreaGroupIntervalUpdate}
+                                        variant="primary"
+                                        size="md"
+                                        className="flex-1"
+                                        disabled={!selectedAreaGroup}
+                                    >
+                                        Update All Rooms
+                                    </StandardButton>
+                                    <StandardButton
+                                        onClick={() => {
+                                            setShowAreaGroupModal(false);
+                                            setSelectedAreaGroup('');
+                                            setAreaGroupInterval('15');
+                                        }}
+                                        variant="secondary"
+                                        size="md"
+                                        className="flex-1"
+                                    >
+                                        Cancel
+                                    </StandardButton>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>

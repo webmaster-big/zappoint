@@ -61,6 +61,19 @@ const OnsiteBooking: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
   const currentUser = getStoredUser();
   const isCompanyAdmin = currentUser?.role === 'company_admin';
+  
+  // Helper function to scroll to top of the main content container
+  const scrollToTop = () => {
+    // Try to find the main content container (parent with overflow-y-auto)
+    const mainContent = document.querySelector('main');
+    if (mainContent) {
+      mainContent.scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+      // Fallback to window scroll
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+  
   const [locations, setLocations] = useState<Array<{ id: number; name: string; address?: string; city?: string; state?: string }>>([]);
   const [selectedLocation, setSelectedLocation] = useState<number | null>(null);
   const [packages, setPackages] = useState<OnsiteBookingPackage[]>([]);
@@ -556,6 +569,7 @@ const OnsiteBooking: React.FC = () => {
     }));
     setSelectedRoomId(null); // Reset selected room ID
     setStep(2); // Move directly to step 2 (Date & Time) after selecting a package
+    scrollToTop();
   };
 
   const handleAttractionToggle = (attractionId: string) => {
@@ -1665,7 +1679,7 @@ const OnsiteBooking: React.FC = () => {
         <StandardButton
           type="button"
           variant="secondary"
-          onClick={() => setStep(1)}
+          onClick={() => { setStep(1); scrollToTop(); }}
           className="flex-1"
         >
           Back to Packages
@@ -1673,7 +1687,7 @@ const OnsiteBooking: React.FC = () => {
         <StandardButton
           type="button"
           variant="primary"
-          onClick={() => setStep(3)}
+          onClick={() => { setStep(3); scrollToTop(); }}
           className="flex-2"
         >
           Continue to Attractions & Add-ons
@@ -1852,7 +1866,7 @@ const OnsiteBooking: React.FC = () => {
         <StandardButton
           type="button"
           variant="secondary"
-          onClick={() => setStep(2)}
+          onClick={() => { setStep(2); scrollToTop(); }}
           className="flex-1"
         >
           Back to Date & Time
@@ -1860,7 +1874,7 @@ const OnsiteBooking: React.FC = () => {
         <StandardButton
           type="button"
           variant="primary"
-          onClick={() => setStep(4)}
+          onClick={() => { setStep(4); scrollToTop(); }}
           className="flex-2"
         >
           Continue to Customer Details
@@ -2059,7 +2073,7 @@ const OnsiteBooking: React.FC = () => {
         <StandardButton
           type="button"
           variant="secondary"
-          onClick={() => setStep(3)}
+          onClick={() => { setStep(3); scrollToTop(); }}
           className="flex-1"
         >
           Back
@@ -2067,7 +2081,7 @@ const OnsiteBooking: React.FC = () => {
         <StandardButton
           type="button"
           variant="primary"
-          onClick={() => setStep(5)}
+          onClick={() => { setStep(5); scrollToTop(); }}
           className="flex-2"
         >
           Continue to Payment
@@ -2644,7 +2658,7 @@ const OnsiteBooking: React.FC = () => {
         <StandardButton
           type="button"
           variant="secondary"
-          onClick={() => setStep(4)}
+          onClick={() => { setStep(4); scrollToTop(); }}
           className="flex-1"
         >
           Back

@@ -111,7 +111,8 @@ const EditPackage: React.FC = () => {
 
                 const roomsData = roomsRes.data?.rooms?.map(room => ({
                     id: room.id,
-                    name: room.name
+                    name: room.name,
+                    area_group: room.area_group || undefined
                 })) || [];
 
                 const promosData = promosRes.data?.promos?.filter(promo => 
@@ -1217,25 +1218,53 @@ const EditPackage: React.FC = () => {
                                     </StandardButton>
                                 )}
                             </div>
-                            <div className="flex flex-wrap gap-2 mb-2">
-                                 {[...rooms]
-                                     .sort((a, b) =>
-                                       a.name.localeCompare(b.name, undefined, {
-                                         numeric: true,
-                                         sensitivity: "base",
-                                       })
-                                     )
-                                     .map((room) => (
-                                    <StandardButton
-                                        key={room.name}
-                                        variant={form.rooms.includes(room.name) ? "primary" : "secondary"}
-                                        size="sm"
-                                        className="rounded-full"
-                                        onClick={() => handleMultiSelect("rooms", room.name)}
-                                    >
-                                        {room.name}
-                                    </StandardButton>
-                                ))}
+                            {/* Group rooms by area_group */}
+                            {(() => {
+                                const groupedRooms = rooms.reduce((acc, room) => {
+                                    const group = room.area_group || 'Ungrouped';
+                                    if (!acc[group]) acc[group] = [];
+                                    acc[group].push(room);
+                                    return acc;
+                                }, {} as Record<string, typeof rooms>);
+                                
+                                const sortedGroups = Object.keys(groupedRooms).sort((a, b) => {
+                                    if (a === 'Ungrouped') return 1;
+                                    if (b === 'Ungrouped') return -1;
+                                    return a.localeCompare(b);
+                                });
+                                
+                                return sortedGroups.map(group => (
+                                    <div key={group} className="mb-4">
+                                        {sortedGroups.length > 1 && (
+                                            <div className="text-xs font-medium text-gray-500 mb-2 flex items-center gap-1">
+                                                <span className="w-2 h-2 rounded-full bg-gray-400"></span>
+                                                {group}
+                                            </div>
+                                        )}
+                                        <div className="flex flex-wrap gap-2">
+                                            {[...groupedRooms[group]]
+                                                .sort((a, b) =>
+                                                    a.name.localeCompare(b.name, undefined, {
+                                                        numeric: true,
+                                                        sensitivity: "base",
+                                                    })
+                                                )
+                                                .map((room) => (
+                                                    <StandardButton
+                                                        key={room.name}
+                                                        variant={form.rooms.includes(room.name) ? "primary" : "secondary"}
+                                                        size="sm"
+                                                        className="rounded-full"
+                                                        onClick={() => handleMultiSelect("rooms", room.name)}
+                                                    >
+                                                        {room.name}
+                                                    </StandardButton>
+                                                ))}
+                                        </div>
+                                    </div>
+                                ));
+                            })()}
+                            <div className="flex gap-2 mt-2">
                                 <input
                                     type="text"
                                     placeholder="Space name"
