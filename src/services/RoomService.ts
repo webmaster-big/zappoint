@@ -31,8 +31,16 @@ export interface Room {
   name: string;
   capacity?: number;
   is_available: boolean;
+  break_time?: BreakTime[];
   created_at: string;
   updated_at: string;
+}
+
+// Break time type
+export interface BreakTime {
+  days: string[];
+  start_time: string;
+  end_time: string;
 }
 
 export interface RoomFilters {
@@ -44,13 +52,6 @@ export interface RoomFilters {
   per_page?: number;
   page?: number;
   user_id?: number;
-}
-
-// Break time type
-export interface BreakTime {
-  days: string[];
-  start_time: string;
-  end_time: string;
 }
 
 export interface CreateRoomData {

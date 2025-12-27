@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Calendar, ChevronLeft, ChevronRight, Clock, Users, Package as PackageIcon, X } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, Clock, Users, Package as PackageIcon, X, Coffee } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import bookingService from '../../../services/bookingService';
-import { roomService } from '../../../services/RoomService';
+import { roomService, type BreakTime } from '../../../services/RoomService';
 import StandardButton from '../../../components/ui/StandardButton';
 import type { Booking } from '../../../services/bookingService';
 import type { Room } from '../../../services/RoomService';
@@ -96,13 +96,74 @@ const SpaceSchedule = () => {
     return `${duration} min`;
   };
 
-  // Filter time slots to only show rows with bookings
+  // Get day name from date (e.g., 'monday', 'tuesday')
+  const getDayName = (date: Date): string => {
+    const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    return days[date.getDay()];
+  };
+
+  // Check if a time slot is during a break time for a specific room
+  const isBreakTime = (space: Room, slot: TimeSlot): boolean => {
+    if (!space.break_time || space.break_time.length === 0) return false;
+    
+    const dayName = getDayName(selectedDate);
+    const slotMinutes = slot.hour * 60 + slot.minute;
+    
+    for (const breakTime of space.break_time) {
+      // Check if today is in the break time days
+      if (!breakTime.days.includes(dayName)) continue;
+      
+      // Parse break start and end times
+      const [startHour, startMinute] = breakTime.start_time.split(':').map(Number);
+      const [endHour, endMinute] = breakTime.end_time.split(':').map(Number);
+      const breakStartMinutes = startHour * 60 + startMinute;
+      const breakEndMinutes = endHour * 60 + endMinute;
+      
+      // Check if slot falls within break time
+      if (slotMinutes >= breakStartMinutes && slotMinutes < breakEndMinutes) {
+        return true;
+      }
+    }
+    
+    return false;
+  };
+
+  // Check if this is the first slot of a break (for showing the break info)
+  const isBreakTimeStart = (space: Room, slot: TimeSlot): { isStart: boolean; rowSpan: number; breakTime: BreakTime | null } => {
+    if (!space.break_time || space.break_time.length === 0) {
+      return { isStart: false, rowSpan: 0, breakTime: null };
+    }
+    
+    const dayName = getDayName(selectedDate);
+    const slotMinutes = slot.hour * 60 + slot.minute;
+    
+    for (const breakTime of space.break_time) {
+      if (!breakTime.days.includes(dayName)) continue;
+      
+      const [startHour, startMinute] = breakTime.start_time.split(':').map(Number);
+      const [endHour, endMinute] = breakTime.end_time.split(':').map(Number);
+      const breakStartMinutes = startHour * 60 + startMinute;
+      const breakEndMinutes = endHour * 60 + endMinute;
+      
+      // Check if this slot is the start of the break
+      if (slotMinutes === breakStartMinutes) {
+        const breakDurationMinutes = breakEndMinutes - breakStartMinutes;
+        const rowSpan = Math.ceil(breakDurationMinutes / timeInterval);
+        return { isStart: true, rowSpan, breakTime };
+      }
+    }
+    
+    return { isStart: false, rowSpan: 0, breakTime: null };
+  };
+
+  // Filter time slots to only show rows with bookings or breaks
   const getVisibleTimeSlots = (): TimeSlot[] => {
     return timeSlots.filter(slot => {
-      // Check if any space has a booking at this time or continuing through this time
+      // Check if any space has a booking or break at this time
       return spaces.some(space => {
         const cellData = getBookingForCell(space, slot);
-        return cellData !== null;
+        const hasBreak = isBreakTime(space, slot);
+        return cellData !== null || hasBreak;
       });
     });
   };
@@ -303,6 +364,29 @@ const SpaceSchedule = () => {
             Today
           </StandardButton>
         </div>
+
+        {/* Legend */}
+        <div className="flex flex-wrap items-center gap-4 mt-4 pt-4 border-t border-gray-200 text-sm">
+          <span className="font-medium text-gray-600">Legend:</span>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 bg-green-100 rounded"></div>
+            <span className="text-gray-600">Confirmed</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 bg-yellow-100 rounded"></div>
+            <span className="text-gray-600">Pending</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 bg-blue-100 rounded"></div>
+            <span className="text-gray-600">Checked In</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 bg-gray-200 rounded border-2 border-dashed border-gray-300 flex items-center justify-center">
+              <Coffee className="w-2.5 h-2.5 text-gray-500" />
+            </div>
+            <span className="text-gray-600">Break Time</span>
+          </div>
+        </div>
       </div>
 
       {/* Schedule Grid */}
@@ -363,10 +447,37 @@ const SpaceSchedule = () => {
                   </td>
                   {spaces.map(space => {
                     const cellData = getBookingForCell(space, slot);
+                    const breakTimeData = isBreakTimeStart(space, slot);
+                    const isInBreak = isBreakTime(space, slot);
                     
                     // Skip if this slot is occupied by a booking that started earlier
                     if (cellData && cellData.rowSpan === 0) {
                       return null;
+                    }
+
+                    // Skip if this slot is occupied by a break that started earlier (not the start slot)
+                    if (isInBreak && !breakTimeData.isStart) {
+                      return null;
+                    }
+
+                    // Render break time cell
+                    if (breakTimeData.isStart && breakTimeData.breakTime) {
+                      return (
+                        <td
+                          key={space.id}
+                          rowSpan={breakTimeData.rowSpan}
+                          className="px-2 py-2 border-r border-gray-200 bg-gray-100"
+                          style={{ verticalAlign: 'middle' }}
+                        >
+                          <div className="h-full min-h-full flex flex-col items-center justify-center p-2 bg-gray-200/50 rounded-lg border-2 border-dashed border-gray-300">
+                            <Coffee className="w-6 h-6 text-gray-500 mb-2" />
+                            <div className="font-semibold text-sm text-gray-700">Break Time</div>
+                            <div className="text-xs text-gray-500 mt-1">
+                              {formatTime12Hour(breakTimeData.breakTime.start_time)} - {formatTime12Hour(breakTimeData.breakTime.end_time)}
+                            </div>
+                          </div>
+                        </td>
+                      );
                     }
 
                     // Render booking cell
