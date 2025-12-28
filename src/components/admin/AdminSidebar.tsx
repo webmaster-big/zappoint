@@ -308,15 +308,66 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
         },
       });
 
-      const data = await response.json();
+      // Handle authentication errors - token is invalid/expired (HTTP status)
+      if (response.status === 401 || response.status === 403) {
+        console.warn('[AdminSidebar] Authentication failed (HTTP status), logging out user');
+        forceLogout();
+        return 0;
+      }
+
+      // Check content type - if it's HTML, it means auth failed and server returned login page
+      const contentType = response.headers.get('content-type');
+      if (contentType && !contentType.includes('application/json')) {
+        console.warn('[AdminSidebar] Received non-JSON response (likely HTML error page), logging out user');
+        forceLogout();
+        return 0;
+      }
+
+      let data;
+      try {
+        data = await response.json();
+      } catch (parseError) {
+        // If JSON parsing fails, it's likely an HTML error page (auth failure)
+        console.warn('[AdminSidebar] Failed to parse JSON response (received HTML), logging out user');
+        forceLogout();
+        return 0;
+      }
+
+      // Handle authentication errors from response body (Laravel often returns this way)
+      if (
+        data.message === 'Unauthenticated.' || 
+        data.message === 'Unauthenticated' ||
+        data.error === 'Unauthenticated.' ||
+        data.error === 'Unauthenticated' ||
+        (data.success === false && (data.message?.toLowerCase().includes('unauthenticated') || data.message?.toLowerCase().includes('unauthorized')))
+      ) {
+        console.warn('[AdminSidebar] Authentication failed (response body), logging out user');
+        forceLogout();
+        return 0;
+      }
 
       if (data.success) {
         return data.data.pagination.total || 0;
       }
       return 0;
     } catch (error) {
+      console.error('[AdminSidebar] Error fetching unread notifications count:', error);
+      // If there's any network error or unexpected error, it might be auth-related
       return 0;
     }
+  };
+
+  // Force logout helper - clears all storage and redirects
+  const forceLogout = () => {
+    console.warn('[AdminSidebar] Forcing logout - clearing all user data');
+    // Clear all possible user data
+    localStorage.removeItem('zapzone_user');
+    localStorage.removeItem('zapzone_token');
+    sessionStorage.clear();
+    // Disconnect notification stream
+    notificationStreamService.disconnect();
+    // Force hard redirect to login page
+    window.location.replace('/admin');
   };
 
 
@@ -444,8 +495,23 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
     };
 
     // Handle connection errors
-    const handleError = () => {
-      // Stream connection error
+    const handleError = (error?: any) => {
+      // Stream connection error - might be auth failure
+      console.warn('[AdminSidebar] Notification stream connection error:', error);
+      
+      // If error indicates authentication failure, force logout
+      if (error && typeof error === 'object') {
+        const errorMessage = error.message || error.toString?.() || '';
+        if (
+          errorMessage.toLowerCase().includes('401') ||
+          errorMessage.toLowerCase().includes('403') ||
+          errorMessage.toLowerCase().includes('unauthenticated') ||
+          errorMessage.toLowerCase().includes('unauthorized')
+        ) {
+          console.warn('[AdminSidebar] Stream authentication error detected, logging out user');
+          forceLogout();
+        }
+      }
     };
 
     // Connect to the notification stream

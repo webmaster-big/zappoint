@@ -89,7 +89,9 @@ const DatePicker: React.FC<DatePickerProps> = ({
 
   const isDateSelected = (date: Date) => {
     if (!selectedDate) return false;
-    const selected = new Date(selectedDate);
+    // Parse ISO date string (YYYY-MM-DD) in local timezone to avoid UTC offset issues
+    const [year, month, day] = selectedDate.split('-').map(Number);
+    const selected = new Date(year, month - 1, day);
     return selected.toDateString() === date.toDateString();
   };
 
