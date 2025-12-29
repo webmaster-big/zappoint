@@ -75,7 +75,7 @@ export interface BookPackagePackage {
   min_participants?: number;
   max_participants: number;
   duration: number;
-  duration_unit: "hours" | "minutes";
+  duration_unit: "hours" | "minutes" | "hours and minutes";
   price_per_additional_30min?: string | null;
   price_per_additional_1hr?: string | null;
   availability_type?: "daily" | "weekly" | "monthly";

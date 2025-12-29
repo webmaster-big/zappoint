@@ -24,6 +24,25 @@ import type {
 } from '../../../types/createPackage.types';
 import type { AvailabilitySchedule } from '../../../services/PackageService';
 
+// Helper function to get ordinal suffix (1st, 2nd, 3rd, etc.)
+const getOrdinal = (n: number): string => {
+    const s = ['th', 'st', 'nd', 'rd'];
+    const v = n % 100;
+    return n + (s[(v - 20) % 10] || s[v] || s[0]);
+};
+
+// Helper function to sort rooms numerically (extracts numbers from room names)
+const sortRoomsNumerically = (roomNames: string[]): string[] => {
+    return [...roomNames].sort((a, b) => {
+        // Extract numbers from room names (e.g., "Room 1" -> 1, "Space 10" -> 10)
+        const numA = parseInt(a.replace(/\D/g, '')) || 0;
+        const numB = parseInt(b.replace(/\D/g, '')) || 0;
+        if (numA !== numB) return numA - numB;
+        // If no numbers or same numbers, sort alphabetically
+        return a.localeCompare(b);
+    });
+};
+
 const EditPackage: React.FC = () => {
     const { themeColor, fullColor } = useThemeColor();
     const { id } = useParams<{ id: string }>();
@@ -54,7 +73,9 @@ const EditPackage: React.FC = () => {
         maxParticipants: "",
         pricePerAdditional: "",
         duration: "",
-        durationUnit: "hours" as "hours" | "minutes",
+        durationUnit: "hours" as "hours" | "minutes" | "hours and minutes",
+        durationHours: "",
+        durationMinutes: "",
         promos: [] as string[], // will store promo.code
         giftCards: [] as string[], // will store giftCard.code
         addOns: [] as string[],
@@ -200,6 +221,15 @@ const EditPackage: React.FC = () => {
                     return time.substring(0, 5);
                 };
 
+                // Parse duration for "hours and minutes" unit
+                let durationHours = "";
+                let durationMinutes = "";
+                if (pkg.duration_unit === "hours and minutes" && pkg.duration) {
+                    const decimalDuration = parseFloat(pkg.duration);
+                    durationHours = String(Math.floor(decimalDuration));
+                    durationMinutes = String(Math.round((decimalDuration % 1) * 60));
+                }
+
                 setForm({
                     name: pkg.name || "",
                     description: pkg.description || "",
@@ -214,6 +244,8 @@ const EditPackage: React.FC = () => {
                     pricePerAdditional: String(pkg.price_per_additional || ""),
                     duration: String(pkg.duration || ""),
                     durationUnit: pkg.duration_unit || "hours",
+                    durationHours: durationHours,
+                    durationMinutes: durationMinutes,
                     promos: promoCodes,
                     giftCards: giftCardCodes,
                     addOns: addOnNames,
@@ -224,7 +256,12 @@ const EditPackage: React.FC = () => {
                     timeSlotStart: formatTime(pkg.time_slot_start || "09:00"),
                     timeSlotEnd: formatTime(pkg.time_slot_end || "17:00"),
                     timeSlotInterval: String(pkg.time_slot_interval || "30"),
-                    availability_schedules: pkg.availability_schedules || [],
+                    // Format time fields in availability schedules to ensure HH:MM format
+                    availability_schedules: (pkg.availability_schedules || []).map((schedule: AvailabilitySchedule) => ({
+                        ...schedule,
+                        time_slot_start: formatTime(schedule.time_slot_start || "09:00"),
+                        time_slot_end: formatTime(schedule.time_slot_end || "17:00"),
+                    })),
                     image: pkg.image || "",
                     partialPaymentPercentage: String(pkg.partial_payment_percentage || "0"),
                     partialPaymentFixed: String(pkg.partial_payment_fixed || "0"),
@@ -488,7 +525,21 @@ const EditPackage: React.FC = () => {
         const minParticipants = form.minParticipants ? parseInt(form.minParticipants) : undefined;
         const pricePerAdditional = parseFloat(form.pricePerAdditional || '0');
         const maxParticipants = parseInt(form.maxParticipants || '0');
-        const duration = parseInt(form.duration || '0');
+
+        // Calculate duration based on unit type
+        let duration: number;
+        if (form.durationUnit === 'hours and minutes') {
+            const hours = parseInt(form.durationHours) || 0;
+            const minutes = parseInt(form.durationMinutes) || 0;
+            if (hours === 0 && minutes === 0) {
+                showToast("Please enter a valid duration (hours and/or minutes)", "error");
+                return;
+            }
+            // Convert to decimal hours: e.g., 1 hour 45 min = 1.75
+            duration = hours + (minutes / 60);
+        } else {
+            duration = parseFloat(form.duration || '0');
+        }
 
         if (isNaN(price) || price < 0) {
             showToast("Please enter a valid price", "error");
@@ -510,7 +561,7 @@ const EditPackage: React.FC = () => {
             return;
         }
 
-        if (form.duration && (isNaN(duration) || duration < 1)) {
+        if (form.durationUnit !== 'hours and minutes' && form.duration && (isNaN(duration) || duration < 1)) {
             showToast("Please enter a valid duration", "error");
             return;
         }
@@ -612,6 +663,14 @@ const EditPackage: React.FC = () => {
 
     // Format duration for display
     const formatDuration = () => {
+        if (form.durationUnit === 'hours and minutes') {
+            const hours = parseInt(form.durationHours) || 0;
+            const minutes = parseInt(form.durationMinutes) || 0;
+            if (hours === 0 && minutes === 0) return "Not specified";
+            if (hours > 0 && minutes > 0) return `${hours} hr ${minutes} min`;
+            if (hours > 0) return `${hours} hr`;
+            return `${minutes} min`;
+        }
         if (!form.duration) return "Not specified";
         return `${form.duration} ${form.durationUnit}`;
     };
@@ -851,25 +910,56 @@ const EditPackage: React.FC = () => {
                                 
                                 <div>
                                     <label className="block font-semibold mb-2 text-base text-neutral-800">Duration</label>
-                                    <div className="flex gap-2">
-                                        <input
-                                            type="number"
-                                            name="duration"
-                                            value={form.duration}
-                                            onChange={handleChange}
-                                            className={`flex-1 rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400`}
-                                            min="0"
-                                            placeholder="Enter duration"
-                                        />
+                                    <div className="space-y-2">
                                         <select
                                             name="durationUnit"
                                             value={form.durationUnit}
                                             onChange={handleChange}
-                                            className={`rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all`}
+                                            className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all`}
                                         >
                                             <option value="hours">Hours</option>
                                             <option value="minutes">Minutes</option>
+                                            <option value="hours and minutes">Hours & Minutes</option>
                                         </select>
+                                        {form.durationUnit === 'hours and minutes' ? (
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <div>
+                                                    <label className="block text-xs text-gray-600 mb-1">Hours</label>
+                                                    <input
+                                                        type="number"
+                                                        name="durationHours"
+                                                        value={form.durationHours}
+                                                        onChange={handleChange}
+                                                        className={`w-full rounded-md border border-gray-200 px-3 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400`}
+                                                        min="0"
+                                                        placeholder="0"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs text-gray-600 mb-1">Minutes</label>
+                                                    <input
+                                                        type="number"
+                                                        name="durationMinutes"
+                                                        value={form.durationMinutes}
+                                                        onChange={handleChange}
+                                                        className={`w-full rounded-md border border-gray-200 px-3 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400`}
+                                                        min="0"
+                                                        max="59"
+                                                        placeholder="0"
+                                                    />
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <input
+                                                type="number"
+                                                name="duration"
+                                                value={form.duration}
+                                                onChange={handleChange}
+                                                className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400`}
+                                                min="1"
+                                                placeholder="Enter duration"
+                                            />
+                                        )}
                                     </div>
                                 </div>
 
@@ -1554,7 +1644,7 @@ const EditPackage: React.FC = () => {
             </div>
             
             {/* Live Preview Section */}
-            <div className="w-full md:w-[420px] md:max-w-sm md:sticky md:top-1 h-fit">
+            <div className="w-full md:w-[420px] md:max-w-sm h-fit">
                 <div className="rounded-xl border border-gray-200 bg-white p-4 sm:p-6 md:p-8 shadow-none">
                     <h3 className="text-2xl font-bold mb-6 text-neutral-900 tracking-tight">Live Preview</h3>
                     <div className="space-y-4">
@@ -1582,14 +1672,20 @@ const EditPackage: React.FC = () => {
                             </span>
                         </div>
                         
-                        {/* Time Slots in Preview */}
+                        {/* Time Slots in Preview - show from availability schedules */}
                         <div className="mb-2 flex items-start gap-2">
                             <Clock className="w-4 h-4 text-gray-500 mt-0.5" />
                             <div className="flex-1">
                                 <span className="font-semibold">Time Slots:</span>
                                 <div className="text-neutral-800 text-sm mt-1">
-                                    {form.timeSlotStart && form.timeSlotEnd && form.timeSlotInterval ? (
-                                        <span>{form.timeSlotStart} - {form.timeSlotEnd} (every {form.timeSlotInterval} min)</span>
+                                    {form.availability_schedules.length > 0 ? (
+                                        form.availability_schedules.map((schedule, idx) => (
+                                            <div key={idx}>
+                                                {formatTimeRange(schedule.time_slot_start, schedule.time_slot_end)} (every {schedule.time_slot_interval} min)
+                                            </div>
+                                        ))
+                                    ) : form.timeSlotStart && form.timeSlotEnd && form.timeSlotInterval ? (
+                                        <span>{formatTimeRange(form.timeSlotStart, form.timeSlotEnd)} (every {form.timeSlotInterval} min)</span>
                                     ) : (
                                         <span className="text-gray-400">Not configured</span>
                                     )}
@@ -1605,7 +1701,7 @@ const EditPackage: React.FC = () => {
                         </div>
                         <div className="mb-2">
                             <span className="font-semibold">SPACE:</span> <span className="text-neutral-800 text-sm">{form.rooms.length > 0
-                                ? form.rooms.join(", ")
+                                ? sortRoomsNumerically(form.rooms).join(", ")
                                 : "No rooms selected"}</span>
                         </div>
                         <div className="mb-2">
@@ -1635,9 +1731,9 @@ const EditPackage: React.FC = () => {
                                 ) : null;
                             }) : <span className="text-neutral-800 text-sm">No gift cards selected</span>}
                         </div>
-                        {form.maxParticipants && form.pricePerAdditional && (
+                        {form.minParticipants && form.pricePerAdditional && parseFloat(form.pricePerAdditional) > 0 && (
                             <div className="mb-2">
-                                <span className="font-semibold">Additional:</span> <span className="text-neutral-800 text-sm">${form.pricePerAdditional} per participant after {form.maxParticipants}</span>
+                                <span className="font-semibold">Additional:</span> <span className="text-neutral-800 text-sm">${form.pricePerAdditional} per person after the {getOrdinal(parseInt(form.minParticipants))}</span>
                             </div>
                         )}
                     </div>

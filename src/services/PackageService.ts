@@ -37,7 +37,7 @@ export interface Package {
   price_per_additional?: number;
   max_participants: number;
   duration: number;
-  duration_unit: 'hours' | 'minutes';
+  duration_unit: 'hours' | 'minutes' | 'hours and minutes';
   price_per_additional_30min?: number;
   price_per_additional_1hr?: number;
   availability_type: 'daily' | 'weekly' | 'monthly';
@@ -120,7 +120,7 @@ export interface CreatePackageData {
   max_participants: number;
   min_participants?: number;
   duration: number;
-  duration_unit: 'hours' | 'minutes';
+  duration_unit: 'hours' | 'minutes' | 'hours and minutes';
   price_per_additional_30min?: number;
   price_per_additional_1hr?: number;
   // Old format (deprecated but kept for backward compatibility)

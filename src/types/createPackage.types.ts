@@ -1,6 +1,6 @@
 // Types for: src/pages/admin/packages/CreatePackage.tsx
 
-export type CreatePackageDurationUnit = "hours" | "minutes";
+export type CreatePackageDurationUnit = "hours" | "minutes" | "hours and minutes";
 export type CreatePackageAvailabilityType = "daily" | "weekly" | "monthly";
 
 export interface CreatePackageAttraction {

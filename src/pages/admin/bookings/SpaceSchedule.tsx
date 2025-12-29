@@ -64,12 +64,20 @@ const SpaceSchedule = () => {
   };
 
   // Calculate end time based on start time and duration
-  const calculateEndTime = (startTime: string, duration: number, unit: 'hours' | 'minutes'): string => {
+  const calculateEndTime = (startTime: string, duration: number, unit: 'hours' | 'minutes' | 'hours and minutes'): string => {
     const [hourStr, minuteStr] = startTime.split(':');
     let hour = parseInt(hourStr);
     let minute = parseInt(minuteStr);
     
-    const durationInMinutes = unit === 'hours' ? duration * 60 : duration;
+    // For 'hours and minutes', duration is a decimal (e.g., 1.75 = 1 hr 45 min)
+    let durationInMinutes: number;
+    if (unit === 'hours and minutes') {
+      const hours = Math.floor(duration);
+      const mins = Math.round((duration % 1) * 60);
+      durationInMinutes = hours * 60 + mins;
+    } else {
+      durationInMinutes = unit === 'hours' ? duration * 60 : duration;
+    }
     
     minute += durationInMinutes;
     hour += Math.floor(minute / 60);
@@ -80,7 +88,15 @@ const SpaceSchedule = () => {
   };
 
   // Format duration based on unit
-  const formatDuration = (duration: number, unit: 'hours' | 'minutes'): string => {
+  const formatDuration = (duration: number, unit: 'hours' | 'minutes' | 'hours and minutes'): string => {
+    // Handle 'hours and minutes' unit with decimal value (e.g., 1.75 = 1 hr 45 min)
+    if (unit === 'hours and minutes') {
+      const hours = Math.floor(duration);
+      const minutes = Math.round((duration % 1) * 60);
+      if (hours > 0 && minutes > 0) return `${hours} hr ${minutes} min`;
+      if (hours > 0) return `${hours} hr`;
+      return `${minutes} min`;
+    }
     if (unit === 'hours') {
       return duration === 1 ? '1 hour' : `${duration} hours`;
     }

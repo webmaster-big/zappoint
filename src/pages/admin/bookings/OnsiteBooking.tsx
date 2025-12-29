@@ -153,6 +153,15 @@ const OnsiteBooking: React.FC = () => {
   // Format duration for display
   const formatDuration = (pkg: OnsiteBookingPackage | null) => {
     if (!pkg || !pkg.duration) return "Not specified";
+    // Handle 'hours and minutes' unit with decimal value (e.g., 1.75 = 1 hr 45 min)
+    if (pkg.durationUnit === 'hours and minutes') {
+      const decimalDuration = parseFloat(String(pkg.duration));
+      const hours = Math.floor(decimalDuration);
+      const minutes = Math.round((decimalDuration % 1) * 60);
+      if (hours > 0 && minutes > 0) return `${hours} hr ${minutes} min`;
+      if (hours > 0) return `${hours} hr`;
+      return `${minutes} min`;
+    }
     return `${pkg.duration} ${pkg.durationUnit}`;
   };
 
@@ -902,7 +911,7 @@ const OnsiteBooking: React.FC = () => {
       const durationUnit = selectedPackage.durationUnit || 'hours';
       // Convert days to hours for the API (API only accepts minutes or hours)
       let finalDuration = durationValue;
-      let finalDurationUnit: 'minutes' | 'hours' = 'hours';
+      let finalDurationUnit: 'minutes' | 'hours' | 'hours and minutes' = 'hours';
       
       if (durationUnit.toLowerCase() === 'days') {
         finalDuration = durationValue * 24;
@@ -910,6 +919,10 @@ const OnsiteBooking: React.FC = () => {
       } else if (durationUnit.toLowerCase() === 'minutes') {
         finalDuration = durationValue;
         finalDurationUnit = 'minutes';
+      } else if (durationUnit === 'hours and minutes') {
+        // Keep as decimal hours for 'hours and minutes' unit
+        finalDuration = durationValue;
+        finalDurationUnit = 'hours and minutes';
       } else {
         finalDuration = durationValue;
         finalDurationUnit = 'hours';

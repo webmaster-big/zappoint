@@ -57,7 +57,7 @@ export interface OnsiteBookingPackage {
   giftCards: OnsiteBookingGiftCard[];
   promos: OnsiteBookingPromo[];
   duration: string;
-  durationUnit: "hours" | "minutes";
+  durationUnit: "hours" | "minutes" | "hours and minutes";
   pricePerAdditional30min: string;
   pricePerAdditional1hr: string;
   partialPaymentPercentage?: number;

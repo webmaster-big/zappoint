@@ -51,7 +51,7 @@ export interface CreateBookingData {
   // Participants and duration
   participants: number;
   duration: number;
-  duration_unit: 'hours' | 'minutes';
+  duration_unit: 'hours' | 'minutes' | 'hours and minutes';
   
   // Payment
   total_amount: number;
@@ -95,7 +95,7 @@ export interface UpdateBookingData {
   booking_time?: string;
   participants?: number;
   duration?: number;
-  duration_unit?: 'hours' | 'minutes';
+  duration_unit?: 'hours' | 'minutes' | 'hours and minutes';
   total_amount?: number;
   amount_paid?: number;
   discount_amount?: number;
@@ -146,7 +146,7 @@ export interface CreateTimeSlotData {
   booked_date: string;
   time_slot_start: string;
   duration: number;
-  duration_unit: 'hours' | 'minutes';
+  duration_unit: 'hours' | 'minutes' | 'hours and minutes';
   status?: 'booked' | 'completed' | 'cancelled' | 'no_show';
   notes?: string;
 }
@@ -169,7 +169,7 @@ export interface Booking {
   booking_time: string;
   participants: number;
   duration: number;
-  duration_unit: 'hours' | 'minutes';
+  duration_unit: 'hours' | 'minutes' | 'hours and minutes';
   total_amount: string | number;
   amount_paid: string | number;
   discount_amount?: string | number;

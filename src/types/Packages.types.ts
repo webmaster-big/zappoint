@@ -12,7 +12,7 @@ export interface PackagesPackage {
   maxParticipants: string | number;
   pricePerAdditional: string | number;
   duration: string;
-  durationUnit: "hours" | "minutes";
+  durationUnit: "hours" | "minutes" | "hours and minutes";
   promos: Array<{ name: string; code: string; description: string }>;
   giftCards: Array<{ name: string; code: string; description: string }>;
   addOns: Array<{ name: string; price: number }>;
