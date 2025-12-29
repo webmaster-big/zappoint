@@ -110,7 +110,7 @@ const EntertainmentLandingPage = () => {
             name: pkg.name,
             description: pkg.description,
             price: pkg.price,
-            duration: `${pkg.duration} hours`,
+            duration: pkg.duration === 0 || !pkg.duration ? 'Unlimited' : formatDurationDisplay(pkg.duration, pkg.duration_unit),
             participants: `Up to ${pkg.max_guests} guests`,
             includes: [], // This would need to be added to backend if needed
             rating: 4.8, // Default rating, backend doesn't return this yet

@@ -18,6 +18,7 @@ import customerService from '../../../services/CustomerService';
 import { locationService } from '../../../services/LocationService';
 import { dayOffService, type DayOff } from '../../../services/DayOffService';
 import { getImageUrl, getStoredUser, formatTimeTo12Hour } from '../../../utils/storage';
+import { formatDurationDisplay } from '../../../utils/timeFormat';
 import { loadAcceptJS, processCardPayment, validateCardNumber, formatCardNumber, getCardType } from '../../../services/PaymentService';
 import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
 
@@ -153,16 +154,7 @@ const OnsiteBooking: React.FC = () => {
   // Format duration for display
   const formatDuration = (pkg: OnsiteBookingPackage | null) => {
     if (!pkg || !pkg.duration) return "Not specified";
-    // Handle 'hours and minutes' unit with decimal value (e.g., 1.75 = 1 hr 45 min)
-    if (pkg.durationUnit === 'hours and minutes') {
-      const decimalDuration = parseFloat(String(pkg.duration));
-      const hours = Math.floor(decimalDuration);
-      const minutes = Math.round((decimalDuration % 1) * 60);
-      if (hours > 0 && minutes > 0) return `${hours} hr ${minutes} min`;
-      if (hours > 0) return `${hours} hr`;
-      return `${minutes} min`;
-    }
-    return `${pkg.duration} ${pkg.durationUnit}`;
+    return formatDurationDisplay(pkg.duration, pkg.durationUnit);
   };
 
   // Fetch locations for company admin

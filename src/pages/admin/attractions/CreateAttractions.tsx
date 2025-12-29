@@ -12,6 +12,7 @@ import type { Location } from '../../../services/LocationService';
 import type { Category } from '../../../services/CategoryService';
 import LocationSelector from '../../../components/admin/LocationSelector';
 import { Plus, Trash2, Info, Tag, Calendar, Clock } from 'lucide-react';
+import { formatDurationDisplay, formatTimeRange } from '../../../utils/timeFormat';
 import StandardButton from '../../../components/ui/StandardButton';
 
 const CreateAttraction = () => {
@@ -270,7 +271,7 @@ const CreateAttraction = () => {
         max_capacity: Number(formData.maxCapacity),
         category: formData.category,
         duration: formData.duration ? Number(formData.duration) : undefined,
-        duration_unit: formData.durationUnit as 'hours' | 'minutes',
+        duration_unit: formData.durationUnit as 'hours' | 'minutes' | 'hours and minutes',
         availability: formData.availability,
         image: formData.images.length > 0 ? formData.images : undefined, // Send all images as array
         is_active: true,
@@ -352,7 +353,7 @@ const CreateAttraction = () => {
             </span>
             {formData.duration ? (
               <span className="text-sm text-gray-600">
-                {formData.duration === '0' ? 'Unlimited' : `${formData.duration} ${formData.durationUnit}`}
+                {formData.duration === '0' ? 'Unlimited' : formatDurationDisplay(parseFloat(formData.duration), formData.durationUnit)}
               </span>
             ) : (
               <span className="text-sm text-gray-600">Unlimited</span>
@@ -378,7 +379,7 @@ const CreateAttraction = () => {
                     ))}
                   </div>
                   <div className="text-xs text-gray-600">
-                    {schedule.start_time} - {schedule.end_time}
+                    {formatTimeRange(schedule.start_time, schedule.end_time)}
                   </div>
                 </div>
               ))}

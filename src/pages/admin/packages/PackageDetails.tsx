@@ -18,7 +18,7 @@ import { packageService, type Package } from '../../../services';
 import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
 import { extractIdFromSlug } from '../../../utils/slug';
-import { formatTimeRange } from '../../../utils/timeFormat';
+import { formatTimeRange, formatDurationDisplay } from '../../../utils/timeFormat';
 
 const PackageDetails = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -253,7 +253,7 @@ const PackageDetails = () => {
                   <div>
                     <p className="text-sm text-gray-500">Duration</p>
                     <p className="font-medium text-gray-900">
-                      {packageData.duration} {packageData.duration_unit || 'hours'}
+                      {formatDurationDisplay(packageData.duration, packageData.duration_unit)}
                     </p>
                   </div>
                 </div>

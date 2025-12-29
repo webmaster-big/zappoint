@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import bookingService, { type Booking } from '../../../services/bookingService';
+import { formatDurationDisplay, convertTo12Hour } from '../../../utils/timeFormat';
 import StandardButton from '../../../components/ui/StandardButton';
 
 const ViewBooking: React.FC = () => {
@@ -257,7 +258,7 @@ const ViewBooking: React.FC = () => {
                       day: 'numeric' 
                     })}
                   </p>
-                  <p className="text-sm text-gray-600">{booking.booking_time}</p>
+                  <p className="text-sm text-gray-600">{convertTo12Hour(booking.booking_time)}</p>
                 </div>
               </div>
 
@@ -268,7 +269,7 @@ const ViewBooking: React.FC = () => {
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Duration</p>
-                  <p className="font-medium text-gray-900">{booking.duration} {booking.duration_unit}</p>
+                  <p className="font-medium text-gray-900">{formatDurationDisplay(booking.duration, booking.duration_unit)}</p>
                 </div>
               </div>
 

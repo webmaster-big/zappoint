@@ -19,6 +19,7 @@ import {
   Square,
   Link2
 } from 'lucide-react';
+import { formatDurationDisplay } from '../../../utils/timeFormat';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
 import StandardButton from '../../../components/ui/StandardButton';
@@ -127,7 +128,7 @@ const ManageAttractions = () => {
         max_capacity: Number(attraction.maxCapacity),
         category: attraction.category,
         duration: attraction.duration ? Number(attraction.duration) : undefined,
-        duration_unit: attraction.durationUnit as 'hours' | 'minutes',
+        duration_unit: attraction.durationUnit as 'hours' | 'minutes' | 'hours and minutes',
         availability: Array.isArray(attraction.availability) ? attraction.availability : [{
           days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'],
           start_time: '09:00',
@@ -715,7 +716,7 @@ const ManageAttractions = () => {
                       {attraction.maxCapacity} people
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {attraction.duration === '0' || !attraction.duration ? 'Unlimited' : `${attraction.duration} ${attraction.durationUnit}`}
+                      {attraction.duration === '0' || !attraction.duration ? 'Unlimited' : formatDurationDisplay(parseFloat(attraction.duration), attraction.durationUnit)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <select

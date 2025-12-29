@@ -60,13 +60,20 @@ export function formatDurationDisplay(
     const hours = Math.floor(durationValue);
     const minutes = Math.round((durationValue % 1) * 60);
     if (hours > 0 && minutes > 0) return `${hours} hr ${minutes} min`;
-    if (hours > 0) return `${hours} hr`;
+    if (hours > 0) return hours === 1 ? '1 hour' : `${hours} hours`;
     if (minutes > 0) return `${minutes} min`;
     return 'Not specified';
   }
   
-  // Handle regular hours
+  // Handle regular hours - also handle decimal values that should be whole numbers (e.g., 2.00)
   if (durationUnit === 'hours') {
+    const wholeHours = Math.floor(durationValue);
+    const decimalPart = durationValue % 1;
+    // If decimal part is very small (like 0.00), treat as whole hours
+    if (decimalPart < 0.01) {
+      return wholeHours === 1 ? '1 hour' : `${wholeHours} hours`;
+    }
+    // Otherwise show decimal
     return durationValue === 1 ? '1 hour' : `${durationValue} hours`;
   }
   
@@ -74,15 +81,20 @@ export function formatDurationDisplay(
   if (durationUnit === 'minutes') {
     if (durationValue >= 60) {
       const hours = Math.floor(durationValue / 60);
-      const mins = durationValue % 60;
+      const mins = Math.round(durationValue % 60);
       if (mins === 0) {
         return hours === 1 ? '1 hour' : `${hours} hours`;
       }
       return `${hours} hr ${mins} min`;
     }
-    return `${durationValue} min`;
+    return `${Math.round(durationValue)} min`;
   }
   
-  // Default fallback
+  // Default fallback - try to format nicely
+  const wholeValue = Math.floor(durationValue);
+  const decimalPart = durationValue % 1;
+  if (decimalPart < 0.01) {
+    return `${wholeValue} ${durationUnit || 'hours'}`;
+  }
   return `${durationValue} ${durationUnit || 'hours'}`;
 }

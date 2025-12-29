@@ -25,6 +25,7 @@ import { createPayment } from '../../../services/PaymentService';
 import { locationService } from '../../../services/LocationService';
 import LocationSelector from '../../../components/admin/LocationSelector';
 import { getStoredUser, API_BASE_URL } from '../../../utils/storage';
+import { formatDurationDisplay } from '../../../utils/timeFormat';
 import { MapPin } from 'lucide-react';
 
 // Convert 24-hour time to 12-hour format with AM/PM
@@ -219,7 +220,7 @@ const Bookings: React.FC = () => {
             quantity: addon.pivot?.quantity || 1
           })) || [],
           duration: booking.duration && booking.duration_unit 
-            ? `${booking.duration} ${booking.duration_unit}`
+            ? formatDurationDisplay(booking.duration, booking.duration_unit)
             : '2 hours',
           activity: booking.package?.category || 'Package Booking',
           notes: booking.notes,
@@ -273,7 +274,7 @@ const Bookings: React.FC = () => {
               quantity: addon.pivot?.quantity || 1
             })) || [],
             duration: booking.duration && booking.duration_unit 
-              ? `${booking.duration} ${booking.duration_unit}`
+              ? formatDurationDisplay(booking.duration, booking.duration_unit)
               : '2 hours',
             activity: booking.package?.category || 'Package Booking',
             notes: booking.notes,
@@ -706,7 +707,7 @@ const Bookings: React.FC = () => {
       booking.booking_date || '',
       booking.booking_time ? formatTime12Hour(booking.booking_time) : '',
       booking.participants || 0,
-      booking.duration && booking.duration_unit ? `${booking.duration} ${booking.duration_unit}` : '',
+      booking.duration && booking.duration_unit ? formatDurationDisplay(booking.duration, booking.duration_unit) : '',
       booking.status || '',
       booking.payment_method || '',
       booking.payment_status || '',

@@ -4,6 +4,7 @@ import { useThemeColor } from '../../../hooks/useThemeColor';
 import bookingService from '../../../services/bookingService';
 import { roomService, type BreakTime } from '../../../services/RoomService';
 import StandardButton from '../../../components/ui/StandardButton';
+import { formatDurationDisplay } from '../../../utils/timeFormat';
 import type { Booking } from '../../../services/bookingService';
 import type { Room } from '../../../services/RoomService';
 
@@ -89,27 +90,7 @@ const SpaceSchedule = () => {
 
   // Format duration based on unit
   const formatDuration = (duration: number, unit: 'hours' | 'minutes' | 'hours and minutes'): string => {
-    // Handle 'hours and minutes' unit with decimal value (e.g., 1.75 = 1 hr 45 min)
-    if (unit === 'hours and minutes') {
-      const hours = Math.floor(duration);
-      const minutes = Math.round((duration % 1) * 60);
-      if (hours > 0 && minutes > 0) return `${hours} hr ${minutes} min`;
-      if (hours > 0) return `${hours} hr`;
-      return `${minutes} min`;
-    }
-    if (unit === 'hours') {
-      return duration === 1 ? '1 hour' : `${duration} hours`;
-    }
-    // Convert minutes to hours if >= 60 minutes
-    if (duration >= 60) {
-      const hours = Math.floor(duration / 60);
-      const mins = duration % 60;
-      if (mins === 0) {
-        return hours === 1 ? '1 hour' : `${hours} hours`;
-      }
-      return `${hours}h ${mins}m`;
-    }
-    return `${duration} min`;
+    return formatDurationDisplay(duration, unit);
   };
 
   // Get day name from date (e.g., 'monday', 'tuesday')

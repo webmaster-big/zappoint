@@ -17,7 +17,7 @@ import { attractionService } from '../../../services/AttractionService';
 import { ASSET_URL } from '../../../utils/storage';
 import Toast from '../../../components/ui/Toast';
 import { extractIdFromSlug } from '../../../utils/slug';
-import { formatTimeRange } from '../../../utils/timeFormat';
+import { formatTimeRange, formatDurationDisplay } from '../../../utils/timeFormat';
 
 interface AttractionAvailabilitySchedule {
   days: string[];
@@ -233,7 +233,7 @@ const AttractionDetails = () => {
                 <div>
                   <p className="text-sm text-gray-500">Duration</p>
                   <p className="font-medium text-gray-900">
-                    {attraction.duration} {attraction.duration_unit || 'minutes'}
+                    {formatDurationDisplay(attraction.duration, attraction.duration_unit)}
                   </p>
                 </div>
               </div>

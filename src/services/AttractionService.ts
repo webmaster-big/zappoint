@@ -36,7 +36,7 @@ export interface Attraction {
   category: string;
   unit?: string;
   duration?: number;
-  duration_unit?: 'hours' | 'minutes';
+  duration_unit?: 'hours' | 'minutes' | 'hours and minutes';
   availability?: Record<string, unknown>;
   image?: string | string[]; // Support both single image and array
   rating?: number;
@@ -74,7 +74,7 @@ export interface CreateAttractionData {
   category: string;
   unit?: string;
   duration?: number;
-  duration_unit?: 'hours' | 'minutes';
+  duration_unit?: 'hours' | 'minutes' | 'hours and minutes';
   availability?: AttractionAvailabilitySchedule[];
   image?: string | string[]; // Support both single image and array
   rating?: number;

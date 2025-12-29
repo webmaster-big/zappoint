@@ -27,6 +27,7 @@ import { createPayment } from '../../../services/PaymentService';
 import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
 import { getStoredUser } from '../../../utils/storage';
+import { formatDurationDisplay, convertTo12Hour } from '../../../utils/timeFormat';
 
 interface ScanResult {
   bookingId: number;
@@ -559,7 +560,7 @@ const CheckIn: React.FC = () => {
   }, []); // Empty dependency array - only cleanup on unmount
 
   const formatTime = (timeString: string) => {
-    return timeString; // Assuming time is already in a readable format
+    return convertTo12Hour(timeString);
   };
 
   return (
@@ -758,7 +759,7 @@ const CheckIn: React.FC = () => {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-gray-900">{formatTime(booking.booking_time)}</div>
-                          <div className="text-xs text-gray-500">{booking.duration} {booking.duration_unit}</div>
+                          <div className="text-xs text-gray-500">{formatDurationDisplay(booking.duration, booking.duration_unit)}</div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           {booking.participants}
@@ -917,7 +918,7 @@ const CheckIn: React.FC = () => {
                       <div>
                         <p className="text-xs text-gray-500">Date & Time</p>
                         <p className="font-medium text-gray-800">
-                          {new Date(verifiedBooking.booking_date).toLocaleDateString()} at {verifiedBooking.booking_time}
+                          {new Date(verifiedBooking.booking_date).toLocaleDateString()} at {convertTo12Hour(verifiedBooking.booking_time)}
                         </p>
                       </div>
                     </div>
@@ -938,7 +939,7 @@ const CheckIn: React.FC = () => {
                       </div>
                       <div>
                         <p className="text-xs text-gray-500">Duration</p>
-                        <p className="font-medium text-gray-800">{verifiedBooking.duration} {verifiedBooking.duration_unit}</p>
+                        <p className="font-medium text-gray-800">{formatDurationDisplay(verifiedBooking.duration, verifiedBooking.duration_unit)}</p>
                       </div>
                     </div>
 
@@ -1389,7 +1390,7 @@ const CheckIn: React.FC = () => {
                       <div>
                         <p className="text-xs text-gray-500">Date & Time</p>
                         <p className="font-medium text-gray-800">
-                          {new Date(selectedBooking.booking_date).toLocaleDateString()} at {selectedBooking.booking_time}
+                          {new Date(selectedBooking.booking_date).toLocaleDateString()} at {convertTo12Hour(selectedBooking.booking_time)}
                         </p>
                       </div>
                     </div>
@@ -1410,7 +1411,7 @@ const CheckIn: React.FC = () => {
                       </div>
                       <div>
                         <p className="text-xs text-gray-500">Duration</p>
-                        <p className="font-medium text-gray-800">{selectedBooking.duration} {selectedBooking.duration_unit}</p>
+                        <p className="font-medium text-gray-800">{formatDurationDisplay(selectedBooking.duration, selectedBooking.duration_unit)}</p>
                       </div>
                     </div>
 

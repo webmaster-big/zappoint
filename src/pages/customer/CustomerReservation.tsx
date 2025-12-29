@@ -24,7 +24,7 @@ import html2canvas from 'html2canvas';
 import type { SortBy, SortOrder } from '../../types/customer';
 import bookingService, { type Booking } from '../../services/bookingService';
 import type { BookPackagePackage } from '../../types/BookPackage.types';
-import { formatDurationDisplay } from '../../utils/timeFormat';
+import { formatDurationDisplay, convertTo12Hour } from '../../utils/timeFormat';
 
 const CustomerReservations = () => {
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -261,7 +261,7 @@ const CustomerReservations = () => {
               </div>
               <div style="margin-bottom: 6px;">
                 <span style="font-size: 12px; color: #64748b;">Time:</span>
-                <span style="font-size: 14px; font-weight: 600; color: #1e293b; margin-left: 5px;">${booking.booking_time}</span>
+                <span style="font-size: 14px; font-weight: 600; color: #1e293b; margin-left: 5px;">${convertTo12Hour(booking.booking_time)}</span>
               </div>
               <div>
                 <span style="font-size: 12px; color: #64748b;">Participants:</span>
@@ -533,7 +533,7 @@ const CustomerReservations = () => {
                             </div>
                             <div className="flex items-center gap-2">
                               <Calendar size={16} className="text-blue-800" />
-                              <span>{booking.booking_date.split('T')[0]} at {booking.booking_time}</span>
+                              <span>{booking.booking_date.split('T')[0]} at {convertTo12Hour(booking.booking_time)}</span>
                             </div>
                             <div className="flex items-center gap-2">
                               <Users size={16} className="text-blue-800" />
@@ -722,7 +722,7 @@ const CustomerReservations = () => {
                   </div>
                   <div className="flex items-center gap-2">
                     <Clock size={16} className="text-blue-800" />
-                    <span><strong>Time:</strong> {selectedBooking.booking_time}</span>
+                    <span><strong>Time:</strong> {convertTo12Hour(selectedBooking.booking_time)}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Users size={16} className="text-blue-800" />

@@ -14,6 +14,7 @@ import {
   Clock,
   DollarSign
 } from 'lucide-react';
+import { formatDurationDisplay } from '../../../utils/timeFormat';
 import type { PurchaseAttractionAttraction, PurchaseAttractionCustomerInfo } from '../../../types/PurchaseAttraction.types';
 import { attractionService, type Attraction } from '../../../services/AttractionService';
 import { attractionPurchaseService } from '../../../services/AttractionPurchaseService';
@@ -1366,7 +1367,7 @@ const PurchaseAttraction = () => {
                     <div>
                       <p className="text-xs text-gray-500">Duration</p>
                       <p className="text-sm font-medium text-gray-900">
-                        {attraction.duration === '0' || !attraction.duration ? 'Unlimited' : `${attraction.duration} ${attraction.durationUnit}`}
+                        {attraction.duration === '0' || !attraction.duration ? 'Unlimited' : formatDurationDisplay(parseFloat(attraction.duration), attraction.durationUnit)}
                       </p>
                     </div>
                   </div>
@@ -1516,7 +1517,7 @@ const PurchaseAttraction = () => {
                 </div>
                 <div className="flex justify-between text-sm sm:text-base">
                   <span className="text-gray-600">Duration:</span>
-                  <span className="font-medium text-gray-900">{attraction.duration === '0' || !attraction.duration ? 'Unlimited' : `${attraction.duration} ${attraction.durationUnit}`}</span>
+                  <span className="font-medium text-gray-900">{attraction.duration === '0' || !attraction.duration ? 'Unlimited' : formatDurationDisplay(parseFloat(attraction.duration), attraction.durationUnit)}</span>
                 </div>
               </div>
             </div>

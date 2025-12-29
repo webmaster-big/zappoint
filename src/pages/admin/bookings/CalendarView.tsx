@@ -24,6 +24,7 @@ import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
 import type { ToastMessage } from './../../../types/Toast';
 import { getStoredUser } from '../../../utils/storage';
+import { formatDurationDisplay } from '../../../utils/timeFormat';
 
 // Convert 24-hour time to 12-hour format with AM/PM
 const formatTime12Hour = (time24: string): string => {
@@ -1071,7 +1072,7 @@ const CalendarView: React.FC = () => {
                     </div>
                     <div className="flex justify-between items-center pt-2 border-t border-gray-200">
                       <span className="text-sm text-gray-600">Duration</span>
-                      <span className="text-sm font-medium text-gray-900">{selectedBooking.duration} {selectedBooking.duration_unit}</span>
+                      <span className="text-sm font-medium text-gray-900">{formatDurationDisplay(selectedBooking.duration, selectedBooking.duration_unit)}</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-gray-600">Participants</span>

@@ -9,6 +9,7 @@ import roomService from '../../../services/RoomService';
 import { locationService } from '../../../services/LocationService';
 import LocationSelector from '../../../components/admin/LocationSelector';
 import { getStoredUser, getImageUrl } from '../../../utils/storage';
+import { formatDurationDisplay } from '../../../utils/timeFormat';
 
 const ManualBooking: React.FC = () => {
   const navigate = useNavigate();
@@ -484,7 +485,7 @@ const ManualBooking: React.FC = () => {
                             {p.category || 'Package'}
                           </span>
                           <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-700">
-                            {p.duration} {p.duration_unit}
+                            {formatDurationDisplay(p.duration, p.duration_unit)}
                           </span>
                           <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-700">
                             Up to {p.max_participants} people
@@ -839,7 +840,7 @@ const ManualBooking: React.FC = () => {
                     <div className="grid grid-cols-2 gap-3 mb-4">
                       <div className="bg-gray-50 rounded-lg p-2">
                         <p className="text-xs text-gray-500">Duration</p>
-                        <p className="text-sm font-semibold text-gray-900">{pkg.duration} {pkg.duration_unit}</p>
+                        <p className="text-sm font-semibold text-gray-900">{formatDurationDisplay(pkg.duration, pkg.duration_unit)}</p>
                       </div>
                       <div className="bg-gray-50 rounded-lg p-2">
                         <p className="text-xs text-gray-500">Capacity</p>

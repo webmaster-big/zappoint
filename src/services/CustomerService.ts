@@ -175,6 +175,7 @@ export interface GroupedPackage {
   category: string;
   max_guests: number;
   duration: number;
+  duration_unit?: 'hours' | 'minutes' | 'hours and minutes';
   image: string | string[];
   locations: GroupedPackageLocation[];
   booking_links: PackageBookingLink[];

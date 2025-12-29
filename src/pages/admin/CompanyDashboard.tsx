@@ -31,7 +31,7 @@ import LocationSelector from '../../components/admin/LocationSelector';
 import bookingService from '../../services/bookingService';
 import { locationService, type Location } from '../../services/LocationService';
 import { metricsService } from '../../services/MetricsService';
-import { formatDurationDisplay } from '../../utils/timeFormat';
+import { formatDurationDisplay, convertTo12Hour } from '../../utils/timeFormat';
 
 const CompanyDashboard: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
@@ -1327,7 +1327,7 @@ const CompanyDashboard: React.FC = () => {
                       <div className="font-medium text-gray-900 text-xs md:text-sm">
                         {bookingDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                       </div>
-                      <div className="text-xs text-gray-500">{booking.booking_time}</div>
+                      <div className="text-xs text-gray-500">{convertTo12Hour(booking.booking_time)}</div>
                     </td>
                     <td className="px-3 md:px-4 py-2 md:py-3">
                       <div>
@@ -1475,7 +1475,7 @@ const CompanyDashboard: React.FC = () => {
                           </span>
                           <span className="flex items-center gap-1">
                             <Clock size={14} />
-                            {booking.booking_time}
+                            {convertTo12Hour(booking.booking_time)}
                           </span>
                         </div>
                       </div>
@@ -1702,7 +1702,7 @@ const CompanyDashboard: React.FC = () => {
                   </div>
                   <div className="flex items-center">
                     <Clock className="h-4 w-4 text-gray-400 mr-3" />
-                    <span className="text-sm text-gray-900">{selectedBooking.booking_time}</span>
+                    <span className="text-sm text-gray-900">{convertTo12Hour(selectedBooking.booking_time)}</span>
                   </div>
                   {selectedBooking.duration && (
                     <div className="flex justify-between items-center pt-2 border-t border-gray-200">

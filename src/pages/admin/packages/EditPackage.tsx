@@ -14,7 +14,7 @@ import {
     categoryService
 } from '../../../services';
 import type { Category } from '../../../services/CategoryService';
-import { formatTimeRange } from '../../../utils/timeFormat';
+import { formatTimeRange, formatDurationDisplay } from '../../../utils/timeFormat';
 import type { 
     CreatePackageAttraction, 
     CreatePackageAddOn, 
@@ -672,7 +672,7 @@ const EditPackage: React.FC = () => {
             return `${minutes} min`;
         }
         if (!form.duration) return "Not specified";
-        return `${form.duration} ${form.durationUnit}`;
+        return formatDurationDisplay(parseFloat(form.duration), form.durationUnit);
     };
 
     // Loading state

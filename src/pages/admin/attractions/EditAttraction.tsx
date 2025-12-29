@@ -10,7 +10,7 @@ import { ASSET_URL, getStoredUser } from '../../../utils/storage';
 import { categoryService } from '../../../services';
 import type { Category } from '../../../services/CategoryService';
 import { Plus, Trash2, Info, Tag, Calendar, Clock } from 'lucide-react';
-import { formatTimeRange } from '../../../utils/timeFormat';
+import { formatTimeRange, formatDurationDisplay } from '../../../utils/timeFormat';
 import StandardButton from '../../../components/ui/StandardButton';
 
 const EditAttraction = () => {
@@ -302,7 +302,7 @@ const EditAttraction = () => {
         max_capacity: Number(formData.maxCapacity),
         category: formData.category,
         duration: formData.duration ? Number(formData.duration) : undefined,
-        duration_unit: formData.durationUnit as 'hours' | 'minutes',
+        duration_unit: formData.durationUnit as 'hours' | 'minutes' | 'hours and minutes',
         availability: formData.availability,
         image: formData.images.length > 0 ? formData.images : undefined, // Send all images as array
         is_active: true,
@@ -382,7 +382,7 @@ const EditAttraction = () => {
             </span>
             {formData.duration ? (
               <span className="text-sm text-gray-600">
-                {formData.duration === '0' ? 'Unlimited' : `${formData.duration} ${formData.durationUnit}`}
+                {formData.duration === '0' ? 'Unlimited' : formatDurationDisplay(parseFloat(formData.duration), formData.durationUnit)}
               </span>
             ) : (
               <span className="text-sm text-gray-600">Unlimited</span>

@@ -8,6 +8,7 @@ import {
   Search,
   X
 } from 'lucide-react';
+import { formatDurationDisplay } from '../../../utils/timeFormat';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import type { CreatePurchaseAttraction, CreatePurchaseCustomerInfo } from '../../../types/CreatePurchase.types';
 import { attractionService, type Attraction } from '../../../services/AttractionService';
@@ -536,7 +537,7 @@ const CreatePurchase = () => {
                           </span>
                         </span>
                         <span className="text-xs text-gray-500">
-                          {attraction.duration} {attraction.durationUnit}
+                          {attraction.duration === '0' || !attraction.duration ? 'Unlimited' : formatDurationDisplay(parseFloat(attraction.duration), attraction.durationUnit)}
                         </span>
                       </div>
                     </div>

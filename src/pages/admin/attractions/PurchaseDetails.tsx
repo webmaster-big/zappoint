@@ -13,6 +13,7 @@ import {
   DollarSign,
   FileText
 } from 'lucide-react';
+import { formatDurationDisplay } from '../../../utils/timeFormat';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { attractionPurchaseService } from '../../../services/AttractionPurchaseService';
 import Toast from '../../../components/ui/Toast';
@@ -233,7 +234,7 @@ const PurchaseDetails = () => {
                   <div>
                     <p className="text-sm text-gray-500">Duration</p>
                     <p className="font-medium text-gray-900">
-                      {purchase.attraction.duration} {purchase.attraction.duration_unit || 'minutes'}
+                      {formatDurationDisplay(purchase.attraction.duration, purchase.attraction.duration_unit)}
                     </p>
                   </div>
                 </div>

@@ -11,6 +11,7 @@ import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
 import customerService from '../../../services/CustomerService';
 import DatePicker from '../../../components/ui/DatePicker';
 import { extractIdFromSlug } from '../../../utils/slug';
+import { formatDurationDisplay } from '../../../utils/timeFormat';
 import StandardButton from '../../../components/ui/StandardButton';
 
 // Helper function to parse ISO date string (YYYY-MM-DD) in local timezone
@@ -591,16 +592,7 @@ const BookPackage: React.FC = () => {
   // Format duration for display
   const formatDuration = () => {
     if (!pkg || !pkg.duration) return "Not specified";
-    // Handle 'hours and minutes' unit with decimal value (e.g., 1.75 = 1 hr 45 min)
-    if (pkg.duration_unit === 'hours and minutes') {
-      const decimalDuration = parseFloat(String(pkg.duration));
-      const hours = Math.floor(decimalDuration);
-      const minutes = Math.round((decimalDuration % 1) * 60);
-      if (hours > 0 && minutes > 0) return `${hours} hr ${minutes} min`;
-      if (hours > 0) return `${hours} hr`;
-      return `${minutes} min`;
-    }
-    return `${pkg.duration} ${pkg.duration_unit}`;
+    return formatDurationDisplay(pkg.duration, pkg.duration_unit);
   };
 
   const partialAmount = calculatePartialAmount();

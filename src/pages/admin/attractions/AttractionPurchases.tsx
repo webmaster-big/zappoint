@@ -14,6 +14,7 @@ import {
   Eye,
   DollarSign
 } from 'lucide-react';
+import { formatDurationDisplay } from '../../../utils/timeFormat';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
 import type { AttractionPurchasesPurchase, AttractionPurchasesFilterOptions } from '../../../types/AttractionPurchases.types';
@@ -140,7 +141,7 @@ const ManagePurchases = () => {
         paymentMethod: purchase.payment_method === 'e-wallet' ? 'paypal' : 
                       purchase.payment_method === 'credit' ? 'credit_card' : 
                       purchase.payment_method as 'credit_card' | 'paypal',
-        duration: purchase.attraction?.duration ? `${purchase.attraction.duration} ${purchase.attraction.duration_unit || 'minutes'}` : '',
+        duration: purchase.attraction?.duration ? formatDurationDisplay(purchase.attraction.duration, purchase.attraction.duration_unit) : '',
         activity: purchase.attraction?.category || '',
         locationId: purchase.location_id,
       }));
