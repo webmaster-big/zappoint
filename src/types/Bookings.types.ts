@@ -23,6 +23,8 @@ export interface BookingsPageBooking {
   referenceNumber: string;
   activity?: string;
   location?: string;
+  notes?: string;
+  internal_notes?: string; // Staff-only notes, never shown to customer
 }
 
 export interface BookingsPageFilterOptions {

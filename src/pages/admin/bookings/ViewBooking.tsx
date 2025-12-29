@@ -575,10 +575,22 @@ const ViewBooking: React.FC = () => {
               )}
               {booking.notes && (
                 <div>
-                  <h3 className="font-medium text-gray-900 mb-2">Notes</h3>
+                  <h3 className="font-medium text-gray-900 mb-2">Customer Notes</h3>
                   <p className="text-gray-700">{booking.notes}</p>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Internal Staff Notes */}
+          {booking.internal_notes && (
+            <div className="p-6 bg-amber-50/50 border-t border-amber-100">
+              <div className="flex items-center gap-2 mb-2">
+                <AlertCircle size={16} className="text-amber-600" />
+                <h3 className="font-medium text-gray-900">Internal Staff Notes</h3>
+                <span className="text-xs text-amber-600 font-medium bg-amber-100 px-2 py-0.5 rounded">Staff Only</span>
+              </div>
+              <p className="text-gray-700">{booking.internal_notes}</p>
             </div>
           )}
         </div>

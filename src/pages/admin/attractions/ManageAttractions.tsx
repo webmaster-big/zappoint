@@ -198,7 +198,7 @@ const ManageAttractions = () => {
     {
       title: 'Avg. Price',
       value: attractions.length > 0 
-        ? `$${Number((attractions.reduce((sum, a) => sum + Number(a.price), 0) / attractions.length).toFixed(2))}` 
+        ? `$${(attractions.reduce((sum, a) => sum + Number(a.price), 0) / attractions.length).toFixed(2)}` 
         : '$0.00',
       change: 'Per attraction',
       accent: `bg-${themeColor}-100 text-${fullColor}`,

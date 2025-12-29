@@ -53,6 +53,8 @@ const EditBooking: React.FC = () => {
     paymentType: 'full' as 'full' | 'partial',
     roomId: null as number | null,
     notes: '',
+    internalNotes: '', // Staff-only notes, never shown to customer
+    sendNotification: true, // Whether to send notification email on update
     giftCardCode: '',
     promoCode: '',
     guestOfHonorName: '',
@@ -133,6 +135,8 @@ const EditBooking: React.FC = () => {
           paymentType: bookingData.payment_status === 'partial' ? 'partial' : 'full',
           roomId: bookingData.room_id || null,
           notes: bookingData.notes || '',
+          internalNotes: bookingData.internal_notes || '',
+          sendNotification: true, // Default to sending notifications
           giftCardCode: '',
           promoCode: '',
           guestOfHonorName: bookingData.guest_of_honor_name || '',
@@ -344,6 +348,8 @@ const EditBooking: React.FC = () => {
         payment_status: amountPaid >= totalAmount ? 'paid' : 
                        amountPaid > 0 && amountPaid < totalAmount ? 'partial' : 'pending',
         notes: formData.notes || undefined,
+        internal_notes: formData.internalNotes || undefined,
+        send_notification: formData.sendNotification,
         room_id: formData.roomId || undefined,
         additional_attractions: additionalAttractions.length > 0 ? additionalAttractions : undefined,
         additional_addons: additionalAddons.length > 0 ? additionalAddons : undefined,
@@ -845,7 +851,7 @@ const EditBooking: React.FC = () => {
           {/* Notes */}
           <div className="p-6 border-b border-gray-100">
             <label htmlFor="notes" className="block text-sm font-medium text-gray-800 mb-2">
-              Notes
+              Customer Notes
             </label>
             <textarea
               name="notes"
@@ -854,8 +860,57 @@ const EditBooking: React.FC = () => {
               value={formData.notes}
               onChange={handleInputChange}
               className={`w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
-              placeholder="Any special requests or notes..."
+              placeholder="Any special requests or notes from customer..."
             />
+          </div>
+
+          {/* Internal Staff Notes */}
+          <div className="p-6 border-b border-gray-100 bg-amber-50/50">
+            <div className="flex items-center gap-2 mb-2">
+              <AlertCircle size={16} className="text-amber-600" />
+              <label htmlFor="internalNotes" className="block text-sm font-medium text-gray-800">
+                Internal Staff Notes
+              </label>
+              <span className="text-xs text-amber-600 font-medium bg-amber-100 px-2 py-0.5 rounded">Staff Only</span>
+            </div>
+            <p className="text-xs text-gray-500 mb-3">These notes are only visible to staff and will never be shown or sent to the customer.</p>
+            <textarea
+              name="internalNotes"
+              id="internalNotes"
+              rows={3}
+              value={formData.internalNotes}
+              onChange={handleInputChange}
+              className={`w-full px-4 py-3 border border-amber-200 rounded-lg focus:ring-2 focus:ring-amber-400 focus:border-transparent bg-white`}
+              placeholder="Internal notes about this booking (e.g., dietary restrictions, VIP customer, special arrangements)..."
+            />
+          </div>
+
+          {/* Notification Control */}
+          <div className="p-6 border-b border-gray-100 bg-blue-50/50">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <Mail size={16} className="text-blue-600" />
+                  <label htmlFor="sendNotification" className="text-sm font-medium text-gray-800">
+                    Send Customer Notification
+                  </label>
+                </div>
+                <p className="text-xs text-gray-500">
+                  When enabled, the customer will receive an email notification about changes to their booking (e.g., date/time updates).
+                </p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  name="sendNotification"
+                  id="sendNotification"
+                  checked={formData.sendNotification}
+                  onChange={(e) => setFormData(prev => ({ ...prev, sendNotification: e.target.checked }))}
+                  className="sr-only peer"
+                />
+                <div className={`w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-${themeColor}-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-${fullColor}`}></div>
+              </label>
+            </div>
           </div>
 
           {/* Guest of Honor */}

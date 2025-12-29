@@ -103,10 +103,12 @@ export interface UpdateBookingData {
   payment_status?: 'paid' | 'partial' | 'pending';
   status?: 'pending' | 'confirmed' | 'checked-in' | 'completed' | 'cancelled';
   notes?: string;
+  internal_notes?: string; // Staff-only notes, never shown to customer
   special_requests?: string;
   guest_of_honor_name?: string;
   guest_of_honor_age?: number;
   guest_of_honor_gender?: 'male' | 'female' | 'other';
+  send_notification?: boolean; // Control whether to send customer notification on update
   additional_attractions?: Array<{
     attraction_id: number;
     quantity: number;
@@ -177,6 +179,7 @@ export interface Booking {
   payment_status: 'paid' | 'partial' | 'pending';
   status: 'pending' | 'confirmed' | 'checked-in' | 'completed' | 'cancelled';
   notes?: string;
+  internal_notes?: string; // Staff-only notes, never shown to customer
   special_requests?: string;
   guest_of_honor_name?: string;
   guest_of_honor_age?: number;

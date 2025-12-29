@@ -1174,8 +1174,23 @@ const CheckIn: React.FC = () => {
                           <AlertCircle className={`h-5 w-5 text-${fullColor}`} />
                         </div>
                         <div>
-                          <p className="text-xs text-gray-500">Notes</p>
+                          <p className="text-xs text-gray-500">Customer Notes</p>
                           <p className="font-medium text-gray-800">{verifiedBooking.notes}</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {verifiedBooking.internal_notes && (
+                      <div className="flex items-start gap-3 col-span-full bg-amber-50 rounded-lg p-3 border border-amber-200">
+                        <div className="p-2 bg-amber-100 rounded-lg">
+                          <AlertCircle className="h-5 w-5 text-amber-600" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <p className="text-xs text-amber-700 font-medium">Internal Staff Notes</p>
+                            <span className="text-xs text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded">Staff Only</span>
+                          </div>
+                          <p className="font-medium text-gray-800">{verifiedBooking.internal_notes}</p>
                         </div>
                       </div>
                     )}
@@ -1627,8 +1642,23 @@ const CheckIn: React.FC = () => {
                           <AlertCircle className={`h-5 w-5 text-${fullColor}`} />
                         </div>
                         <div>
-                          <p className="text-xs text-gray-500">Notes</p>
+                          <p className="text-xs text-gray-500">Customer Notes</p>
                           <p className="font-medium text-gray-800">{selectedBooking.notes}</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {selectedBooking.internal_notes && (
+                      <div className="flex items-start gap-3 col-span-full bg-amber-50 rounded-lg p-3 border border-amber-200">
+                        <div className="p-2 bg-amber-100 rounded-lg">
+                          <AlertCircle className="h-5 w-5 text-amber-600" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <p className="text-xs text-amber-700 font-medium">Internal Staff Notes</p>
+                            <span className="text-xs text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded">Staff Only</span>
+                          </div>
+                          <p className="font-medium text-gray-800">{selectedBooking.internal_notes}</p>
                         </div>
                       </div>
                     )}
