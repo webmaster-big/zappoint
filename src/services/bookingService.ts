@@ -466,6 +466,18 @@ const bookingService = {
   },
 
   /**
+   * Update internal notes for a booking
+   */
+  async updateInternalNotes(bookingId: number, internalNotes: string): Promise<{
+    success: boolean;
+    message: string;
+    data?: any;
+  }> {
+    const response = await api.patch(`/bookings/${bookingId}/internal-notes`, { internal_notes: internalNotes });
+    return response.data;
+  },
+
+  /**
    * Create package room association
    */
   async createPackageRoom(data: {
