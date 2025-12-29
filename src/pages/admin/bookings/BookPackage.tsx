@@ -13,6 +13,13 @@ import DatePicker from '../../../components/ui/DatePicker';
 import { extractIdFromSlug } from '../../../utils/slug';
 import StandardButton from '../../../components/ui/StandardButton';
 
+// Helper function to parse ISO date string (YYYY-MM-DD) in local timezone
+// Avoids UTC offset issues that cause date to show as previous day
+const parseLocalDate = (isoDateString: string): Date => {
+  const [year, month, day] = isoDateString.split('-').map(Number);
+  return new Date(year, month - 1, day);
+};
+
 const countries = [
   'United States', 'Canada', 'United Kingdom', 'Afghanistan', 'Albania', 'Algeria', 'Andorra', 'Angola',
   'Argentina', 'Armenia', 'Australia', 'Austria', 'Azerbaijan', 'Bahamas', 'Bahrain', 'Bangladesh',
@@ -887,7 +894,7 @@ const BookPackage: React.FC = () => {
                 <div className="flex justify-between text-sm sm:text-base">
                   <span className="text-gray-600">Date:</span>
                   <span className="font-medium text-gray-900 text-right ml-2">
-                    {new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+                    {parseLocalDate(selectedDate).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm sm:text-base">
@@ -2019,7 +2026,7 @@ const BookPackage: React.FC = () => {
                   <div className="flex justify-between items-center mb-2">
                     <span className="text-gray-600 text-sm">Date:</span>
                     <span className="font-medium text-gray-800 text-sm">
-                      {new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                      {parseLocalDate(selectedDate).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
                     </span>
                   </div>
                 )}

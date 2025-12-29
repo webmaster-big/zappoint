@@ -21,6 +21,13 @@ import { getImageUrl, getStoredUser, formatTimeTo12Hour } from '../../../utils/s
 import { loadAcceptJS, processCardPayment, validateCardNumber, formatCardNumber, getCardType } from '../../../services/PaymentService';
 import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
 
+// Helper function to parse ISO date string (YYYY-MM-DD) in local timezone
+// Avoids UTC offset issues that cause date to show as previous day
+const parseLocalDate = (isoDateString: string): Date => {
+  const [year, month, day] = isoDateString.split('-').map(Number);
+  return new Date(year, month - 1, day);
+};
+
 // Extended booking data interface for request
 interface ExtendedBookingData extends CreateBookingData {
   additional_attractions?: Array<{
@@ -1181,7 +1188,7 @@ const OnsiteBooking: React.FC = () => {
                   <div className="flex items-center gap-2">
                     <Calendar className="w-4 h-4 text-gray-400" />
                     <span className="text-gray-900">
-                      {new Date(bookingData.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      {parseLocalDate(bookingData.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                     </span>
                   </div>
                 )}
@@ -2145,7 +2152,7 @@ const OnsiteBooking: React.FC = () => {
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">Date:</span>
                 <span className="font-medium text-gray-900">
-                  {new Date(bookingData.date).toLocaleDateString('en-US', { 
+                  {parseLocalDate(bookingData.date).toLocaleDateString('en-US', { 
                     weekday: 'long', 
                     year: 'numeric', 
                     month: 'long', 
