@@ -1179,12 +1179,22 @@ const EditPackage: React.FC = () => {
                                                     </div>
 
                                                     {/* Preview generated time slots */}
-                                                    {form.duration && schedule.time_slot_start && schedule.time_slot_end && (
+                                                    {((form.durationUnit === 'hours and minutes' && (form.durationHours || form.durationMinutes)) || (form.durationUnit !== 'hours and minutes' && form.duration)) && schedule.time_slot_start && schedule.time_slot_end && (
                                                         <div className="mt-3 pt-3 border-t border-gray-200">
                                                             <p className="text-xs font-medium text-gray-600 mb-2">Generated Time Slots:</p>
                                                             <div className="flex flex-wrap gap-1">
                                                                 {(() => {
-                                                                    const slotDuration = form.durationUnit === 'hours' ? parseInt(form.duration) * 60 : parseInt(form.duration);
+                                                                    // Calculate duration in minutes based on unit
+                                                                    let slotDuration: number;
+                                                                    if (form.durationUnit === 'hours and minutes') {
+                                                                        const hours = parseInt(form.durationHours) || 0;
+                                                                        const mins = parseInt(form.durationMinutes) || 0;
+                                                                        slotDuration = hours * 60 + mins;
+                                                                    } else if (form.durationUnit === 'hours') {
+                                                                        slotDuration = parseInt(form.duration) * 60;
+                                                                    } else {
+                                                                        slotDuration = parseInt(form.duration);
+                                                                    }
                                                                     const interval = schedule.time_slot_interval;
                                                                     const [startHour, startMin] = schedule.time_slot_start.split(':').map(Number);
                                                                     const [endHour, endMin] = schedule.time_slot_end.split(':').map(Number);

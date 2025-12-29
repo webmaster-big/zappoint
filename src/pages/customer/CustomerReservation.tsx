@@ -24,6 +24,7 @@ import html2canvas from 'html2canvas';
 import type { SortBy, SortOrder } from '../../types/customer';
 import bookingService, { type Booking } from '../../services/bookingService';
 import type { BookPackagePackage } from '../../types/BookPackage.types';
+import { formatDurationDisplay } from '../../utils/timeFormat';
 
 const CustomerReservations = () => {
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -282,7 +283,7 @@ const CustomerReservations = () => {
               <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 15px;">
                 <div style="background: #f1f5f9; padding: 10px; border-radius: 4px;">
                   <div style="font-size: 11px; color: #64748b; text-transform: uppercase;">Duration</div>
-                  <div style="font-size: 14px; font-weight: 600; color: #1e293b; margin-top: 2px;">${booking.duration} ${booking.duration_unit}</div>
+                  <div style="font-size: 14px; font-weight: 600; color: #1e293b; margin-top: 2px;">${formatDurationDisplay(booking.duration, booking.duration_unit)}</div>
                 </div>
                 <div style="background: #f1f5f9; padding: 10px; border-radius: 4px;">
                   <div style="font-size: 11px; color: #64748b; text-transform: uppercase;">Package Price</div>
@@ -697,7 +698,7 @@ const CustomerReservations = () => {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Duration:</span>
-                      <span className="font-medium">{selectedBooking.duration} {selectedBooking.duration_unit}</span>
+                      <span className="font-medium">{formatDurationDisplay(selectedBooking.duration, selectedBooking.duration_unit)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Participants:</span>

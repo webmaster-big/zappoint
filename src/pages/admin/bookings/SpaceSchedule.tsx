@@ -292,10 +292,17 @@ const SpaceSchedule = () => {
       
       // Check if this slot matches the booking start time
       if (bookingHour === slot.hour && bookingMinute === slot.minute) {
-        // Calculate duration in minutes
-        const durationInMinutes = booking.duration_unit === 'hours' 
-          ? booking.duration * 60 
-          : booking.duration;
+        // Calculate duration in minutes - handle 'hours and minutes' unit with decimal value
+        let durationInMinutes: number;
+        if (booking.duration_unit === 'hours and minutes') {
+          const hours = Math.floor(booking.duration);
+          const mins = Math.round((booking.duration % 1) * 60);
+          durationInMinutes = hours * 60 + mins;
+        } else {
+          durationInMinutes = booking.duration_unit === 'hours' 
+            ? booking.duration * 60 
+            : booking.duration;
+        }
         // Use the booking's package interval if available, otherwise use state interval
         const interval = booking.package?.time_slot_interval || timeInterval;
         const durationInSlots = Math.ceil(durationInMinutes / interval);
@@ -309,9 +316,17 @@ const SpaceSchedule = () => {
       // Calculate if current slot is within the booking duration
       const bookingStartMinutes = bookingHour * 60 + bookingMinute;
       const slotMinutes = slot.hour * 60 + slot.minute;
-      const durationInMinutes = booking.duration_unit === 'hours' 
-        ? booking.duration * 60 
-        : booking.duration;
+      // Handle 'hours and minutes' unit with decimal value
+      let durationInMinutes: number;
+      if (booking.duration_unit === 'hours and minutes') {
+        const hours = Math.floor(booking.duration);
+        const mins = Math.round((booking.duration % 1) * 60);
+        durationInMinutes = hours * 60 + mins;
+      } else {
+        durationInMinutes = booking.duration_unit === 'hours' 
+          ? booking.duration * 60 
+          : booking.duration;
+      }
       const bookingEndMinutes = bookingStartMinutes + durationInMinutes;
       
       if (slotMinutes > bookingStartMinutes && slotMinutes < bookingEndMinutes) {

@@ -18,7 +18,7 @@ import type { Attraction, Package as PackageType, BookingType } from '../../type
 import { customerService, type GroupedAttraction, type GroupedPackage } from '../../services/CustomerService';
 import { ASSET_URL } from '../../utils/storage';
 import { generateSlug, generateLocationSlug } from '../../utils/slug';
-import { convertTo12Hour } from '../../utils/timeFormat';
+import { convertTo12Hour, formatDurationDisplay } from '../../utils/timeFormat';
 
 const EntertainmentLandingPage = () => {
   const [selectedLocation, setSelectedLocation] = useState('All Locations');
@@ -77,7 +77,7 @@ const EntertainmentLandingPage = () => {
             image: Array.isArray(attr.image) ? attr.image[0] : attr.image,
             category: attr.category,
             availableLocations: attr.locations.map(loc => loc.location_name),
-            duration: attr.duration === 0 || !attr.duration ? 'Unlimited' : `${attr.duration} ${attr.duration_unit}`,
+            duration: attr.duration === 0 || !attr.duration ? 'Unlimited' : formatDurationDisplay(attr.duration, attr.duration_unit),
             pricingType: attr.pricing_type,
             purchaseLinks: attr.purchase_links,
             availability: undefined, // Will be loaded when modal opens

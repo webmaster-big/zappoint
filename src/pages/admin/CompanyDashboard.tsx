@@ -31,6 +31,7 @@ import LocationSelector from '../../components/admin/LocationSelector';
 import bookingService from '../../services/bookingService';
 import { locationService, type Location } from '../../services/LocationService';
 import { metricsService } from '../../services/MetricsService';
+import { formatDurationDisplay } from '../../utils/timeFormat';
 
 const CompanyDashboard: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
@@ -1706,7 +1707,7 @@ const CompanyDashboard: React.FC = () => {
                   {selectedBooking.duration && (
                     <div className="flex justify-between items-center pt-2 border-t border-gray-200">
                       <span className="text-sm text-gray-600">Duration</span>
-                      <span className="text-sm font-medium text-gray-900">{selectedBooking.duration} {selectedBooking.duration_unit}</span>
+                      <span className="text-sm font-medium text-gray-900">{formatDurationDisplay(selectedBooking.duration, selectedBooking.duration_unit)}</span>
                     </div>
                   )}
                   <div className="flex justify-between items-center">

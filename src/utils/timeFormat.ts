@@ -37,3 +37,52 @@ export function formatTimeRange(startTime: string, endTime: string): string {
   if (!startTime || !endTime) return '';
   return `${convertTo12Hour(startTime)} - ${convertTo12Hour(endTime)}`;
 }
+
+/**
+ * Formats duration for display based on unit type
+ * Handles 'hours and minutes' unit with decimal values (e.g., 1.90 = 1 hr 54 min)
+ * @param duration - Duration value (can be number or string)
+ * @param durationUnit - Unit type: 'hours', 'minutes', or 'hours and minutes'
+ * @returns Formatted duration string (e.g., "1 hr 54 min", "2 hours", "30 minutes")
+ */
+export function formatDurationDisplay(
+  duration: number | string | undefined,
+  durationUnit: string | undefined
+): string {
+  if (duration === undefined || duration === null || duration === '') return 'Not specified';
+  
+  const durationValue = typeof duration === 'string' ? parseFloat(duration) : duration;
+  
+  if (isNaN(durationValue)) return 'Not specified';
+  
+  // Handle 'hours and minutes' unit with decimal value (e.g., 1.90 = 1 hr 54 min)
+  if (durationUnit === 'hours and minutes') {
+    const hours = Math.floor(durationValue);
+    const minutes = Math.round((durationValue % 1) * 60);
+    if (hours > 0 && minutes > 0) return `${hours} hr ${minutes} min`;
+    if (hours > 0) return `${hours} hr`;
+    if (minutes > 0) return `${minutes} min`;
+    return 'Not specified';
+  }
+  
+  // Handle regular hours
+  if (durationUnit === 'hours') {
+    return durationValue === 1 ? '1 hour' : `${durationValue} hours`;
+  }
+  
+  // Handle minutes - convert to hours if >= 60
+  if (durationUnit === 'minutes') {
+    if (durationValue >= 60) {
+      const hours = Math.floor(durationValue / 60);
+      const mins = durationValue % 60;
+      if (mins === 0) {
+        return hours === 1 ? '1 hour' : `${hours} hours`;
+      }
+      return `${hours} hr ${mins} min`;
+    }
+    return `${durationValue} min`;
+  }
+  
+  // Default fallback
+  return `${durationValue} ${durationUnit || 'hours'}`;
+}
