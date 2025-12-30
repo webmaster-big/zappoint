@@ -388,29 +388,35 @@ const LocationManagerProfile = () => {
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between">
             <div className="flex items-center space-x-4 mb-4 sm:mb-0">
               <div className="relative group">
-                {profileData.personal.avatar ? (
-                  <div className="relative">
-                    <img 
-                      src={`${ASSET_URL}${profileData.personal.avatar}`}
-                      alt="Profile" 
-                      className="w-20 h-20 rounded-full object-cover border-4 border-white shadow-lg"
-                      onError={(e) => {
-                        console.error('Image failed to load:', `${ASSET_URL}${profileData.personal.avatar}`);
-                        e.currentTarget.style.display = 'none';
-                      }}
-                    />
-                    <div className="absolute inset-0 rounded-full bg-black opacity-0 group-hover:opacity-20 transition-opacity"></div>
-                  </div>
-                ) : (
-                  <div className="relative">
+                <div className="relative">
+                  {profileData.personal.avatar ? (
+                    <>
+                      <img 
+                        src={`${ASSET_URL}${profileData.personal.avatar}`}
+                        alt="Profile" 
+                        className="w-20 h-20 rounded-full object-cover border-4 border-white shadow-lg"
+                        onError={(e) => {
+                          console.error('Image failed to load:', `${ASSET_URL}${profileData.personal.avatar}`);
+                          e.currentTarget.style.display = 'none';
+                          const fallback = e.currentTarget.nextElementSibling;
+                          if (fallback) fallback.classList.remove('hidden');
+                        }}
+                      />
+                      <div className={`hidden w-20 h-20 bg-gradient-to-br from-${themeColor}-400 via-${themeColor}-600 to-${themeColor}-800 rounded-full flex items-center justify-center text-white shadow-lg border-4 border-white`}>
+                        <span className="text-3xl font-bold tracking-tight">
+                          {profileData.personal.firstName?.[0]?.toUpperCase() || ''}{profileData.personal.lastName?.[0]?.toUpperCase() || ''}
+                        </span>
+                      </div>
+                    </>
+                  ) : (
                     <div className={`w-20 h-20 bg-gradient-to-br from-${themeColor}-400 via-${themeColor}-600 to-${themeColor}-800 rounded-full flex items-center justify-center text-white shadow-lg border-4 border-white`}>
                       <span className="text-3xl font-bold tracking-tight">
                         {profileData.personal.firstName?.[0]?.toUpperCase() || ''}{profileData.personal.lastName?.[0]?.toUpperCase() || ''}
                       </span>
                     </div>
-                    <div className="absolute inset-0 rounded-full bg-gradient-to-t from-black/20 to-transparent"></div>
-                  </div>
-                )}
+                  )}
+                  <div className="absolute inset-0 rounded-full bg-black opacity-0 group-hover:opacity-20 transition-opacity pointer-events-none"></div>
+                </div>
                 <label className={`absolute -bottom-1 -right-1 bg-${fullColor} text-white p-2 rounded-full hover:bg-${themeColor}-900 transition cursor-pointer shadow-lg border-2 border-white group-hover:scale-110 transform`}>
                   <Camera size={16} />
                   <input 
