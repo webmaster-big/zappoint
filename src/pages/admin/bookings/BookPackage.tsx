@@ -14,7 +14,7 @@ interface DayOffWithTime {
   time_end?: string | null;
   reason?: string;
 }
-import { loadAcceptJS, processCardPayment, validateCardNumber, formatCardNumber, getCardType, updatePayment } from '../../../services/PaymentService';
+import { loadAcceptJS, processCardPayment, validateCardNumber, formatCardNumber, getCardType, updatePayment, PAYMENT_TYPE } from '../../../services/PaymentService';
 import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
 import customerService from '../../../services/CustomerService';
 import DatePicker from '../../../components/ui/DatePicker';
@@ -908,13 +908,16 @@ const BookPackage: React.FC = () => {
         
         console.log('✅ Booking created:', { bookingId, referenceNumber });
         
-        // Update payment record with booking_id
+        // Update payment record with payable_id and payable_type
         if (paymentResponse.payment?.id) {
           try {
-            await updatePayment(paymentResponse.payment.id, { booking_id: bookingId });
-            console.log('✅ Payment record updated with booking_id:', bookingId);
+            await updatePayment(paymentResponse.payment.id, { 
+              payable_id: bookingId,
+              payable_type: PAYMENT_TYPE.BOOKING
+            });
+            console.log('✅ Payment record updated with payable_id:', bookingId);
           } catch (paymentUpdateError) {
-            console.error('⚠️ Failed to update payment with booking_id:', paymentUpdateError);
+            console.error('⚠️ Failed to update payment with payable_id:', paymentUpdateError);
           }
         }
         

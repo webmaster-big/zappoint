@@ -27,7 +27,8 @@ interface DayOffWithTime {
   reason?: string;
 }
 import { formatDurationDisplay } from '../../../utils/timeFormat';
-import { loadAcceptJS, processCardPayment, validateCardNumber, formatCardNumber, getCardType } from '../../../services/PaymentService';
+import { loadAcceptJS, processCardPayment, validateCardNumber, formatCardNumber, getCardType, createPayment } from '../../../services/PaymentService';
+import { PAYMENT_TYPE } from '../../../types/Payment.types';
 import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
 
 // Helper function to parse ISO date string (YYYY-MM-DD) in local timezone
@@ -1222,6 +1223,29 @@ const OnsiteBooking: React.FC = () => {
         } catch (qrError) {
           console.error('⚠️ Failed to store QR code, but booking was created:', qrError);
           // Don't fail the entire process if QR storage fails
+        }
+        
+        // Step 5: Create payment record if amount_paid > 0
+        if (amountPaid > 0) {
+          try {
+            const paymentData = {
+              payable_id: bookingId,
+              payable_type: PAYMENT_TYPE.BOOKING,
+              customer_id: response.data.customer_id || null,
+              amount: amountPaid,
+              currency: 'USD',
+              method: bookingData.paymentMethod as 'card' | 'cash',
+              status: 'completed' as const,
+              location_id: bookingData_request.location_id,
+              notes: `Payment for booking ${referenceNumber}`,
+            };
+            
+            await createPayment(paymentData);
+            console.log('✅ Payment record created for booking:', bookingId);
+          } catch (paymentError) {
+            console.error('⚠️ Failed to create payment record:', paymentError);
+            // Don't fail the entire process if payment record creation fails
+          }
         }
         
         // Show success toast

@@ -31,6 +31,7 @@ import PurchaseAttraction from "./pages/admin/attractions/PurchaseAttraction";
 import ManagePurchases from "./pages/admin/attractions/AttractionPurchases";
 import CreatePurchase from "./pages/admin/attractions/CreatePurchase";
 import AttractionCheckIn from "./pages/admin/attractions/AttractionCheckIn";
+import Payments from "./pages/admin/payments/Payments";
 import CustomerAnalytics from "./pages/admin/customer/CustomerAnalytics";
 import CustomerListing from "./pages/admin/customer/Customers";
 import CompanyAdminRegistration from "./pages/auth/Register";
@@ -142,12 +143,14 @@ function App() {
           <Route path="/manager/attendants/activity" element={<ProtectedRoute allowedRoles={['location_manager']}><AttendantActivityLogs /></ProtectedRoute>} />
           <Route path="/manager/day-offs" element={<ProtectedRoute allowedRoles={['location_manager']}><DayOffs /></ProtectedRoute>} />
           <Route path="/manager/analytics" element={<ProtectedRoute allowedRoles={['location_manager']}><LocationAnalytics /></ProtectedRoute>} />
+          <Route path="/manager/payments" element={<ProtectedRoute allowedRoles={['location_manager']}><Payments /></ProtectedRoute>} />
           
           {/* Company Admin-only Routes */}
           <Route path="/admin/analytics" element={<ProtectedRoute allowedRoles={['company_admin']}><CompanyAnalytics /></ProtectedRoute>} />
           <Route path="/admin/activity" element={<ProtectedRoute allowedRoles={['company_admin']}><LocationActivityLogs /></ProtectedRoute>} />
           <Route path="/admin/day-offs" element={<ProtectedRoute allowedRoles={['company_admin']}><DayOffs /></ProtectedRoute>} />
           <Route path="/admin/users" element={<ProtectedRoute allowedRoles={['company_admin']}><ManageAccounts /></ProtectedRoute>} />
+          <Route path="/admin/payments" element={<ProtectedRoute allowedRoles={['company_admin']}><Payments /></ProtectedRoute>} />
           {/* <Route path="/admin/users/create" element={<ProtectedRoute allowedRoles={['company_admin']}><CreateAccount /></ProtectedRoute>} /> */}
           
           {/* Shared Routes - All authenticated users */}

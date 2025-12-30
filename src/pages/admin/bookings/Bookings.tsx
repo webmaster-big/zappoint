@@ -22,7 +22,7 @@ import StandardButton from '../../../components/ui/StandardButton';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
 import type { BookingsPageBooking, BookingsPageFilterOptions } from '../../../types/Bookings.types';
 import bookingService from '../../../services/bookingService';
-import { createPayment } from '../../../services/PaymentService';
+import { createPayment, PAYMENT_TYPE } from '../../../services/PaymentService';
 import { locationService } from '../../../services/LocationService';
 import LocationSelector from '../../../components/admin/LocationSelector';
 import { getStoredUser, API_BASE_URL } from '../../../utils/storage';
@@ -826,7 +826,8 @@ const Bookings: React.FC = () => {
 
       // Create payment record using PaymentService
       const paymentResponse = await createPayment({
-        booking_id: Number(selectedBookingForPayment.id),
+        payable_id: Number(selectedBookingForPayment.id),
+        payable_type: PAYMENT_TYPE.BOOKING,
         customer_id: customerId,
         location_id: locationId,
         amount: amount,

@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import bookingService, { type Booking } from '../../../services/bookingService';
-import { createPayment } from '../../../services/PaymentService';
+import { createPayment, PAYMENT_TYPE } from '../../../services/PaymentService';
 import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
 import { getStoredUser } from '../../../utils/storage';
@@ -465,7 +465,8 @@ const CheckIn: React.FC = () => {
 
       // Create payment record using PaymentService
       const paymentResponse = await createPayment({
-        booking_id: selectedBookingForPayment.id,
+        payable_id: selectedBookingForPayment.id,
+        payable_type: PAYMENT_TYPE.BOOKING,
         customer_id: customerId,
         location_id: locationId,
         amount: amount,

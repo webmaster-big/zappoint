@@ -31,13 +31,14 @@ import {
   FileText,
   UserCog,
   CalendarOff,
-  Sparkles
+  Sparkles,
+  CreditCard
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useThemeColor } from '../../hooks/useThemeColor';
 import type { NavItem, UserData, SidebarProps } from '../../types/sidebar.types';
-import { ASSET_URL, API_BASE_URL } from '../../utils/storage';
+import { API_BASE_URL, getImageUrl } from '../../utils/storage';
 import { notificationStreamService, type NotificationObject } from '../../services/NotificationStreamService';
 
 // Helper function to add descriptions to navigation items
@@ -78,7 +79,8 @@ const addDescriptions = (navItems: NavItem[]): NavItem[] => {
     'Day Offs': 'Manage blocked dates and holidays',
     'Notifications': 'Manage your notification preferences',
     'User Management': 'Administer user accounts and permissions',
-    'Manage Accounts': 'View and edit user accounts'
+    'Manage Accounts': 'View and edit user accounts',
+    'Payments': 'Manage and view all payment transactions'
   };
 
   return navItems.map(item => {
@@ -179,6 +181,7 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
           { label: 'Customer Analytics', href: '/customers/analytics', icon: PieChart },
           { label: 'Customers', href: '/customers', icon: Users }
         ]},
+        { label: 'Payments', icon: CreditCard, href: '/manager/payments', section: 'Financial' },
         { label: 'Attendants Management', icon: UserCog, section: 'Team', items: [
           { label: 'Manage Attendants', href: '/manager/attendants', icon: Users },
           { label: 'Activity Log', href: '/manager/attendants/activity', icon: FileText },
@@ -219,6 +222,7 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
           { label: 'Customer Analytics', href: '/customers/analytics', icon: PieChart },
           { label: 'Customers', href: '/customers', icon: Users }
         ]},
+        { label: 'Payments', icon: CreditCard, href: '/admin/payments', section: 'Financial' },
         { label: 'User Management', icon: UserCog, section: 'Administration', items: [
           { label: 'Manage Accounts', href: '/admin/users', icon: Users },
           { label: 'Activity Log', href: '/admin/activity', icon: FileText },
@@ -1022,7 +1026,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
             <div className="flex items-center justify-center w-full transition-all duration-300">
               {companyLogo ? (
                 <img 
-                  src={`${ASSET_URL}${companyLogo}`}
+                  src={getImageUrl(companyLogo)}
                   alt="Company Logo" 
                   className={`object-contain transition-all duration-300 ${isMinimized ? 'w-10 h-10' : 'max-h-12 max-w-[80%]'}`}
                   onError={(e) => {
@@ -1162,7 +1166,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
                 >
                   {user.profile_path ? (
                     <img 
-                      src={`${ASSET_URL}${user.profile_path}`}
+                      src={getImageUrl(user.profile_path)}
                       alt={user.name}
                       className="w-full h-full object-cover"
                       onError={(e) => {
@@ -1232,7 +1236,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
                   <div className={`w-10 h-10 rounded-full flex items-center justify-center overflow-hidden ${!user.profile_path ? `bg-${themeColor}-200` : ''}`}>
                     {user.profile_path ? (
                       <img 
-                        src={`${ASSET_URL}${user.profile_path}`}
+                        src={getImageUrl(user.profile_path)}
                         alt={user.name}
                         className="w-full h-full object-cover"
                         onError={(e) => {

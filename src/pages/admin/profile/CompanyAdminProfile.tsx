@@ -17,7 +17,7 @@ import {
   CheckCircle
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
-import { API_BASE_URL, ASSET_URL, getStoredUser, setStoredUser } from '../../../utils/storage';
+import { API_BASE_URL, getStoredUser, setStoredUser, getImageUrl } from '../../../utils/storage';
 import StandardButton from '../../../components/ui/StandardButton';
 import type { CompanyAdminProfileData } from '../../../types/CompanyAdminProfile.types';
 import { getAuthToken } from '../../../services';
@@ -248,7 +248,7 @@ const CompanyAdminProfile = () => {
       }
 
       console.log('Profile avatar path:', user.profile_path);
-      console.log('Full avatar URL:', `${ASSET_URL}${user.profile_path}`);
+      console.log('Full avatar URL:', getImageUrl(user.profile_path));
       setProfileData(newProfileData);
       setEditedData(newProfileData);
     } catch (err) {
@@ -687,11 +687,11 @@ const CompanyAdminProfile = () => {
                   {profileData.personal.avatar ? (
                     <>
                       <img 
-                        src={`${ASSET_URL}${profileData.personal.avatar}`}
+                        src={getImageUrl(profileData.personal.avatar)}
                         alt="Profile" 
                         className="w-20 h-20 rounded-full object-cover border-4 border-white shadow-lg"
                         onError={(e) => {
-                          console.error('Image failed to load:', `${ASSET_URL}${profileData.personal.avatar}`);
+                          console.error('Image failed to load:', getImageUrl(profileData.personal.avatar));
                           e.currentTarget.style.display = 'none';
                           const fallback = e.currentTarget.nextElementSibling;
                           if (fallback) fallback.classList.remove('hidden');
@@ -929,11 +929,11 @@ const CompanyAdminProfile = () => {
                         {profileData.company.logoPath ? (
                           <>
                             <img 
-                              src={`${ASSET_URL}${profileData.company.logoPath}`}
+                              src={getImageUrl(profileData.company.logoPath)}
                               alt="Company Logo" 
                               className="w-24 h-24 rounded-lg object-contain border-2 border-gray-200 bg-white p-2"
                               onError={(e) => {
-                                console.error('Logo failed to load:', `${ASSET_URL}${profileData.company.logoPath}`);
+                                console.error('Logo failed to load:', getImageUrl(profileData.company.logoPath));
                                 e.currentTarget.style.display = 'none';
                                 const fallback = e.currentTarget.nextElementSibling;
                                 if (fallback) fallback.classList.remove('hidden');
@@ -971,7 +971,7 @@ const CompanyAdminProfile = () => {
                     </div>
                     <div className="text-sm text-gray-500">
                       <p>Upload your company logo</p>
-                      <p className="text-xs">Max size: 20MB. Supported: PNG, JPG, SVG</p>
+                      <p className="text-xs">Max size: 20MB. Supported: PNG, JPG, JPEG</p>
                     </div>
                   </div>
                 </div>

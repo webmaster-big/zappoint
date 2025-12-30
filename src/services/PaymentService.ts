@@ -9,7 +9,10 @@ import type {
   AcceptJSSecureData,
   AcceptJSResponse,
   PaymentOpaqueData,
+  PaymentFilters,
+  PaginatedPaymentsResponse,
 } from '../types/Payment.types';
+import { PAYMENT_TYPE } from '../types/Payment.types';
 
 // Create axios instance with base configuration
 const api = axios.create({
@@ -79,12 +82,38 @@ export const getPayment = async (id: number): Promise<PaymentApiResponse<Payment
 /**
  * Get all payments with optional filters
  * 
- * @param filters - Optional filters (booking_id, customer_id, status, etc.)
- * @returns List of payments
+ * @param filters - Optional filters (payable_id, payable_type, customer_id, status, etc.)
+ * @returns Paginated list of payments
  */
-export const getPayments = async (filters?: Record<string, any>): Promise<PaymentApiResponse<Payment[]>> => {
-  const response = await api.get<PaymentApiResponse<Payment[]>>('/payments', { params: filters });
+export const getPayments = async (filters?: PaymentFilters): Promise<PaginatedPaymentsResponse> => {
+  const response = await api.get<PaginatedPaymentsResponse>('/payments', { params: filters });
   return response.data;
+};
+
+/**
+ * Get payments for a specific booking
+ * 
+ * @param bookingId - Booking ID
+ * @returns List of payments for the booking
+ */
+export const getPaymentsForBooking = async (bookingId: number): Promise<PaginatedPaymentsResponse> => {
+  return getPayments({
+    payable_id: bookingId,
+    payable_type: PAYMENT_TYPE.BOOKING,
+  });
+};
+
+/**
+ * Get payments for a specific attraction purchase
+ * 
+ * @param purchaseId - Attraction purchase ID
+ * @returns List of payments for the attraction purchase
+ */
+export const getPaymentsForAttractionPurchase = async (purchaseId: number): Promise<PaginatedPaymentsResponse> => {
+  return getPayments({
+    payable_id: purchaseId,
+    payable_type: PAYMENT_TYPE.ATTRACTION_PURCHASE,
+  });
 };
 
 /**
@@ -111,6 +140,248 @@ export const updatePayment = async (
 export const deletePayment = async (id: number): Promise<PaymentApiResponse> => {
   const response = await api.delete<PaymentApiResponse>(`/payments/${id}`);
   return response.data;
+};
+
+/**
+ * Invoice Generation Functions
+ */
+
+/**
+ * Invoice export filter options
+ */
+export interface InvoiceExportFilters {
+  payment_ids?: number[];
+  payable_type?: 'booking' | 'attraction_purchase';
+  date?: string; // Single date Y-m-d
+  start_date?: string;
+  end_date?: string;
+  week?: 'current' | 'next' | string; // 'current', 'next', or date string
+  location_id?: number;
+  customer_id?: number;
+  status?: 'pending' | 'completed' | 'failed' | 'refunded';
+  method?: 'card' | 'cash';
+  view_mode?: 'report' | 'individual';
+}
+
+/**
+ * Export invoices with comprehensive filtering options
+ * This is the main function that uses the unified /payments/invoices/export endpoint
+ * 
+ * @param filters - Export filters
+ * @param stream - true to view in browser, false to download
+ */
+export const exportInvoices = async (
+  filters: InvoiceExportFilters,
+  stream: boolean = false
+): Promise<void> => {
+  const token = getStoredUser()?.token;
+  const params = new URLSearchParams();
+  
+  if (filters.payment_ids?.length) {
+    filters.payment_ids.forEach(id => params.append('payment_ids[]', id.toString()));
+  }
+  if (filters.payable_type) params.append('payable_type', filters.payable_type);
+  if (filters.date) params.append('date', filters.date);
+  if (filters.start_date) params.append('start_date', filters.start_date);
+  if (filters.end_date) params.append('end_date', filters.end_date);
+  if (filters.week) params.append('week', filters.week);
+  if (filters.location_id) params.append('location_id', filters.location_id.toString());
+  if (filters.customer_id) params.append('customer_id', filters.customer_id.toString());
+  if (filters.status) params.append('status', filters.status);
+  if (filters.method) params.append('method', filters.method);
+  if (filters.view_mode) params.append('view_mode', filters.view_mode);
+  if (stream) params.append('stream', 'true');
+  
+  const response = await fetch(`${API_BASE_URL}/payments/invoices/export?${params.toString()}`, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+  
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to export invoices');
+  }
+  
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  
+  if (stream) {
+    window.open(url, '_blank');
+  } else {
+    const link = document.createElement('a');
+    link.href = url;
+    // Generate filename based on filters
+    let filename = 'invoices';
+    if (filters.payable_type) {
+      filename += '-' + filters.payable_type.replace('_', '-');
+    }
+    if (filters.date) {
+      filename += '-' + filters.date;
+    } else if (filters.start_date && filters.end_date) {
+      filename += '-' + filters.start_date + '-to-' + filters.end_date;
+    } else if (filters.week) {
+      filename += '-week-' + filters.week;
+    }
+    filename += '.pdf';
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+};
+
+/**
+ * Export invoices for a specific day
+ * 
+ * @param date - Date string (Y-m-d)
+ * @param stream - true to view in browser, false to download
+ */
+export const exportInvoicesForDay = async (
+  date: string,
+  stream: boolean = false
+): Promise<void> => {
+  const token = getStoredUser()?.token;
+  const params = new URLSearchParams();
+  if (stream) params.append('stream', 'true');
+  
+  const url = `${API_BASE_URL}/payments/invoices/day/${date}${params.toString() ? '?' + params.toString() : ''}`;
+  
+  const response = await fetch(url, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+  
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'No invoices found for this date');
+  }
+  
+  const blob = await response.blob();
+  const blobUrl = URL.createObjectURL(blob);
+  
+  if (stream) {
+    window.open(blobUrl, '_blank');
+  } else {
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = `invoices-${date}.pdf`;
+    link.click();
+    URL.revokeObjectURL(blobUrl);
+  }
+};
+
+/**
+ * Export invoices for a week
+ * 
+ * @param week - 'current', 'next', or date string for week containing that date
+ * @param stream - true to view in browser, false to download
+ */
+export const exportInvoicesForWeek = async (
+  week: 'current' | 'next' | string = 'current',
+  stream: boolean = false
+): Promise<void> => {
+  const token = getStoredUser()?.token;
+  const params = new URLSearchParams();
+  if (stream) params.append('stream', 'true');
+  
+  const url = `${API_BASE_URL}/payments/invoices/week/${week}${params.toString() ? '?' + params.toString() : ''}`;
+  
+  const response = await fetch(url, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+  
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'No invoices found for this week');
+  }
+  
+  const blob = await response.blob();
+  const blobUrl = URL.createObjectURL(blob);
+  
+  if (stream) {
+    window.open(blobUrl, '_blank');
+  } else {
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = `invoices-week-${week}.pdf`;
+    link.click();
+    URL.revokeObjectURL(blobUrl);
+  }
+};
+
+/**
+ * Download or view single invoice PDF
+ * Uses the unified export endpoint with single payment ID
+ * 
+ * @param paymentId - Payment ID
+ * @param stream - true to view in browser, false to download
+ */
+export const getInvoice = async (paymentId: number, stream: boolean = false): Promise<void> => {
+  return exportInvoices({ payment_ids: [paymentId], view_mode: 'individual' }, stream);
+};
+
+/**
+ * Download single invoice PDF (backward compatibility)
+ * 
+ * @param paymentId - Payment ID
+ */
+export const downloadInvoice = async (paymentId: number): Promise<void> => {
+  return getInvoice(paymentId, false);
+};
+
+/**
+ * View single invoice PDF in browser (backward compatibility)
+ * 
+ * @param paymentId - Payment ID
+ */
+export const viewInvoice = async (paymentId: number): Promise<void> => {
+  return getInvoice(paymentId, true);
+};
+
+/**
+ * Generate filtered invoices report PDF
+ * Uses the unified export endpoint with view_mode: 'report'
+ * 
+ * @param filters - Report filters
+ * @param download - Whether to download or view in browser
+ */
+export const generateInvoicesReport = async (
+  filters: {
+    location_id?: number;
+    status?: 'pending' | 'completed' | 'failed' | 'refunded';
+    method?: 'card' | 'cash';
+    payable_type?: 'booking' | 'attraction_purchase';
+    customer_id?: number;
+    start_date?: string;
+    end_date?: string;
+    payment_ids?: number[];
+  },
+  download: boolean = false
+): Promise<void> => {
+  return exportInvoices({
+    ...filters,
+    view_mode: 'report',
+  }, !download); // stream = !download (true to view, false to download)
+};
+
+/**
+ * Export multiple invoices as bulk PDF (one invoice per page)
+ * Uses the unified export endpoint with view_mode: 'individual'
+ * 
+ * @param paymentIds - Array of payment IDs
+ * @param download - Whether to download or view in browser
+ */
+export const exportBulkInvoices = async (
+  paymentIds: number[],
+  download: boolean = true
+): Promise<void> => {
+  return exportInvoices({
+    payment_ids: paymentIds,
+    view_mode: 'individual',
+  }, !download); // stream = !download (true to view, false to download)
 };
 
 /**
@@ -259,7 +530,7 @@ export const processCardPayment = async (
     console.log('✅ Payment processed successfully');
     
     return response;
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('❌ Payment processing failed:', error);
     throw error;
   }
@@ -337,12 +608,22 @@ export default {
   createPayment,
   getPayment,
   getPayments,
+  getPaymentsForBooking,
+  getPaymentsForAttractionPurchase,
   updatePayment,
   deletePayment,
+  downloadInvoice,
+  viewInvoice,
+  generateInvoicesReport,
+  exportBulkInvoices,
   loadAcceptJS,
   tokenizeCard,
   processCardPayment,
   validateCardNumber,
   formatCardNumber,
   getCardType,
+  PAYMENT_TYPE,
 };
+
+// Re-export PAYMENT_TYPE for convenience
+export { PAYMENT_TYPE };

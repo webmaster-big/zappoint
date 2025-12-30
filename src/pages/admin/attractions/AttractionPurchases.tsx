@@ -19,7 +19,7 @@ import { useThemeColor } from '../../../hooks/useThemeColor';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
 import type { AttractionPurchasesPurchase, AttractionPurchasesFilterOptions } from '../../../types/AttractionPurchases.types';
 import { attractionPurchaseService } from '../../../services/AttractionPurchaseService';
-import { createPayment } from '../../../services/PaymentService';
+import { createPayment, PAYMENT_TYPE } from '../../../services/PaymentService';
 import Toast from '../../../components/ui/Toast';
 import { getStoredUser } from '../../../utils/storage';
 import { locationService } from '../../../services';
@@ -435,7 +435,8 @@ const ManagePurchases = () => {
 
       // Create payment record using PaymentService
       const paymentResponse = await createPayment({
-        attraction_purchase_id: Number(selectedPurchaseForPayment.id),
+        payable_id: Number(selectedPurchaseForPayment.id),
+        payable_type: PAYMENT_TYPE.ATTRACTION_PURCHASE,
         customer_id: customerId,
         location_id: locationId,
         amount: amount,

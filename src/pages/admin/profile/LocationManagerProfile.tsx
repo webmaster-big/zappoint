@@ -13,7 +13,7 @@ import {
   CheckCircle
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
-import { API_BASE_URL, ASSET_URL, getStoredUser, setStoredUser } from '../../../utils/storage';
+import { API_BASE_URL, getStoredUser, setStoredUser, getImageUrl } from '../../../utils/storage';
 import StandardButton from '../../../components/ui/StandardButton';
 import type { LocationManagerProfileData } from '../../../types/LocationManagerProfile.types';
 import { getAuthToken } from '../../../services';
@@ -392,11 +392,11 @@ const LocationManagerProfile = () => {
                   {profileData.personal.avatar ? (
                     <>
                       <img 
-                        src={`${ASSET_URL}${profileData.personal.avatar}`}
+                        src={getImageUrl(profileData.personal.avatar)}
                         alt="Profile" 
                         className="w-20 h-20 rounded-full object-cover border-4 border-white shadow-lg"
                         onError={(e) => {
-                          console.error('Image failed to load:', `${ASSET_URL}${profileData.personal.avatar}`);
+                          console.error('Image failed to load:', getImageUrl(profileData.personal.avatar));
                           e.currentTarget.style.display = 'none';
                           const fallback = e.currentTarget.nextElementSibling;
                           if (fallback) fallback.classList.remove('hidden');

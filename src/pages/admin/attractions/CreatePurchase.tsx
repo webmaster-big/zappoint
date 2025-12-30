@@ -19,7 +19,8 @@ import LocationSelector from '../../../components/admin/LocationSelector';
 import Toast from '../../../components/ui/Toast';
 import EmptyStateModal from '../../../components/ui/EmptyStateModal';
 import { ASSET_URL, getStoredUser } from '../../../utils/storage';
-import { loadAcceptJS, processCardPayment, validateCardNumber, formatCardNumber, getCardType } from '../../../services/PaymentService';
+import { loadAcceptJS, processCardPayment, validateCardNumber, formatCardNumber, getCardType, createPayment } from '../../../services/PaymentService';
+import { PAYMENT_TYPE } from '../../../types/Payment.types';
 import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
 import { generatePurchaseQRCode } from '../../../utils/qrcode';
 import StandardButton from '../../../components/ui/StandardButton';
@@ -394,6 +395,30 @@ const CreatePurchase = () => {
         console.log('✅ QR code generated successfully');
       } catch (qrError) {
         console.error('❌ QR code generation failed:', qrError);
+      }
+
+      // Create payment record if amount_paid > 0
+      const actualAmountPaid = paymentMethod === 'paylater' ? 0 : amountPaid;
+      if (actualAmountPaid > 0) {
+        try {
+          const paymentData = {
+            payable_id: createdPurchase.id,
+            payable_type: PAYMENT_TYPE.ATTRACTION_PURCHASE,
+            customer_id: selectedCustomerId || null,
+            amount: actualAmountPaid,
+            currency: 'USD',
+            method: paymentMethod as 'card' | 'cash',
+            status: 'completed' as const,
+            location_id: selectedAttraction.locationId || 1,
+            notes: `Payment for attraction purchase: ${selectedAttraction.name}`,
+          };
+          
+          await createPayment(paymentData);
+          console.log('✅ Payment record created for purchase:', createdPurchase.id);
+        } catch (paymentError) {
+          console.error('⚠️ Failed to create payment record:', paymentError);
+          // Don't fail the entire process if payment record creation fails
+        }
       }
 
       // Send receipt email with QR code only if QR code was generated
