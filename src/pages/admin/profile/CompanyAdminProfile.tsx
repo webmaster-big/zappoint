@@ -550,8 +550,8 @@ const CompanyAdminProfile = () => {
         try {
           const base64String = reader.result as string;
 
-          const response = await fetch(`${API_BASE_URL}/companies/${companyId}`, {
-            method: 'PUT',
+          const response = await fetch(`${API_BASE_URL}/companies/${companyId}/logo`, {
+            method: 'PATCH',
             headers: {
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json',
