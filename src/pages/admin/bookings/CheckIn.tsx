@@ -830,7 +830,7 @@ const CheckIn: React.FC = () => {
                 {(() => {
                   console.log('Verified Booking Status:', verifiedBooking.status);
                   console.log('Verified Booking Payment Status:', verifiedBooking.payment_status);
-                  console.log('Verified Booking Add-ons:', verifiedBooking.addOns || (verifiedBooking as any).add_ons);
+                  console.log('Verified Booking Add-ons:', verifiedBooking.add_ons || (verifiedBooking as any).add_ons);
                   return null;
                 })()}
                 
@@ -1137,15 +1137,15 @@ const CheckIn: React.FC = () => {
                       </div>
                     )}
 
-                    {((verifiedBooking.addOns || (verifiedBooking as any).add_ons) && Array.isArray(verifiedBooking.addOns || (verifiedBooking as any).add_ons) && (verifiedBooking.addOns || (verifiedBooking as any).add_ons).length > 0) && (
+                    {((verifiedBooking.add_ons || (verifiedBooking as any).add_ons) && Array.isArray(verifiedBooking.add_ons || (verifiedBooking as any).add_ons) && (verifiedBooking.add_ons || (verifiedBooking as any).add_ons).length > 0) && (
                       <div className="flex items-start gap-3 col-span-full">
                         <div className={`p-2 bg-${themeColor}-100 rounded-lg`}>
                           <PackageIcon className={`h-5 w-5 text-${fullColor}`} />
                         </div>
                         <div>
-                          <p className="text-xs text-gray-500">Add-Ons ({(verifiedBooking.addOns || (verifiedBooking as any).add_ons).length})</p>
+                          <p className="text-xs text-gray-500">Add-Ons ({(verifiedBooking.add_ons || (verifiedBooking as any).add_ons).length})</p>
                           <div className="space-y-1 mt-1">
-                            {((verifiedBooking.addOns || (verifiedBooking as any).add_ons) as Record<string, unknown>[]).map((addon, index: number) => (
+                            {((verifiedBooking.add_ons || (verifiedBooking as any).add_ons) as Record<string, unknown>[]).map((addon, index: number) => (
                               <p key={index} className="font-medium text-gray-800">
                                 • {addon.name as string} - ${Number(addon.price).toFixed(2)}
                                 {(addon.pivot as any)?.quantity && (addon.pivot as any).quantity > 1 && ` (x${(addon.pivot as any).quantity})`}
@@ -1605,15 +1605,15 @@ const CheckIn: React.FC = () => {
                       </div>
                     )}
 
-                    {((selectedBooking.addOns || (selectedBooking as any).add_ons) && Array.isArray(selectedBooking.addOns || (selectedBooking as any).add_ons) && (selectedBooking.addOns || (selectedBooking as any).add_ons).length > 0) && (
+                    {((selectedBooking.add_ons || (selectedBooking as any).add_ons) && Array.isArray(selectedBooking.add_ons || (selectedBooking as any).add_ons) && (selectedBooking.add_ons || (selectedBooking as any).add_ons).length > 0) && (
                       <div className="flex items-start gap-3 col-span-full">
                         <div className={`p-2 bg-${themeColor}-100 rounded-lg`}>
                           <PackageIcon className={`h-5 w-5 text-${fullColor}`} />
                         </div>
                         <div>
-                          <p className="text-xs text-gray-500">Add-Ons ({(selectedBooking.addOns || (selectedBooking as any).add_ons).length})</p>
+                          <p className="text-xs text-gray-500">Add-Ons ({(selectedBooking.add_ons || (selectedBooking as any).add_ons).length})</p>
                           <div className="space-y-1 mt-1">
-                            {((selectedBooking.addOns || (selectedBooking as any).add_ons) as Record<string, unknown>[]).map((addon, index: number) => (
+                            {((selectedBooking.add_ons || (selectedBooking as any).add_ons) as Record<string, unknown>[]).map((addon, index: number) => (
                               <p key={index} className="font-medium text-gray-800">
                                 • {addon.name as string} - ${Number(addon.price).toFixed(2)}
                                 {(addon.pivot as any)?.quantity && (addon.pivot as any).quantity > 1 && ` (x${(addon.pivot as any).quantity})`}

@@ -171,6 +171,18 @@ class AttractionService {
     const response = await api.post('/attractions/bulk-delete', { ids });
     return response.data;
   }
+
+  /**
+   * Bulk import attractions
+   */
+  async bulkImport(data: { attractions: CreateAttractionData[] }): Promise<ApiResponse<{
+    imported: Attraction[];
+    imported_count: number;
+    failed_count: number;
+  }> & { errors?: Array<{ index: number; name: string; error: string }> }> {
+    const response = await api.post('/attractions/bulk-import', data);
+    return response.data;
+  }
 }
 
 // Export a singleton instance

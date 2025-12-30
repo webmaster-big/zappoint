@@ -118,9 +118,13 @@ const ManageAttractions = () => {
         return;
       }
 
-      // Convert to API format
+      // Get the current user's location_id
+      const currentUser = getStoredUser();
+      const userLocationId = currentUser?.location_id || 1;
+
+      // Convert to API format - use user's location_id for all imports
       const attractionsToImport = parsedData.map((attraction: ManageAttractionsAttraction) => ({
-        location_id: 1, // Will be set by backend
+        location_id: userLocationId, // Use logged-in user's location_id
         name: attraction.name,
         description: attraction.description,
         price: Number(attraction.price),
@@ -138,22 +142,43 @@ const ManageAttractions = () => {
         is_active: attraction.status === 'active',
       }));
 
-      // Note: The backend bulkImport endpoint would need to be added to the service
-      // For now, we'll import them one by one
-      let successCount = 0;
-      for (const attraction of attractionsToImport) {
-        try {
-          await attractionService.createAttraction(attraction);
-          successCount++;
-        } catch (err) {
-          console.error('Failed to import attraction:', err);
+      // Use bulk import endpoint
+      try {
+        const response = await attractionService.bulkImport({ attractions: attractionsToImport });
+        
+        setImportData("");
+        setShowImportModal(false);
+        
+        const successCount = response.data.imported_count || 0;
+        const failedCount = response.data.failed_count || 0;
+        
+        if (failedCount > 0) {
+          console.error('Import errors:', response.errors);
+          setToast({ message: `Imported ${successCount} attraction(s). ${failedCount} failed. Check console for details.`, type: 'info' });
+        } else {
+          setToast({ message: `Successfully imported ${successCount} attraction(s)!`, type: 'success' });
         }
-      }
+        
+        loadAttractions(); // Reload the list
+      } catch (err) {
+        console.error('Bulk import failed, trying individual imports...', err);
+        
+        // Fallback: import one by one if bulk endpoint fails
+        let successCount = 0;
+        for (const attraction of attractionsToImport) {
+          try {
+            await attractionService.createAttraction(attraction);
+            successCount++;
+          } catch (err) {
+            console.error('Failed to import attraction:', err);
+          }
+        }
 
-      setImportData("");
-      setShowImportModal(false);
-      setToast({ message: `Successfully imported ${successCount} of ${attractionsToImport.length} attraction(s)!`, type: 'success' });
-      loadAttractions(); // Reload the list
+        setImportData("");
+        setShowImportModal(false);
+        setToast({ message: `Successfully imported ${successCount} of ${attractionsToImport.length} attraction(s)!`, type: 'success' });
+        loadAttractions();
+      }
     } catch (error) {
       console.error('Import error:', error);
       setToast({ message: 'Invalid JSON format. Please check your data and try again.', type: 'error' });

@@ -253,12 +253,16 @@ const Packages: React.FC = () => {
         return;
       }
 
+      // Get the current user's location_id
+      const currentUser = getStoredUser();
+      const userLocationId = currentUser?.location_id || 1;
+
       // Prepare packages for bulk import (remove any IDs that might exist)
       const packagesForImport = parsedData.map(pkg => {
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { id: _id, created_at: _created, updated_at: _updated, ...cleanPkg } = pkg;
         return {
-          location_id: cleanPkg.location_id || 1,
+          location_id: userLocationId, // Use logged-in user's location_id
           name: cleanPkg.name,
           description: cleanPkg.description || '',
           category: cleanPkg.category || 'Uncategorized',

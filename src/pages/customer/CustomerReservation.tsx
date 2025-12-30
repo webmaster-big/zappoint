@@ -304,11 +304,11 @@ const CustomerReservations = () => {
           </div>
           ` : ''}
 
-          ${booking.addOns && (booking.addOns as any[]).length > 0 ? `
+          ${booking.add_ons && (booking.add_ons as any[]).length > 0 ? `
           <div style="margin-bottom: 20px; background: #f8fafc; padding: 15px;">
             <h4 style="margin: 0 0 10px 0; font-size: 13px; color: #1e40af; text-transform: uppercase; letter-spacing: 0.5px;">Add-ons</h4>
             <ul style="margin: 0; padding-left: 20px; font-size: 13px; color: #1e40af;">
-              ${(booking.addOns as any[]).map(addon => `<li style="margin-bottom: 5px;">${addon.name}${addon.pivot?.quantity ? ` (x${addon.pivot.quantity})` : ''}</li>`).join('')}
+              ${(booking.add_ons as any[]).map(addon => `<li style="margin-bottom: 5px;">${addon.name}${addon.pivot?.quantity ? ` (x${addon.pivot.quantity})` : ''}</li>`).join('')}
             </ul>
           </div>
           ` : ''}
@@ -747,11 +747,11 @@ const CustomerReservations = () => {
               )}
 
               {/* Add-ons */}
-              {selectedBooking.addOns && (selectedBooking.addOns as any[]).length > 0 && (
+              {selectedBooking.add_ons && (selectedBooking.add_ons as any[]).length > 0 && (
                 <div>
                   <h4 className="font-medium text-gray-900 mb-2 text-sm">Add-ons</h4>
                   <ul className="space-y-2">
-                    {(selectedBooking.addOns as any[]).map((addon, index) => (
+                    {(selectedBooking.add_ons as any[]).map((addon, index) => (
                       <li key={index} className="flex items-center gap-2">
                         <CheckCircle size={16} className="text-blue-500" />
                         <span>{addon.name}</span>

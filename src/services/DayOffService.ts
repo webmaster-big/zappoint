@@ -31,6 +31,8 @@ export interface DayOff {
   date: string;
   reason?: string;
   is_recurring: boolean;
+  time_start?: string | null;  // Close starting at this time (e.g., "16:00" for close at 4 PM)
+  time_end?: string | null;    // Delayed opening until this time (e.g., "16:00" for open at 4 PM)
   created_at: string;
   updated_at: string;
   location?: {
@@ -58,6 +60,8 @@ export interface CreateDayOffData {
   date: string;
   reason?: string;
   is_recurring?: boolean;
+  time_start?: string | null;  // Close starting at this time
+  time_end?: string | null;    // Delayed opening until this time
 }
 
 export interface UpdateDayOffData {
@@ -65,6 +69,8 @@ export interface UpdateDayOffData {
   date?: string;
   reason?: string;
   is_recurring?: boolean;
+  time_start?: string | null;  // Close starting at this time
+  time_end?: string | null;    // Delayed opening until this time
 }
 
 export interface CheckDateData {

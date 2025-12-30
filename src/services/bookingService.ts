@@ -197,8 +197,28 @@ export interface Booking {
   creator?: unknown;
   giftCard?: unknown;
   promo?: unknown;
-  attractions?: unknown[];
-  addOns?: unknown[];
+  attractions?: Array<{
+    id: number;
+    name: string;
+    price?: string | number;
+    pivot?: {
+      attraction_id: number;
+      booking_id: number;
+      quantity: number;
+      price_at_booking: string | number;
+    };
+  }>;
+  add_ons?: Array<{
+    id: number;
+    name: string;
+    price?: string | number;
+    pivot?: {
+      add_on_id: number;
+      booking_id: number;
+      quantity: number;
+      price_at_booking: string | number;
+    };
+  }>;
   payments?: unknown[];
 }
 

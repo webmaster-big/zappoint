@@ -6,6 +6,14 @@ import bookingService from '../../../services/bookingService';
 import timeSlotService, { type TimeSlot } from '../../../services/timeSlotService';
 import { dayOffService, type DayOff } from '../../../services/DayOffService';
 import { getImageUrl, formatTimeTo12Hour } from "../../../utils/storage";
+
+// Interface for day offs with time info for partial closures
+interface DayOffWithTime {
+  date: Date;
+  time_start?: string | null;
+  time_end?: string | null;
+  reason?: string;
+}
 import { loadAcceptJS, processCardPayment, validateCardNumber, formatCardNumber, getCardType, updatePayment } from '../../../services/PaymentService';
 import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
 import customerService from '../../../services/CustomerService';
@@ -103,6 +111,7 @@ const BookPackage: React.FC = () => {
   const [availableTimeSlots, setAvailableTimeSlots] = useState<TimeSlot[]>([]);
   const [loadingTimeSlots, setLoadingTimeSlots] = useState(false);
   const [dayOffs, setDayOffs] = useState<Date[]>([]);
+  const [dayOffsWithTime, setDayOffsWithTime] = useState<DayOffWithTime[]>([]);
   
   // Confirmation modal state
   const [showConfirmation, setShowConfirmation] = useState(false);
@@ -287,33 +296,66 @@ const BookPackage: React.FC = () => {
         if (response.success && response.data) {
           // Convert day off dates to Date objects
           // Also handle recurring day offs (same month/day each year)
-          const dayOffDates: Date[] = [];
+          const fullDayOffDates: Date[] = [];
+          const partialDayOffs: DayOffWithTime[] = [];
           const today = new Date();
           const futureLimit = new Date();
           futureLimit.setFullYear(futureLimit.getFullYear() + 1); // Look 1 year ahead
           
           response.data.forEach((dayOff: DayOff) => {
             const offDate = new Date(dayOff.date);
+            const hasTimeRestriction = dayOff.time_start || dayOff.time_end;
             
             if (dayOff.is_recurring) {
               // For recurring, add for current year and next year
               const currentYearDate = new Date(today.getFullYear(), offDate.getMonth(), offDate.getDate());
               const nextYearDate = new Date(today.getFullYear() + 1, offDate.getMonth(), offDate.getDate());
               
-              if (currentYearDate >= today) {
-                dayOffDates.push(currentYearDate);
+              if (hasTimeRestriction) {
+                // Partial day off - store with time info
+                if (currentYearDate >= today) {
+                  partialDayOffs.push({
+                    date: currentYearDate,
+                    time_start: dayOff.time_start,
+                    time_end: dayOff.time_end,
+                    reason: dayOff.reason
+                  });
+                }
+                partialDayOffs.push({
+                  date: nextYearDate,
+                  time_start: dayOff.time_start,
+                  time_end: dayOff.time_end,
+                  reason: dayOff.reason
+                });
+              } else {
+                // Full day off
+                if (currentYearDate >= today) {
+                  fullDayOffDates.push(currentYearDate);
+                }
+                fullDayOffDates.push(nextYearDate);
               }
-              dayOffDates.push(nextYearDate);
             } else {
               // Non-recurring, just add the date if it's not in the past
               if (offDate >= today) {
-                dayOffDates.push(offDate);
+                if (hasTimeRestriction) {
+                  // Partial day off
+                  partialDayOffs.push({
+                    date: offDate,
+                    time_start: dayOff.time_start,
+                    time_end: dayOff.time_end,
+                    reason: dayOff.reason
+                  });
+                } else {
+                  // Full day off
+                  fullDayOffDates.push(offDate);
+                }
               }
             }
           });
           
-          setDayOffs(dayOffDates);
-          console.log('📅 Day offs loaded:', dayOffDates.length, 'dates');
+          setDayOffs(fullDayOffDates);
+          setDayOffsWithTime(partialDayOffs);
+          console.log('📅 Day offs loaded:', fullDayOffDates.length, 'full days,', partialDayOffs.length, 'partial days');
         }
       } catch (error) {
         console.error('Error fetching day offs:', error);
@@ -322,6 +364,51 @@ const BookPackage: React.FC = () => {
     
     fetchDayOffs();
   }, [pkg?.location_id]);
+
+  // Helper function to check if a time slot conflicts with a partial day off
+  const isTimeSlotRestricted = (slotStartTime: string, slotEndTime: string): boolean => {
+    if (!selectedDate || dayOffsWithTime.length === 0) return false;
+    
+    // Find partial day off for the selected date
+    const selectedDateObj = parseLocalDate(selectedDate);
+    const partialDayOff = dayOffsWithTime.find(dayOff => 
+      dayOff.date.getFullYear() === selectedDateObj.getFullYear() &&
+      dayOff.date.getMonth() === selectedDateObj.getMonth() &&
+      dayOff.date.getDate() === selectedDateObj.getDate()
+    );
+    
+    if (!partialDayOff) return false;
+    
+    // Convert times to comparable format (minutes since midnight)
+    const toMinutes = (timeStr: string): number => {
+      const [hours, minutes] = timeStr.split(':').map(Number);
+      return hours * 60 + minutes;
+    };
+    
+    const slotStart = toMinutes(slotStartTime);
+    const slotEnd = toMinutes(slotEndTime);
+    
+    // If time_start is set (closes at this time), any slot that starts at or after this time is restricted
+    if (partialDayOff.time_start) {
+      const closesAt = toMinutes(partialDayOff.time_start);
+      if (slotStart >= closesAt) return true;
+      // Also restrict if slot ends after closing time
+      if (slotEnd > closesAt) return true;
+    }
+    
+    // If time_end is set (opens at this time), any slot that starts before this time is restricted
+    if (partialDayOff.time_end) {
+      const opensAt = toMinutes(partialDayOff.time_end);
+      if (slotStart < opensAt) return true;
+    }
+    
+    return false;
+  };
+
+  // Filter available time slots based on partial day offs
+  const filteredTimeSlots = availableTimeSlots.filter(slot => 
+    !isTimeSlotRestricted(slot.start_time, slot.end_time)
+  );
 
   // Helper function to get week of month (1-5, where 5 is last week)
   const getWeekOfMonth = (date: Date): number => {
@@ -688,27 +775,50 @@ const BookPackage: React.FC = () => {
       console.log('✅ Payment successful:', paymentResponse.transaction_id);
       
       // Step 2: Create booking with payment info
+      console.log('📦 Building additional attractions/addons...', {
+        selectedAttractions,
+        selectedAddOns,
+        pkgAttractions: pkg.attractions,
+        pkgAddOns: pkg.add_ons
+      });
+      
       const additionalAttractions = Object.entries(selectedAttractions)
         .filter(([, qty]) => qty > 0)
         .map(([id, qty]) => {
           const attraction = pkg.attractions.find(a => a.id === Number(id));
+          if (!attraction) {
+            console.warn(`⚠️ Attraction not found: ${id}, available:`, pkg.attractions.map(a => a.id));
+            return null;
+          }
+          // price_at_booking should be unit price, backend calculates total
+          const unitPrice = Number(attraction.price);
+          console.log(`✅ Attraction found: ${attraction.name}, price: ${unitPrice}`);
           return {
             attraction_id: Number(id),
             quantity: qty,
-            price_at_booking: attraction ? Number(attraction.price) : 0
+            price_at_booking: unitPrice
           };
-        });
+        })
+        .filter((item): item is { attraction_id: number; quantity: number; price_at_booking: number } => item !== null);
       
       const additionalAddons = Object.entries(selectedAddOns)
         .filter(([, qty]) => qty > 0)
         .map(([id, qty]) => {
           const addon = pkg.add_ons.find(a => a.id === Number(id));
+          if (!addon) {
+            console.warn(`⚠️ Add-on not found: ${id}, available:`, pkg.add_ons.map(a => a.id));
+            return null;
+          }
+          // price_at_booking should be unit price, backend calculates total
+          const unitPrice = Number(addon.price);
+          console.log(`✅ Add-on found: ${addon.name}, price: ${unitPrice}`);
           return {
             addon_id: Number(id),
             quantity: qty,
-            price_at_booking: addon ? Number(addon.price) : 0
+            price_at_booking: unitPrice
           };
-        });
+        })
+        .filter((item): item is { addon_id: number; quantity: number; price_at_booking: number } => item !== null);
       
       const bookingData = {
         guest_name: `${form.firstName} ${form.lastName}`,
@@ -1223,6 +1333,7 @@ const BookPackage: React.FC = () => {
                         availableDates={availableDates}
                         onChange={(date) => setSelectedDate(date)}
                         dayOffs={dayOffs}
+                        dayOffsWithTime={dayOffsWithTime}
                       />
                     </div>
                     
@@ -1235,8 +1346,8 @@ const BookPackage: React.FC = () => {
                         </div>
                       ) : (
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                          {availableTimeSlots.length > 0 ? (
-                            availableTimeSlots.map((slot) => (
+                          {filteredTimeSlots.length > 0 ? (
+                            filteredTimeSlots.map((slot) => (
                               <label key={slot.start_time} className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition ${selectedTime === slot.start_time ? 'border-blue-800 bg-blue-50' : 'border-gray-300 bg-white hover:border-blue-400'}`}> 
                                 <input
                                   type="radio"

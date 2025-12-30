@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Edit2, Trash2, Calendar, MapPin, CheckSquare, Square, Plus, X, CalendarOff, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, Edit2, Trash2, Calendar, MapPin, CheckSquare, Square, Plus, X, CalendarOff, RefreshCw, ChevronLeft, ChevronRight, Clock } from 'lucide-react';
 import StandardButton from '../../../components/ui/StandardButton';
 import Toast from '../../../components/ui/Toast';
 import { dayOffService, locationService } from '../../../services';
@@ -45,7 +45,9 @@ const DayOffs: React.FC = () => {
     const [formData, setFormData] = useState({
         date: '',
         reason: '',
-        is_recurring: false
+        is_recurring: false,
+        time_start: '',  // Close starting at this time (partial day closure)
+        time_end: ''     // Delayed opening until this time
     });
 
     // Multi-select calendar state
@@ -54,6 +56,8 @@ const DayOffs: React.FC = () => {
     const [bulkSelectedDates, setBulkSelectedDates] = useState<Set<string>>(new Set());
     const [bulkReason, setBulkReason] = useState('');
     const [bulkIsRecurring, setBulkIsRecurring] = useState(false);
+    const [bulkTimeStart, setBulkTimeStart] = useState('');  // Close starting at this time
+    const [bulkTimeEnd, setBulkTimeEnd] = useState('');      // Delayed opening until this time
     const [bulkCreating, setBulkCreating] = useState(false);
 
     // Toast state
@@ -142,7 +146,9 @@ const DayOffs: React.FC = () => {
         setFormData({
             date: '',
             reason: '',
-            is_recurring: false
+            is_recurring: false,
+            time_start: '',
+            time_end: ''
         });
         setSelectedDayOff(null);
     };
@@ -161,7 +167,9 @@ const DayOffs: React.FC = () => {
                 location_id: locationId,
                 date: formData.date,
                 reason: formData.reason || undefined,
-                is_recurring: formData.is_recurring
+                is_recurring: formData.is_recurring,
+                time_start: sanitizeTimeValue(formData.time_start),
+                time_end: sanitizeTimeValue(formData.time_end)
             });
             
             showToast('Day Off created successfully!', 'success');
@@ -181,11 +189,17 @@ const DayOffs: React.FC = () => {
         if (!selectedDayOff) return;
 
         try {
-            await dayOffService.updateDayOff(selectedDayOff.id, {
+            const updateData = {
                 date: formData.date,
                 reason: formData.reason || undefined,
-                is_recurring: formData.is_recurring
-            });
+                is_recurring: formData.is_recurring,
+                time_start: sanitizeTimeValue(formData.time_start),
+                time_end: sanitizeTimeValue(formData.time_end)
+            };
+            
+            console.log('Updating day off with data:', updateData);
+            
+            await dayOffService.updateDayOff(selectedDayOff.id, updateData);
             
             showToast('Day Off updated successfully!', 'success');
             setShowEditModal(false);
@@ -269,7 +283,9 @@ const DayOffs: React.FC = () => {
         setFormData({
             date: dayOff.date.split('T')[0], // Extract date part
             reason: dayOff.reason || '',
-            is_recurring: dayOff.is_recurring
+            is_recurring: dayOff.is_recurring,
+            time_start: dayOff.time_start || '',
+            time_end: dayOff.time_end || ''
         });
         setShowEditModal(true);
     };
@@ -308,6 +324,47 @@ const DayOffs: React.FC = () => {
         today.setHours(0, 0, 0, 0);
         const date = new Date(dateString);
         return date < today;
+    };
+
+    // Sanitize time value - convert empty strings to null and validate format
+    const sanitizeTimeValue = (time: string): string | null => {
+        if (!time || time.trim() === '') {
+            return null;
+        }
+        // Validate HH:mm format
+        const timeRegex = /^([0-1][0-9]|2[0-3]):[0-5][0-9]$/;
+        if (!timeRegex.test(time.trim())) {
+            return null; // Return null for invalid formats
+        }
+        return time.trim();
+    };
+
+    // Format time for display (24h to 12h format)
+    const formatTime = (time: string | null | undefined): string => {
+        if (!time) return '';
+        const [hours, minutes] = time.split(':');
+        const h = parseInt(hours);
+        const ampm = h >= 12 ? 'PM' : 'AM';
+        const h12 = h % 12 || 12;
+        return `${h12}:${minutes} ${ampm}`;
+    };
+
+    // Get closure type label
+    const getClosureTypeLabel = (dayOff: DayOff): { label: string; color: string } | null => {
+        const hasStart = dayOff.time_start && dayOff.time_start !== '';
+        const hasEnd = dayOff.time_end && dayOff.time_end !== '';
+        
+        if (!hasStart && !hasEnd) {
+            return null; // Full day - no special label needed
+        }
+        if (hasStart && !hasEnd) {
+            return { label: `Closes at ${formatTime(dayOff.time_start)}`, color: 'bg-orange-100 text-orange-700' };
+        }
+        if (!hasStart && hasEnd) {
+            return { label: `Opens at ${formatTime(dayOff.time_end)}`, color: 'bg-blue-100 text-blue-700' };
+        }
+        // Both set - specific time range
+        return { label: `${formatTime(dayOff.time_start)} - ${formatTime(dayOff.time_end)}`, color: 'bg-yellow-100 text-yellow-700' };
     };
 
     // Bulk calendar helper functions
@@ -365,7 +422,9 @@ const DayOffs: React.FC = () => {
                     location_id: locationId,
                     date: dateStr,
                     reason: bulkReason || undefined,
-                    is_recurring: bulkIsRecurring
+                    is_recurring: bulkIsRecurring,
+                    time_start: sanitizeTimeValue(bulkTimeStart),
+                    time_end: sanitizeTimeValue(bulkTimeEnd)
                 });
                 successCount++;
             } catch (error) {
@@ -390,6 +449,8 @@ const DayOffs: React.FC = () => {
         setBulkSelectedDates(new Set());
         setBulkReason('');
         setBulkIsRecurring(false);
+        setBulkTimeStart('');
+        setBulkTimeEnd('');
     };
 
     const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
@@ -587,97 +648,126 @@ const DayOffs: React.FC = () => {
                     </div>
                 ) : dayOffs.length > 0 ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                        {dayOffs.map((dayOff) => (
-                            <div 
-                                key={dayOff.id} 
-                                className={`relative border-2 rounded-lg p-4 transition-all ${
-                                    selectionMode 
-                                        ? 'cursor-pointer hover:shadow-lg hover:scale-105' 
-                                        : 'hover:shadow-md hover:border-gray-300'
-                                } ${
-                                    selectedDayOffIds.has(dayOff.id)
-                                        ? `border-${fullColor} bg-${themeColor}-50 shadow-lg scale-105`
-                                        : isPastDate(dayOff.date)
-                                            ? 'border-gray-200 bg-gray-50 opacity-75'
-                                            : 'border-gray-200 bg-white'
-                                }`}
-                                onClick={() => selectionMode && toggleDayOffSelection(dayOff.id)}
-                            >
-                                {/* Selection Checkbox */}
-                                {selectionMode && (
-                                    <div className="absolute top-3 right-3">
-                                        {selectedDayOffIds.has(dayOff.id) ? (
-                                            <CheckSquare className={`w-6 h-6 text-${fullColor}`} />
+                        {dayOffs.map((dayOff) => {
+                            const closureType = getClosureTypeLabel(dayOff);
+                            const isPast = isPastDate(dayOff.date);
+                            
+                            return (
+                                <div 
+                                    key={dayOff.id} 
+                                    className={`relative border rounded-xl p-4 transition-all h-[160px] flex flex-col ${
+                                        selectionMode 
+                                            ? 'cursor-pointer hover:shadow-lg hover:-translate-y-0.5' 
+                                            : 'hover:shadow-md'
+                                    } ${
+                                        selectedDayOffIds.has(dayOff.id)
+                                            ? `border-${fullColor} bg-${themeColor}-50 shadow-md`
+                                            : isPast
+                                                ? 'border-gray-200 bg-gray-50/50'
+                                                : 'border-gray-200 bg-white hover:border-gray-300'
+                                    }`}
+                                    onClick={() => selectionMode && toggleDayOffSelection(dayOff.id)}
+                                >
+                                    {/* Selection Checkbox or Action Buttons */}
+                                    <div className="absolute top-3 right-3 flex gap-1">
+                                        {selectionMode ? (
+                                            selectedDayOffIds.has(dayOff.id) ? (
+                                                <CheckSquare className={`w-5 h-5 text-${fullColor}`} />
+                                            ) : (
+                                                <Square className="w-5 h-5 text-gray-400" />
+                                            )
                                         ) : (
-                                            <Square className="w-6 h-6 text-gray-400" />
+                                            <>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleEditClick(dayOff);
+                                                    }}
+                                                    className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-600 hover:text-gray-900 transition-colors"
+                                                    title="Edit"
+                                                >
+                                                    <Edit2 className="w-4 h-4" />
+                                                </button>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleDeleteDayOff(dayOff.id, formatDate(dayOff.date));
+                                                    }}
+                                                    className="p-1.5 rounded-lg hover:bg-red-50 text-gray-600 hover:text-red-600 transition-colors"
+                                                    title="Delete"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            </>
                                         )}
                                     </div>
-                                )}
 
-                                <div className="flex justify-between items-start mb-3">
-                                    <div className="flex-1 min-w-0 pr-8">
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <Calendar className={`w-4 h-4 ${isPastDate(dayOff.date) ? 'text-gray-400' : `text-${fullColor}`}`} />
+                                    {/* Date Header */}
+                                    <div className="mb-3 pr-20">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <Calendar className={`w-4 h-4 ${isPast ? 'text-gray-400' : `text-${fullColor}`}`} />
                                             <h3 className="font-semibold text-base text-gray-900">
-                                                {formatDate(dayOff.date)}
+                                                {new Date(dayOff.date).toLocaleDateString('en-US', { 
+                                                    month: 'short', 
+                                                    day: 'numeric', 
+                                                    year: 'numeric' 
+                                                })}
                                             </h3>
                                         </div>
-                                        <div className="flex items-center gap-2 flex-wrap">
+
+                                        {/* Status Badges */}
+                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                            {closureType ? (
+                                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium ${closureType.color}`}>
+                                                    <Clock className="w-3 h-3" />
+                                                    {closureType.label}
+                                                </span>
+                                            ) : (
+                                                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-red-100 text-red-700">
+                                                    Full Day Closure
+                                                </span>
+                                            )}
                                             {dayOff.is_recurring && (
-                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700">
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-purple-100 text-purple-700">
                                                     <RefreshCw className="w-3 h-3" />
                                                     Recurring
                                                 </span>
                                             )}
-                                            {isPastDate(dayOff.date) && (
-                                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">
-                                                    Past
-                                                </span>
-                                            )}
                                         </div>
                                     </div>
-                                    {!selectionMode && (
-                                        <div className="flex gap-1 ml-2">
-                                            <StandardButton
-                                                onClick={() => handleEditClick(dayOff)}
-                                                variant="ghost"
-                                                size="sm"
-                                                className="p-1.5"
-                                                icon={Edit2}
-                                                title="Edit Day Off"
-                                            />
-                                            <StandardButton
-                                                onClick={() => handleDeleteDayOff(dayOff.id, formatDate(dayOff.date))}
-                                                variant="danger"
-                                                size="sm"
-                                                className="p-1.5"
-                                                icon={Trash2}
-                                                title="Delete Day Off"
-                                            />
-                                        </div>
-                                    )}
-                                </div>
 
-                                <div className="space-y-2 mt-3 pt-3 border-t border-gray-100">
-                                    {dayOff.reason && (
-                                        <div className="text-sm text-gray-700">
-                                            <span className="font-medium">Reason:</span> {dayOff.reason}
-                                        </div>
-                                    )}
+                                    {/* Content Area */}
+                                    <div className="flex-1 min-h-0">
+                                        {dayOff.reason && (
+                                            <p className="text-sm text-gray-600 line-clamp-2 mb-2">
+                                                {dayOff.reason}
+                                            </p>
+                                        )}
+                                        {dayOff.location && (
+                                            <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                                                <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
+                                                <span className="truncate">{dayOff.location.name}</span>
+                                            </div>
+                                        )}
+                                    </div>
 
-                                    {dayOff.location && (
-                                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                                            <MapPin className="w-4 h-4 text-gray-400" />
-                                            <span>{dayOff.location.name}</span>
-                                        </div>
-                                    )}
-
-                                    <div className="text-xs text-gray-500">
-                                        Created {new Date(dayOff.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                    {/* Footer */}
+                                    <div className="flex items-center justify-between mt-auto pt-3 border-t border-gray-100">
+                                        <span className="text-xs text-gray-400">
+                                            {new Date(dayOff.created_at).toLocaleDateString('en-US', { 
+                                                month: 'short', 
+                                                day: 'numeric' 
+                                            })}
+                                        </span>
+                                        {isPast && (
+                                            <span className="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-600">
+                                                Past
+                                            </span>
+                                        )}
                                     </div>
                                 </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 ) : (
                     <div className="flex flex-col items-center py-16">
@@ -807,6 +897,68 @@ const DayOffs: React.FC = () => {
                                     />
                                 </div>
 
+                                {/* Partial Day Closure Options */}
+                                <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                                    <label className="block text-sm font-medium text-gray-700 mb-3">
+                                        Partial Day Closure <span className="text-xs text-gray-500">(Optional)</span>
+                                    </label>
+                                    <p className="text-xs text-gray-500 mb-3">
+                                        Leave both empty for full day closure. Set one or both for partial closures.
+                                    </p>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-600 mb-1">
+                                                Delayed Opening Until
+                                            </label>
+                                            <div className="relative">
+                                                <input
+                                                    type="time"
+                                                    name="time_end"
+                                                    value={formData.time_end}
+                                                    onChange={handleInputChange}
+                                                    className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                                />
+                                                {formData.time_end && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setFormData(prev => ({ ...prev, time_end: '' }))}
+                                                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                                        title="Clear time"
+                                                    >
+                                                        <X className="w-4 h-4" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                            <p className="text-xs text-gray-400 mt-1">Closed until this time</p>
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-600 mb-1">
+                                                Close Starting At
+                                            </label>
+                                            <div className="relative">
+                                                <input
+                                                    type="time"
+                                                    name="time_start"
+                                                    value={formData.time_start}
+                                                    onChange={handleInputChange}
+                                                    className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                                />
+                                                {formData.time_start && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setFormData(prev => ({ ...prev, time_start: '' }))}
+                                                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                                        title="Clear time"
+                                                    >
+                                                        <X className="w-4 h-4" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                            <p className="text-xs text-gray-400 mt-1">Closed from this time</p>
+                                        </div>
+                                    </div>
+                                </div>
+
                                 <div className="flex items-center">
                                     <input
                                         type="checkbox"
@@ -881,6 +1033,68 @@ const DayOffs: React.FC = () => {
                                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                         placeholder="e.g., Holiday, Maintenance, etc."
                                     />
+                                </div>
+
+                                {/* Partial Day Closure Options */}
+                                <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                                    <label className="block text-sm font-medium text-gray-700 mb-3">
+                                        Partial Day Closure <span className="text-xs text-gray-500">(Optional)</span>
+                                    </label>
+                                    <p className="text-xs text-gray-500 mb-3">
+                                        Leave both empty for full day closure. Set one or both for partial closures.
+                                    </p>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-600 mb-1">
+                                                Delayed Opening Until
+                                            </label>
+                                            <div className="relative">
+                                                <input
+                                                    type="time"
+                                                    name="time_end"
+                                                    value={formData.time_end}
+                                                    onChange={handleInputChange}
+                                                    className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                                />
+                                                {formData.time_end && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setFormData(prev => ({ ...prev, time_end: '' }))}
+                                                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                                        title="Clear time"
+                                                    >
+                                                        <X className="w-4 h-4" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                            <p className="text-xs text-gray-400 mt-1">Closed until this time</p>
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-600 mb-1">
+                                                Close Starting At
+                                            </label>
+                                            <div className="relative">
+                                                <input
+                                                    type="time"
+                                                    name="time_start"
+                                                    value={formData.time_start}
+                                                    onChange={handleInputChange}
+                                                    className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                                />
+                                                {formData.time_start && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setFormData(prev => ({ ...prev, time_start: '' }))}
+                                                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                                        title="Clear time"
+                                                    >
+                                                        <X className="w-4 h-4" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                            <p className="text-xs text-gray-400 mt-1">Closed from this time</p>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <div className="flex items-center">
@@ -1056,6 +1270,68 @@ const DayOffs: React.FC = () => {
                                             placeholder="e.g., Holiday, Maintenance, etc."
                                             disabled={bulkCreating}
                                         />
+                                    </div>
+
+                                    {/* Partial Day Closure Options */}
+                                    <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                                        <label className="block text-sm font-medium text-gray-700 mb-3">
+                                            Partial Day Closure <span className="text-xs text-gray-500">(Optional - applies to all selected dates)</span>
+                                        </label>
+                                        <p className="text-xs text-gray-500 mb-3">
+                                            Leave both empty for full day closure. Set one or both for partial closures.
+                                        </p>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div>
+                                                <label className="block text-xs font-medium text-gray-600 mb-1">
+                                                    Delayed Opening Until
+                                                </label>
+                                                <div className="relative">
+                                                    <input
+                                                        type="time"
+                                                        value={bulkTimeEnd}
+                                                        onChange={(e) => setBulkTimeEnd(e.target.value)}
+                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                                        disabled={bulkCreating}
+                                                    />
+                                                    {bulkTimeEnd && !bulkCreating && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setBulkTimeEnd('')}
+                                                            className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                                            title="Clear time"
+                                                        >
+                                                            <X className="w-4 h-4" />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                                <p className="text-xs text-gray-400 mt-1">Closed until this time</p>
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-medium text-gray-600 mb-1">
+                                                    Close Starting At
+                                                </label>
+                                                <div className="relative">
+                                                    <input
+                                                        type="time"
+                                                        value={bulkTimeStart}
+                                                        onChange={(e) => setBulkTimeStart(e.target.value)}
+                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                                        disabled={bulkCreating}
+                                                    />
+                                                    {bulkTimeStart && !bulkCreating && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setBulkTimeStart('')}
+                                                            className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                                            title="Clear time"
+                                                        >
+                                                            <X className="w-4 h-4" />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                                <p className="text-xs text-gray-400 mt-1">Closed from this time</p>
+                                            </div>
+                                        </div>
                                     </div>
 
                                     <div className="flex items-center">

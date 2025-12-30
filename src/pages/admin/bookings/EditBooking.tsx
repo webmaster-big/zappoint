@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { Calendar, Users, Package, Clock, Mail, Phone, User, Home, AlertCircle, ArrowLeft, Bell, BellOff, Save } from 'lucide-react';
+import { Calendar, Package, User, Home, AlertCircle, ArrowLeft, Bell, BellOff, Save } from 'lucide-react';
 import StandardButton from '../../../components/ui/StandardButton';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import bookingService, { type Booking } from '../../../services/bookingService';
@@ -56,6 +56,8 @@ const EditBooking: React.FC = () => {
           const response = await bookingService.getBookings({ reference_number: referenceNumber });
           if (response.success && response.data && response.data.bookings.length > 0) {
             bookingData = response.data.bookings[0];
+
+            console.log('Loaded booking by reference number:', bookingData);
           }
         } else if (id) {
           const response = await bookingService.getBookingById(Number(id));
@@ -331,8 +333,8 @@ const EditBooking: React.FC = () => {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block font-semibold mb-2 text-base text-neutral-800 flex items-center gap-1">
-                      <Mail size={16} /> Email
+                    <label className="block font-semibold mb-2 text-base text-neutral-800">
+                      Email
                     </label>
                     <input
                       type="email"
@@ -345,8 +347,8 @@ const EditBooking: React.FC = () => {
                     />
                   </div>
                   <div>
-                    <label className="block font-semibold mb-2 text-base text-neutral-800 flex items-center gap-1">
-                      <Phone size={16} /> Phone
+                    <label className="block font-semibold mb-2 text-base text-neutral-800">
+                      Phone
                     </label>
                     <input
                       type="tel"
@@ -381,8 +383,8 @@ const EditBooking: React.FC = () => {
                     />
                   </div>
                   <div>
-                    <label className="block font-semibold mb-2 text-base text-neutral-800 flex items-center gap-1">
-                      <Clock size={16} /> Time
+                    <label className="block font-semibold mb-2 text-base text-neutral-800">
+                      Time
                     </label>
                     <input
                       type="time"
@@ -397,8 +399,8 @@ const EditBooking: React.FC = () => {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block font-semibold mb-2 text-base text-neutral-800 flex items-center gap-1">
-                      <Users size={16} /> Participants
+                    <label className="block font-semibold mb-2 text-base text-neutral-800">
+                      Participants
                     </label>
                     <input
                       type="number"
@@ -648,24 +650,114 @@ const EditBooking: React.FC = () => {
 
             {/* Payment Summary */}
             <div>
-              <p className="text-sm text-gray-500 mb-3">Payment</p>
+              <p className="text-sm text-gray-500 mb-3">Payment Breakdown</p>
               <div className="space-y-2">
+                {/* Package Price */}
                 <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Total Amount</span>
-                  <span className="font-semibold text-gray-900">${Number(originalBooking?.total_amount || 0).toFixed(2)}</span>
+                  <span className="text-sm text-gray-600">Package</span>
+                  <span className="font-medium text-gray-900">
+                    ${packageDetails ? Number(packageDetails.price).toFixed(2) : '0.00'}
+                  </span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Amount Paid</span>
-                  <span className="font-semibold text-green-600">${originalAmountPaid.toFixed(2)}</span>
-                </div>
-                {Number(originalBooking?.total_amount || 0) > originalAmountPaid && (
-                  <div className="flex justify-between pt-2 border-t border-gray-100">
-                    <span className="text-sm font-medium text-gray-900">Balance Due</span>
-                    <span className="font-bold text-red-600">
-                      ${(Number(originalBooking?.total_amount || 0) - originalAmountPaid).toFixed(2)}
-                    </span>
+                
+                {/* Attractions List */}
+                {originalBooking?.attractions && originalBooking.attractions.length > 0 && (
+                  <div className="pt-2 border-t border-gray-100">
+                    <p className="text-xs text-gray-500 mb-2">Attractions</p>
+                    {originalBooking.attractions.map((attr, idx) => {
+                      const price = Number(attr.pivot?.price_at_booking || 0);
+                      const qty = Number(attr.pivot?.quantity || 1);
+                      return (
+                        <div key={idx} className="flex justify-between text-sm">
+                          <span className="text-gray-600">
+                            {attr.name} {qty > 1 && `×${qty}`}
+                          </span>
+                          <span className="text-gray-900">${(price * qty).toFixed(2)}</span>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
+                
+                {/* Add-ons List */}
+                {originalBooking?.add_ons && originalBooking.add_ons.length > 0 && (
+                  <div className="pt-2 border-t border-gray-100">
+                    <p className="text-xs text-gray-500 mb-2">Add-ons</p>
+                    {originalBooking.add_ons.map((addon, idx) => {
+                      const price = Number(addon.pivot?.price_at_booking || 0);
+                      const qty = Number(addon.pivot?.quantity || 1);
+                      return (
+                        <div key={idx} className="flex justify-between text-sm">
+                          <span className="text-gray-600">
+                            {addon.name} {qty > 1 && `×${qty}`}
+                          </span>
+                          <span className="text-gray-900">${(price * qty).toFixed(2)}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                
+                {/* Calculated Totals */}
+                {(() => {
+                  const packagePrice = packageDetails ? Number(packageDetails.price) : 0;
+                  
+                  const attractionsTotal = (originalBooking?.attractions || []).reduce((sum, attr) => {
+                    const price = Number(attr.pivot?.price_at_booking || 0);
+                    const qty = Number(attr.pivot?.quantity || 1);
+                    return sum + (price * qty);
+                  }, 0);
+                  
+                  const addonsTotal = (originalBooking?.add_ons || []).reduce((sum, addon) => {
+                    const price = Number(addon.pivot?.price_at_booking || 0);
+                    const qty = Number(addon.pivot?.quantity || 1);
+                    return sum + (price * qty);
+                  }, 0);
+                  
+                  const originalTotal = Number(originalBooking?.total_amount || 0);
+                  const calculatedTotal = packagePrice + attractionsTotal + addonsTotal;
+                  
+                  // Use calculated total if package changed, otherwise use original
+                  const isPackageChanged = formData.packageId !== originalBooking?.package_id;
+                  const displayTotal = isPackageChanged ? calculatedTotal : originalTotal;
+                  const balance = displayTotal - originalAmountPaid;
+                  
+                  return (
+                    <>
+                      {/* Total */}
+                      <div className="flex justify-between pt-3 border-t border-gray-200">
+                        <span className="text-sm font-semibold text-gray-900">Total Amount</span>
+                        <span className="font-bold text-gray-900">
+                          ${displayTotal.toFixed(2)}
+                          {isPackageChanged && (
+                            <span className="text-xs text-orange-600 ml-1">(Updated)</span>
+                          )}
+                        </span>
+                      </div>
+                      
+                      {/* Amount Paid */}
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-600">Amount Paid</span>
+                        <span className="font-semibold text-green-600">${originalAmountPaid.toFixed(2)}</span>
+                      </div>
+                      
+                      {/* Balance Due */}
+                      {balance > 0 && (
+                        <div className="flex justify-between pt-2 border-t border-gray-100">
+                          <span className="text-sm font-medium text-red-700">Balance Due</span>
+                          <span className="font-bold text-red-600">${balance.toFixed(2)}</span>
+                        </div>
+                      )}
+                      
+                      {balance <= 0 && (
+                        <div className="flex justify-between pt-2 border-t border-gray-100">
+                          <span className="text-sm font-medium text-green-700">Payment Status</span>
+                          <span className="font-bold text-green-600">Fully Paid</span>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
             </div>
           </div>

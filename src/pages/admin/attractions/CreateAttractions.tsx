@@ -703,6 +703,7 @@ const CreateAttraction = () => {
                     onChange={handleImageUpload}
                     className={`block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-${themeColor}-50 file:text-${fullColor} hover:file:bg-${themeColor}-100`}
                   />
+                  <p className="text-xs text-gray-500 mt-1">Accepts images below 20MB. We recommend using low file sizes with good quality to avoid loading issues.</p>
                 </div>
 
                 {imagePreviews.length > 0 && (
