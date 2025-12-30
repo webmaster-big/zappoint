@@ -31,6 +31,7 @@ const CompanyAdminProfile = () => {
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
 
   // Profile data state
   const [profileData, setProfileData] = useState<CompanyAdminProfileData>({
@@ -236,6 +237,15 @@ const CompanyAdminProfile = () => {
           totalEmployees: totalEmployees
         }
       };
+
+      // Store company logo in localStorage for sidebar access
+      if (company.logo_path) {
+        localStorage.setItem('company_logo_path', company.logo_path);
+        // Dispatch event so AdminSidebar can update
+        window.dispatchEvent(new CustomEvent('zapzone_company_logo_updated', {
+          detail: { logoPath: company.logo_path }
+        }));
+      }
 
       console.log('Profile avatar path:', user.profile_path);
       console.log('Full avatar URL:', `${ASSET_URL}${user.profile_path}`);
@@ -502,6 +512,115 @@ const CompanyAdminProfile = () => {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to upload profile photo');
       setUploadingPhoto(false);
+    }
+  };
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      setError('Please upload an image file');
+      return;
+    }
+
+    // Validate file size (max 20MB for logo)
+    if (file.size > 20 * 1024 * 1024) {
+      setError('Logo size should be less than 20MB');
+      return;
+    }
+
+    setUploadingLogo(true);
+    setError(null);
+
+    try {
+      const token = getAuthToken();
+      const companyId = getStoredUser()?.company_id;
+      
+      if (!token || !companyId) {
+        throw new Error('Not authenticated');
+      }
+
+      // Convert file to base64
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      
+      reader.onload = async () => {
+        try {
+          const base64String = reader.result as string;
+
+          const response = await fetch(`${API_BASE_URL}/companies/${companyId}`, {
+            method: 'PUT',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+            body: JSON.stringify({
+              logo_path: base64String,
+            }),
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Failed to upload company logo');
+          }
+
+          const result = await response.json();
+          const newLogoPath = result.data?.logo_path;
+
+          console.log('New logo path from API:', newLogoPath);
+
+          // Update cached company data
+          const cachedCompany = localStorage.getItem(`company_${companyId}`);
+          if (cachedCompany) {
+            const companyData = JSON.parse(cachedCompany);
+            companyData.logo_path = newLogoPath;
+            localStorage.setItem(`company_${companyId}`, JSON.stringify(companyData));
+          }
+
+          // Store company logo in a separate key for easy access by sidebar/layout
+          localStorage.setItem('company_logo_path', newLogoPath || '');
+
+          // Dispatch custom event to notify sidebar and other components
+          window.dispatchEvent(new CustomEvent('zapzone_company_logo_updated', {
+            detail: { logoPath: newLogoPath }
+          }));
+
+          // Update component state
+          setProfileData(prev => ({
+            ...prev,
+            company: {
+              ...prev.company,
+              logoPath: newLogoPath || ''
+            }
+          }));
+
+          setEditedData(prev => ({
+            ...prev,
+            company: {
+              ...prev.company,
+              logoPath: newLogoPath || ''
+            }
+          }));
+
+          setSuccessMessage('Company logo updated successfully!');
+          setTimeout(() => setSuccessMessage(null), 3000);
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'Failed to upload company logo');
+        } finally {
+          setUploadingLogo(false);
+        }
+      };
+
+      reader.onerror = () => {
+        setError('Failed to read image file');
+        setUploadingLogo(false);
+      };
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to upload company logo');
+      setUploadingLogo(false);
     }
   };
 
@@ -779,6 +898,55 @@ const CompanyAdminProfile = () => {
                     disabled={!isEditing}
                     className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 disabled:bg-gray-100 disabled:text-gray-500`}
                   />
+                </div>
+
+                {/* Company Logo Upload */}
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Company Logo</label>
+                  <div className="flex items-center space-x-4">
+                    <div className="relative group">
+                      {profileData.company.logoPath ? (
+                        <div className="relative">
+                          <img 
+                            src={`${ASSET_URL}${profileData.company.logoPath}`}
+                            alt="Company Logo" 
+                            className="w-24 h-24 rounded-lg object-contain border-2 border-gray-200 bg-white p-2"
+                            onError={(e) => {
+                              console.error('Logo failed to load:', `${ASSET_URL}${profileData.company.logoPath}`);
+                              e.currentTarget.style.display = 'none';
+                            }}
+                          />
+                          <div className="absolute inset-0 rounded-lg bg-black opacity-0 group-hover:opacity-20 transition-opacity"></div>
+                        </div>
+                      ) : (
+                        <div className={`w-24 h-24 bg-gray-100 rounded-lg flex items-center justify-center border-2 border-dashed border-gray-300`}>
+                          <Building className="w-10 h-10 text-gray-400" />
+                        </div>
+                      )}
+                      <label className={`absolute -bottom-1 -right-1 bg-${fullColor} text-white p-2 rounded-full hover:bg-${themeColor}-900 transition cursor-pointer shadow-lg border-2 border-white group-hover:scale-110 transform`}>
+                        <Camera size={16} />
+                        <input 
+                          type="file" 
+                          accept="image/*" 
+                          onChange={handleLogoUpload} 
+                          className="hidden" 
+                          disabled={uploadingLogo}
+                        />
+                      </label>
+                      {uploadingLogo && (
+                        <div className="absolute inset-0 bg-black/60 rounded-lg flex items-center justify-center">
+                          <div className="flex flex-col items-center">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-t-2 border-white"></div>
+                            <span className="text-white text-xs mt-1">Uploading...</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <div className="text-sm text-gray-500">
+                      <p>Upload your company logo</p>
+                      <p className="text-xs">Max size: 20MB. Supported: PNG, JPG, SVG</p>
+                    </div>
+                  </div>
                 </div>
                 
                 <div>

@@ -63,17 +63,13 @@ const CompanyAnalytics: React.FC = () => {
     
     try {
       setIsLoading(true);
-      const params: any = {
+      const params = {
         company_id: companyId,
         date_range: dateRange,
-        location_ids: selectedLocations.length > 0 ? selectedLocations : undefined
+        ...(selectedLocations.length > 0 && { location_ids: selectedLocations }),
+        ...(dateRange === 'custom' && startDate && { start_date: startDate }),
+        ...(dateRange === 'custom' && endDate && { end_date: endDate }),
       };
-      
-      // Add custom date range if selected
-      if (dateRange === 'custom' && startDate && endDate) {
-        params.start_date = startDate;
-        params.end_date = endDate;
-      }
       
       const data = await AnalyticsService.getCompanyAnalytics(params);
       console.log('Fetched Company Analytics:', data);
@@ -106,18 +102,14 @@ const CompanyAnalytics: React.FC = () => {
     
     setIsExporting(true);
     try {
-      const params: any = {
+      const params = {
         company_id: companyId,
         date_range: dateRange,
-        location_ids: selectedLocations.length > 0 ? selectedLocations : undefined,
         format: exportFormat,
+        ...(selectedLocations.length > 0 && { location_ids: selectedLocations }),
+        ...(dateRange === 'custom' && startDate && { start_date: startDate }),
+        ...(dateRange === 'custom' && endDate && { end_date: endDate }),
       };
-      
-      // Add custom date range if selected
-      if (dateRange === 'custom' && startDate && endDate) {
-        params.start_date = startDate;
-        params.end_date = endDate;
-      }
       
       const exportData = await AnalyticsService.exportCompanyAnalytics(params);
       
@@ -146,10 +138,10 @@ const CompanyAnalytics: React.FC = () => {
     );
   }
 
-  const { company, key_metrics, revenue_trend, location_performance, package_distribution, peak_hours, daily_performance, booking_status, top_attractions } = analyticsData;
+  const { company, key_metrics, revenue_trend, location_performance, package_distribution, peak_hours, daily_performance, booking_status, top_attractions, available_locations } = analyticsData;
   
-  // All available locations for filter
-  const allLocations = location_performance.map(loc => ({
+  // All available locations for filter (from API response)
+  const allLocations = available_locations || location_performance.map(loc => ({
     id: loc.location_id,
     name: loc.location,
   }));

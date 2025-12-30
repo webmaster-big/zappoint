@@ -26,12 +26,16 @@ api.interceptors.request.use(
 
 export interface LocationAnalyticsParams {
   location_id: number;
-  date_range?: '7d' | '30d' | '90d' | '1y';
+  date_range?: '7d' | '30d' | '90d' | '1y' | 'custom';
+  start_date?: string;
+  end_date?: string;
 }
 
 export interface CompanyAnalyticsParams {
   company_id: number;
-  date_range?: '7d' | '30d' | '90d' | '1y';
+  date_range?: '7d' | '30d' | '90d' | '1y' | 'custom';
+  start_date?: string;
+  end_date?: string;
   location_ids?: number[];
 }
 
@@ -150,6 +154,10 @@ export interface CompanyAnalyticsResponse {
     end_date: string;
   };
   selected_locations: number[];
+  available_locations: Array<{
+    id: number;
+    name: string;
+  }>;
   key_metrics: {
     total_revenue: {
       value: number;

@@ -248,12 +248,55 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
   const profileDropdownRef = useRef<HTMLDivElement>(null);
   const [searchValue, setSearchValue] = useState('');
+  const [companyLogo, setCompanyLogo] = useState<string | null>(null);
   const [searchSuggestions, setSearchSuggestions] = useState<{ label: string; href: string; description?: string; fragmentId?: string }[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
   
   // Sidebar layout preference
   const [sidebarLayout, setSidebarLayout] = useState<'dropdown' | 'grouped'>('dropdown');
+
+  // Load company logo on mount and listen for updates
+  useEffect(() => {
+    // Load from localStorage first
+    const loadCompanyLogo = () => {
+      const storedLogo = localStorage.getItem('company_logo_path');
+      if (storedLogo) {
+        setCompanyLogo(storedLogo);
+        return;
+      }
+      
+      // Try to get from cached company data
+      const user = JSON.parse(localStorage.getItem('zapzone_user') || '{}');
+      if (user.company_id) {
+        const cachedCompany = localStorage.getItem(`company_${user.company_id}`);
+        if (cachedCompany) {
+          const companyData = JSON.parse(cachedCompany);
+          if (companyData.logo_path) {
+            setCompanyLogo(companyData.logo_path);
+            localStorage.setItem('company_logo_path', companyData.logo_path);
+          }
+        }
+      }
+    };
+    
+    loadCompanyLogo();
+    
+    // Listen for logo updates
+    const handleLogoUpdate = (event: CustomEvent<{ logoPath: string }>) => {
+      if (event.detail?.logoPath) {
+        setCompanyLogo(event.detail.logoPath);
+      }
+    };
+    
+    window.addEventListener('zapzone_company_logo_updated', handleLogoUpdate as EventListener);
+    window.addEventListener('storage', loadCompanyLogo);
+    
+    return () => {
+      window.removeEventListener('zapzone_company_logo_updated', handleLogoUpdate as EventListener);
+      window.removeEventListener('storage', loadCompanyLogo);
+    };
+  }, []);
 
   // Unread notifications count from localStorage (zapzone_notifications)
   const [unreadNotifications, setUnreadNotifications] = useState<number>(0);
@@ -977,10 +1020,22 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
           {/* Header with Logo and Minimize Button */}
           <div className="relative flex items-center justify-center p-4 border-b border-gray-200 transition-all duration-300">
             <div className="flex items-center justify-center w-full transition-all duration-300">
+              {companyLogo ? (
+                <img 
+                  src={`${ASSET_URL}${companyLogo}`}
+                  alt="Company Logo" 
+                  className={`object-contain transition-all duration-300 ${isMinimized ? 'w-10 h-10' : 'max-h-12 max-w-[80%]'}`}
+                  onError={(e) => {
+                    console.error('Company logo failed to load, falling back to default');
+                    e.currentTarget.style.display = 'none';
+                    e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                  }}
+                />
+              ) : null}
               <img 
-                src="\Zap-Zone.png" 
+                src="/Zap-Zone.png" 
                 alt="Logo" 
-                className={`object-contain transition-all duration-300 ${isMinimized ? 'w-10 h-10' : 'w-3/5'}`}
+                className={`object-contain transition-all duration-300 ${isMinimized ? 'w-10 h-10' : 'w-3/5'} ${companyLogo ? 'hidden' : ''}`}
               />
             </div>
             

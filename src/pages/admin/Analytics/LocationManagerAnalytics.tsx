@@ -55,16 +55,12 @@ const LocationManagerAnalytics: React.FC = () => {
     
     try {
       setIsLoading(true);
-      const params: any = {
+      const params = {
         location_id: locationId,
         date_range: dateRange,
+        ...(dateRange === 'custom' && startDate && { start_date: startDate }),
+        ...(dateRange === 'custom' && endDate && { end_date: endDate }),
       };
-      
-      // Add custom date range if selected
-      if (dateRange === 'custom' && startDate && endDate) {
-        params.start_date = startDate;
-        params.end_date = endDate;
-      }
       
       const data = await AnalyticsService.getLocationAnalytics(params);
 
@@ -92,18 +88,14 @@ const LocationManagerAnalytics: React.FC = () => {
     
     setIsExporting(true);
     try {
-      const params: any = {
+      const params = {
         location_id: locationId,
         date_range: dateRange,
         format: exportFormat,
         sections: selectedSections,
+        ...(dateRange === 'custom' && startDate && { start_date: startDate }),
+        ...(dateRange === 'custom' && endDate && { end_date: endDate }),
       };
-      
-      // Add custom date range if selected
-      if (dateRange === 'custom' && startDate && endDate) {
-        params.start_date = startDate;
-        params.end_date = endDate;
-      }
       
       const exportData = await AnalyticsService.exportAnalytics(params);
       
