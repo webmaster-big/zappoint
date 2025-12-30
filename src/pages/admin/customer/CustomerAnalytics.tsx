@@ -46,7 +46,9 @@ import type { CustomerAnalyticsAnalyticsData } from '../../../types/CustomerAnal
 
 const CustomerAnalytics: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
-  const [dateRange, setDateRange] = useState<'7d' | '30d' | '90d' | '1y'>('30d');
+  const [dateRange, setDateRange] = useState<'7d' | '30d' | '90d' | '1y' | 'custom'>('30d');
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
   const [selectedLocation, setSelectedLocation] = useState<number | null>(null);
   const [locations, setLocations] = useState<Array<{ id: number; name: string }>>([]);
   const [loading, setLoading] = useState(true);
@@ -59,7 +61,7 @@ const CustomerAnalytics: React.FC = () => {
   const [exportFormat, setExportFormat] = useState<'csv' | 'pdf' | 'receipt'>('csv');
   const [exportSections, setExportSections] = useState<string[]>(['customers', 'revenue', 'bookings', 'activities', 'packages']);
   const [isExporting, setIsExporting] = useState(false);
-  const [exportDateRange, setExportDateRange] = useState<'7d' | '30d' | '90d' | '1y' | 'all' | ''>('all');
+  const [exportDateRange, setExportDateRange] = useState<'7d' | '30d' | '90d' | '1y' | 'all' | 'custom' | ''>('all');
   const [exportLocation, setExportLocation] = useState<number | null>(null);
   
   const user = getStoredUser();
@@ -75,7 +77,7 @@ const CustomerAnalytics: React.FC = () => {
   // Fetch analytics data when date range or location changes
   useEffect(() => {
     fetchAnalytics();
-  }, [dateRange, selectedLocation]);
+  }, [dateRange, startDate, endDate, selectedLocation]);
 
   const fetchLocations = async () => {
     try {
@@ -95,6 +97,12 @@ const CustomerAnalytics: React.FC = () => {
         user_id: user?.id,
         date_range: dateRange,
       };
+      
+      // Add custom date range if selected
+      if (dateRange === 'custom' && startDate && endDate) {
+        params.start_date = startDate;
+        params.end_date = endDate;
+      }
       
       if (selectedLocation !== null) {
         params.location_id = selectedLocation;
@@ -148,6 +156,12 @@ const CustomerAnalytics: React.FC = () => {
       
       // Add date_range (defaults to 'all' if not set)
       params.date_range = exportDateRange || 'all';
+      
+      // Add custom date range if selected
+      if (params.date_range === 'custom' && startDate && endDate) {
+        params.start_date = startDate;
+        params.end_date = endDate;
+      }
       
       // Only add location_id if selected
       if (exportLocation !== null) {
@@ -240,14 +254,35 @@ const CustomerAnalytics: React.FC = () => {
             )}
             <select 
               value={dateRange}
-              onChange={(e) => setDateRange(e.target.value as '7d' | '30d' | '90d' | '1y')}
+              onChange={(e) => setDateRange(e.target.value as '7d' | '30d' | '90d' | '1y' | 'custom')}
               className={`px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-${themeColor}-500`}
             >
               <option value="7d">Last 7 days</option>
               <option value="30d">Last 30 days</option>
               <option value="90d">Last 90 days</option>
               <option value="1y">Last year</option>
+              <option value="custom">Custom Range</option>
             </select>
+            {dateRange === 'custom' && (
+              <div className="flex items-center gap-2">
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-${themeColor}-500"
+                  placeholder="Start Date"
+                />
+                <span className="text-gray-500">to</span>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  min={startDate}
+                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-${themeColor}-500"
+                  placeholder="End Date"
+                />
+              </div>
+            )}
             <StandardButton 
               variant="primary"
               size="md"
@@ -746,7 +781,7 @@ const CustomerAnalytics: React.FC = () => {
               <label className="block text-sm font-medium text-gray-700 mb-2">Date Range</label>
               <select 
                 value={exportDateRange}
-                onChange={(e) => setExportDateRange(e.target.value as '7d' | '30d' | '90d' | '1y' | 'all' | '')}
+                onChange={(e) => setExportDateRange(e.target.value as '7d' | '30d' | '90d' | '1y' | 'all' | 'custom' | '')}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="all">All Time</option>
@@ -754,7 +789,31 @@ const CustomerAnalytics: React.FC = () => {
                 <option value="30d">Last 30 days</option>
                 <option value="90d">Last 90 days</option>
                 <option value="1y">Last year</option>
+                <option value="custom">Custom Range</option>
               </select>
+              {exportDateRange === 'custom' && (
+                <div className="mt-3 space-y-2">
+                  <div>
+                    <label className="text-xs text-gray-600 mb-1 block">Start Date</label>
+                    <input
+                      type="date"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-600 mb-1 block">End Date</label>
+                    <input
+                      type="date"
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                      min={startDate}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Location Selection for Company Admin */}

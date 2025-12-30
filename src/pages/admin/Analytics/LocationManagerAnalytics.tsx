@@ -34,7 +34,9 @@ import {
 
 const LocationManagerAnalytics: React.FC = () => {
   const { themeColor } = useThemeColor();
-  const [dateRange, setDateRange] = useState<'7d' | '30d' | '90d' | '1y'>('30d');
+  const [dateRange, setDateRange] = useState<'7d' | '30d' | '90d' | '1y' | 'custom'>('30d');
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
   const [showExportModal, setShowExportModal] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -48,10 +50,18 @@ const LocationManagerAnalytics: React.FC = () => {
   const fetchAnalytics = useCallback(async () => {
     try {
       setIsLoading(true);
-      const data = await AnalyticsService.getLocationAnalytics({
+      const params: any = {
         location_id: locationId,
         date_range: dateRange,
-      });
+      };
+      
+      // Add custom date range if selected
+      if (dateRange === 'custom' && startDate && endDate) {
+        params.start_date = startDate;
+        params.end_date = endDate;
+      }
+      
+      const data = await AnalyticsService.getLocationAnalytics(params);
 
       console.log('Fetched Location Analytics:', data);
       setAnalyticsData(data);
@@ -60,7 +70,7 @@ const LocationManagerAnalytics: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [locationId, dateRange]);
+  }, [locationId, dateRange, startDate, endDate]);
 
   useEffect(() => {
     fetchAnalytics();
@@ -71,12 +81,20 @@ const LocationManagerAnalytics: React.FC = () => {
     
     setIsExporting(true);
     try {
-      const exportData = await AnalyticsService.exportAnalytics({
+      const params: any = {
         location_id: locationId,
         date_range: dateRange,
         format: exportFormat,
         sections: selectedSections,
-      });
+      };
+      
+      // Add custom date range if selected
+      if (dateRange === 'custom' && startDate && endDate) {
+        params.start_date = startDate;
+        params.end_date = endDate;
+      }
+      
+      const exportData = await AnalyticsService.exportAnalytics(params);
       
       AnalyticsService.downloadExportedFile(
         exportData,
@@ -140,14 +158,35 @@ const LocationManagerAnalytics: React.FC = () => {
         <div className="flex flex-wrap items-center gap-3 mt-4 md:mt-0">
           <select
             value={dateRange}
-            onChange={(e) => setDateRange(e.target.value as '7d' | '30d' | '90d' | '1y')}
+            onChange={(e) => setDateRange(e.target.value as '7d' | '30d' | '90d' | '1y' | 'custom')}
             className={`px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-${themeColor}-500`}
           >
             <option value="7d">Last 7 days</option>
             <option value="30d">Last 30 days</option>
             <option value="90d">Last 90 days</option>
             <option value="1y">Last year</option>
+            <option value="custom">Custom Range</option>
           </select>
+          {dateRange === 'custom' && (
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-${themeColor}-500"
+                placeholder="Start Date"
+              />
+              <span className="text-gray-500">to</span>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                min={startDate}
+                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-${themeColor}-500"
+                placeholder="End Date"
+              />
+            </div>
+          )}
           <StandardButton
             onClick={() => setShowExportModal(true)}
             variant="secondary"
@@ -424,14 +463,38 @@ const LocationManagerAnalytics: React.FC = () => {
                 <label className="text-sm font-medium text-gray-700 mb-2 block">Time Period</label>
                 <select
                   value={dateRange}
-                  onChange={(e) => setDateRange(e.target.value as '7d' | '30d' | '90d' | '1y')}
+                  onChange={(e) => setDateRange(e.target.value as '7d' | '30d' | '90d' | '1y' | 'custom')}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-${themeColor}-500"
                 >
                   <option value="7d">Last 7 days</option>
                   <option value="30d">Last 30 days</option>
                   <option value="90d">Last 90 days</option>
                   <option value="1y">Last year</option>
+                  <option value="custom">Custom Range</option>
                 </select>
+                {dateRange === 'custom' && (
+                  <div className="mt-3 space-y-2">
+                    <div>
+                      <label className="text-xs text-gray-600 mb-1 block">Start Date</label>
+                      <input
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-${themeColor}-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-600 mb-1 block">End Date</label>
+                      <input
+                        type="date"
+                        value={endDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                        min={startDate}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-${themeColor}-500"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Data Sections to Include */}
