@@ -517,17 +517,24 @@ const CompanyAdminProfile = () => {
 
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file) {
+      console.log('No file selected');
+      return;
+    }
+
+    console.log('File selected:', file.name, file.type, file.size);
 
     // Validate file type
     if (!file.type.startsWith('image/')) {
       setError('Please upload an image file');
+      console.error('Invalid file type:', file.type);
       return;
     }
 
     // Validate file size (max 20MB for logo)
     if (file.size > 20 * 1024 * 1024) {
       setError('Logo size should be less than 20MB');
+      console.error('File too large:', file.size);
       return;
     }
 
@@ -537,6 +544,8 @@ const CompanyAdminProfile = () => {
     try {
       const token = getAuthToken();
       const companyId = getStoredUser()?.company_id;
+      
+      console.log('Token:', token ? 'exists' : 'missing', 'CompanyId:', companyId);
       
       if (!token || !companyId) {
         throw new Error('Not authenticated');
@@ -549,6 +558,8 @@ const CompanyAdminProfile = () => {
       reader.onload = async () => {
         try {
           const base64String = reader.result as string;
+          console.log('Base64 string length:', base64String.length);
+          console.log('Uploading to:', `${API_BASE_URL}/companies/${companyId}/logo`);
 
           const response = await fetch(`${API_BASE_URL}/companies/${companyId}/logo`, {
             method: 'PATCH',
@@ -562,8 +573,11 @@ const CompanyAdminProfile = () => {
             }),
           });
 
+          console.log('Response status:', response.status);
+
           if (!response.ok) {
             const errorData = await response.json();
+            console.error('Upload error:', errorData);
             throw new Error(errorData.message || 'Failed to upload company logo');
           }
 
