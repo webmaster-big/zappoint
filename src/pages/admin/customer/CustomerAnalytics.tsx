@@ -91,6 +91,11 @@ const CustomerAnalytics: React.FC = () => {
   };
 
   const fetchAnalytics = async () => {
+    // Don't fetch if custom range is selected but dates are not set
+    if (dateRange === 'custom' && (!startDate || !endDate)) {
+      return;
+    }
+    
     try {
       setLoading(true);
       const params: any = {
@@ -146,6 +151,12 @@ const CustomerAnalytics: React.FC = () => {
 
   const handleExport = async () => {
     try {
+      // Validate custom date range
+      if (exportDateRange === 'custom' && (!startDate || !endDate)) {
+        alert('Please select both start and end dates for custom range.');
+        return;
+      }
+      
       setIsExporting(true);
       
       const params: any = {

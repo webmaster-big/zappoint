@@ -48,6 +48,11 @@ const LocationManagerAnalytics: React.FC = () => {
   const locationId = 1; // Replace with actual location ID from user context
 
   const fetchAnalytics = useCallback(async () => {
+    // Don't fetch if custom range is selected but dates are not set
+    if (dateRange === 'custom' && (!startDate || !endDate)) {
+      return;
+    }
+    
     try {
       setIsLoading(true);
       const params: any = {
@@ -78,6 +83,12 @@ const LocationManagerAnalytics: React.FC = () => {
   
   const handleExport = async () => {
     if (!analyticsData) return;
+    
+    // Validate custom date range
+    if (dateRange === 'custom' && (!startDate || !endDate)) {
+      alert('Please select both start and end dates for custom range.');
+      return;
+    }
     
     setIsExporting(true);
     try {
