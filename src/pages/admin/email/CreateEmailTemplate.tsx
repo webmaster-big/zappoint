@@ -12,7 +12,27 @@ import {
   Copy,
   X,
   Mail,
-  Code
+  Code,
+  Bold,
+  Italic,
+  Underline,
+  Strikethrough,
+  List,
+  ListOrdered,
+  Link as LinkIcon,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  Heading1,
+  Heading2,
+  Quote,
+  Type,
+  Highlighter,
+  Image,
+  Loader2,
+  Check,
+  Undo2,
+  Redo2
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { emailCampaignService } from '../../../services/EmailCampaignService';
@@ -20,11 +40,16 @@ import { locationService } from '../../../services/LocationService';
 import StandardButton from '../../../components/ui/StandardButton';
 import Toast from '../../../components/ui/Toast';
 import { getStoredUser } from '../../../utils/storage';
-import type { CreateEmailTemplateData, EmailTemplateStatus, EmailTemplateVariable } from '../../../types/EmailCampaign.types';
+import type { CreateEmailTemplateData, EmailTemplateStatus } from '../../../types/EmailCampaign.types';
+
+interface VariableItem {
+  name: string;
+  sampleValue: string;
+}
 
 interface VariableGroup {
   name: string;
-  variables: EmailTemplateVariable[];
+  variables: VariableItem[];
 }
 
 const CreateEmailTemplate: React.FC = () => {
@@ -33,6 +58,7 @@ const CreateEmailTemplate: React.FC = () => {
   const currentUser = getStoredUser();
   const isCompanyAdmin = currentUser?.role === 'company_admin';
   const bodyEditorRef = useRef<HTMLDivElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   // Form state
   const [formData, setFormData] = useState<CreateEmailTemplateData>({
@@ -49,6 +75,14 @@ const CreateEmailTemplate: React.FC = () => {
   const [showPreview, setShowPreview] = useState(false);
   const [previewData, setPreviewData] = useState<{ subject: string; body: string } | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [showImageSizeModal, setShowImageSizeModal] = useState(false);
+  const [pendingImageFile, setPendingImageFile] = useState<File | null>(null);
+  
+  // Link modal state
+  const [showLinkModal, setShowLinkModal] = useState(false);
+  const [linkUrl, setLinkUrl] = useState('');
+  const [linkText, setLinkText] = useState('');
 
   // Variables panel state
   const [variableGroups, setVariableGroups] = useState<VariableGroup[]>([]);
@@ -85,13 +119,22 @@ const CreateEmailTemplate: React.FC = () => {
 
         // Fetch available variables
         const varResponse = await emailCampaignService.getTemplateVariables();
-        if (varResponse.success) {
+        if (varResponse.success && varResponse.data) {
+          // Convert flat key-value object to array of { name, sampleValue }
+          const parseVariables = (obj: Record<string, string> | undefined): VariableItem[] => {
+            if (!obj || typeof obj !== 'object') return [];
+            return Object.entries(obj).map(([name, sampleValue]) => ({
+              name,
+              sampleValue: String(sampleValue)
+            }));
+          };
+          
           const groups: VariableGroup[] = [
-            { name: 'default', variables: varResponse.data.default || [] },
-            { name: 'customer', variables: varResponse.data.customer || [] },
-            { name: 'user', variables: varResponse.data.user || [] }
+            { name: 'default', variables: parseVariables(varResponse.data.default) },
+            { name: 'customer', variables: parseVariables(varResponse.data.customer) },
+            { name: 'user', variables: parseVariables(varResponse.data.user) }
           ];
-          setVariableGroups(groups);
+          setVariableGroups(groups.filter(g => g.variables.length > 0));
         }
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -225,10 +268,126 @@ const CreateEmailTemplate: React.FC = () => {
     }
   };
 
-  // Basic text formatting
+  // Basic text formatting - focus editor first then execute command
   const formatText = (command: string, value?: string) => {
+    // Focus the editor first
+    if (bodyEditorRef.current) {
+      bodyEditorRef.current.focus();
+    }
+    
+    // Small delay to ensure focus is established
+    setTimeout(() => {
+      document.execCommand(command, false, value);
+      handleBodyChange();
+    }, 0);
+  };
+
+  // Handle image file selection - show size modal
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const validTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      setToast({ message: 'Please select a valid image file (PNG, JPG, GIF, WebP)', type: 'error' });
+      if (imageInputRef.current) imageInputRef.current.value = '';
+      return;
+    }
+
+    // Validate file size (5MB max)
+    if (file.size > 5 * 1024 * 1024) {
+      setToast({ message: 'Image must be less than 5MB', type: 'error' });
+      if (imageInputRef.current) imageInputRef.current.value = '';
+      return;
+    }
+
+    // Store file and show size picker modal
+    setPendingImageFile(file);
+    setShowImageSizeModal(true);
+  };
+
+  // Upload and insert image with selected size
+  const handleImageUpload = async (maxWidth: string) => {
+    if (!pendingImageFile) return;
+
+    try {
+      setUploadingImage(true);
+      setShowImageSizeModal(false);
+      
+      const response = await emailCampaignService.uploadImage(pendingImageFile);
+      
+      if (response.success) {
+        // Insert image at cursor position with chosen size
+        if (bodyEditorRef.current) {
+          bodyEditorRef.current.focus();
+          const imgHtml = `<img src="${response.data.url}" alt="${response.data.original_name}" style="max-width: ${maxWidth}; height: auto; display: block; margin: 10px 0;" />`;
+          document.execCommand('insertHTML', false, imgHtml);
+          handleBodyChange();
+        }
+        setToast({ message: 'Image uploaded and inserted!', type: 'success' });
+      }
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      setToast({ message: 'Failed to upload image', type: 'error' });
+    } finally {
+      setUploadingImage(false);
+      setPendingImageFile(null);
+      // Reset input
+      if (imageInputRef.current) {
+        imageInputRef.current.value = '';
+      }
+    }
+  };
+
+  // Handle toolbar button click - use onMouseDown to prevent blur
+  const handleToolbarClick = (e: React.MouseEvent, command: string, value?: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // Execute command directly - onMouseDown prevents blur
     document.execCommand(command, false, value);
     handleBodyChange();
+  };
+
+  // Insert link with text
+  const insertLink = () => {
+    if (!linkUrl.trim()) {
+      setToast({ message: 'Please enter a URL', type: 'error' });
+      return;
+    }
+    
+    const url = linkUrl.startsWith('http') ? linkUrl : `https://${linkUrl}`;
+    const text = linkText.trim() || url;
+    
+    if (bodyEditorRef.current) {
+      bodyEditorRef.current.focus();
+      const linkHtml = `<a href="${url}" target="_blank" style="color: #3182ce; text-decoration: underline;">${text}</a>`;
+      document.execCommand('insertHTML', false, linkHtml);
+      handleBodyChange();
+    }
+    
+    setShowLinkModal(false);
+    setLinkUrl('');
+    setLinkText('');
+  };
+
+  // Apply text color
+  const applyTextColor = (color: string) => {
+    if (bodyEditorRef.current) {
+      bodyEditorRef.current.focus();
+      document.execCommand('foreColor', false, color);
+      handleBodyChange();
+    }
+  };
+
+  // Apply highlight/background color
+  const applyHighlight = (color: string) => {
+    if (bodyEditorRef.current) {
+      bodyEditorRef.current.focus();
+      document.execCommand('hiliteColor', false, color);
+      handleBodyChange();
+    }
   };
 
   return (
@@ -367,72 +526,271 @@ const CreateEmailTemplate: React.FC = () => {
                   Email Body <span className="text-red-500">*</span>
                 </label>
                 
-                {/* Simple Toolbar */}
-                <div className="flex items-center gap-1 p-2 border border-gray-300 border-b-0 rounded-t-lg bg-gray-50">
+                {/* Simplified Toolbar */}
+                <div className="flex flex-wrap items-center gap-1 p-2 border border-gray-300 border-b-0 rounded-t-lg bg-gray-50">
+                  {/* Undo/Redo */}
                   <button
                     type="button"
-                    onClick={() => formatText('bold')}
-                    className="p-2 hover:bg-gray-200 rounded font-bold"
-                    title="Bold"
+                    onMouseDown={(e) => handleToolbarClick(e, 'undo')}
+                    className="p-1.5 hover:bg-gray-200 rounded text-gray-600"
+                    title="Undo (Ctrl+Z)"
                   >
-                    B
+                    <Undo2 className="w-4 h-4" />
                   </button>
                   <button
                     type="button"
-                    onClick={() => formatText('italic')}
-                    className="p-2 hover:bg-gray-200 rounded italic"
-                    title="Italic"
+                    onMouseDown={(e) => handleToolbarClick(e, 'redo')}
+                    className="p-1.5 hover:bg-gray-200 rounded text-gray-600"
+                    title="Redo (Ctrl+Y)"
                   >
-                    I
+                    <Redo2 className="w-4 h-4" />
+                  </button>
+                  <div className="w-px h-5 bg-gray-300 mx-1" />
+                  
+                  {/* Normal Text */}
+                  <button
+                    type="button"
+                    onMouseDown={(e) => handleToolbarClick(e, 'formatBlock', 'p')}
+                    className="px-2 py-1 text-xs hover:bg-gray-200 rounded text-gray-600 border border-gray-300 bg-white"
+                    title="Normal Text (Remove heading/list)"
+                  >
+                    <Type className="w-4 h-4 inline mr-1" />
+                    Normal
+                  </button>
+                  <div className="w-px h-5 bg-gray-300 mx-1" />
+                  
+                  {/* Font Style */}
+                  <button
+                    type="button"
+                    onMouseDown={(e) => handleToolbarClick(e, 'bold')}
+                    className="p-1.5 hover:bg-gray-200 rounded text-gray-600"
+                    title="Bold (Ctrl+B)"
+                  >
+                    <Bold className="w-4 h-4" />
                   </button>
                   <button
                     type="button"
-                    onClick={() => formatText('underline')}
-                    className="p-2 hover:bg-gray-200 rounded underline"
-                    title="Underline"
+                    onMouseDown={(e) => handleToolbarClick(e, 'italic')}
+                    className="p-1.5 hover:bg-gray-200 rounded text-gray-600"
+                    title="Italic (Ctrl+I)"
                   >
-                    U
+                    <Italic className="w-4 h-4" />
                   </button>
-                  <div className="w-px h-6 bg-gray-300 mx-1" />
                   <button
                     type="button"
-                    onClick={() => formatText('insertUnorderedList')}
-                    className="p-2 hover:bg-gray-200 rounded text-sm"
+                    onMouseDown={(e) => handleToolbarClick(e, 'underline')}
+                    className="p-1.5 hover:bg-gray-200 rounded text-gray-600"
+                    title="Underline (Ctrl+U)"
+                  >
+                    <Underline className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onMouseDown={(e) => handleToolbarClick(e, 'strikeThrough')}
+                    className="p-1.5 hover:bg-gray-200 rounded text-gray-600"
+                    title="Strikethrough"
+                  >
+                    <Strikethrough className="w-4 h-4" />
+                  </button>
+                  <div className="w-px h-5 bg-gray-300 mx-1" />
+                  
+                  {/* Text Color Buttons */}
+                  <div className="flex items-center gap-0.5">
+                    <button
+                      type="button"
+                      onMouseDown={(e) => { e.preventDefault(); applyTextColor('#e53e3e'); }}
+                      className="w-5 h-5 rounded border border-gray-300 bg-red-500 hover:ring-2 hover:ring-red-300"
+                      title="Red Text"
+                    />
+                    <button
+                      type="button"
+                      onMouseDown={(e) => { e.preventDefault(); applyTextColor('#3182ce'); }}
+                      className="w-5 h-5 rounded border border-gray-300 bg-blue-500 hover:ring-2 hover:ring-blue-300"
+                      title="Blue Text"
+                    />
+                    <button
+                      type="button"
+                      onMouseDown={(e) => { e.preventDefault(); applyTextColor('#38a169'); }}
+                      className="w-5 h-5 rounded border border-gray-300 bg-green-500 hover:ring-2 hover:ring-green-300"
+                      title="Green Text"
+                    />
+                    <button
+                      type="button"
+                      onMouseDown={(e) => { e.preventDefault(); applyTextColor('#000000'); }}
+                      className="w-5 h-5 rounded border border-gray-300 bg-black hover:ring-2 hover:ring-gray-400"
+                      title="Black Text"
+                    />
+                  </div>
+                  <div className="w-px h-5 bg-gray-300 mx-1" />
+                  
+                  {/* Highlight */}
+                  <button
+                    type="button"
+                    onMouseDown={(e) => { e.preventDefault(); applyHighlight('#fef08a'); }}
+                    className="p-1.5 hover:bg-gray-200 rounded text-yellow-600"
+                    title="Highlight Yellow"
+                  >
+                    <Highlighter className="w-4 h-4" />
+                  </button>
+                  <div className="w-px h-5 bg-gray-300 mx-1" />
+                  
+                  {/* Headings */}
+                  <button
+                    type="button"
+                    onMouseDown={(e) => handleToolbarClick(e, 'formatBlock', 'h1')}
+                    className="p-1.5 hover:bg-gray-200 rounded text-gray-600"
+                    title="Heading 1"
+                  >
+                    <Heading1 className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onMouseDown={(e) => handleToolbarClick(e, 'formatBlock', 'h2')}
+                    className="p-1.5 hover:bg-gray-200 rounded text-gray-600"
+                    title="Heading 2"
+                  >
+                    <Heading2 className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onMouseDown={(e) => handleToolbarClick(e, 'formatBlock', 'blockquote')}
+                    className="p-1.5 hover:bg-gray-200 rounded text-gray-600"
+                    title="Quote"
+                  >
+                    <Quote className="w-4 h-4" />
+                  </button>
+                  <div className="w-px h-5 bg-gray-300 mx-1" />
+                  
+                  {/* Alignment */}
+                  <button
+                    type="button"
+                    onMouseDown={(e) => handleToolbarClick(e, 'justifyLeft')}
+                    className="p-1.5 hover:bg-gray-200 rounded text-gray-600"
+                    title="Align Left"
+                  >
+                    <AlignLeft className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onMouseDown={(e) => handleToolbarClick(e, 'justifyCenter')}
+                    className="p-1.5 hover:bg-gray-200 rounded text-gray-600"
+                    title="Align Center"
+                  >
+                    <AlignCenter className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onMouseDown={(e) => handleToolbarClick(e, 'justifyRight')}
+                    className="p-1.5 hover:bg-gray-200 rounded text-gray-600"
+                    title="Align Right"
+                  >
+                    <AlignRight className="w-4 h-4" />
+                  </button>
+                  <div className="w-px h-5 bg-gray-300 mx-1" />
+                  
+                  {/* Lists */}
+                  <button
+                    type="button"
+                    onMouseDown={(e) => handleToolbarClick(e, 'insertUnorderedList')}
+                    className="p-1.5 hover:bg-gray-200 rounded text-gray-600"
                     title="Bullet List"
                   >
-                    • List
+                    <List className="w-4 h-4" />
                   </button>
                   <button
                     type="button"
-                    onClick={() => formatText('insertOrderedList')}
-                    className="p-2 hover:bg-gray-200 rounded text-sm"
+                    onMouseDown={(e) => handleToolbarClick(e, 'insertOrderedList')}
+                    className="p-1.5 hover:bg-gray-200 rounded text-gray-600"
                     title="Numbered List"
                   >
-                    1. List
+                    <ListOrdered className="w-4 h-4" />
                   </button>
-                  <div className="w-px h-6 bg-gray-300 mx-1" />
+                  <div className="w-px h-5 bg-gray-300 mx-1" />
+                  
+                  {/* Link */}
                   <button
                     type="button"
-                    onClick={() => {
-                      const url = prompt('Enter URL:');
-                      if (url) formatText('createLink', url);
-                    }}
-                    className="p-2 hover:bg-gray-200 rounded text-sm text-blue-600"
+                    onClick={() => setShowLinkModal(true)}
+                    className="p-1.5 hover:bg-gray-200 rounded text-gray-600"
                     title="Insert Link"
                   >
-                    Link
+                    <LinkIcon className="w-4 h-4" />
+                  </button>
+                  
+                  {/* Image Upload */}
+                  <button
+                    type="button"
+                    onClick={() => imageInputRef.current?.click()}
+                    disabled={uploadingImage}
+                    className="p-1.5 hover:bg-gray-200 rounded text-gray-600 disabled:opacity-50"
+                    title="Insert Image"
+                  >
+                    {uploadingImage ? <Loader2 className="w-4 h-4 animate-spin" /> : <Image className="w-4 h-4" />}
+                  </button>
+                  <input
+                    ref={imageInputRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/jpg,image/gif,image/webp"
+                    onChange={handleImageSelect}
+                    className="hidden"
+                  />
+                  
+                  {/* Clear Formatting */}
+                  <button
+                    type="button"
+                    onMouseDown={(e) => handleToolbarClick(e, 'removeFormat')}
+                    className="p-1.5 hover:bg-gray-200 rounded text-gray-600 ml-auto"
+                    title="Clear Formatting"
+                  >
+                    <X className="w-4 h-4" />
                   </button>
                 </div>
                 
                 {/* Content Editable Editor */}
-                <div
-                  ref={bodyEditorRef}
-                  contentEditable
-                  onInput={handleBodyChange}
-                  className="w-full min-h-[300px] px-4 py-3 border border-gray-300 rounded-b-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-none prose prose-sm max-w-none"
-                  style={{ whiteSpace: 'pre-wrap' }}
-                />
-                <p className="text-xs text-gray-500 mt-1">Click on a variable in the panel to insert it at cursor position</p>
+                <div className="relative">
+                  {/* Placeholder - shown when editor is empty */}
+                  {!formData.body && (
+                    <div 
+                      className="absolute top-3 left-4 text-gray-400 pointer-events-none select-none z-0"
+                      aria-hidden="true"
+                    >
+                      <p className="text-base">Start composing your email...</p>
+                      <p className="text-sm mt-2">💡 Tips:</p>
+                      <ul className="text-sm ml-4 list-disc">
+                        <li>Use the toolbar above to format text</li>
+                        <li>Click variables on the right to insert them</li>
+                        <li>Use {`{{ variable_name }}`} syntax for dynamic content</li>
+                        <li>Preview your email before saving</li>
+                      </ul>
+                    </div>
+                  )}
+                  <div
+                    ref={bodyEditorRef}
+                    contentEditable
+                    suppressContentEditableWarning
+                    onInput={handleBodyChange}
+                    onFocus={(e) => {
+                      e.currentTarget.classList.add('ring-2', 'ring-blue-500', 'border-blue-500');
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.classList.remove('ring-2', 'ring-blue-500', 'border-blue-500');
+                    }}
+                    className="w-full min-h-[400px] overflow-y-auto px-4 py-3 border border-gray-300 rounded-b-lg focus:outline-none bg-white transition-all resize-y relative z-10"
+                    style={{ whiteSpace: 'pre-wrap' }}
+                    onKeyDown={(e) => {
+                      // Handle keyboard shortcuts
+                      if (e.ctrlKey || e.metaKey) {
+                        if (e.key === 'b') { e.preventDefault(); formatText('bold'); }
+                        if (e.key === 'i') { e.preventDefault(); formatText('italic'); }
+                        if (e.key === 'u') { e.preventDefault(); formatText('underline'); }
+                      }
+                    }}
+                  />
+                </div>
+                <div className="flex items-center justify-between mt-1">
+                  <p className="text-xs text-gray-500">Click on a variable in the panel to insert it at cursor position. Supports Ctrl+B (bold), Ctrl+I (italic), Ctrl+U (underline).</p>
+                  <p className="text-xs text-gray-400">{formData.body ? `${formData.body.length} characters` : '0 characters'}</p>
+                </div>
               </div>
             </div>
           </div>
@@ -474,11 +832,13 @@ const CreateEmailTemplate: React.FC = () => {
                               <button
                                 type="button"
                                 onClick={() => insertVariable(variable.name)}
-                                className={`text-sm font-mono text-${fullColor} hover:underline block truncate`}
+                                className="text-sm font-mono text-blue-600 hover:underline block truncate"
                               >
                                 {'{{ ' + variable.name + ' }}'}
                               </button>
-                              <p className="text-xs text-gray-500 truncate">{variable.description}</p>
+                              <p className="text-xs text-gray-500 truncate" title={variable.sampleValue}>
+                                Sample: {variable.sampleValue}
+                              </p>
                             </div>
                             <button
                               type="button"
@@ -549,6 +909,149 @@ const CreateEmailTemplate: React.FC = () => {
               <StandardButton variant="secondary" onClick={() => setShowPreview(false)}>
                 Close Preview
               </StandardButton>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Image Size Picker Modal */}
+      {showImageSizeModal && pendingImageFile && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-3 bg-blue-100 rounded-full">
+                <Image className="w-6 h-6 text-blue-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Select Image Size</h3>
+                <p className="text-sm text-gray-500">{pendingImageFile.name}</p>
+              </div>
+            </div>
+            
+            {/* Image Preview */}
+            <div className="mb-4 p-4 bg-gray-50 rounded-lg flex justify-center">
+              <img 
+                src={URL.createObjectURL(pendingImageFile)} 
+                alt="Preview" 
+                className="max-h-32 max-w-full object-contain rounded"
+              />
+            </div>
+            
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              <button
+                type="button"
+                onClick={() => handleImageUpload('200px')}
+                className="p-3 border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors text-center"
+              >
+                <div className="text-sm font-medium text-gray-900">Small</div>
+                <div className="text-xs text-gray-500">200px width</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleImageUpload('400px')}
+                className="p-3 border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors text-center"
+              >
+                <div className="text-sm font-medium text-gray-900">Medium</div>
+                <div className="text-xs text-gray-500">400px width</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleImageUpload('600px')}
+                className="p-3 border-2 border-blue-500 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors text-center"
+              >
+                <div className="text-sm font-medium text-blue-700">Large</div>
+                <div className="text-xs text-blue-600">600px width</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleImageUpload('100%')}
+                className="p-3 border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors text-center"
+              >
+                <div className="text-sm font-medium text-gray-900">Full Width</div>
+                <div className="text-xs text-gray-500">100% width</div>
+              </button>
+            </div>
+            
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowImageSizeModal(false);
+                  setPendingImageFile(null);
+                  if (imageInputRef.current) imageInputRef.current.value = '';
+                }}
+                className="px-4 py-2 text-gray-600 hover:text-gray-800"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Link Modal */}
+      {showLinkModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-3 bg-blue-100 rounded-full">
+                <LinkIcon className="w-6 h-6 text-blue-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Insert Link</h3>
+                <p className="text-sm text-gray-500">Add a hyperlink to your email</p>
+              </div>
+            </div>
+            
+            <div className="space-y-4 mb-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  URL <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="url"
+                  value={linkUrl}
+                  onChange={(e) => setLinkUrl(e.target.value)}
+                  placeholder="https://example.com"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Display Text <span className="text-gray-400">(optional)</span>
+                </label>
+                <input
+                  type="text"
+                  value={linkText}
+                  onChange={(e) => setLinkText(e.target.value)}
+                  placeholder="Click here"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+                <p className="text-xs text-gray-500 mt-1">If empty, the URL will be shown</p>
+              </div>
+            </div>
+            
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowLinkModal(false);
+                  setLinkUrl('');
+                  setLinkText('');
+                }}
+                className="px-4 py-2 text-gray-600 hover:text-gray-800"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={insertLink}
+                className={`px-4 py-2 bg-${fullColor} text-white rounded-lg hover:opacity-90 flex items-center gap-2`}
+              >
+                <Check className="w-4 h-4" />
+                Insert Link
+              </button>
             </div>
           </div>
         </div>

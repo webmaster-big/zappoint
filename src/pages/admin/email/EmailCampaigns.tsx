@@ -208,7 +208,9 @@ const EmailCampaigns: React.FC = () => {
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-              <Send className={`w-7 h-7 text-${fullColor}`} />
+              <div className={`p-2 bg-${themeColor}-100 rounded-lg`}>
+                <Send className={`w-6 h-6 text-${fullColor}`} />
+              </div>
               Email Campaigns
             </h1>
             <p className="text-gray-600 mt-1">Send bulk emails to customers and staff</p>
@@ -247,8 +249,8 @@ const EmailCampaigns: React.FC = () => {
                   <CounterAnimation value={statistics.total_campaigns} />
                 </p>
               </div>
-              <div className={`p-3 bg-${themeColor}-100 rounded-full`}>
-                <Send className={`w-6 h-6 text-${fullColor}`} />
+              <div className="p-3 bg-blue-100 rounded-full">
+                <Send className="w-6 h-6 text-blue-600" />
               </div>
             </div>
           </div>
@@ -282,12 +284,12 @@ const EmailCampaigns: React.FC = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-500">Success Rate</p>
-                <p className="text-2xl font-bold text-gray-900">
+                <p className="text-2xl font-bold text-green-600">
                   {statistics.success_rate.toFixed(1)}%
                 </p>
               </div>
-              <div className="p-3 bg-blue-100 rounded-full">
-                <BarChart3 className="w-6 h-6 text-blue-600" />
+              <div className="p-3 bg-purple-100 rounded-full">
+                <BarChart3 className="w-6 h-6 text-purple-600" />
               </div>
             </div>
           </div>
@@ -361,10 +363,10 @@ const EmailCampaigns: React.FC = () => {
       </div>
 
       {/* Campaigns Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-visible">
         {loading ? (
           <div className="p-8 text-center">
-            <div className={`animate-spin w-8 h-8 border-4 border-${themeColor}-200 border-t-${fullColor} rounded-full mx-auto mb-4`}></div>
+            <div className="animate-spin w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full mx-auto mb-4"></div>
             <p className="text-gray-500">Loading campaigns...</p>
           </div>
         ) : campaigns.length === 0 ? (
@@ -381,7 +383,7 @@ const EmailCampaigns: React.FC = () => {
         ) : (
           <>
             {/* Desktop Table */}
-            <div className="hidden md:block overflow-x-auto">
+            <div className="hidden md:block overflow-visible">
               <table className="w-full">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
@@ -441,10 +443,10 @@ const EmailCampaigns: React.FC = () => {
                           {campaign.sent_at ? formatDate(campaign.sent_at) : '-'}
                         </td>
                         <td className="py-4 px-4">
-                          <div className="flex items-center justify-end gap-2">
+                          <div className="flex items-center justify-end gap-1">
                             <Link
                               to={`/admin/email/campaigns/${campaign.id}`}
-                              className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                              className="p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
                               title="View Details"
                             >
                               <Eye className="w-4 h-4" />
@@ -452,56 +454,63 @@ const EmailCampaigns: React.FC = () => {
                             <div className="relative">
                               <button
                                 onClick={() => setActiveDropdown(activeDropdown === campaign.id ? null : campaign.id)}
-                                className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                                className="p-2 text-gray-600 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
                               >
                                 <MoreVertical className="w-4 h-4" />
                               </button>
                               {activeDropdown === campaign.id && (
-                                <div className="absolute right-0 mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10">
-                                  <Link
-                                    to={`/admin/email/campaigns/${campaign.id}`}
-                                    className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                                  >
-                                    <Eye className="w-4 h-4" />
-                                    View Details
-                                  </Link>
-                                  {campaign.status === 'completed' && campaign.failed_count > 0 && (
-                                    <button
-                                      onClick={() => handleResend(campaign.id, 'failed')}
-                                      className="w-full flex items-center gap-2 px-4 py-2 text-sm text-yellow-600 hover:bg-yellow-50"
+                                <>
+                                  {/* Backdrop to close dropdown */}
+                                  <div 
+                                    className="fixed inset-0 z-40" 
+                                    onClick={() => setActiveDropdown(null)}
+                                  />
+                                  <div className="absolute right-0 bottom-full mb-1 w-48 bg-white rounded-lg shadow-xl border border-gray-200 py-1 z-50">
+                                    <Link
+                                      to={`/admin/email/campaigns/${campaign.id}`}
+                                      className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
                                     >
-                                      <RotateCcw className="w-4 h-4" />
-                                      Resend Failed
-                                    </button>
-                                  )}
-                                  {(campaign.status === 'pending' || campaign.status === 'sending') && (
-                                    <button
-                                      onClick={() => {
-                                        setCancelConfirm(campaign.id);
-                                        setActiveDropdown(null);
-                                      }}
-                                      className="w-full flex items-center gap-2 px-4 py-2 text-sm text-orange-600 hover:bg-orange-50"
-                                    >
-                                      <Ban className="w-4 h-4" />
-                                      Cancel Campaign
-                                    </button>
-                                  )}
-                                  {(campaign.status === 'completed' || campaign.status === 'cancelled' || campaign.status === 'failed') && (
-                                    <>
-                                      <hr className="my-1" />
+                                      <Eye className="w-4 h-4" />
+                                      View Details
+                                    </Link>
+                                    {campaign.status === 'completed' && campaign.failed_count > 0 && (
+                                      <button
+                                        onClick={() => handleResend(campaign.id, 'failed')}
+                                        className="w-full flex items-center gap-2 px-4 py-2 text-sm text-yellow-600 hover:bg-yellow-50"
+                                      >
+                                        <RotateCcw className="w-4 h-4" />
+                                        Resend Failed
+                                      </button>
+                                    )}
+                                    {(campaign.status === 'pending' || campaign.status === 'sending') && (
                                       <button
                                         onClick={() => {
-                                          setDeleteConfirm(campaign.id);
+                                          setCancelConfirm(campaign.id);
                                           setActiveDropdown(null);
                                         }}
-                                        className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                                        className="w-full flex items-center gap-2 px-4 py-2 text-sm text-orange-600 hover:bg-orange-50"
                                       >
-                                        <Trash2 className="w-4 h-4" />
-                                        Delete
+                                        <Ban className="w-4 h-4" />
+                                        Cancel Campaign
                                       </button>
-                                    </>
-                                  )}
-                                </div>
+                                    )}
+                                    {(campaign.status === 'completed' || campaign.status === 'cancelled' || campaign.status === 'failed') && (
+                                      <>
+                                        <hr className="my-1" />
+                                        <button
+                                          onClick={() => {
+                                            setDeleteConfirm(campaign.id);
+                                            setActiveDropdown(null);
+                                          }}
+                                          className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                                        >
+                                          <Trash2 className="w-4 h-4" />
+                                          Delete
+                                        </button>
+                                      </>
+                                    )}
+                                  </div>
+                                </>
                               )}
                             </div>
                           </div>
@@ -511,6 +520,8 @@ const EmailCampaigns: React.FC = () => {
                   })}
                 </tbody>
               </table>
+              {/* Spacer to ensure dropdown visibility with few rows */}
+              {campaigns.length <= 3 && <div className="h-48" />}
             </div>
 
             {/* Mobile Cards */}

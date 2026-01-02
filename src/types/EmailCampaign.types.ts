@@ -64,13 +64,16 @@ export interface EmailTemplateVariable {
   description: string;
 }
 
+// Backend returns variables as flat key-value pairs (variable_name => sample_value)
+export interface EmailTemplateVariablesData {
+  default: Record<string, string>;
+  customer: Record<string, string>;
+  user: Record<string, string>;
+}
+
 export interface EmailTemplateVariablesResponse {
   success: boolean;
-  data: {
-    default: EmailTemplateVariable[];
-    customer: EmailTemplateVariable[];
-    user: EmailTemplateVariable[];
-  };
+  data: EmailTemplateVariablesData;
 }
 
 export interface PreviewTemplateRequest {
@@ -136,6 +139,28 @@ export interface RecipientFilters {
   [key: string]: string | number | boolean | undefined;
 }
 
+// Attachment stored on backend
+export interface StoredAttachment {
+  original_name: string;
+  path: string;
+  mime_type: string;
+  size: number;
+}
+
+// Image upload response from backend
+export interface ImageUploadResponse {
+  success: boolean;
+  data: {
+    url: string;
+    path: string;
+    filename: string;
+    original_name: string;
+    mime_type: string;
+    size: number;
+  };
+  message: string;
+}
+
 export interface CreateEmailCampaignData {
   name: string;
   subject: string;
@@ -147,6 +172,7 @@ export interface CreateEmailCampaignData {
   send_now?: boolean;
   scheduled_at?: string;
   location_id?: number;
+  attachments?: File[];  // For frontend file upload
 }
 
 export interface EmailCampaignFilters {

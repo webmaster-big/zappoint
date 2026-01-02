@@ -22,6 +22,7 @@ import type {
   EmailCampaignStatistics,
   EmailCampaignStatisticsFilters,
   EmailTemplateStatus,
+  ImageUploadResponse,
 } from '../types/EmailCampaign.types';
 
 // Create axios instance with base configuration
@@ -231,15 +232,71 @@ export const getEmailCampaign = async (
 
 /**
  * Create and optionally send an email campaign
- * @param data - Email campaign creation data
+ * Uses FormData to support file attachments
+ * @param data - Email campaign creation data (may include attachments)
  * @returns Created email campaign
  */
 export const createEmailCampaign = async (
   data: CreateEmailCampaignData
 ): Promise<EmailCampaignApiResponse<EmailCampaign>> => {
+  // Use FormData to support file attachments
+  const formData = new FormData();
+  
+  // Add basic fields
+  formData.append('name', data.name);
+  formData.append('subject', data.subject);
+  formData.append('body', data.body);
+  
+  // Add recipient_types as individual array items
+  data.recipient_types.forEach((type, index) => {
+    formData.append(`recipient_types[${index}]`, type);
+  });
+  
+  // Add custom_emails if present
+  if (data.custom_emails && data.custom_emails.length > 0) {
+    data.custom_emails.forEach((email, index) => {
+      formData.append(`custom_emails[${index}]`, email);
+    });
+  }
+  
+  // Add recipient_filters if present
+  if (data.recipient_filters) {
+    Object.entries(data.recipient_filters).forEach(([key, value]) => {
+      if (value !== undefined) {
+        formData.append(`recipient_filters[${key}]`, String(value));
+      }
+    });
+  }
+  
+  // Add optional fields
+  if (data.email_template_id) {
+    formData.append('email_template_id', String(data.email_template_id));
+  }
+  if (data.send_now !== undefined) {
+    formData.append('send_now', data.send_now ? '1' : '0');
+  }
+  if (data.scheduled_at) {
+    formData.append('scheduled_at', data.scheduled_at);
+  }
+  if (data.location_id) {
+    formData.append('location_id', String(data.location_id));
+  }
+  
+  // Add attachments if present
+  if (data.attachments && data.attachments.length > 0) {
+    data.attachments.forEach((file, index) => {
+      formData.append(`attachments[${index}]`, file);
+    });
+  }
+  
   const response = await api.post<EmailCampaignApiResponse<EmailCampaign>>(
     '/email-campaigns',
-    data
+    formData,
+    {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    }
   );
   return response.data;
 };
@@ -334,6 +391,30 @@ export const getEmailCampaignStatistics = async (
   return response.data;
 };
 
+/**
+ * Upload an image for use in email body
+ * Returns a public URL that can be embedded with an <img> tag
+ * @param image - Image file to upload (PNG, JPG, JPEG, GIF, WebP, max 5MB)
+ * @returns Upload response with URL
+ */
+export const uploadEmailImage = async (
+  image: File
+): Promise<ImageUploadResponse> => {
+  const formData = new FormData();
+  formData.append('image', image);
+  
+  const response = await api.post<ImageUploadResponse>(
+    '/email-campaigns/upload-image',
+    formData,
+    {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    }
+  );
+  return response.data;
+};
+
 // Export as a service object for consistency with other services
 export const emailCampaignService = {
   // Templates
@@ -358,6 +439,9 @@ export const emailCampaignService = {
   previewRecipients: previewRecipients,
   sendTestEmail: sendTestEmail,
   getStatistics: getEmailCampaignStatistics,
+  
+  // Image Upload
+  uploadImage: uploadEmailImage,
 };
 
 export default emailCampaignService;

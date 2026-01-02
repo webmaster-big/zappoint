@@ -199,7 +199,9 @@ const EmailTemplates: React.FC = () => {
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-              <Mail className={`w-7 h-7 text-${fullColor}`} />
+              <div className={`p-2 bg-${themeColor}-100 rounded-lg`}>
+                <Mail className={`w-6 h-6 text-${fullColor}`} />
+              </div>
               Email Templates
             </h1>
             <p className="text-gray-600 mt-1">Create and manage reusable email templates</p>
@@ -302,7 +304,7 @@ const EmailTemplates: React.FC = () => {
             {/* Filter Toggle */}
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className={`p-2 rounded-lg border ${showFilters ? `bg-${themeColor}-50 border-${themeColor}-300 text-${fullColor}` : 'border-gray-300 text-gray-600 hover:bg-gray-50'}`}
+              className={`p-2 rounded-lg border ${showFilters ? 'bg-blue-50 border-blue-300 text-blue-600' : 'border-gray-300 text-gray-600 hover:bg-gray-50'}`}
             >
               <Filter className="w-5 h-5" />
             </button>
@@ -311,10 +313,10 @@ const EmailTemplates: React.FC = () => {
       </div>
 
       {/* Templates Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-visible">
         {loading ? (
           <div className="p-8 text-center">
-            <div className={`animate-spin w-8 h-8 border-4 border-${themeColor}-200 border-t-${fullColor} rounded-full mx-auto mb-4`}></div>
+            <div className="animate-spin w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full mx-auto mb-4"></div>
             <p className="text-gray-500">Loading templates...</p>
           </div>
         ) : templates.length === 0 ? (
@@ -331,7 +333,7 @@ const EmailTemplates: React.FC = () => {
         ) : (
           <>
             {/* Desktop Table */}
-            <div className="hidden md:block overflow-x-auto">
+            <div className="hidden md:block overflow-visible">
               <table className="w-full">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
@@ -368,17 +370,17 @@ const EmailTemplates: React.FC = () => {
                           {formatDate(template.created_at)}
                         </td>
                         <td className="py-4 px-4">
-                          <div className="flex items-center justify-end gap-2">
+                          <div className="flex items-center justify-end gap-1">
                             <button
                               onClick={() => setPreviewTemplate(template)}
-                              className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                              className="p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
                               title="Preview"
                             >
                               <Eye className="w-4 h-4" />
                             </button>
                             <Link
                               to={`/admin/email/templates/edit/${template.id}`}
-                              className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                              className="p-2 text-green-600 hover:text-green-700 hover:bg-green-50 rounded-lg transition-colors"
                               title="Edit"
                             >
                               <Edit className="w-4 h-4" />
@@ -386,58 +388,65 @@ const EmailTemplates: React.FC = () => {
                             <div className="relative">
                               <button
                                 onClick={() => setActiveDropdown(activeDropdown === template.id ? null : template.id)}
-                                className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                                className="p-2 text-gray-600 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
                               >
                                 <MoreVertical className="w-4 h-4" />
                               </button>
                               {activeDropdown === template.id && (
-                                <div className="absolute right-0 mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10">
-                                  <button
-                                    onClick={() => handleDuplicate(template.id)}
-                                    className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                                  >
-                                    <Copy className="w-4 h-4" />
-                                    Duplicate
-                                  </button>
-                                  {template.status !== 'active' && (
+                                <>
+                                  {/* Backdrop to close dropdown */}
+                                  <div 
+                                    className="fixed inset-0 z-40" 
+                                    onClick={() => setActiveDropdown(null)}
+                                  />
+                                  <div className="absolute right-0 bottom-full mb-1 w-48 bg-white rounded-lg shadow-xl border border-gray-200 py-1 z-50">
                                     <button
-                                      onClick={() => handleStatusChange(template.id, 'active')}
-                                      className="w-full flex items-center gap-2 px-4 py-2 text-sm text-green-600 hover:bg-green-50"
+                                      onClick={() => handleDuplicate(template.id)}
+                                      className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
                                     >
-                                      <CheckCircle className="w-4 h-4" />
-                                      Set Active
+                                      <Copy className="w-4 h-4" />
+                                      Duplicate
                                     </button>
-                                  )}
-                                  {template.status !== 'draft' && (
+                                    {template.status !== 'active' && (
+                                      <button
+                                        onClick={() => handleStatusChange(template.id, 'active')}
+                                        className="w-full flex items-center gap-2 px-4 py-2 text-sm text-green-600 hover:bg-green-50"
+                                      >
+                                        <CheckCircle className="w-4 h-4" />
+                                        Set Active
+                                      </button>
+                                    )}
+                                    {template.status !== 'draft' && (
+                                      <button
+                                        onClick={() => handleStatusChange(template.id, 'draft')}
+                                        className="w-full flex items-center gap-2 px-4 py-2 text-sm text-yellow-600 hover:bg-yellow-50"
+                                      >
+                                        <Clock className="w-4 h-4" />
+                                        Set as Draft
+                                      </button>
+                                    )}
+                                    {template.status !== 'archived' && (
+                                      <button
+                                        onClick={() => handleStatusChange(template.id, 'archived')}
+                                        className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50"
+                                      >
+                                        <Archive className="w-4 h-4" />
+                                        Archive
+                                      </button>
+                                    )}
+                                    <hr className="my-1" />
                                     <button
-                                      onClick={() => handleStatusChange(template.id, 'draft')}
-                                      className="w-full flex items-center gap-2 px-4 py-2 text-sm text-yellow-600 hover:bg-yellow-50"
+                                      onClick={() => {
+                                        setDeleteConfirm(template.id);
+                                        setActiveDropdown(null);
+                                      }}
+                                      className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50"
                                     >
-                                      <Clock className="w-4 h-4" />
-                                      Set as Draft
+                                      <Trash2 className="w-4 h-4" />
+                                      Delete
                                     </button>
-                                  )}
-                                  {template.status !== 'archived' && (
-                                    <button
-                                      onClick={() => handleStatusChange(template.id, 'archived')}
-                                      className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50"
-                                    >
-                                      <Archive className="w-4 h-4" />
-                                      Archive
-                                    </button>
-                                  )}
-                                  <hr className="my-1" />
-                                  <button
-                                    onClick={() => {
-                                      setDeleteConfirm(template.id);
-                                      setActiveDropdown(null);
-                                    }}
-                                    className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                    Delete
-                                  </button>
-                                </div>
+                                  </div>
+                                </>
                               )}
                             </div>
                           </div>
@@ -447,6 +456,8 @@ const EmailTemplates: React.FC = () => {
                   })}
                 </tbody>
               </table>
+              {/* Spacer to ensure dropdown visibility with few rows */}
+              {templates.length <= 3 && <div className="h-48" />}
             </div>
 
             {/* Mobile Cards */}
