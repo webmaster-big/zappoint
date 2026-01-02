@@ -202,102 +202,98 @@ const EmailCampaigns: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-6">
+    <div className="min-h-screen p-4 md:p-8 space-y-8">
       {/* Header */}
-      <div className="mb-6">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-              <div className={`p-2 bg-${themeColor}-100 rounded-lg`}>
-                <Send className={`w-6 h-6 text-${fullColor}`} />
-              </div>
-              Email Campaigns
-            </h1>
-            <p className="text-gray-600 mt-1">Send bulk emails to customers and staff</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <Link to="/admin/email/templates">
-              <StandardButton variant="secondary" icon={Mail}>
-                Templates
-              </StandardButton>
-            </Link>
-            <StandardButton
-              variant="secondary"
-              icon={RefreshCcw}
-              onClick={() => { fetchCampaigns(); fetchStatistics(); }}
-              disabled={loading}
-            >
-              Refresh
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-2">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-1">
+            Email Campaigns
+          </h1>
+          <p className="text-sm text-gray-600">
+            Send bulk emails to customers and staff
+          </p>
+        </div>
+        <div className="flex items-center gap-3 mt-4 md:mt-0">
+          <Link to="/admin/email/templates">
+            <StandardButton variant="secondary" icon={Mail}>
+              Templates
             </StandardButton>
-            <Link to="/admin/email/campaigns/create">
-              <StandardButton variant="primary" icon={Plus}>
-                New Campaign
-              </StandardButton>
-            </Link>
-          </div>
+          </Link>
+          <StandardButton
+            variant="secondary"
+            icon={RefreshCcw}
+            onClick={() => { fetchCampaigns(); fetchStatistics(); }}
+            disabled={loading}
+          >
+            Refresh
+          </StandardButton>
+          <Link to="/admin/email/campaigns/create">
+            <StandardButton variant="primary" icon={Plus}>
+              New Campaign
+            </StandardButton>
+          </Link>
         </div>
       </div>
 
-      {/* Statistics Cards */}
+      {/* Statistics Cards - Dashboard Style */}
       {statistics && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-500">Total Campaigns</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  <CounterAnimation value={statistics.total_campaigns} />
-                </p>
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 flex flex-col gap-2 hover:shadow-md transition-shadow min-h-[120px]">
+            <div className="flex items-center gap-2">
+              <div className={`p-2 rounded-lg bg-${themeColor}-100`}>
+                <Send size={20} className={`text-${fullColor}`} />
               </div>
-              <div className="p-3 bg-blue-100 rounded-full">
-                <Send className="w-6 h-6 text-blue-600" />
-              </div>
+              <span className="text-base font-semibold text-gray-800">Total Campaigns</span>
             </div>
+            <div className="flex items-end gap-2 mt-2">
+              <CounterAnimation value={statistics.total_campaigns} className="text-2xl font-bold text-gray-900" />
+            </div>
+            <p className="text-xs mt-1 text-gray-400">All time campaigns created</p>
           </div>
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-500">Emails Sent</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  <CounterAnimation value={statistics.total_emails_sent} />
-                </p>
+
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 flex flex-col gap-2 hover:shadow-md transition-shadow min-h-[120px]">
+            <div className="flex items-center gap-2">
+              <div className={`p-2 rounded-lg bg-${themeColor}-100`}>
+                <CheckCircle size={20} className={`text-${fullColor}`} />
               </div>
-              <div className="p-3 bg-green-100 rounded-full">
-                <CheckCircle className="w-6 h-6 text-green-600" />
-              </div>
+              <span className="text-base font-semibold text-gray-800">Emails Sent</span>
             </div>
+            <div className="flex items-end gap-2 mt-2">
+              <CounterAnimation value={statistics.total_emails_sent} className="text-2xl font-bold text-gray-900" />
+            </div>
+            <p className="text-xs mt-1 text-gray-400">Successfully delivered emails</p>
           </div>
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-500">Failed Emails</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  <CounterAnimation value={statistics.total_emails_failed} />
-                </p>
+
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 flex flex-col gap-2 hover:shadow-md transition-shadow min-h-[120px]">
+            <div className="flex items-center gap-2">
+              <div className="p-2 rounded-lg bg-red-100">
+                <XCircle size={20} className="text-red-600" />
               </div>
-              <div className="p-3 bg-red-100 rounded-full">
-                <XCircle className="w-6 h-6 text-red-600" />
-              </div>
+              <span className="text-base font-semibold text-gray-800">Failed Emails</span>
             </div>
+            <div className="flex items-end gap-2 mt-2">
+              <CounterAnimation value={statistics.total_emails_failed} className="text-2xl font-bold text-gray-900" />
+            </div>
+            <p className="text-xs mt-1 text-gray-400">Delivery failures</p>
           </div>
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-500">Success Rate</p>
-                <p className="text-2xl font-bold text-green-600">
-                  {statistics.success_rate.toFixed(1)}%
-                </p>
+
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 flex flex-col gap-2 hover:shadow-md transition-shadow min-h-[120px]">
+            <div className="flex items-center gap-2">
+              <div className={`p-2 rounded-lg bg-${themeColor}-100`}>
+                <BarChart3 size={20} className={`text-${fullColor}`} />
               </div>
-              <div className="p-3 bg-purple-100 rounded-full">
-                <BarChart3 className="w-6 h-6 text-purple-600" />
-              </div>
+              <span className="text-base font-semibold text-gray-800">Success Rate</span>
             </div>
+            <div className="flex items-end gap-2 mt-2">
+              <span className="text-2xl font-bold text-green-600">{statistics.success_rate.toFixed(1)}%</span>
+            </div>
+            <p className="text-xs mt-1 text-gray-400">Email delivery success rate</p>
           </div>
         </div>
       )}
 
       {/* Filters Section */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-6">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100">
         <div className="p-4">
           <div className="flex flex-col md:flex-row gap-4">
             {/* Search */}
@@ -363,36 +359,44 @@ const EmailCampaigns: React.FC = () => {
       </div>
 
       {/* Campaigns Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-visible">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-visible">
         {loading ? (
           <div className="p-8 text-center">
-            <div className="animate-spin w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full mx-auto mb-4"></div>
+            <div className={`animate-spin w-8 h-8 border-4 border-${themeColor}-200 border-t-${fullColor} rounded-full mx-auto mb-4`}></div>
             <p className="text-gray-500">Loading campaigns...</p>
           </div>
         ) : campaigns.length === 0 ? (
-          <div className="p-12 text-center">
-            <Send className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No campaigns found</h3>
-            <p className="text-gray-500 mb-6">Get started by creating your first email campaign</p>
-            <Link to="/admin/email/campaigns/create">
-              <StandardButton variant="primary" icon={Plus}>
-                Create Campaign
-              </StandardButton>
-            </Link>
+          <div className="px-6 py-12 text-center">
+            <div className="flex flex-col items-center justify-center">
+              <div className={`inline-flex p-4 rounded-full bg-${themeColor}-50 mb-4`}>
+                <Send className={`h-12 w-12 text-${themeColor}-400`} />
+              </div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No campaigns found</h3>
+              <p className="text-gray-500 mb-6">
+                {filters.search || filters.status !== 'all'
+                  ? 'Try adjusting your search or filters'
+                  : 'Get started by creating your first email campaign'}
+              </p>
+              <Link to="/admin/email/campaigns/create">
+                <StandardButton variant="primary" icon={Plus}>
+                  Create Campaign
+                </StandardButton>
+              </Link>
+            </div>
           </div>
         ) : (
           <>
             {/* Desktop Table */}
-            <div className="hidden md:block overflow-visible">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-sm text-left">
+                <thead className="text-xs text-gray-500 uppercase bg-gray-50 border-b">
                   <tr>
-                    <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Campaign</th>
-                    <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Recipients</th>
-                    <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Status</th>
-                    <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Progress</th>
-                    <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Sent At</th>
-                    <th className="text-right py-3 px-4 text-sm font-semibold text-gray-700">Actions</th>
+                    <th scope="col" className="px-6 py-4 font-medium">Campaign</th>
+                    <th scope="col" className="px-6 py-4 font-medium">Recipients</th>
+                    <th scope="col" className="px-6 py-4 font-medium">Status</th>
+                    <th scope="col" className="px-6 py-4 font-medium">Progress</th>
+                    <th scope="col" className="px-6 py-4 font-medium">Sent At</th>
+                    <th scope="col" className="px-6 py-4 font-medium text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -403,46 +407,46 @@ const EmailCampaigns: React.FC = () => {
                       : 0;
                     return (
                       <tr key={campaign.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="py-4 px-4">
+                        <td className="px-6 py-4">
                           <div>
                             <p className="font-medium text-gray-900">{campaign.name}</p>
-                            <p className="text-sm text-gray-500 truncate max-w-md">{campaign.subject}</p>
+                            <p className="text-xs text-gray-500 truncate max-w-md mt-0.5">{campaign.subject}</p>
                           </div>
                         </td>
-                        <td className="py-4 px-4">
+                        <td className="px-6 py-4">
                           <div className="flex items-center gap-1.5">
-                            <Users className="w-4 h-4 text-gray-400" />
-                            <span className="text-gray-900">{campaign.total_recipients}</span>
+                            <Users className={`w-4 h-4 text-${themeColor}-500`} />
+                            <span className="font-medium text-gray-900">{campaign.total_recipients}</span>
                           </div>
                         </td>
-                        <td className="py-4 px-4">
-                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium ${statusConfig[campaign.status]?.color || 'bg-gray-100 text-gray-700'}`}>
+                        <td className="px-6 py-4">
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${statusConfig[campaign.status]?.color || 'bg-gray-100 text-gray-700'}`}>
                             <StatusIcon className="w-3.5 h-3.5" />
                             {statusConfig[campaign.status]?.label || campaign.status}
                           </span>
                         </td>
-                        <td className="py-4 px-4">
+                        <td className="px-6 py-4">
                           <div className="flex items-center gap-2">
-                            <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden max-w-[100px]">
+                            <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden max-w-[120px]">
                               <div 
-                                className={`h-full ${campaign.failed_count > 0 ? 'bg-yellow-500' : 'bg-green-500'}`}
+                                className={`h-full rounded-full ${campaign.failed_count > 0 ? 'bg-yellow-500' : `bg-${themeColor}-500`}`}
                                 style={{ width: `${successRate}%` }}
                               />
                             </div>
-                            <span className="text-xs text-gray-500">
+                            <span className="text-xs text-gray-600 font-medium">
                               {campaign.sent_count}/{campaign.total_recipients}
                             </span>
                             {campaign.failed_count > 0 && (
-                              <span className="text-xs text-red-500">
+                              <span className="text-xs text-red-500 font-medium">
                                 ({campaign.failed_count} failed)
                               </span>
                             )}
                           </div>
                         </td>
-                        <td className="py-4 px-4 text-sm text-gray-500">
+                        <td className="px-6 py-4 text-gray-500">
                           {campaign.sent_at ? formatDate(campaign.sent_at) : '-'}
                         </td>
-                        <td className="py-4 px-4">
+                        <td className="px-6 py-4">
                           <div className="flex items-center justify-end gap-1">
                             <Link
                               to={`/admin/email/campaigns/${campaign.id}`}

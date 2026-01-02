@@ -18,13 +18,14 @@ import {
   CheckCircle,
   Clock,
   Archive,
-  Mail
+  LayoutTemplate
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { emailCampaignService } from '../../../services/EmailCampaignService';
 import { locationService } from '../../../services/LocationService';
 import StandardButton from '../../../components/ui/StandardButton';
 import Toast from '../../../components/ui/Toast';
+import CounterAnimation from '../../../components/ui/CounterAnimation';
 import { getStoredUser } from '../../../utils/storage';
 import type { EmailTemplate, EmailTemplateFilters, EmailTemplateStatus } from '../../../types/EmailCampaign.types';
 
@@ -56,6 +57,14 @@ const EmailTemplates: React.FC = () => {
   const [activeDropdown, setActiveDropdown] = useState<number | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
   const [previewTemplate, setPreviewTemplate] = useState<EmailTemplate | null>(null);
+
+  // Template statistics (calculated from loaded templates)
+  const templateStats = {
+    total: totalItems,
+    active: templates.filter(t => t.status === 'active').length,
+    draft: templates.filter(t => t.status === 'draft').length,
+    archived: templates.filter(t => t.status === 'archived').length
+  };
 
   // Status configuration
   const statusConfig: Record<EmailTemplateStatus, { color: string; icon: React.ElementType; label: string }> = {
@@ -193,39 +202,127 @@ const EmailTemplates: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-6">
+    <div className="min-h-screen p-4 md:p-8 space-y-8">
       {/* Header */}
-      <div className="mb-6">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-              <div className={`p-2 bg-${themeColor}-100 rounded-lg`}>
-                <Mail className={`w-6 h-6 text-${fullColor}`} />
-              </div>
-              Email Templates
-            </h1>
-            <p className="text-gray-600 mt-1">Create and manage reusable email templates</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <StandardButton
-              variant="secondary"
-              icon={RefreshCcw}
-              onClick={() => fetchTemplates()}
-              disabled={loading}
-            >
-              Refresh
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-2">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-1">
+            Email Templates
+          </h1>
+          <p className="text-sm text-gray-600">
+            Create and manage reusable email templates
+          </p>
+        </div>
+        <div className="flex items-center gap-3 mt-4 md:mt-0">
+          <StandardButton
+            variant="secondary"
+            icon={RefreshCcw}
+            onClick={() => fetchTemplates()}
+            disabled={loading}
+          >
+            Refresh
+          </StandardButton>
+          <Link to="/admin/email/templates/create">
+            <StandardButton variant="primary" icon={Plus}>
+              Create Template
             </StandardButton>
-            <Link to="/admin/email/templates/create">
-              <StandardButton variant="primary" icon={Plus}>
-                Create Template
-              </StandardButton>
-            </Link>
+          </Link>
+        </div>
+      </div>
+
+      {/* Statistics Cards - Dashboard Style */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 flex flex-col gap-2 hover:shadow-md transition-shadow min-h-[120px]">
+          <div className="flex items-center gap-2">
+            <div className={`p-2 rounded-lg bg-${themeColor}-100`}>
+              <LayoutTemplate size={20} className={`text-${fullColor}`} />
+            </div>
+            <span className="text-base font-semibold text-gray-800">Total Templates</span>
           </div>
+          {loading ? (
+            <div className="animate-pulse space-y-2 mt-2">
+              <div className="h-8 bg-gray-200 rounded w-16"></div>
+              <div className="h-3 bg-gray-200 rounded w-20"></div>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-end gap-2 mt-2">
+                <CounterAnimation value={templateStats.total} className="text-2xl font-bold text-gray-900" />
+              </div>
+              <p className="text-xs mt-1 text-gray-400">All templates in system</p>
+            </>
+          )}
+        </div>
+
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 flex flex-col gap-2 hover:shadow-md transition-shadow min-h-[120px]">
+          <div className="flex items-center gap-2">
+            <div className={`p-2 rounded-lg bg-${themeColor}-100`}>
+              <CheckCircle size={20} className={`text-${fullColor}`} />
+            </div>
+            <span className="text-base font-semibold text-gray-800">Active</span>
+          </div>
+          {loading ? (
+            <div className="animate-pulse space-y-2 mt-2">
+              <div className="h-8 bg-gray-200 rounded w-16"></div>
+              <div className="h-3 bg-gray-200 rounded w-20"></div>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-end gap-2 mt-2">
+                <CounterAnimation value={templateStats.active} className="text-2xl font-bold text-gray-900" />
+              </div>
+              <p className="text-xs mt-1 text-gray-400">Ready to use in campaigns</p>
+            </>
+          )}
+        </div>
+
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 flex flex-col gap-2 hover:shadow-md transition-shadow min-h-[120px]">
+          <div className="flex items-center gap-2">
+            <div className="p-2 rounded-lg bg-yellow-100">
+              <Clock size={20} className="text-yellow-600" />
+            </div>
+            <span className="text-base font-semibold text-gray-800">Draft</span>
+          </div>
+          {loading ? (
+            <div className="animate-pulse space-y-2 mt-2">
+              <div className="h-8 bg-gray-200 rounded w-16"></div>
+              <div className="h-3 bg-gray-200 rounded w-20"></div>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-end gap-2 mt-2">
+                <CounterAnimation value={templateStats.draft} className="text-2xl font-bold text-gray-900" />
+              </div>
+              <p className="text-xs mt-1 text-gray-400">Work in progress</p>
+            </>
+          )}
+        </div>
+
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 flex flex-col gap-2 hover:shadow-md transition-shadow min-h-[120px]">
+          <div className="flex items-center gap-2">
+            <div className="p-2 rounded-lg bg-gray-100">
+              <Archive size={20} className="text-gray-600" />
+            </div>
+            <span className="text-base font-semibold text-gray-800">Archived</span>
+          </div>
+          {loading ? (
+            <div className="animate-pulse space-y-2 mt-2">
+              <div className="h-8 bg-gray-200 rounded w-16"></div>
+              <div className="h-3 bg-gray-200 rounded w-20"></div>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-end gap-2 mt-2">
+                <CounterAnimation value={templateStats.archived} className="text-2xl font-bold text-gray-900" />
+              </div>
+              <p className="text-xs mt-1 text-gray-400">No longer in use</p>
+            </>
+          )}
         </div>
       </div>
 
       {/* Filters Section */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-6">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 mb-6">
         <div className="p-4">
           <div className="flex flex-col md:flex-row gap-4">
             {/* Search */}
@@ -313,35 +410,43 @@ const EmailTemplates: React.FC = () => {
       </div>
 
       {/* Templates Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-visible">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-visible">
         {loading ? (
           <div className="p-8 text-center">
-            <div className="animate-spin w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full mx-auto mb-4"></div>
+            <div className={`animate-spin w-8 h-8 border-4 border-${themeColor}-200 border-t-${fullColor} rounded-full mx-auto mb-4`}></div>
             <p className="text-gray-500">Loading templates...</p>
           </div>
         ) : templates.length === 0 ? (
-          <div className="p-12 text-center">
-            <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No templates found</h3>
-            <p className="text-gray-500 mb-6">Get started by creating your first email template</p>
-            <Link to="/admin/email/templates/create">
-              <StandardButton variant="primary" icon={Plus}>
-                Create Template
-              </StandardButton>
-            </Link>
+          <div className="px-6 py-12 text-center">
+            <div className="flex flex-col items-center justify-center">
+              <div className={`inline-flex p-4 rounded-full bg-${themeColor}-50 mb-4`}>
+                <FileText className={`h-12 w-12 text-${themeColor}-400`} />
+              </div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No templates found</h3>
+              <p className="text-gray-500 mb-6">
+                {filters.search || filters.status !== 'all' || filters.category !== 'all'
+                  ? 'Try adjusting your search or filters'
+                  : 'Get started by creating your first email template'}
+              </p>
+              <Link to="/admin/email/templates/create">
+                <StandardButton variant="primary" icon={Plus}>
+                  Create Template
+                </StandardButton>
+              </Link>
+            </div>
           </div>
         ) : (
           <>
             {/* Desktop Table */}
-            <div className="hidden md:block overflow-visible">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-sm text-left">
+                <thead className="text-xs text-gray-500 uppercase bg-gray-50 border-b">
                   <tr>
-                    <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Template</th>
-                    <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Category</th>
-                    <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Status</th>
-                    <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Created</th>
-                    <th className="text-right py-3 px-4 text-sm font-semibold text-gray-700">Actions</th>
+                    <th scope="col" className="px-6 py-4 font-medium">Template</th>
+                    <th scope="col" className="px-6 py-4 font-medium">Category</th>
+                    <th scope="col" className="px-6 py-4 font-medium">Status</th>
+                    <th scope="col" className="px-6 py-4 font-medium">Created</th>
+                    <th scope="col" className="px-6 py-4 font-medium text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -349,27 +454,27 @@ const EmailTemplates: React.FC = () => {
                     const StatusIcon = statusConfig[template.status]?.icon || Clock;
                     return (
                       <tr key={template.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="py-4 px-4">
+                        <td className="px-6 py-4">
                           <div>
                             <p className="font-medium text-gray-900">{template.name}</p>
-                            <p className="text-sm text-gray-500 truncate max-w-md">{template.subject}</p>
+                            <p className="text-xs text-gray-500 truncate max-w-md mt-0.5">{template.subject}</p>
                           </div>
                         </td>
-                        <td className="py-4 px-4">
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700 capitalize">
+                        <td className="px-6 py-4">
+                          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-${themeColor}-50 text-${themeColor}-700 border border-${themeColor}-200 capitalize`}>
                             {template.category || 'Uncategorized'}
                           </span>
                         </td>
-                        <td className="py-4 px-4">
-                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium ${statusConfig[template.status]?.color || 'bg-gray-100 text-gray-700'}`}>
+                        <td className="px-6 py-4">
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${statusConfig[template.status]?.color || 'bg-gray-100 text-gray-700'}`}>
                             <StatusIcon className="w-3.5 h-3.5" />
                             {statusConfig[template.status]?.label || template.status}
                           </span>
                         </td>
-                        <td className="py-4 px-4 text-sm text-gray-500">
+                        <td className="px-6 py-4 text-gray-500">
                           {formatDate(template.created_at)}
                         </td>
-                        <td className="py-4 px-4">
+                        <td className="px-6 py-4">
                           <div className="flex items-center justify-end gap-1">
                             <button
                               onClick={() => setPreviewTemplate(template)}
