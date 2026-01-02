@@ -63,6 +63,12 @@ import AttractionDetails from "./pages/admin/attractions/AttractionDetails";
 import PurchaseDetails from "./pages/admin/attractions/PurchaseDetails";
 import PackageDetails from "./pages/admin/packages/PackageDetails";
 import SpaceSchedule from "./pages/admin/bookings/SpaceSchedule";
+import EmailTemplates from "./pages/admin/email/EmailTemplates";
+import CreateEmailTemplate from "./pages/admin/email/CreateEmailTemplate";
+import EditEmailTemplate from "./pages/admin/email/EditEmailTemplate";
+import EmailCampaigns from "./pages/admin/email/EmailCampaigns";
+import CreateEmailCampaign from "./pages/admin/email/CreateEmailCampaign";
+import EmailCampaignDetails from "./pages/admin/email/EmailCampaignDetails";
 
 
 function App() {
@@ -131,6 +137,14 @@ function App() {
           {/* Customers Routes - All authenticated users */}
           <Route path="/customers/analytics" element={<CustomerAnalytics />} />
           <Route path="/customers" element={<CustomerListing />} />
+          
+          {/* Email Campaigns Routes - All authenticated users */}
+          <Route path="/admin/email/templates" element={<EmailTemplates />} />
+          <Route path="/admin/email/templates/create" element={<CreateEmailTemplate />} />
+          <Route path="/admin/email/templates/edit/:id" element={<EditEmailTemplate />} />
+          <Route path="/admin/email/campaigns" element={<EmailCampaigns />} />
+          <Route path="/admin/email/campaigns/create" element={<CreateEmailCampaign />} />
+          <Route path="/admin/email/campaigns/:id" element={<EmailCampaignDetails />} />
           
           {/* Profile Routes - Role-specific */}
           <Route path="/admin/profile" element={<ProtectedRoute allowedRoles={['company_admin']}><CompanyAdminProfile /></ProtectedRoute>} />
