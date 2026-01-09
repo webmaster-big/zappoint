@@ -32,6 +32,7 @@ import bookingService from '../../services/bookingService';
 import { bookingCacheService } from '../../services/BookingCacheService';
 import { locationService, type Location } from '../../services/LocationService';
 import { metricsService } from '../../services/MetricsService';
+import { metricsCacheService } from '../../services/MetricsCacheService';
 import { formatDurationDisplay, convertTo12Hour, parseLocalDate } from '../../utils/timeFormat';
 
 const CompanyDashboard: React.FC = () => {
@@ -223,18 +224,29 @@ const CompanyDashboard: React.FC = () => {
   }, []);
 
   // Fetch metrics data when selectedLocation changes
-  // PERFORMANCE OPTIMIZATION: Using new Metrics API endpoint
-  // - OLD: 4 API calls fetching ~1400 records, client-side calculation
-  // - NEW: 1 API call returning pre-computed metrics
-  // - Result: 3-5x faster load times, 90% less data transfer
+  // PERFORMANCE OPTIMIZATION: Cache-first loading with background refresh
+  // - Display cached metrics instantly
+  // - Fetch fresh data in background
+  // - Smooth update when new data arrives
   useEffect(() => {
     const fetchMetricsData = async () => {
       try {
-        setLoading(true);
         console.log('🔄 Starting metrics fetch for location:', selectedLocation);
         
-        // Fetch ALL TIME metrics (no date filter for main metrics)
-        console.log('📊 Fetching all-time metrics...');
+        // Step 1: Try to load from cache first for instant display
+        const cachedData = await metricsCacheService.getCachedMetrics<typeof metrics>('company', selectedLocation);
+        
+        if (cachedData) {
+          console.log('📦 [CompanyDashboard] Loaded metrics from cache');
+          setMetrics(cachedData.metrics);
+          if (cachedData.locationStats) {
+            setApiLocationStats(cachedData.locationStats);
+          }
+          setLoading(false);
+        }
+        
+        // Step 2: Fetch fresh data from API in background
+        console.log('📊 Fetching all-time metrics from API...');
         const metricsResponse = await metricsService.getDashboardMetrics({
           // No date_from/date_to for all-time metrics
         });
@@ -243,27 +255,28 @@ const CompanyDashboard: React.FC = () => {
         console.log('📊 Metrics:', metricsResponse.metrics);
         console.log('🎫 Recent purchases:', metricsResponse.recentPurchases?.length || 0);
         
-        // Set metrics from API response
+        // Step 3: Update state with fresh data (smooth transition)
         if (metricsResponse.metrics) {
           setMetrics(metricsResponse.metrics);
         } else {
           console.error('⚠️ No metrics in API response');
         }
         
-        // Set recent purchases from API response
-        // if (metricsResponse.recentPurchases) {
-        //   setTicketPurchases(metricsResponse.recentPurchases as any);
-        // }
-        
         // For company_admin, we get locationStats directly from API
-        // Location stats should be for current week only
-        // We'll need to fetch it separately with date range
         if (metricsResponse.locationStats) {
           setApiLocationStats(metricsResponse.locationStats);
           console.log('📍 Location stats from API (company_admin):', Object.keys(metricsResponse.locationStats).length, 'locations');
         } else if (metricsResponse.locationDetails) {
           console.log('📍 Location details from API (manager/attendant):', metricsResponse.locationDetails.name);
         }
+        
+        // Step 4: Cache the fresh data for next time
+        await metricsCacheService.cacheMetrics('company', {
+          metrics: metricsResponse.metrics,
+          locationStats: metricsResponse.locationStats,
+        }, selectedLocation);
+        
+        console.log('✅ [CompanyDashboard] Metrics cached successfully');
         
         // Get current week for calendar and location performance
         const today = new Date();
@@ -318,8 +331,6 @@ const CompanyDashboard: React.FC = () => {
       } catch (error: any) {
         console.error('❌ Error fetching metrics data:', error);
         console.error('Error details:', error.message || error);
-        // Show user-friendly error
-        alert(`Failed to load dashboard metrics: ${error.message || 'Unknown error'}`);
       } finally {
         setLoading(false);
       }

@@ -24,6 +24,7 @@ import { getStoredUser } from '../../utils/storage';
 import bookingService from '../../services/bookingService';
 import { bookingCacheService } from '../../services/BookingCacheService';
 import MetricsService from '../../services/MetricsService';
+import { metricsCacheService } from '../../services/MetricsCacheService';
 import { useThemeColor } from '../../hooks/useThemeColor';
 import { parseLocalDate } from '../../utils/timeFormat';
 
@@ -64,28 +65,44 @@ const AttendantDashboard: React.FC = () => {
    }, []);
 
    // Fetch metrics data (only on mount and location change)
+   // Uses cache-first approach: display cached data instantly, then refresh in background
    useEffect(() => {
      const fetchMetricsData = async () => {
        if (!locationId) return;
        
        try {
-         setLoading(true);
+         // Step 1: Try to load from cache first for instant display
+         const cachedData = await metricsCacheService.getCachedMetrics<typeof metrics>('attendant', locationId);
          
-         // Fetch all-time metrics from API
+         if (cachedData) {
+           console.log('📦 [AttendantDashboard] Loaded metrics from cache');
+           setMetrics(cachedData.metrics);
+           setTicketPurchases(cachedData.recentPurchases || []);
+           setRecentBookings(cachedData.recentBookings || []);
+           setLoading(false);
+         }
+         
+         // Step 2: Fetch fresh data from API in background
+         console.log('🔄 [AttendantDashboard] Fetching fresh metrics from API...');
          const metricsResponse = await MetricsService.getAttendantMetrics({
            location_id: locationId,
          });
          
          console.log('📊 Attendant Metrics Response:', metricsResponse);
          
-         // Set metrics from API
+         // Step 3: Update state with fresh data (smooth transition)
          setMetrics(metricsResponse.metrics);
-         
-         // Set recent purchases from API
          setTicketPurchases(metricsResponse.recentPurchases || []);
-         
-         // Set recent bookings from API
          setRecentBookings(metricsResponse.recentBookings || []);
+         
+         // Step 4: Cache the fresh data for next time
+         await metricsCacheService.cacheMetrics('attendant', {
+           metrics: metricsResponse.metrics,
+           recentPurchases: metricsResponse.recentPurchases || [],
+           recentBookings: metricsResponse.recentBookings || [],
+         }, locationId);
+         
+         console.log('✅ [AttendantDashboard] Metrics cached successfully');
          
        } catch (error) {
          console.error('Error fetching metrics data:', error);

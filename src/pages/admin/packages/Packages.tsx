@@ -441,6 +441,15 @@ const Packages: React.FC = () => {
           >
             Export
           </StandardButton>
+          <Link to="/packages/trashed">
+            <StandardButton
+              variant="ghost"
+              size="md"
+              icon={Trash2}
+            >
+              Deleted
+            </StandardButton>
+          </Link>
           <Link to="/packages/create">
             <StandardButton
               variant="primary"

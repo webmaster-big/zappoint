@@ -29,6 +29,7 @@ import bookingService from '../../services/bookingService';
 import { bookingCacheService } from '../../services/BookingCacheService';
 import { locationService } from '../../services/LocationService';
 import { metricsService } from '../../services/MetricsService';
+import { metricsCacheService } from '../../services/MetricsCacheService';
 import { formatDurationDisplay, convertTo12Hour, parseLocalDate } from '../../utils/timeFormat';
 
 const LocationManagerDashboard: React.FC = () => {
@@ -88,24 +89,36 @@ const LocationManagerDashboard: React.FC = () => {
   }, []);
 
   // Fetch metrics data (only on mount and location change)
-  // PERFORMANCE OPTIMIZATION: Using new Metrics API endpoint
-  // - OLD: Multiple API calls with client-side calculations
-  // - NEW: 1 API call returning pre-computed all-time metrics
-  // - Result: 3-5x faster load times
+  // PERFORMANCE OPTIMIZATION: Cache-first loading with background refresh
+  // - Display cached metrics instantly
+  // - Fetch fresh data in background
+  // - Smooth update when new data arrives
   useEffect(() => {
     const fetchMetricsData = async () => {
       if (!locationId) return;
       
       try {
-        setLoading(true);
         console.log('🔄 Starting metrics fetch for location:', locationId);
+        
+        // Step 1: Try to load from cache first for instant display
+        const cachedData = await metricsCacheService.getCachedMetrics<typeof metrics>('manager', locationId);
+        
+        if (cachedData) {
+          console.log('📦 [ManagerDashboard] Loaded metrics from cache');
+          setMetrics(cachedData.metrics);
+          if (cachedData.recentPurchases) {
+            setTicketPurchases(cachedData.recentPurchases);
+          }
+          setLoading(false);
+        }
+        
+        // Step 2: Fetch fresh data from API in background
+        console.log('📊 Fetching all-time metrics from API...');
         
         // Fetch location details
         await locationService.getLocation(locationId);
-        // setLocationDetails(locationResponse.data);
         
         // Fetch ALL TIME metrics (no date filter for main metrics)
-        console.log('📊 Fetching all-time metrics...');
         const metricsResponse = await metricsService.getDashboardMetrics({
           // No date_from/date_to for all-time metrics
         });
@@ -114,7 +127,7 @@ const LocationManagerDashboard: React.FC = () => {
         console.log('📊 Metrics:', metricsResponse.metrics);
         console.log('🎫 Recent purchases:', metricsResponse.recentPurchases?.length || 0);
         
-        // Set metrics from API response
+        // Step 3: Update state with fresh data (smooth transition)
         if (metricsResponse.metrics) {
           setMetrics(metricsResponse.metrics);
         } else {
@@ -130,10 +143,17 @@ const LocationManagerDashboard: React.FC = () => {
           console.log('📍 Location details from API:', metricsResponse.locationDetails.name);
         }
         
+        // Step 4: Cache the fresh data for next time
+        await metricsCacheService.cacheMetrics('manager', {
+          metrics: metricsResponse.metrics,
+          recentPurchases: metricsResponse.recentPurchases || [],
+        }, locationId);
+        
+        console.log('✅ [ManagerDashboard] Metrics cached successfully');
+        
       } catch (error: any) {
         console.error('❌ Error fetching metrics data:', error);
         console.error('Error details:', error.message || error);
-        alert(`Failed to load dashboard metrics: ${error.message || 'Unknown error'}`);
       } finally {
         setLoading(false);
       }

@@ -276,6 +276,15 @@ const CustomPackages: React.FC = () => {
           <p className="text-gray-600 mt-1">Holiday, special, seasonal, and promotional packages</p>
         </div>
         <div className="flex items-center gap-2">
+          <Link to="/packages/trashed">
+            <StandardButton
+              variant="ghost"
+              size="md"
+              icon={Trash2}
+            >
+              Deleted
+            </StandardButton>
+          </Link>
           <Link to="/packages/create">
             <StandardButton
               variant="primary"
