@@ -13,6 +13,8 @@ import type {
   OnsiteBookingData 
 } from '../../../types/onsiteBooking.types';
 import bookingService, { type CreateBookingData } from '../../../services/bookingService';
+import { bookingCacheService } from '../../../services/BookingCacheService';
+import { packageCacheService } from '../../../services/PackageCacheService';
 import timeSlotService, { type TimeSlot } from '../../../services/timeSlotService';
 import customerService from '../../../services/CustomerService';
 import { locationService } from '../../../services/LocationService';
@@ -238,6 +240,94 @@ const OnsiteBooking: React.FC = () => {
     const fetchPackages = async () => {
       try {
         setLoadingPackages(true);
+        
+        // Try cache first for faster loading
+        const cacheFilters = selectedLocation !== null 
+          ? { location_id: selectedLocation, status: 'active' as const }
+          : { status: 'active' as const };
+        
+        const cachedPackages = await packageCacheService.getFilteredPackagesFromCache(cacheFilters);
+        
+        if (cachedPackages && cachedPackages.length > 0) {
+          console.log('📦 Using cached packages:', cachedPackages.length);
+          // Transform cached packages to match OnsiteBookingPackage interface
+          const transformedPackages: OnsiteBookingPackage[] = cachedPackages.map((pkg: any) => ({
+            id: pkg.id,
+            name: pkg.name,
+            description: pkg.description,
+            price: Number(pkg.price),
+            minParticipants: pkg.min_participants,
+            maxParticipants: pkg.max_participants,
+            category: pkg.category,
+            features: pkg.features,
+            availabilityType: pkg.availability_type,
+            availableDays: pkg.available_days || [],
+            availableWeekDays: pkg.available_week_days || [],
+            availableMonthDays: pkg.available_month_days || [],
+            availability_schedules: pkg.availability_schedules || [],
+            attractions: pkg.attractions?.map((a: any) => ({
+              id: a.id.toString(),
+              name: a.name,
+              description: a.description || '',
+              price: Number(a.price),
+              pricingType: a.pricing_type as 'per_person' | 'per_unit',
+              category: a.category || '',
+              maxCapacity: a.max_capacity || 0,
+              image: Array.isArray(a.image) ? a.image[0] : a.image
+            })) || [],
+            addOns: pkg.add_ons?.map((a: any) => ({
+              id: a.id,
+              name: a.name,
+              price: Number(a.price),
+              image: Array.isArray(a.image) ? a.image[0] : a.image
+            })) || [],
+            rooms: pkg.rooms?.map((r: any) => ({
+              id: r.id,
+              name: r.name,
+              capacity: r.capacity
+            })) || [],
+            image: Array.isArray(pkg.image) ? pkg.image[0] : pkg.image,
+            giftCards: pkg.gift_cards?.map((gc: any) => ({
+              id: gc.id,
+              code: gc.code,
+              type: gc.type,
+              value: gc.discount_value,
+              initial_value: gc.discount_value,
+              remaining_usage: gc.remaining_usage || 0,
+              max_usage: gc.max_usage || 1,
+              status: gc.status,
+              expiry_date: gc.expiry_date,
+              description: gc.description || ''
+            })) || [],
+            promos: pkg.promos?.map((p: any) => ({
+              id: p.id,
+              code: p.code,
+              type: p.type,
+              value: p.discount_value,
+              status: p.status,
+              start_date: p.start_date,
+              end_date: p.end_date,
+              usage_limit_per_user: p.usage_limit_per_user || 1,
+              usage_limit_total: p.usage_limit_total || 100,
+              description: p.description || ''
+            })) || [],
+            duration: pkg.duration?.toString() || '2',
+            durationUnit: pkg.duration_unit || 'hours',
+            pricePerAdditional30min: pkg.price_per_additional_30min?.toString() || '0',
+            pricePerAdditional1hr: pkg.price_per_additional_1hr?.toString() || '0',
+            pricePerAdditional: Number(pkg.price_per_additional || 0),
+            partialPaymentPercentage: pkg.partial_payment_percentage || 0,
+            partialPaymentFixed: pkg.partial_payment_fixed || 0,
+            has_guest_of_honor: pkg.has_guest_of_honor || false
+          }));
+          
+          setPackages(transformedPackages);
+          if (transformedPackages.length === 0) {
+            setShowEmptyModal(true);
+          }
+          return;
+        }
+        
         // Fetch all packages from backend
         const params: any = {user_id: getStoredUser()?.id};
         if (selectedLocation !== null) {
@@ -336,6 +426,11 @@ const OnsiteBooking: React.FC = () => {
           
           console.log('✅ All transformed packages:', transformedPackages);
           setPackages(transformedPackages);
+          
+          // Cache the raw packages for future use
+          if (response.data.packages.length > 0) {
+            await packageCacheService.cachePackages(response.data.packages);
+          }
           
           // Show modal if no packages available
           if (transformedPackages.length === 0) {
@@ -1207,6 +1302,9 @@ const OnsiteBooking: React.FC = () => {
         
         console.log('✅ Booking created:', { bookingId, referenceNumber });
         
+        // Add the new booking to cache
+        await bookingCacheService.addBookingToCache(response.data);
+        
         // Step 3: Generate QR code with the actual reference number
         const qrCodeBase64 = await QRCode.toDataURL(referenceNumber, {
           width: 300,
@@ -1893,7 +1991,7 @@ const OnsiteBooking: React.FC = () => {
                 {isSelected && (
                   <div className={`mt-3 pt-3 border-t border-${themeColor}-200 flex items-center justify-between`}>
                     <span className="text-sm font-medium text-gray-700">Quantity:</span>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
                       <StandardButton
                         type="button"
                         variant="secondary"
@@ -1903,7 +2001,16 @@ const OnsiteBooking: React.FC = () => {
                       >
                         {''}
                       </StandardButton>
-                      <span className="font-bold text-lg text-gray-900 w-8 text-center">{selectedQty}</span>
+                      <input
+                        type="number"
+                        min="1"
+                        value={selectedQty}
+                        onChange={(e) => {
+                          const newQty = parseInt(e.target.value) || 1;
+                          handleAttractionQuantityChange(String(attraction.id), newQty);
+                        }}
+                        className="w-16 text-center font-bold text-lg text-gray-900 border border-gray-300 rounded px-2 py-1"
+                      />
                       <StandardButton
                         type="button"
                         variant="secondary"
@@ -1966,7 +2073,7 @@ const OnsiteBooking: React.FC = () => {
                     {isSelected && (
                       <div className={`mt-3 pt-3 border-t border-${themeColor}-200 flex items-center justify-between`}>
                         <span className="text-sm font-medium text-gray-700">Quantity:</span>
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2">
                           <StandardButton
                             type="button"
                             variant="secondary"
@@ -1976,7 +2083,16 @@ const OnsiteBooking: React.FC = () => {
                           >
                             {''}
                           </StandardButton>
-                          <span className="font-bold text-lg text-gray-900 w-8 text-center">{selectedQty}</span>
+                          <input
+                            type="number"
+                            min="1"
+                            value={selectedQty}
+                            onChange={(e) => {
+                              const newQty = parseInt(e.target.value) || 1;
+                              handleAddOnQuantityChange(addOn.name, newQty);
+                            }}
+                            className="w-16 text-center font-bold text-lg text-gray-900 border border-gray-300 rounded px-2 py-1"
+                          />
                           <StandardButton
                             type="button"
                             variant="secondary"

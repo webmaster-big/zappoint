@@ -29,9 +29,10 @@ import StandardButton from '../../components/ui/StandardButton';
 import CounterAnimation from '../../components/ui/CounterAnimation';
 import LocationSelector from '../../components/admin/LocationSelector';
 import bookingService from '../../services/bookingService';
+import { bookingCacheService } from '../../services/BookingCacheService';
 import { locationService, type Location } from '../../services/LocationService';
 import { metricsService } from '../../services/MetricsService';
-import { formatDurationDisplay, convertTo12Hour } from '../../utils/timeFormat';
+import { formatDurationDisplay, convertTo12Hour, parseLocalDate } from '../../utils/timeFormat';
 
 const CompanyDashboard: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
@@ -146,7 +147,7 @@ const CompanyDashboard: React.FC = () => {
 
   const monthDays = getMonthDays(currentMonth);
 
-  // Fetch monthly calendar data (changes when month changes)
+  // Fetch monthly calendar data (changes when month changes) - USE CACHE FIRST
   useEffect(() => {
     const fetchMonthlyData = async () => {
       if (calendarView !== 'month') return;
@@ -157,16 +158,33 @@ const CompanyDashboard: React.FC = () => {
         const monthStart = new Date(year, month, 1);
         const monthEnd = new Date(year, month + 1, 0);
         
-        // Fetch bookings for the selected month
-        const bookingsResponse = await bookingService.getBookings({
-          location_id: selectedLocation === 'all' ? undefined : selectedLocation,
+        const dateParams = {
           date_from: monthStart.toISOString().split('T')[0],
           date_to: monthEnd.toISOString().split('T')[0],
-          per_page: 500,
-        });
+        };
         
-        const bookings = bookingsResponse.data.bookings || [];
-        setMonthlyBookings(bookings);
+        // Try cache first for instant loading
+        let bookings = await bookingCacheService.getFilteredBookingsFromCache(dateParams);
+        
+        if (bookings && bookings.length > 0) {
+          // Filter by location if needed
+          if (selectedLocation !== 'all') {
+            bookings = bookings.filter(b => b.location_id === selectedLocation);
+          }
+          setMonthlyBookings(bookings);
+        } else {
+          // No cache, fetch from API
+          const bookingsResponse = await bookingService.getBookings({
+            location_id: selectedLocation === 'all' ? undefined : selectedLocation,
+            ...dateParams,
+            per_page: 500,
+          });
+          
+          bookings = bookingsResponse.data.bookings || [];
+          setMonthlyBookings(bookings);
+          // Cache for next time
+          await bookingCacheService.cacheBookings(bookings);
+        }
         
       } catch (error) {
         console.error('Error fetching monthly data:', error);
@@ -179,7 +197,7 @@ const CompanyDashboard: React.FC = () => {
   // Get bookings for a specific day
   const getBookingsForDay = (date: Date) => {
     return monthlyBookings.filter(booking => {
-      const bookingDate = new Date(booking.booking_date);
+      const bookingDate = parseLocalDate(booking.booking_date);
       return bookingDate.toDateString() === date.toDateString();
     });
   };
@@ -259,24 +277,42 @@ const CompanyDashboard: React.FC = () => {
         
         console.log('📅 Current week range:', weekStart.toISOString().split('T')[0], 'to', weekEnd.toISOString().split('T')[0]);
         
-        // Fetch ALL bookings for calendar view
-        // This is separate from metrics calculation
-        const allBookingsParams: any = {
+        // Fetch bookings for calendar view - USE CACHE FIRST for faster loading
+        const bookingParams = {
           date_from: weekStart.toISOString().split('T')[0],
           date_to: weekEnd.toISOString().split('T')[0],
-          per_page: 500,
         };
         
-        // Apply location filter for filtered view if selected
-        if (selectedLocation !== 'all') {
-          allBookingsParams.location_id = selectedLocation;
+        // Try cache first for instant loading
+        let allBookings = await bookingCacheService.getFilteredBookingsFromCache(bookingParams);
+        
+        if (allBookings && allBookings.length > 0) {
+          console.log('📋 Using cached bookings:', allBookings.length);
+          // Filter by location if needed
+          if (selectedLocation !== 'all') {
+            allBookings = allBookings.filter(b => b.location_id === selectedLocation);
+          }
+          setAllWeeklyBookings(allBookings);
+        } else {
+          // No cache, fetch from API
+          console.log('📋 No cache, fetching from API...');
+          const allBookingsParams: any = {
+            date_from: weekStart.toISOString().split('T')[0],
+            date_to: weekEnd.toISOString().split('T')[0],
+            per_page: 500,
+          };
+          
+          if (selectedLocation !== 'all') {
+            allBookingsParams.location_id = selectedLocation;
+          }
+          
+          const allBookingsResponse = await bookingService.getBookings(allBookingsParams);
+          allBookings = allBookingsResponse.data.bookings || [];
+          setAllWeeklyBookings(allBookings);
+          // Cache for next time
+          await bookingCacheService.cacheBookings(allBookings);
         }
         
-        console.log('📋 Fetching bookings with params:', allBookingsParams);
-        const allBookingsResponse = await bookingService.getBookings(allBookingsParams);
-        const allBookings = allBookingsResponse.data.bookings || [];
-        
-        setAllWeeklyBookings(allBookings);
         console.log('✅ Loaded', allBookings.length, 'bookings');
         
       } catch (error: any) {
@@ -293,7 +329,7 @@ const CompanyDashboard: React.FC = () => {
   }, [selectedLocation]);
 
   // Fetch weekly calendar data when currentWeek changes
-  // We fetch ALL bookings (without location filter) and filter in the component for better UX
+  // Uses cache service for faster loading, syncs in background
   useEffect(() => {
     const fetchWeeklyData = async () => {
       try {
@@ -304,13 +340,24 @@ const CompanyDashboard: React.FC = () => {
         const bookingParams: any = {
           date_from: weekStart.toISOString().split('T')[0],
           date_to: weekEnd.toISOString().split('T')[0],
-          per_page: 500,
         };
         
-        // Fetch ALL bookings for the selected week
-        const bookingsResponse = await bookingService.getBookings(bookingParams);
-        const bookings = bookingsResponse.data.bookings || [];
-        setWeeklyBookings(bookings);
+        // Try to get from cache first, then sync in background
+        const cachedBookings = await bookingCacheService.getFilteredBookingsFromCache(bookingParams);
+        
+        if (cachedBookings && cachedBookings.length > 0) {
+          setWeeklyBookings(cachedBookings);
+        } else {
+          // No cache, fetch from API
+          const bookingsResponse = await bookingService.getBookings({
+            ...bookingParams,
+            per_page: 500,
+          });
+          const bookings = bookingsResponse.data.bookings || [];
+          setWeeklyBookings(bookings);
+          // Cache the fetched bookings
+          await bookingCacheService.cacheBookings(bookings);
+        }
         
       } catch (error) {
         console.error('Error fetching weekly data:', error);
@@ -367,7 +414,7 @@ const CompanyDashboard: React.FC = () => {
   // Only show bookings for the current week in the calendar and table
   // Filter by selectedLocation in the component (not in the API call)
   const bookingsThisWeek = weeklyBookings.filter(booking => {
-    const bookingDate = new Date(booking.booking_date);
+    const bookingDate = parseLocalDate(booking.booking_date);
     const isInCurrentWeek = weekDates.some(date => date.toDateString() === bookingDate.toDateString());
     const matchesLocation = selectedLocation === 'all' || booking.location_id === selectedLocation;
     return isInCurrentWeek && matchesLocation;
@@ -451,7 +498,7 @@ const CompanyDashboard: React.FC = () => {
     
     // Populate with bookings
     filteredCalendarBookings.forEach(booking => {
-      const bookingDate = new Date(booking.booking_date);
+      const bookingDate = parseLocalDate(booking.booking_date);
       const dateStr = bookingDate.toDateString();
       // Convert booking time from 24-hour to 12-hour format to match our time slots
       const time = convertTo12HourFormat(booking.booking_time);
@@ -551,7 +598,7 @@ const CompanyDashboard: React.FC = () => {
     
     // Filter all bookings for current week
     const currentWeekAllBookings = allWeeklyBookings.filter(booking => {
-      const bookingDate = new Date(booking.booking_date);
+      const bookingDate = parseLocalDate(booking.booking_date);
       return weekDates.some(date => date.toDateString() === bookingDate.toDateString());
     });
     
@@ -1311,7 +1358,7 @@ const CompanyDashboard: React.FC = () => {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {currentBookings.length > 0 ? currentBookings.map(booking => {
-                const bookingDate = new Date(booking.booking_date);
+                const bookingDate = parseLocalDate(booking.booking_date);
                 const customerName = booking.customer ? `${booking.customer.first_name} ${booking.customer.last_name}` : booking.guest_name || 'Guest';
                 const customerEmail = booking.customer?.email || booking.guest_email || '';
                 const activityName = booking.attraction?.name || booking.package?.name || '-';
@@ -1697,7 +1744,7 @@ const CompanyDashboard: React.FC = () => {
                   <div className="flex items-center">
                     <Calendar className="h-4 w-4 text-gray-400 mr-3" />
                     <span className="text-sm text-gray-900">
-                      {new Date(selectedBooking.booking_date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                      {parseLocalDate(selectedBooking.booking_date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                     </span>
                   </div>
                   <div className="flex items-center">

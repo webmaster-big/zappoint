@@ -173,7 +173,9 @@ export interface GroupedPackage {
   description: string;
   price: number;
   category: string;
+  min_participants: number;
   max_guests: number;
+  price_per_additional?: number;
   duration: number;
   duration_unit?: 'hours' | 'minutes' | 'hours and minutes';
   image: string | string[];

@@ -14,7 +14,7 @@ import {
   XCircle
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
-import { packageService, type Package } from '../../../services';
+import { packageService, packageCacheService, type Package } from '../../../services';
 import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
 import { extractIdFromSlug } from '../../../utils/slug';
@@ -39,9 +39,25 @@ const PackageDetails = () => {
     if (!packageId) return;
     try {
       setLoading(true);
+      
+      // Check cache first
+      const cachedPackage = await packageCacheService.getPackageFromCache(packageId);
+      
+      if (cachedPackage) {
+        setPackageData(cachedPackage);
+        setLoading(false);
+        return;
+      }
+      
+      // If not in cache, fetch from API
       const response = await packageService.getPackage(packageId);
       console.log(response);
       setPackageData(response.data);
+      
+      // Update cache with fetched data
+      if (response.data) {
+        await packageCacheService.updatePackageInCache(response.data);
+      }
     } catch (error) {
       console.error('Error loading package details:', error);
       setToast({ message: 'Failed to load package details', type: 'error' });
@@ -54,6 +70,10 @@ const PackageDetails = () => {
     if (window.confirm('Are you sure you want to delete this package? This action cannot be undone.')) {
       try {
         await packageService.deletePackage(packageData!.id);
+        
+        // Remove from cache
+        await packageCacheService.removePackageFromCache(packageData!.id);
+        
         setToast({ message: 'Package deleted successfully', type: 'success' });
         setTimeout(() => navigate('/packages'), 1500);
       } catch (error) {

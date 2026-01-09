@@ -13,10 +13,12 @@ import {
   CreditCard,
   PackageIcon,
   RefreshCw,
-  MapPin
+  MapPin,
+  Loader2
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import bookingService from '../../../services/bookingService';
+import { bookingCacheService } from '../../../services/BookingCacheService';
 import { locationService } from '../../../services/LocationService';
 import type { Booking } from '../../../services/bookingService';
 import type { CalendarViewFilterOptions } from '../../../types/calendarView.types';
@@ -24,7 +26,7 @@ import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
 import type { ToastMessage } from './../../../types/Toast';
 import { getStoredUser } from '../../../utils/storage';
-import { formatDurationDisplay } from '../../../utils/timeFormat';
+import { formatDurationDisplay, parseLocalDate } from '../../../utils/timeFormat';
 
 // Convert 24-hour time to 12-hour format with AM/PM
 const formatTime12Hour = (time24: string): string => {
@@ -48,7 +50,8 @@ const CalendarView: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [filteredBookings, setFilteredBookings] = useState<Booking[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true); // Only for first load
+  const [dataLoading, setDataLoading] = useState(false); // For navigation changes
   const [currentDate, setCurrentDate] = useState(new Date());
   const [filters, setFilters] = useState<CalendarViewFilterOptions>({
     view: 'month',
@@ -66,6 +69,8 @@ const CalendarView: React.FC = () => {
   const [userData, setUserData] = useState<UserData | null>(null);
   const [filterLocation, setFilterLocation] = useState<string>('all');
   const [locations, setLocations] = useState<Array<{ id: number; name: string }>>([]);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [pickerMonth, setPickerMonth] = useState(new Date());
 
   // Load user data from localStorage
   useEffect(() => {
@@ -92,10 +97,15 @@ const CalendarView: React.FC = () => {
     fetchLocations();
   }, [userData]);
 
-  // Load bookings from API
+  // Load bookings from API with cache support
   const loadBookings = useCallback(async () => {
     try {
-      setLoading(true);
+      // Only show full loading on initial load
+      if (initialLoading) {
+        // Keep initialLoading true
+      } else {
+        setDataLoading(true);
+      }
       
       // Calculate date range based on current view
       const startDate = new Date(currentDate);
@@ -120,7 +130,19 @@ const CalendarView: React.FC = () => {
         endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0);
         endDate.setHours(23, 59, 59, 999);
       } else if (filters.view === 'range' && filters.dateRange.start && filters.dateRange.end) {
-        // Use custom range
+        // Use custom range - check if cache has data first
+        const hasCache = await bookingCacheService.hasCachedData();
+        
+        if (hasCache) {
+          const cachedBookings = await bookingCacheService.getFilteredBookingsFromCache({
+            date_from: filters.dateRange.start,
+            date_to: filters.dateRange.end,
+          });
+          setBookings((cachedBookings || []) as Booking[]);
+          return;
+        }
+        
+        // No cache, fetch from API
         const response = await bookingService.getBookings({
           date_from: filters.dateRange.start,
           date_to: filters.dateRange.end,
@@ -129,32 +151,50 @@ const CalendarView: React.FC = () => {
         
         if (response.success && response.data) {
           setBookings(response.data.bookings);
+          await bookingCacheService.cacheBookings(response.data.bookings);
         }
         return;
       }
 
-      const response = await bookingService.getBookings({
+      const dateParams = {
         date_from: startDate.toISOString().split('T')[0],
         date_to: endDate.toISOString().split('T')[0],
-        per_page: 1000,
-        user_id: getStoredUser()?.id,
-      });
+      };
+
+      // Check if cache has data first
+      const hasCache = await bookingCacheService.hasCachedData();
       
-      if (response.success && response.data) {
-        console.log('Loaded Bookings:', response.data.bookings);
-        console.log('Date range:', startDate.toISOString().split('T')[0], 'to', endDate.toISOString().split('T')[0]);
-        console.log('Total bookings loaded:', response.data.bookings.length);
-        setBookings(response.data.bookings);
+      if (hasCache) {
+        const cachedBookings = await bookingCacheService.getFilteredBookingsFromCache(dateParams);
+        console.log('Using cached bookings:', (cachedBookings || []).length);
+        setBookings((cachedBookings || []) as Booking[]);
       } else {
-        console.log('No bookings data in response');
-        setBookings([]);
+        // No cache, fetch from API
+        const response = await bookingService.getBookings({
+          ...dateParams,
+          per_page: 1000,
+          user_id: getStoredUser()?.id,
+        });
+        
+        if (response.success && response.data) {
+          console.log('Loaded Bookings:', response.data.bookings);
+          console.log('Date range:', startDate.toISOString().split('T')[0], 'to', endDate.toISOString().split('T')[0]);
+          console.log('Total bookings loaded:', response.data.bookings.length);
+          setBookings(response.data.bookings);
+          // Cache the fetched bookings
+          await bookingCacheService.cacheBookings(response.data.bookings);
+        } else {
+          console.log('No bookings data in response');
+          setBookings([]);
+        }
       }
     } catch (error) {
       console.error('Error loading bookings:', error);
       setToast({ message: 'Failed to load bookings', type: 'error' });
       setBookings([]);
     } finally {
-      setLoading(false);
+      setInitialLoading(false);
+      setDataLoading(false);
     }
   }, [currentDate, filters.view, filters.dateRange]);
 
@@ -250,7 +290,55 @@ const CalendarView: React.FC = () => {
   };
 
   const goToToday = () => {
-    setCurrentDate(new Date());
+    const today = new Date();
+    setCurrentDate(today);
+    setPickerMonth(today);
+  };
+
+  // Calendar picker helpers
+  const getPickerCalendarDays = (): (Date | null)[] => {
+    const year = pickerMonth.getFullYear();
+    const month = pickerMonth.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    const startingDayOfWeek = firstDay.getDay();
+    
+    const days: (Date | null)[] = [];
+    for (let i = 0; i < startingDayOfWeek; i++) {
+      days.push(null);
+    }
+    for (let day = 1; day <= daysInMonth; day++) {
+      days.push(new Date(year, month, day));
+    }
+    return days;
+  };
+
+  const isSameDay = (date1: Date, date2: Date): boolean => {
+    return date1.getDate() === date2.getDate() &&
+           date1.getMonth() === date2.getMonth() &&
+           date1.getFullYear() === date2.getFullYear();
+  };
+
+  const isTodayDate = (date: Date): boolean => {
+    return isSameDay(date, new Date());
+  };
+
+  const selectPickerDate = (date: Date) => {
+    setCurrentDate(date);
+    setShowDatePicker(false);
+  };
+
+  const goToPreviousPickerMonth = () => {
+    const newMonth = new Date(pickerMonth);
+    newMonth.setMonth(newMonth.getMonth() - 1);
+    setPickerMonth(newMonth);
+  };
+
+  const goToNextPickerMonth = () => {
+    const newMonth = new Date(pickerMonth);
+    newMonth.setMonth(newMonth.getMonth() + 1);
+    setPickerMonth(newMonth);
   };
 
   const getHeaderText = () => {
@@ -557,7 +645,7 @@ const CalendarView: React.FC = () => {
                     <h4 className="font-medium text-gray-900">{booking.guest_name || 'Guest'}</h4>
                     <p className="text-sm text-gray-500">{getBookingTitle(booking)}</p>
                     <p className="text-sm text-gray-500">
-                      {new Date(booking.booking_date).toLocaleDateString()} at {formatTime12Hour(booking.booking_time)}
+                      {parseLocalDate(booking.booking_date).toLocaleDateString()} at {formatTime12Hour(booking.booking_time)}
                     </p>
                   </div>
                   <div className="flex flex-col items-end gap-2">
@@ -608,7 +696,7 @@ const CalendarView: React.FC = () => {
     }
   };
 
-  if (loading) {
+  if (initialLoading) {
     return (
       <div className="px-6 py-8">
         <div className="flex justify-center items-center h-64">
@@ -638,8 +726,8 @@ const CalendarView: React.FC = () => {
               variant="secondary"
               icon={RefreshCw}
               onClick={loadBookings}
-              disabled={loading}
-              loading={loading}
+              disabled={dataLoading}
+              loading={dataLoading}
             >
               {''}
             </StandardButton>
@@ -672,9 +760,110 @@ const CalendarView: React.FC = () => {
                 {''}
               </StandardButton>
               
-              <h2 className="text-xl font-semibold min-w-[250px] text-center">
-                {getHeaderText()}
-              </h2>
+              {/* Clickable Date with Calendar Dropdown */}
+              <div className="relative">
+                <button
+                  onClick={() => {
+                    setPickerMonth(currentDate);
+                    setShowDatePicker(!showDatePicker);
+                  }}
+                  className={`text-xl font-semibold min-w-[250px] text-center px-4 py-2 rounded-lg hover:bg-${themeColor}-50 transition-colors flex items-center justify-center gap-2`}
+                >
+                  <CalendarIcon className={`w-5 h-5 text-${fullColor}`} />
+                  {getHeaderText()}
+                </button>
+
+                {/* Calendar Dropdown Picker */}
+                {showDatePicker && (
+                  <>
+                    <div 
+                      className="fixed inset-0 z-30"
+                      onClick={() => setShowDatePicker(false)}
+                    />
+                    <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 bg-white rounded-lg shadow-xl border border-gray-200 p-4 z-40 animate-scale-in">
+                      {/* Month Navigation */}
+                      <div className="flex items-center justify-between mb-4">
+                        <button
+                          onClick={goToPreviousPickerMonth}
+                          className="p-2 hover:bg-gray-100 rounded-lg transition"
+                        >
+                          <ChevronLeft className="w-5 h-5 text-gray-600" />
+                        </button>
+                        <div className="text-base font-semibold text-gray-900">
+                          {pickerMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                        </div>
+                        <button
+                          onClick={goToNextPickerMonth}
+                          className="p-2 hover:bg-gray-100 rounded-lg transition"
+                        >
+                          <ChevronRight className="w-5 h-5 text-gray-600" />
+                        </button>
+                      </div>
+
+                      {/* Day Labels */}
+                      <div className="grid grid-cols-7 gap-1 mb-2">
+                        {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(day => (
+                          <div key={day} className="text-center text-xs font-medium text-gray-500 py-2">
+                            {day}
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Calendar Grid */}
+                      <div className="grid grid-cols-7 gap-1">
+                        {getPickerCalendarDays().map((day, index) => {
+                          if (!day) {
+                            return <div key={`empty-${index}`} className="aspect-square w-9" />;
+                          }
+
+                          const isSelected = isSameDay(day, currentDate);
+                          const isToday = isTodayDate(day);
+                          const isPast = day < new Date(new Date().setHours(0, 0, 0, 0));
+
+                          return (
+                            <button
+                              key={index}
+                              onClick={() => selectPickerDate(day)}
+                              className={`
+                                aspect-square w-9 flex items-center justify-center rounded-lg text-sm font-medium transition-all
+                                ${isSelected 
+                                  ? `bg-${fullColor} text-white shadow-md` 
+                                  : isToday
+                                  ? `bg-${themeColor}-100 text-${fullColor} font-semibold`
+                                  : isPast
+                                  ? 'text-gray-400 hover:bg-gray-100'
+                                  : 'text-gray-700 hover:bg-gray-100'
+                                }
+                              `}
+                            >
+                              {day.getDate()}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {/* Quick Actions */}
+                      <div className="mt-4 pt-4 border-t border-gray-200 flex gap-2">
+                        <button
+                          onClick={() => {
+                            goToToday();
+                            setShowDatePicker(false);
+                          }}
+                          className={`flex-1 px-3 py-2 text-sm font-medium text-${fullColor} bg-${themeColor}-50 hover:bg-${themeColor}-100 rounded-lg transition`}
+                        >
+                          Today
+                        </button>
+                        <button
+                          onClick={() => setShowDatePicker(false)}
+                          className="flex-1 px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition"
+                        >
+                          Close
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
               
               <StandardButton
                 variant="ghost"
@@ -693,6 +882,14 @@ const CalendarView: React.FC = () => {
               >
                 Today
               </StandardButton>
+
+              {/* Inline loading indicator */}
+              {dataLoading && (
+                <div className="flex items-center gap-2 ml-2 text-gray-500">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span className="text-sm">Loading...</span>
+                </div>
+              )}
             </div>
             
             <div className="flex gap-2">
@@ -1064,7 +1261,7 @@ const CalendarView: React.FC = () => {
                   <div className="bg-gray-50 rounded-lg p-4 space-y-3">
                     <div className="flex items-center">
                       <CalendarIcon className="h-4 w-4 text-gray-400 mr-3" />
-                      <span className="text-sm text-gray-900">{new Date(selectedBooking.booking_date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                      <span className="text-sm text-gray-900">{parseLocalDate(selectedBooking.booking_date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span>
                     </div>
                     <div className="flex items-center">
                       <Clock className="h-4 w-4 text-gray-400 mr-3" />

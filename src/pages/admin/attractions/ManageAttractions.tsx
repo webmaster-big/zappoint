@@ -28,6 +28,7 @@ import type {
   ManageAttractionsFilterOptions,
 } from '../../../types/manageAttractions.types';
 import { attractionService } from '../../../services/AttractionService';
+import { attractionCacheService } from '../../../services/AttractionCacheService';
 import type { Attraction } from '../../../services/AttractionService';
 import { locationService } from '../../../services/LocationService';
 import LocationSelector from '../../../components/admin/LocationSelector';
@@ -270,6 +271,51 @@ const ManageAttractions = () => {
       setLoading(true);
       const authToken = getAuthToken();
       console.log('🔐 Loading attractions - Auth Token:', authToken ? 'Present' : 'Missing');
+      
+      // Check cache first for instant loading
+      const cachedAttractions = await attractionCacheService.getCachedAttractions();
+      
+      if (cachedAttractions && cachedAttractions.length > 0) {
+        // Convert cached API format to component format
+        const convertedAttractions: ManageAttractionsAttraction[] = cachedAttractions
+          .filter((attr: Attraction & { location?: { id: number; name: string } }) => {
+            // Apply location filter if set
+            if (selectedLocation !== null && attr.location_id !== selectedLocation) {
+              return false;
+            }
+            return true;
+          })
+          .map((attr: Attraction & { location?: { id: number; name: string } }) => ({
+            id: attr.id.toString(),
+            name: attr.name,
+            description: attr.description,
+            category: attr.category,
+            price: attr.price,
+            pricingType: attr.pricing_type,
+            maxCapacity: attr.max_capacity,
+            duration: attr.duration?.toString() || '',
+            durationUnit: attr.duration_unit || 'minutes',
+            location: attr.location?.name || '',
+            locationId: attr.location_id,
+            locationName: attr.location?.name || '',
+            images: attr.image ? (Array.isArray(attr.image) ? attr.image : [attr.image]) : [],
+            status: attr.is_active ? 'active' : 'inactive',
+            createdAt: attr.created_at,
+            availability: typeof attr.availability === 'object' ? attr.availability as Record<string, boolean> : {
+              monday: true,
+              tuesday: true,
+              wednesday: true,
+              thursday: true,
+              friday: true,
+              saturday: true,
+              sunday: true
+            },
+          }));
+        setAttractions(convertedAttractions);
+        setLoading(false);
+        return;
+      }
+      
       const params: Record<string, string | number | boolean | undefined> = {
         search: filters.search || undefined,
         category: filters.category !== 'all' ? filters.category : undefined,
@@ -287,6 +333,9 @@ const ManageAttractions = () => {
       }
       
       const response = await attractionService.getAttractions(params);
+      
+      // Cache the fetched attractions
+      await attractionCacheService.cacheAttractions(response.data.attractions);
 
       // Convert API format to component format
       const convertedAttractions: ManageAttractionsAttraction[] = response.data.attractions.map((attr: Attraction & { location?: { id: number; name: string } }) => ({
@@ -396,6 +445,15 @@ const ManageAttractions = () => {
         attraction.id === id ? { ...attraction, status: newStatus } : attraction
       ));
       
+      // Update cache with new status
+      const cachedAttraction = await attractionCacheService.getAttractionFromCache(Number(id));
+      if (cachedAttraction) {
+        await attractionCacheService.updateAttractionInCache({
+          ...cachedAttraction,
+          is_active: newStatus === 'active'
+        });
+      }
+      
       setToast({ message: 'Status updated successfully', type: 'success' });
     } catch (error) {
       console.error('Error updating status:', error);
@@ -410,6 +468,9 @@ const ManageAttractions = () => {
         
         // Remove attraction from state without full reload
         setAttractions(prev => prev.filter(attraction => attraction.id !== id));
+        
+        // Remove from cache
+        await attractionCacheService.removeAttractionFromCache(Number(id));
         
         setToast({ message: 'Attraction deleted successfully', type: 'success' });
       } catch (error) {
@@ -431,6 +492,11 @@ const ManageAttractions = () => {
         
         // Remove attractions from state without full reload
         setAttractions(prev => prev.filter(attraction => !selectedAttractions.includes(attraction.id)));
+        
+        // Remove from cache
+        await Promise.all(
+          selectedAttractions.map(id => attractionCacheService.removeAttractionFromCache(Number(id)))
+        );
         
         setToast({ message: `${selectedAttractions.length} attraction(s) deleted successfully`, type: 'success' });
         setSelectedAttractions([]);
@@ -460,6 +526,19 @@ const ManageAttractions = () => {
           ? { ...attraction, status: newStatus }
           : attraction
       ));
+      
+      // Update cache for each attraction
+      await Promise.all(
+        selectedAttractions.map(async (id) => {
+          const cachedAttraction = await attractionCacheService.getAttractionFromCache(Number(id));
+          if (cachedAttraction) {
+            await attractionCacheService.updateAttractionInCache({
+              ...cachedAttraction,
+              is_active: newStatus === 'active'
+            });
+          }
+        })
+      );
       
       setToast({ message: `${selectedAttractions.length} attraction(s) updated successfully`, type: 'success' });
       setSelectedAttractions([]);

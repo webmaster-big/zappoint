@@ -4,6 +4,7 @@ import { Users, Tag, Search, Download, Upload, X, CheckSquare, Square, Pencil, T
 import StandardButton from '../../../components/ui/StandardButton';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { packageService, type Package } from '../../../services';
+import { packageCacheService } from '../../../services/PackageCacheService';
 import { getStoredUser } from "../../../utils/storage";
 import { createSlugWithId } from '../../../utils/slug';
 
@@ -47,6 +48,28 @@ const Packages: React.FC = () => {
         setLoading(true);
         setError(null);
         
+        // Check if cache has data first for instant loading
+        const hasCachedData = await packageCacheService.hasCachedData();
+        
+        if (hasCachedData) {
+          console.log('[Packages] Loading from cache...');
+          const cachedPackages = await packageCacheService.getCachedPackages();
+          
+          if (cachedPackages && cachedPackages.length > 0) {
+            // Filter to only show regular packages (exclude custom, holiday, seasonal, special)
+            // Also filter out soft-deleted packages
+            const regularPackages = cachedPackages.filter(
+              (pkg: Package) => (!pkg.package_type || pkg.package_type === 'regular') && !pkg.deleted_at
+            );
+            console.log('[Packages] Loaded from cache:', regularPackages.length, 'packages');
+            setPackages(regularPackages);
+            setLoading(false);
+            return;
+          }
+        }
+        
+        // No cache or cache is empty - fetch from API
+        console.log('[Packages] Fetching from API...');
         const response = await packageService.getPackages({ 
           per_page: 50, // Backend max is 50 for better performance
           sort_by: 'id',
@@ -57,18 +80,16 @@ const Packages: React.FC = () => {
         const packagesData = response.data.packages || [];
         
         // Filter to only show regular packages (exclude custom, holiday, seasonal, special)
+        // Also filter out soft-deleted packages
         const regularPackages = packagesData.filter(
-          (pkg: Package) => !pkg.package_type || pkg.package_type === 'regular'
+          (pkg: Package) => (!pkg.package_type || pkg.package_type === 'regular') && !pkg.deleted_at
         );
         
         setPackages(regularPackages);
         
-        // Cache packages in localStorage for offline fallback
-        try {
-          localStorage.setItem('packages_cache', JSON.stringify(packagesData));
-        } catch (cacheErr) {
-          console.warn('Failed to cache packages:', cacheErr);
-        }
+        // Cache packages using PackageCacheService
+        await packageCacheService.cachePackages(packagesData);
+        console.log('[Packages] Cached', packagesData.length, 'packages');
       } catch (err: unknown) {
         console.error('Error fetching packages:', err);
         
@@ -97,13 +118,16 @@ const Packages: React.FC = () => {
           setError('An unexpected error occurred.');
         }
         
-        // Try to load from localStorage as fallback
+        // Try to load from cache as fallback
         try {
-          const cachedPackages = localStorage.getItem('packages_cache');
-          if (cachedPackages) {
-            const parsed = JSON.parse(cachedPackages);
-            setPackages(parsed);
-            console.log('Loaded packages from cache');
+          const cachedPackages = await packageCacheService.getCachedPackages();
+          if (cachedPackages && cachedPackages.length > 0) {
+            // Filter out custom and soft-deleted packages
+            const regularPackages = cachedPackages.filter(
+              (pkg: Package) => (!pkg.package_type || pkg.package_type === 'regular') && !pkg.deleted_at
+            );
+            setPackages(regularPackages);
+            console.log('Loaded packages from cache fallback');
           } else {
             setPackages([]);
           }
@@ -334,6 +358,8 @@ const Packages: React.FC = () => {
         await packageService.deletePackage(id);
         // Remove from local state
         setPackages(prev => prev.filter(pkg => pkg.id !== id));
+        // Remove from cache
+        await packageCacheService.removePackageFromCache(id);
         alert('Package deleted successfully!');
       } catch (err) {
         console.error('Error deleting package:', err);
@@ -350,6 +376,9 @@ const Packages: React.FC = () => {
       setPackages(prev => prev.map(pkg => 
         pkg.id === id ? { ...pkg, is_active: response.data.is_active } : pkg
       ));
+      
+      // Update in cache
+      await packageCacheService.updatePackageInCache(response.data);
       
       const statusText = response.data.is_active ? 'activated' : 'deactivated';
       alert(`Package ${statusText} successfully!`);

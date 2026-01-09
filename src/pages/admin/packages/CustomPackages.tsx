@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { Users, Tag, Search, Pencil, Trash2, MapPin, Eye, Power, Sparkles, CalendarHeart, Calendar } from "lucide-react";
 import StandardButton from '../../../components/ui/StandardButton';
 import { useThemeColor } from '../../../hooks/useThemeColor';
-import { packageService, type Package } from '../../../services';
+import { packageService, packageCacheService, type Package } from '../../../services';
 import { getStoredUser } from "../../../utils/storage";
 import { createSlugWithId } from '../../../utils/slug';
 import Toast from '../../../components/ui/Toast';
@@ -54,6 +54,21 @@ const CustomPackages: React.FC = () => {
         setLoading(true);
         setError(null);
         
+        // Check cache first
+        const cachedPackages = await packageCacheService.getCachedPackages();
+        
+        if (cachedPackages && cachedPackages.length > 0) {
+          // Filter to only show non-regular packages from cache
+          // Also filter out soft-deleted packages
+          const customPackages = cachedPackages.filter(
+            (pkg: Package) => pkg.package_type && pkg.package_type !== 'regular' && !pkg.deleted_at
+          );
+          setPackages(customPackages);
+          setLoading(false);
+          return;
+        }
+        
+        // If no cache, fetch from API
         const response = await packageService.getPackages({ 
           per_page: 50,
           sort_by: 'id',
@@ -63,9 +78,13 @@ const CustomPackages: React.FC = () => {
         
         const packagesData = response.data.packages || [];
         
+        // Cache the fetched data
+        await packageCacheService.cachePackages(packagesData);
+        
         // Filter to only show non-regular packages
+        // Also filter out soft-deleted packages
         const customPackages = packagesData.filter(
-          (pkg: Package) => pkg.package_type && pkg.package_type !== 'regular'
+          (pkg: Package) => pkg.package_type && pkg.package_type !== 'regular' && !pkg.deleted_at
         );
         
         setPackages(customPackages);
@@ -180,6 +199,10 @@ const CustomPackages: React.FC = () => {
       try {
         await packageService.deletePackage(id);
         setPackages(prev => prev.filter(pkg => pkg.id !== id));
+        
+        // Remove from cache
+        await packageCacheService.removePackageFromCache(id);
+        
         setToast({ message: 'Package deleted successfully!', type: 'success' });
       } catch (err) {
         console.error('Error deleting package:', err);
@@ -192,9 +215,14 @@ const CustomPackages: React.FC = () => {
     try {
       const response = await packageService.toggleStatus(id);
       
+      const updatedPackage = { ...packages.find(pkg => pkg.id === id)!, is_active: response.data.is_active };
+      
       setPackages(prev => prev.map(pkg => 
-        pkg.id === id ? { ...pkg, is_active: response.data.is_active } : pkg
+        pkg.id === id ? updatedPackage : pkg
       ));
+      
+      // Update cache
+      await packageCacheService.updatePackageInCache(updatedPackage);
       
       const statusText = response.data.is_active ? 'activated' : 'deactivated';
       setToast({ message: `Package ${statusText} successfully!`, type: 'success' });

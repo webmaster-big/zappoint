@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import type { CreateAttractionsFormData } from '../../../types/createAttractions.types';
 import { attractionService } from '../../../services/AttractionService';
+import { attractionCacheService } from '../../../services/AttractionCacheService';
 import type { CreateAttractionData } from '../../../services/AttractionService';
 import Toast from '../../../components/ui/Toast';
 import { getStoredUser } from '../../../utils/storage';
@@ -284,6 +285,11 @@ const CreateAttraction = () => {
       const response = await attractionService.createAttraction(attractionData as CreateAttractionData);
       
       console.log('Attraction created:', response);
+      
+      // Add to cache
+      if (response.success && response.data) {
+        await attractionCacheService.addAttractionToCache(response.data);
+      }
       
       setToast({ message: 'Attraction created successfully!', type: 'success' });
       

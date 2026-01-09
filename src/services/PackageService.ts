@@ -51,6 +51,7 @@ export interface Package {
   has_guest_of_honor?: boolean;
   created_at: string;
   updated_at: string;
+  deleted_at?: string | null;
   location?: {
     id: number;
     name: string;
@@ -96,6 +97,7 @@ export interface PackageFilters {
   per_page?: number;
   page?: number;
   user_id?: number;
+  trashed?: 'only' | 'with'; // 'only' = show only soft-deleted, 'with' = include soft-deleted
 }
 
 export interface AvailabilitySchedule {
@@ -200,10 +202,26 @@ class PackageService {
   }
 
   /**
-   * Delete a package
+   * Delete a package (soft delete)
    */
   async deletePackage(id: number): Promise<ApiResponse<null>> {
     const response = await api.delete(`/packages/${id}`);
+    return response.data;
+  }
+
+  /**
+   * Restore a soft-deleted package
+   */
+  async restorePackage(id: number): Promise<ApiResponse<Package>> {
+    const response = await api.post(`/packages/${id}/restore`);
+    return response.data;
+  }
+
+  /**
+   * Permanently delete a package (force delete)
+   */
+  async forceDeletePackage(id: number): Promise<ApiResponse<null>> {
+    const response = await api.delete(`/packages/${id}/force`);
     return response.data;
   }
 

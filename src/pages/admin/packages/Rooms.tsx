@@ -20,6 +20,7 @@ const DAYS_OF_WEEK = [
 import StandardButton from '../../../components/ui/StandardButton';
 import Toast from '../../../components/ui/Toast';
 import { roomService, locationService } from '../../../services';
+import { roomCacheService } from '../../../services/RoomCacheService';
 import LocationSelector from '../../../components/admin/LocationSelector';
 import type { Room, RoomFilters } from '../../../services/RoomService';
 import type { Location } from '../../../services/LocationService';
@@ -157,12 +158,32 @@ const Rooms: React.FC = () => {
                 location_id: isCompanyAdmin && selectedLocationId ? selectedLocationId : undefined
             };
             
+            // Try cache first for faster loading (only for first page with no search/filters)
+            if (currentPage === 1 && !searchTerm && !filters.is_available) {
+                const cachedRooms = await roomCacheService.getFilteredRoomsFromCache(
+                    isCompanyAdmin && selectedLocationId ? { location_id: selectedLocationId } : {}
+                );
+                
+                if (cachedRooms && cachedRooms.length > 0) {
+                    setRooms(cachedRooms);
+                    setTotalPages(1); // Cache doesn't have pagination info
+                    setLoading(false);
+                    return;
+                }
+            }
+            
+            // Fall back to API for filtered/paginated results
             const response = await roomService.getRooms(searchFilters);
             
             if (response.data) {
                 setRooms(response.data.rooms || []);
                 const pagination = response.data.pagination;
                 setTotalPages(pagination?.last_page || 1);
+                
+                // Cache the rooms for next time (only first page without filters)
+                if (currentPage === 1 && !searchTerm && response.data.rooms) {
+                    await roomCacheService.cacheRooms(response.data.rooms);
+                }
             }
         } catch (error) {
             console.error('Error fetching Spaces:', error);
@@ -293,7 +314,7 @@ const Rooms: React.FC = () => {
             const locationId = isCompanyAdmin && modalLocationId ? modalLocationId : 1;
             
             if (creationMode === 'single') {
-                await roomService.createRoom({
+                const createResponse = await roomService.createRoom({
                     location_id: locationId,
                     name: formData.name,
                     capacity: formData.capacity ? parseInt(formData.capacity) : undefined,
@@ -302,15 +323,20 @@ const Rooms: React.FC = () => {
                     area_group: formData.area_group || undefined,
                     booking_interval: formData.booking_interval ? parseInt(formData.booking_interval) : 15
                 });
+                // Sync cache with newly created room
+                if (createResponse.data) {
+                    await roomCacheService.addRoomToCache(createResponse.data);
+                }
                 showToast('Space created successfully!', 'success');
             } else {
                 // Bulk creation
                 const roomsToCreate = generateRoomPreview();
                 const capacity = bulkFormData.capacity ? parseInt(bulkFormData.capacity) : undefined;
                 
-                // Create rooms sequentially
+                // Create rooms sequentially and collect created rooms
+                const createdRooms = [];
                 for (const roomName of roomsToCreate) {
-                    await roomService.createRoom({
+                    const createRes = await roomService.createRoom({
                         location_id: locationId,
                         name: roomName,
                         capacity: capacity,
@@ -319,6 +345,14 @@ const Rooms: React.FC = () => {
                         area_group: bulkFormData.area_group || undefined,
                         booking_interval: bulkFormData.booking_interval ? parseInt(bulkFormData.booking_interval) : 15
                     });
+                    if (createRes.data) {
+                        createdRooms.push(createRes.data);
+                    }
+                }
+                
+                // Sync cache with all newly created rooms
+                if (createdRooms.length > 0) {
+                    await roomCacheService.addRoomsToCache(createdRooms);
                 }
                 
                 showToast(`${roomsToCreate.length} Spaces created successfully!`, 'success');
@@ -339,7 +373,7 @@ const Rooms: React.FC = () => {
         if (!selectedRoom) return;
 
         try {
-            await roomService.updateRoom(selectedRoom.id, {
+            const updateResponse = await roomService.updateRoom(selectedRoom.id, {
                 name: formData.name,
                 capacity: formData.capacity ? parseInt(formData.capacity) : undefined,
                 is_available: formData.is_available,
@@ -347,6 +381,11 @@ const Rooms: React.FC = () => {
                 area_group: formData.area_group || undefined,
                 booking_interval: formData.booking_interval ? parseInt(formData.booking_interval) : 15
             });
+            
+            // Sync cache with updated room
+            if (updateResponse.data) {
+                await roomCacheService.updateRoomInCache(updateResponse.data);
+            }
             
             showToast('Space updated successfully!', 'success');
             setShowEditModal(false);
@@ -366,6 +405,8 @@ const Rooms: React.FC = () => {
 
         try {
             await roomService.deleteRoom(roomId);
+            // Remove from cache
+            await roomCacheService.removeRoomFromCache(roomId);
             showToast('Space deleted successfully!', 'success');
             fetchRooms();
         } catch (error) {
@@ -412,7 +453,10 @@ const Rooms: React.FC = () => {
         }
 
         try {
-            await roomService.bulkDeleteRooms(Array.from(selectedRoomIds));
+            const roomIdsToDelete = Array.from(selectedRoomIds);
+            await roomService.bulkDeleteRooms(roomIdsToDelete);
+            // Remove from cache
+            await roomCacheService.removeRoomsFromCache(roomIdsToDelete);
             showToast(`${selectedRoomIds.size} Space(s) deleted successfully!`, 'success');
             setSelectedRoomIds(new Set());
             setSelectionMode(false);

@@ -4,9 +4,11 @@ import { Calendar, Package, User, Home, AlertCircle, ArrowLeft, Bell, BellOff, S
 import StandardButton from '../../../components/ui/StandardButton';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import bookingService, { type Booking } from '../../../services/bookingService';
+import { bookingCacheService } from '../../../services/BookingCacheService';
 import packageService from '../../../services/PackageService';
 import type { Package as PackageType } from '../../../services/PackageService';
 import roomService from '../../../services/RoomService';
+import { roomCacheService } from '../../../services/RoomCacheService';
 
 const EditBooking: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
@@ -81,14 +83,27 @@ const EditBooking: React.FC = () => {
           setAvailablePackages(packagesResponse.data.packages || []);
         }
 
-        // Load all rooms from location
-        const roomsResponse = await roomService.getRooms({ location_id: bookingData.location_id });
-        if (roomsResponse.success && roomsResponse.data) {
-          const rooms = roomsResponse.data.rooms || roomsResponse.data;
-          setAvailableRooms(Array.isArray(rooms) ? rooms.map((room: any) => ({
+        // Load all rooms from location - try cache first
+        const cachedRooms = await roomCacheService.getFilteredRoomsFromCache({ location_id: bookingData.location_id });
+        
+        if (cachedRooms && cachedRooms.length > 0) {
+          setAvailableRooms(cachedRooms.map(room => ({
             id: room.id,
             name: room.name
-          })) : []);
+          })));
+        } else {
+          // No cache, fetch from API
+          const roomsResponse = await roomService.getRooms({ location_id: bookingData.location_id });
+          if (roomsResponse.success && roomsResponse.data) {
+            const rooms = roomsResponse.data.rooms || roomsResponse.data;
+            const roomsArray = Array.isArray(rooms) ? rooms : [];
+            setAvailableRooms(roomsArray.map((room: any) => ({
+              id: room.id,
+              name: room.name
+            })));
+            // Cache the fetched rooms
+            await roomCacheService.cacheRooms(roomsArray);
+          }
         }
 
         if (bookingData.package_id) {
@@ -185,6 +200,11 @@ const EditBooking: React.FC = () => {
       });
 
       if (response.success) {
+        // Sync the updated booking to cache
+        if (response.data) {
+          await bookingCacheService.updateBookingInCache(response.data);
+        }
+        
         alert('Booking updated successfully!');
         navigate('/bookings');
       } else {

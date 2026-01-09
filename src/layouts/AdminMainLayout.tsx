@@ -2,6 +2,11 @@ import Sidebar from './../components/admin/AdminSidebar';
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Outlet } from 'react-router-dom';
 import { API_BASE_URL } from '../utils/storage';
+import { bookingCacheService } from '../services/BookingCacheService';
+import { roomCacheService } from '../services/RoomCacheService';
+import { packageCacheService } from '../services/PackageCacheService';
+import { addOnCacheService } from '../services/AddOnCacheService';
+import { attractionCacheService } from '../services/AttractionCacheService';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 
 interface UserData {
@@ -54,6 +59,21 @@ const MainLayout: React.FC = () => {
   useEffect(() => {
     loadUserData();
     
+    // Warmup caches on layout mount for faster page loads
+    const warmupCaches = async () => {
+      console.log('[AdminMainLayout] Warming up caches...');
+      // Warmup all caches in parallel
+      await Promise.all([
+        bookingCacheService.warmupCache(),
+        roomCacheService.warmupCache(),
+        packageCacheService.warmupCache(),
+        addOnCacheService.warmupCache(),
+        attractionCacheService.warmupCache()
+      ]);
+      console.log('[AdminMainLayout] Caches warmed up');
+    };
+    warmupCaches();
+    
     // Listen for profile updates
     const handleProfileUpdate = () => {
       loadUserData();
@@ -91,6 +111,13 @@ const MainLayout: React.FC = () => {
       console.error('Logout error:', error);
       // Continue with logout even if API call fails
     } finally {
+      // Clear all caches on logout
+      await bookingCacheService.clearCache();
+      await roomCacheService.clearCache();
+      await packageCacheService.clearCache();
+      await addOnCacheService.clearCache();
+      await attractionCacheService.clearCache();
+      
       // Clear local storage and redirect
       localStorage.removeItem('zapzone_user');
       setUserData(null);

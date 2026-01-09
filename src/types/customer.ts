@@ -97,6 +97,9 @@ export interface Package {
   bookingLinks?: PackageBookingLink[];
   availability_schedules?: PackageAvailabilitySchedule[];
   package_type?: string;
+  min_participants?: number;
+  max_guests?: number;
+  price_per_additional?: number;
 }
 
 // Reservation types

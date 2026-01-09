@@ -12,6 +12,7 @@ import { formatDurationDisplay } from '../../../utils/timeFormat';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import type { CreatePurchaseAttraction, CreatePurchaseCustomerInfo } from '../../../types/CreatePurchase.types';
 import { attractionService, type Attraction } from '../../../services/AttractionService';
+import { attractionCacheService } from '../../../services/AttractionCacheService';
 import { attractionPurchaseService } from '../../../services/AttractionPurchaseService';
 import { customerService, type Customer } from '../../../services/CustomerService';
 import { locationService } from '../../../services/LocationService';
@@ -106,6 +107,48 @@ const CreatePurchase = () => {
     const loadAttractions = async () => {
       try {
         setLoading(true);
+        
+        // Check cache first for instant loading
+        const cachedAttractions = await attractionCacheService.getCachedAttractions();
+        
+        if (cachedAttractions && cachedAttractions.length > 0) {
+          // Filter to active attractions only and apply location filter
+          const filteredCached = cachedAttractions.filter((attr: Attraction) => {
+            if (!attr.is_active) return false;
+            if (selectedLocation !== null && attr.location_id !== selectedLocation) return false;
+            return true;
+          });
+          
+          // Convert cached API format to component format
+          const convertedAttractions: CreatePurchaseAttraction[] = filteredCached.map((attr: Attraction & { location?: { id: number; name: string } }) => ({
+            id: attr.id.toString(),
+            name: attr.name,
+            description: attr.description,
+            category: attr.category,
+            price: attr.price,
+            pricingType: attr.pricing_type,
+            maxCapacity: attr.max_capacity,
+            duration: attr.duration?.toString() || '',
+            durationUnit: attr.duration_unit || 'minutes',
+            location: attr.location?.name || '',
+            locationId: attr.location?.id || attr.location_id,
+            images: attr.image ? (Array.isArray(attr.image) ? attr.image : [attr.image]) : [],
+            status: attr.is_active ? 'active' : 'inactive',
+            createdAt: attr.created_at,
+            availability: typeof attr.availability === 'object' ? attr.availability as Record<string, boolean> : {},
+          }));
+          
+          setAttractions(convertedAttractions);
+          setFilteredAttractions(convertedAttractions);
+          
+          if (convertedAttractions.length === 0) {
+            setShowEmptyModal(true);
+          }
+          setLoading(false);
+          return;
+        }
+        
+        // If no cache, fetch from API
         const params: any = {
           is_active: true,
           per_page: 100,
@@ -115,6 +158,9 @@ const CreatePurchase = () => {
           params.location_id = selectedLocation;
         }
         const response = await attractionService.getAttractions(params);
+        
+        // Cache the fetched attractions
+        await attractionCacheService.cacheAttractions(response.data.attractions);
         
         // Convert API format to component format
         const convertedAttractions: CreatePurchaseAttraction[] = response.data.attractions.map((attr: Attraction & { location?: { id: number; name: string } }) => ({

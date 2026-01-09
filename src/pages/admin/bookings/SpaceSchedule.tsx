@@ -1,12 +1,23 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Calendar, ChevronLeft, ChevronRight, Clock, Users, Package as PackageIcon, X, Coffee, Info } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { Calendar, ChevronLeft, ChevronRight, Clock, Users, Package as PackageIcon, X, Coffee, Info, Loader2 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import bookingService from '../../../services/bookingService';
+import { bookingCacheService } from '../../../services/BookingCacheService';
 import { roomService, type BreakTime } from '../../../services/RoomService';
+import { roomCacheService } from '../../../services/RoomCacheService';
+import { getStoredUser } from '../../../utils/storage';
 import StandardButton from '../../../components/ui/StandardButton';
 import { formatDurationDisplay } from '../../../utils/timeFormat';
 import type { Booking } from '../../../services/bookingService';
 import type { Room } from '../../../services/RoomService';
+
+// Helper function to parse ISO date string (YYYY-MM-DD) in local timezone
+// Avoids UTC offset issues that cause date to show as previous day
+const parseLocalDate = (isoDateString: string): Date => {
+  if (!isoDateString) return new Date();
+  const [year, month, day] = isoDateString.split('T')[0].split('-').map(Number);
+  return new Date(year, month - 1, day);
+};
 
 interface TimeSlot {
   time: string;
@@ -24,18 +35,22 @@ const SpaceSchedule = () => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [spaces, setSpaces] = useState<Room[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true); // Only for first load
+  const [bookingsLoading, setBookingsLoading] = useState(false); // For date changes
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [timeInterval, setTimeInterval] = useState(15);
+  const [showCalendar, setShowCalendar] = useState(false);
+  const [calendarMonth, setCalendarMonth] = useState(new Date());
+  const spacesLoadedRef = useRef(false); // Track if spaces have been loaded
 
-  // Generate time slots based on package time interval
-  const generateTimeSlots = (interval: number = 15): TimeSlot[] => {
+  // Memoize time slots to avoid regenerating on every render
+  const timeSlots = useMemo(() => {
     const slots: TimeSlot[] = [];
     const startHour = 12; // 12 PM
     const endHour = 22; // 10 PM
     
     for (let hour = startHour; hour <= endHour; hour++) {
-      for (let minute = 0; minute < 60; minute += interval) {
+      for (let minute = 0; minute < 60; minute += timeInterval) {
         if (hour === endHour && minute > 0) break; // Stop at 10:00 PM
         
         const displayHour = hour > 12 ? hour - 12 : hour;
@@ -50,9 +65,7 @@ const SpaceSchedule = () => {
       }
     }
     return slots;
-  };
-
-  const timeSlots = generateTimeSlots(timeInterval);
+  }, [timeInterval]);
 
   // Format time to 12-hour format
   const formatTime12Hour = (time: string): string => {
@@ -99,71 +112,8 @@ const SpaceSchedule = () => {
     return days[date.getDay()];
   };
 
-  // Check if a time slot is during a break time for a specific room
-  const isBreakTime = (space: Room, slot: TimeSlot): boolean => {
-    if (!space.break_time || space.break_time.length === 0) return false;
-    
-    const dayName = getDayName(selectedDate);
-    const slotMinutes = slot.hour * 60 + slot.minute;
-    
-    for (const breakTime of space.break_time) {
-      // Check if today is in the break time days
-      if (!breakTime.days.includes(dayName)) continue;
-      
-      // Parse break start and end times
-      const [startHour, startMinute] = breakTime.start_time.split(':').map(Number);
-      const [endHour, endMinute] = breakTime.end_time.split(':').map(Number);
-      const breakStartMinutes = startHour * 60 + startMinute;
-      const breakEndMinutes = endHour * 60 + endMinute;
-      
-      // Check if slot falls within break time
-      if (slotMinutes >= breakStartMinutes && slotMinutes < breakEndMinutes) {
-        return true;
-      }
-    }
-    
-    return false;
-  };
-
-  // Check if this is the first slot of a break (for showing the break info)
-  const isBreakTimeStart = (space: Room, slot: TimeSlot): { isStart: boolean; rowSpan: number; breakTime: BreakTime | null } => {
-    if (!space.break_time || space.break_time.length === 0) {
-      return { isStart: false, rowSpan: 0, breakTime: null };
-    }
-    
-    const dayName = getDayName(selectedDate);
-    const slotMinutes = slot.hour * 60 + slot.minute;
-    
-    for (const breakTime of space.break_time) {
-      if (!breakTime.days.includes(dayName)) continue;
-      
-      const [startHour, startMinute] = breakTime.start_time.split(':').map(Number);
-      const [endHour, endMinute] = breakTime.end_time.split(':').map(Number);
-      const breakStartMinutes = startHour * 60 + startMinute;
-      const breakEndMinutes = endHour * 60 + endMinute;
-      
-      // Check if this slot is the start of the break
-      if (slotMinutes === breakStartMinutes) {
-        const breakDurationMinutes = breakEndMinutes - breakStartMinutes;
-        const rowSpan = Math.ceil(breakDurationMinutes / timeInterval);
-        return { isStart: true, rowSpan, breakTime };
-      }
-    }
-    
-    return { isStart: false, rowSpan: 0, breakTime: null };
-  };
-
-  // Filter time slots to only show rows with bookings or breaks
-  const getVisibleTimeSlots = (): TimeSlot[] => {
-    return timeSlots.filter(slot => {
-      // Check if any space has a booking or break at this time
-      return spaces.some(space => {
-        const cellData = getBookingForCell(space, slot);
-        const hasBreak = isBreakTime(space, slot);
-        return cellData !== null || hasBreak;
-      });
-    });
-  };
+  // Memoize the current day name to avoid recalculating
+  const currentDayName = useMemo(() => getDayName(selectedDate), [selectedDate]);
 
   // Natural sort function: alphabetical first, then numerical
   const naturalSort = (a: Room, b: Room): number => {
@@ -198,31 +148,79 @@ const SpaceSchedule = () => {
     return 0;
   };
 
-  const loadData = useCallback(async () => {
+  // Load spaces only once on mount (they don't change with date) - with cache support
+  const loadSpaces = useCallback(async () => {
+    if (spacesLoadedRef.current) return; // Already loaded
     try {
-      setLoading(true);
+      const user = getStoredUser();
+
+      // Check if cache has any data first
+      const hasCachedRooms = await roomCacheService.hasCachedData();
       
-      // Fetch spaces
-      const spacesResponse = await roomService.getRooms();
+      if (hasCachedRooms) {
+        // Use cached data immediately for instant loading
+        const cachedRooms = await roomCacheService.getCachedRooms();
+        if (cachedRooms) {
+          const sortedSpaces = [...cachedRooms].sort(naturalSort);
+          setSpaces(sortedSpaces);
+          spacesLoadedRef.current = true;
+          return;
+        }
+      }
+      
+      // No cache available, fetch from API
+      const spacesResponse = await roomService.getRooms({
+        user_id: user?.id,
+        per_page: 100
+      });
       const fetchedSpaces = Array.isArray(spacesResponse.data) ? spacesResponse.data : spacesResponse.data.rooms || [];
-      
-      // Sort spaces: alphabetical first, then numerical
+      // Cache for next time
+      await roomCacheService.cacheRooms(fetchedSpaces);
       const sortedSpaces = [...fetchedSpaces].sort(naturalSort);
       setSpaces(sortedSpaces);
+      spacesLoadedRef.current = true;
+    } catch (error) {
+      console.error('Error loading spaces:', error);
+    }
+  }, []);
 
+  // Load bookings for the selected date with cache support
+  const loadBookings = useCallback(async () => {
+    try {
+      setBookingsLoading(true);
+      
       // Format date as YYYY-MM-DD for booking_date filter
       const year = selectedDate.getFullYear();
       const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
       const day = String(selectedDate.getDate()).padStart(2, '0');
       const dateStr = `${year}-${month}-${day}`;
 
-      const bookingsResponse = await bookingService.getBookings({
-        booking_date: dateStr
-      });
+      let fetchedBookings: Booking[];
       
-      const fetchedBookings = bookingsResponse.data.bookings || [];
-      console.log('Fetched bookings for Space Schedule:', dateStr, fetchedBookings);
-      setBookings(fetchedBookings);
+      // Check if cache has any data first
+      const hasCachedBookings = await bookingCacheService.hasCachedData();
+      
+      if (hasCachedBookings) {
+        // Cache exists - use filtered results immediately (even if empty for this date)
+        console.log('[SpaceSchedule] Cache exists, filtering for date:', dateStr);
+        const cachedBookings = await bookingCacheService.getFilteredBookingsFromCache({
+          booking_date: dateStr,
+        });
+        console.log('[SpaceSchedule] Filtered bookings from cache:', cachedBookings?.length || 0);
+        fetchedBookings = (cachedBookings || []) as Booking[];
+        setBookings(fetchedBookings);
+      } else {
+        // No cache available, fetch from API
+        const bookingsResponse = await bookingService.getBookings({
+          booking_date: dateStr,
+          user_id: getStoredUser()?.id
+        });
+        
+        fetchedBookings = bookingsResponse.data.bookings || [];
+        setBookings(fetchedBookings);
+        // Cache for next time
+        await bookingCacheService.cacheBookings(fetchedBookings);
+      }
 
       // Extract time interval from the first booking's package
       if (fetchedBookings.length > 0 && fetchedBookings[0].package) {
@@ -232,93 +230,238 @@ const SpaceSchedule = () => {
         }
       }
     } catch (error) {
-      console.error('Error loading data:', error);
+      console.error('Error loading bookings:', error);
     } finally {
-      setLoading(false);
+      setBookingsLoading(false);
     }
   }, [selectedDate]);
 
-  // Fetch spaces and bookings
+  // Initial load: fetch spaces and bookings in parallel for faster loading
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    const init = async () => {
+      await Promise.all([loadSpaces(), loadBookings()]);
+      setInitialLoading(false);
+    };
+    init();
+  }, []); // Only run once on mount
+
+  // Fetch bookings when date changes (fast - only one API call)
+  useEffect(() => {
+    if (!initialLoading) {
+      loadBookings();
+    }
+  }, [selectedDate]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Navigate dates
   const goToPreviousDay = () => {
     const newDate = new Date(selectedDate);
     newDate.setDate(newDate.getDate() - 1);
     setSelectedDate(newDate);
+    setCalendarMonth(newDate);
   };
 
   const goToNextDay = () => {
     const newDate = new Date(selectedDate);
     newDate.setDate(newDate.getDate() + 1);
     setSelectedDate(newDate);
+    setCalendarMonth(newDate);
   };
 
   const goToToday = () => {
-    setSelectedDate(new Date());
+    const today = new Date();
+    setSelectedDate(today);
+    setCalendarMonth(today);
   };
 
-  // Check if a booking occupies a specific time slot for a space
-  const getBookingForCell = (space: Room, slot: TimeSlot): BookingCell | null => {
-    const spaceBookings = bookings.filter(b => 
-      b.room_id === space.id && 
-      (b.status === 'confirmed' || b.status === 'checked-in' || b.status === 'pending')
-    );
+  // Calendar navigation
+  const goToPreviousMonth = () => {
+    const newMonth = new Date(calendarMonth);
+    newMonth.setMonth(newMonth.getMonth() - 1);
+    setCalendarMonth(newMonth);
+  };
 
-    for (const booking of spaceBookings) {
-      // Parse booking time (format: "HH:mm" or "HH:mm:ss")
-      const [bookingHour, bookingMinute] = booking.booking_time.split(':').map(Number);
-      
-      // Check if this slot matches the booking start time
-      if (bookingHour === slot.hour && bookingMinute === slot.minute) {
-        // Calculate duration in minutes - handle 'hours and minutes' unit with decimal value
-        let durationInMinutes: number;
-        if (booking.duration_unit === 'hours and minutes') {
-          const hours = Math.floor(booking.duration);
-          const mins = Math.round((booking.duration % 1) * 60);
-          durationInMinutes = hours * 60 + mins;
-        } else {
-          durationInMinutes = booking.duration_unit === 'hours' 
-            ? booking.duration * 60 
-            : booking.duration;
-        }
-        // Use the booking's package interval if available, otherwise use state interval
-        const interval = booking.package?.time_slot_interval || timeInterval;
-        const durationInSlots = Math.ceil(durationInMinutes / interval);
-        return {
-          booking,
-          rowSpan: durationInSlots
-        };
-      }
+  const goToNextMonth = () => {
+    const newMonth = new Date(calendarMonth);
+    newMonth.setMonth(newMonth.getMonth() + 1);
+    setCalendarMonth(newMonth);
+  };
 
-      // Check if booking continues through this slot (but don't render it)
-      // Calculate if current slot is within the booking duration
-      const bookingStartMinutes = bookingHour * 60 + bookingMinute;
-      const slotMinutes = slot.hour * 60 + slot.minute;
-      // Handle 'hours and minutes' unit with decimal value
-      let durationInMinutes: number;
-      if (booking.duration_unit === 'hours and minutes') {
-        const hours = Math.floor(booking.duration);
-        const mins = Math.round((booking.duration % 1) * 60);
-        durationInMinutes = hours * 60 + mins;
-      } else {
-        durationInMinutes = booking.duration_unit === 'hours' 
-          ? booking.duration * 60 
-          : booking.duration;
-      }
-      const bookingEndMinutes = bookingStartMinutes + durationInMinutes;
-      
-      if (slotMinutes > bookingStartMinutes && slotMinutes < bookingEndMinutes) {
-        return { booking, rowSpan: 0 }; // Return 0 rowSpan to indicate slot is occupied but shouldn't render
+  const selectDate = (date: Date) => {
+    setSelectedDate(date);
+    setShowCalendar(false);
+  };
+
+  // Generate calendar days for the current month view
+  const getCalendarDays = (): (Date | null)[] => {
+    const year = calendarMonth.getFullYear();
+    const month = calendarMonth.getMonth();
+    
+    // First day of the month
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    
+    // Days in month
+    const daysInMonth = lastDay.getDate();
+    
+    // Starting day of week (0 = Sunday)
+    const startingDayOfWeek = firstDay.getDay();
+    
+    // Build calendar array
+    const days: (Date | null)[] = [];
+    
+    // Add empty slots for days before the month starts
+    for (let i = 0; i < startingDayOfWeek; i++) {
+      days.push(null);
+    }
+    
+    // Add all days in the month
+    for (let day = 1; day <= daysInMonth; day++) {
+      days.push(new Date(year, month, day));
+    }
+    
+    return days;
+  };
+
+  const isSameDay = (date1: Date, date2: Date): boolean => {
+    return date1.getDate() === date2.getDate() &&
+           date1.getMonth() === date2.getMonth() &&
+           date1.getFullYear() === date2.getFullYear();
+  };
+
+  const isToday = (date: Date): boolean => {
+    return isSameDay(date, new Date());
+  };
+
+  // Pre-compute booking map for O(1) lookups - grouped by room_id
+  const bookingsByRoom = useMemo(() => {
+    const map = new Map<number, Booking[]>();
+    for (const booking of bookings) {
+      if (booking.room_id && (booking.status === 'confirmed' || booking.status === 'checked-in' || booking.status === 'pending')) {
+        const roomBookings = map.get(booking.room_id) || [];
+        roomBookings.push(booking);
+        map.set(booking.room_id, roomBookings);
       }
     }
+    return map;
+  }, [bookings]);
 
-    return null;
-  };
+  // Pre-compute ALL cell data once to avoid recalculating during render
+  // This is the key optimization - compute once, use everywhere
+  const cellDataCache = useMemo(() => {
+    const cache = new Map<string, BookingCell | null>();
+    const breakCache = new Map<string, { isStart: boolean; rowSpan: number; breakTime: BreakTime | null }>();
+    const isBreakCache = new Map<string, boolean>();
+    
+    for (const slot of timeSlots) {
+      for (const space of spaces) {
+        const key = `${space.id}-${slot.hour}-${slot.minute}`;
+        
+        // Calculate booking for cell
+        const spaceBookings = bookingsByRoom.get(space.id) || [];
+        let cellData: BookingCell | null = null;
+        
+        for (const booking of spaceBookings) {
+          const [bookingHour, bookingMinute] = booking.booking_time.split(':').map(Number);
+          
+          if (bookingHour === slot.hour && bookingMinute === slot.minute) {
+            let durationInMinutes: number;
+            if (booking.duration_unit === 'hours and minutes') {
+              const hours = Math.floor(booking.duration);
+              const mins = Math.round((booking.duration % 1) * 60);
+              durationInMinutes = hours * 60 + mins;
+            } else {
+              durationInMinutes = booking.duration_unit === 'hours' 
+                ? booking.duration * 60 
+                : booking.duration;
+            }
+            const interval = booking.package?.time_slot_interval || timeInterval;
+            const durationInSlots = Math.ceil(durationInMinutes / interval);
+            cellData = { booking, rowSpan: durationInSlots };
+            break;
+          }
 
-  if (loading) {
+          const bookingStartMinutes = bookingHour * 60 + bookingMinute;
+          const slotMinutes = slot.hour * 60 + slot.minute;
+          let durationInMinutes: number;
+          if (booking.duration_unit === 'hours and minutes') {
+            const hours = Math.floor(booking.duration);
+            const mins = Math.round((booking.duration % 1) * 60);
+            durationInMinutes = hours * 60 + mins;
+          } else {
+            durationInMinutes = booking.duration_unit === 'hours' 
+              ? booking.duration * 60 
+              : booking.duration;
+          }
+          const bookingEndMinutes = bookingStartMinutes + durationInMinutes;
+          
+          if (slotMinutes > bookingStartMinutes && slotMinutes < bookingEndMinutes) {
+            cellData = { booking, rowSpan: 0 };
+            break;
+          }
+        }
+        cache.set(key, cellData);
+        
+        // Calculate break time
+        let isInBreak = false;
+        let breakStart: { isStart: boolean; rowSpan: number; breakTime: BreakTime | null } = { isStart: false, rowSpan: 0, breakTime: null };
+        
+        if (space.break_time && space.break_time.length > 0) {
+          const slotMinutes = slot.hour * 60 + slot.minute;
+          
+          for (const breakTime of space.break_time) {
+            if (!breakTime.days.includes(currentDayName)) continue;
+            
+            const [startHour, startMinute] = breakTime.start_time.split(':').map(Number);
+            const [endHour, endMinute] = breakTime.end_time.split(':').map(Number);
+            const breakStartMinutes = startHour * 60 + startMinute;
+            const breakEndMinutes = endHour * 60 + endMinute;
+            
+            if (slotMinutes >= breakStartMinutes && slotMinutes < breakEndMinutes) {
+              isInBreak = true;
+            }
+            
+            if (slotMinutes === breakStartMinutes) {
+              const breakDurationMinutes = breakEndMinutes - breakStartMinutes;
+              const rowSpan = Math.ceil(breakDurationMinutes / timeInterval);
+              breakStart = { isStart: true, rowSpan, breakTime };
+            }
+          }
+        }
+        
+        isBreakCache.set(key, isInBreak);
+        breakCache.set(key, breakStart);
+      }
+    }
+    
+    return { cache, breakCache, isBreakCache };
+  }, [timeSlots, spaces, bookingsByRoom, currentDayName, timeInterval]);
+
+  // Fast lookups from cache
+  const getCellData = useCallback((spaceId: number, slot: TimeSlot): BookingCell | null => {
+    return cellDataCache.cache.get(`${spaceId}-${slot.hour}-${slot.minute}`) || null;
+  }, [cellDataCache]);
+
+  const getBreakStart = useCallback((spaceId: number, slot: TimeSlot) => {
+    return cellDataCache.breakCache.get(`${spaceId}-${slot.hour}-${slot.minute}`) || { isStart: false, rowSpan: 0, breakTime: null };
+  }, [cellDataCache]);
+
+  const getIsBreak = useCallback((spaceId: number, slot: TimeSlot): boolean => {
+    return cellDataCache.isBreakCache.get(`${spaceId}-${slot.hour}-${slot.minute}`) || false;
+  }, [cellDataCache]);
+
+  // Memoize visible time slots using cached data - much faster now
+  const visibleTimeSlots = useMemo(() => {
+    return timeSlots.filter(slot => {
+      return spaces.some(space => {
+        const key = `${space.id}-${slot.hour}-${slot.minute}`;
+        const hasBooking = cellDataCache.cache.get(key) !== null;
+        const hasBreak = cellDataCache.isBreakCache.get(key) || false;
+        return hasBooking || hasBreak;
+      });
+    });
+  }, [timeSlots, spaces, cellDataCache]);
+
+  if (initialLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className={`animate-spin rounded-full h-12 w-12 border-b-2 border-${fullColor}`}></div>
@@ -347,16 +490,113 @@ const SpaceSchedule = () => {
               {''}
             </StandardButton>
             
-            <div className="flex items-center gap-2">
-              <Calendar className={`w-5 h-5 text-${fullColor}`} />
-              <h2 className="text-xl font-semibold text-gray-900">
-                {selectedDate.toLocaleDateString('en-US', { 
-                  weekday: 'long', 
-                  year: 'numeric', 
-                  month: 'long', 
-                  day: 'numeric' 
-                })}
-              </h2>
+            {/* Calendar Dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setShowCalendar(!showCalendar)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-${themeColor}-50 transition-colors`}
+              >
+                <Calendar className={`w-5 h-5 text-${fullColor}`} />
+                <h2 className="text-xl font-semibold text-gray-900">
+                  {selectedDate.toLocaleDateString('en-US', { 
+                    weekday: 'long', 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric' 
+                  })}
+                </h2>
+              </button>
+
+              {/* Calendar Dropdown */}
+              {showCalendar && (
+                <>
+                  {/* Backdrop */}
+                  <div 
+                    className="fixed inset-0 z-30"
+                    onClick={() => setShowCalendar(false)}
+                  />
+                  
+                  {/* Calendar Popover */}
+                  <div className="absolute top-full left-0 mt-2 bg-white rounded-lg shadow-xl border border-gray-200 p-4 z-40 animate-scale-in">
+                    {/* Month Navigation */}
+                    <div className="flex items-center justify-between mb-4">
+                      <button
+                        onClick={goToPreviousMonth}
+                        className="p-2 hover:bg-gray-100 rounded-lg transition"
+                      >
+                        <ChevronLeft className="w-5 h-5 text-gray-600" />
+                      </button>
+                      <div className="text-base font-semibold text-gray-900">
+                        {calendarMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                      </div>
+                      <button
+                        onClick={goToNextMonth}
+                        className="p-2 hover:bg-gray-100 rounded-lg transition"
+                      >
+                        <ChevronRight className="w-5 h-5 text-gray-600" />
+                      </button>
+                    </div>
+
+                    {/* Day Labels */}
+                    <div className="grid grid-cols-7 gap-1 mb-2">
+                      {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(day => (
+                        <div key={day} className="text-center text-xs font-medium text-gray-500 py-2">
+                          {day}
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Calendar Grid */}
+                    <div className="grid grid-cols-7 gap-1">
+                      {getCalendarDays().map((day, index) => {
+                        if (!day) {
+                          return <div key={`empty-${index}`} className="aspect-square" />;
+                        }
+
+                        const isSelected = isSameDay(day, selectedDate);
+                        const isTodayDate = isToday(day);
+                        const isPast = day < new Date(new Date().setHours(0, 0, 0, 0));
+
+                        return (
+                          <button
+                            key={index}
+                            onClick={() => selectDate(day)}
+                            className={`
+                              aspect-square flex items-center justify-center rounded-lg text-sm font-medium transition-all
+                              ${isSelected 
+                                ? `bg-${fullColor} text-white shadow-md` 
+                                : isTodayDate
+                                ? `bg-${themeColor}-100 text-${fullColor} font-semibold`
+                                : isPast
+                                ? 'text-gray-400 hover:bg-gray-100'
+                                : 'text-gray-700 hover:bg-gray-100'
+                              }
+                            `}
+                          >
+                            {day.getDate()}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Quick Actions */}
+                    <div className="mt-4 pt-4 border-t border-gray-200 flex gap-2">
+                      <button
+                        onClick={goToToday}
+                        className={`flex-1 px-3 py-2 text-sm font-medium text-${fullColor} bg-${themeColor}-50 hover:bg-${themeColor}-100 rounded-lg transition`}
+                      >
+                        Today
+                      </button>
+                      <button
+                        onClick={() => setShowCalendar(false)}
+                        className="flex-1 px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition"
+                      >
+                        Close
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
 
             <StandardButton
@@ -377,6 +617,14 @@ const SpaceSchedule = () => {
             >
               Today
             </StandardButton>
+
+            {/* Loading indicator for date changes */}
+            {bookingsLoading && (
+              <div className="flex items-center gap-2 text-gray-500">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span className="text-sm">Loading...</span>
+              </div>
+            )}
 
             {/* Legend Tooltip */}
             <div className="relative group">
@@ -462,15 +710,16 @@ const SpaceSchedule = () => {
                 </tr>
               </thead>
               <tbody>
-                {getVisibleTimeSlots().map((slot, index) => (
+                {visibleTimeSlots.map((slot, index) => (
                 <tr key={index} className="border-b border-gray-100 hover:bg-gray-50" style={{ height: '60px' }}>
                   <td className="sticky left-0 bg-white z-10 px-4 py-2 text-sm text-gray-600 border-r border-gray-200 font-medium" style={{ height: '60px' }}>
                     {slot.time}
                   </td>
                   {spaces.map(space => {
-                    const cellData = getBookingForCell(space, slot);
-                    const breakTimeData = isBreakTimeStart(space, slot);
-                    const isInBreak = isBreakTime(space, slot);
+                    // Use cached data - no recalculation needed
+                    const cellData = getCellData(space.id, slot);
+                    const breakTimeData = getBreakStart(space.id, slot);
+                    const isInBreak = getIsBreak(space.id, slot);
                     
                     // Skip if this slot is occupied by a booking that started earlier
                     if (cellData && cellData.rowSpan === 0) {
@@ -647,7 +896,7 @@ const SpaceSchedule = () => {
                 <div className="bg-gray-50 rounded-lg p-4 space-y-3">
                   <div className="flex items-center">
                     <Calendar className="h-4 w-4 text-gray-400 mr-3" />
-                    <span className="text-sm text-gray-900">{new Date(selectedBooking.booking_date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                    <span className="text-sm text-gray-900">{parseLocalDate(selectedBooking.booking_date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span>
                   </div>
                   <div className="flex items-center">
                     <Clock className="h-4 w-4 text-gray-400 mr-3" />

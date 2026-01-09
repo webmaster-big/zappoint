@@ -3,6 +3,7 @@ import { Plus, Search, Edit, Trash2, Utensils, Download, Upload, X, CheckSquare,
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import StandardButton from '../../../components/ui/StandardButton';
 import { addOnService, locationService } from '../../../services';
+import { addOnCacheService } from '../../../services/AddOnCacheService';
 import LocationSelector from '../../../components/admin/LocationSelector';
 import Toast from '../../../components/ui/Toast';
 import type { AddOnsAddon } from '../../../types/addOns.types';
@@ -92,16 +93,52 @@ const ManageAddons = () => {
     try {
       setLoading(true);
       
+      // Build filter params
       const params: any = {
         user_id: getStoredUser()?.id,
       };
       
       // For company_admin, only add location_id if a specific location is selected
-      // For location_manager/attendant, backend filters by their location automatically
       if (isCompanyAdmin && selectedLocationId) {
         params.location_id = selectedLocationId;
       }
       
+      // Check if cache has data first for instant loading
+      const hasCachedData = await addOnCacheService.hasCachedData();
+      
+      if (hasCachedData) {
+        console.log('[AddOns] Loading from cache...');
+        const cachedAddOns = await addOnCacheService.getFilteredAddOnsFromCache(params);
+        
+        if (cachedAddOns && cachedAddOns.length > 0) {
+          const formattedAddons: AddOnsAddon[] = cachedAddOns.map(addon => {
+            let imageFull = '';
+            if (addon.image) {
+              const imgStr = String(addon.image);
+              if (imgStr.startsWith('http') || imgStr.startsWith(ASSET_URL)) {
+                imageFull = imgStr;
+              } else {
+                imageFull = `${ASSET_URL}${imgStr}`;
+              }
+            }
+
+            return {
+              id: addon.id.toString(),
+              name: addon.name,
+              price: addon.price || 0,
+              image: imageFull,
+              location: addon.location && typeof addon.location === 'object' ? addon.location : null,
+            };
+          });
+          console.log('[AddOns] Loaded from cache:', formattedAddons.length, 'add-ons');
+          setAddons(formattedAddons);
+          setLoading(false);
+          return;
+        }
+      }
+      
+      // No cache or cache is empty - fetch from API
+      console.log('[AddOns] Fetching from API...');
       const response = await addOnService.getAddOns(params);
       console.log('Add-ons response:', response);
       
@@ -127,6 +164,10 @@ const ManageAddons = () => {
           };
         });
         setAddons(formattedAddons);
+        
+        // Cache the raw add-ons for next time
+        await addOnCacheService.cacheAddOns(response.data.add_ons);
+        console.log('[AddOns] Cached', response.data.add_ons.length, 'add-ons');
       }
     } catch (error) {
       console.error('Error loading addons:', error);
@@ -207,6 +248,9 @@ const ManageAddons = () => {
                 }
               : addon
           ));
+          
+          // Update in cache
+          await addOnCacheService.updateAddOnInCache(result.data);
         }
         
         showToast('Add-on updated successfully!', 'success');
@@ -259,6 +303,9 @@ const ManageAddons = () => {
             location: result.data.location && typeof result.data.location === 'object' ? result.data.location : null,
           };
           setAddons(prev => [...prev, newAddon]);
+          
+          // Add to cache
+          await addOnCacheService.addAddOnToCache(result.data);
         }
         
         showToast('Add-on created successfully!', 'success');
@@ -300,6 +347,9 @@ const ManageAddons = () => {
         
         // Remove addon from state without full reload
         setAddons(prev => prev.filter(addon => addon.id !== id));
+        
+        // Remove from cache
+        await addOnCacheService.removeAddOnFromCache(parseInt(id));
         
         showToast('Add-on deleted successfully!', 'success');
       } catch (error) {

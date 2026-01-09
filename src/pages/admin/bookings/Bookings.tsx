@@ -22,6 +22,7 @@ import StandardButton from '../../../components/ui/StandardButton';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
 import type { BookingsPageBooking, BookingsPageFilterOptions } from '../../../types/Bookings.types';
 import bookingService from '../../../services/bookingService';
+import { bookingCacheService } from '../../../services/BookingCacheService';
 import { createPayment, PAYMENT_TYPE } from '../../../services/PaymentService';
 import { locationService } from '../../../services/LocationService';
 import LocationSelector from '../../../components/admin/LocationSelector';
@@ -37,6 +38,14 @@ const formatTime12Hour = (time24: string): string => {
   const period = hours >= 12 ? 'PM' : 'AM';
   const hours12 = hours % 12 || 12;
   return `${hours12}:${minutes} ${period}`;
+};
+
+// Helper function to parse ISO date string (YYYY-MM-DD) in local timezone
+// Avoids UTC offset issues that cause date to show as previous day
+const parseLocalDate = (isoDateString: string): Date => {
+  if (!isoDateString) return new Date();
+  const [year, month, day] = isoDateString.split('T')[0].split('-').map(Number);
+  return new Date(year, month - 1, day);
 };
 
 const Bookings: React.FC = () => {
@@ -179,7 +188,70 @@ const Bookings: React.FC = () => {
     try {
       setLoading(true);
       
-      // Fetch bookings from backend with filters
+      // Check if cache has data first for instant loading
+      const hasCachedData = await bookingCacheService.hasCachedData();
+      
+      if (hasCachedData) {
+        console.log('[Bookings] Loading from cache...');
+        
+        // Build filter for cache
+        const cacheFilters: any = {};
+        if (selectedLocation !== null) {
+          cacheFilters.location_id = selectedLocation;
+        }
+        
+        // Get bookings from cache
+        const cachedBookings = await bookingCacheService.getFilteredBookingsFromCache(cacheFilters);
+        
+        if (cachedBookings && cachedBookings.length > 0) {
+          // Transform cached booking data to match BookingsPageBooking interface
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const transformedBookings: BookingsPageBooking[] = cachedBookings.map((booking: any) => ({
+            id: booking.id.toString(),
+            type: 'package',
+            packageName: booking.package?.name || 'N/A',
+            room: booking.room?.name || 'N/A',
+            customerName: booking.customer 
+              ? `${booking.customer.first_name} ${booking.customer.last_name}`
+              : booking.guest_name || 'Guest',
+            email: booking.customer?.email || booking.guest_email || '',
+            phone: booking.customer?.phone || booking.guest_phone || '',
+            date: booking.booking_date,
+            time: booking.booking_time,
+            participants: booking.participants,
+            status: booking.status as BookingsPageBooking['status'],
+            totalAmount: Number(booking.total_amount),
+            amountPaid: Number(booking.amount_paid || booking.total_amount),
+            paymentStatus: (booking.payment_status || 'pending') as BookingsPageBooking['paymentStatus'],
+            createdAt: booking.created_at,
+            paymentMethod: booking.payment_method as BookingsPageBooking['paymentMethod'],
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            attractions: booking.attractions?.map((attr: any) => ({
+              name: attr.name,
+              quantity: attr.pivot?.quantity || 1
+            })) || [],
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            addOns: booking.add_ons?.map((addon: any) => ({
+              name: addon.name,
+              quantity: addon.pivot?.quantity || 1
+            })) || [],
+            duration: booking.duration && booking.duration_unit 
+              ? formatDurationDisplay(booking.duration, booking.duration_unit)
+              : '2 hours',
+            activity: booking.package?.category || 'Package Booking',
+            notes: booking.notes,
+            referenceNumber: booking.reference_number,
+            location: booking.location?.name || 'N/A',
+          }));
+          console.log('[Bookings] Loaded from cache:', transformedBookings.length, 'bookings');
+          setBookings(transformedBookings);
+          setLoading(false);
+          return;
+        }
+      }
+      
+      // No cache or cache is empty - fetch from API
+      console.log('[Bookings] Fetching from API...');
       const params: any = {
         page: 1,
         per_page: 1000,
@@ -232,8 +304,11 @@ const Bookings: React.FC = () => {
           referenceNumber: booking.reference_number,
           location: booking.location?.name || 'N/A',
         }));
-        console.log('Transformed Bookings:', transformedBookings);
+        console.log('[Bookings] Fetched from API:', transformedBookings.length, 'bookings');
         setBookings(transformedBookings);
+        
+        // Cache the raw API data for next time
+        await bookingCacheService.cacheBookings(response.data.bookings);
       }
     } catch (error) {
       console.error('Error loading bookings:', error);
@@ -395,7 +470,12 @@ const Bookings: React.FC = () => {
     try {
       // Call API to check in booking
       const userId = getStoredUser()?.id;
-      await bookingService.checkInBooking(referenceNumber, userId);
+      const response = await bookingService.checkInBooking(referenceNumber, userId);
+      
+      // Update cache with checked-in booking
+      if (response?.data) {
+        await bookingCacheService.updateBookingInCache(response.data);
+      }
       
       // Update local state
       const updatedBookings = bookings.map(booking =>
@@ -411,8 +491,12 @@ const Bookings: React.FC = () => {
   const handleStatusChange = async (id: string, newStatus: BookingsPageBooking['status']) => {
     try {
 
-        await bookingService.updateBooking(Number(id), { status: newStatus });
+        const response = await bookingService.updateBooking(Number(id), { status: newStatus });
       
+        // Sync the updated booking to cache
+        if (response.data) {
+          await bookingCacheService.updateBookingInCache(response.data);
+        }
       
       // Update local state
       const updatedBookings = bookings.map(booking =>
@@ -427,13 +511,37 @@ const Bookings: React.FC = () => {
 
   const handlePaymentStatusChange = async (id: string, newPaymentStatus: BookingsPageBooking['paymentStatus']) => {
     try {
+      // Find the booking to get total amount
+      const booking = bookings.find(b => b.id === id);
+      if (!booking) return;
+      
+      // Build update payload - if setting to 'paid', also update amount_paid to match total
+      const updatePayload: any = { payment_status: newPaymentStatus };
+      
+      if (newPaymentStatus === 'paid') {
+        // When marking as paid, set amount_paid to full total amount
+        updatePayload.amount_paid = booking.totalAmount;
+      }
+      
       // Update payment status via API
-      await bookingService.updateBooking(Number(id), { payment_status: newPaymentStatus });
+      const response = await bookingService.updateBooking(Number(id), updatePayload);
+      
+      // Sync the updated booking to cache
+      if (response.data) {
+        await bookingCacheService.updateBookingInCache(response.data);
+      }
       
       // Update local state
-      const updatedBookings = bookings.map(booking =>
-        booking.id === id ? { ...booking, paymentStatus: newPaymentStatus } : booking
-      );
+      const updatedBookings = bookings.map(b => {
+        if (b.id === id) {
+          const updates: any = { paymentStatus: newPaymentStatus };
+          if (newPaymentStatus === 'paid') {
+            updates.amountPaid = b.totalAmount;
+          }
+          return { ...b, ...updates };
+        }
+        return b;
+      });
       setBookings(updatedBookings);
     } catch (error) {
       console.error('Error updating payment status:', error);
@@ -448,7 +556,11 @@ const Bookings: React.FC = () => {
       try {
         // Delete each booking via API
         await Promise.all(
-          selectedBookings.map(id => bookingService.deleteBooking(Number(id)))
+          selectedBookings.map(async (id) => {
+            await bookingService.deleteBooking(Number(id));
+            // Remove from cache
+            await bookingCacheService.removeBookingFromCache(Number(id));
+          })
         );
         
         // Update local state
@@ -467,6 +579,9 @@ const Bookings: React.FC = () => {
       try {
         await bookingService.deleteBooking(Number(id));
         
+        // Remove from cache
+        await bookingCacheService.removeBookingFromCache(Number(id));
+        
         // Update local state
         const updatedBookings = bookings.filter(booking => booking.id !== id);
         setBookings(updatedBookings);
@@ -484,14 +599,19 @@ const Bookings: React.FC = () => {
       // Update each booking status via API
       await Promise.all(
         selectedBookings.map(async (id) => {
+          let response;
           if (newStatus === 'checked-in') {
-            return bookingService.checkInBooking(id);
+            response = await bookingService.checkInBooking(id);
           } else if (newStatus === 'completed') {
-            return bookingService.completeBooking(Number(id));
+            response = await bookingService.completeBooking(Number(id));
           } else if (newStatus === 'cancelled') {
-            return bookingService.cancelBooking(Number(id));
+            response = await bookingService.cancelBooking(Number(id));
           } else {
-            return bookingService.updateBooking(Number(id), { status: newStatus });
+            response = await bookingService.updateBooking(Number(id), { status: newStatus });
+          }
+          // Sync to cache
+          if (response?.data) {
+            await bookingCacheService.updateBookingInCache(response.data);
           }
         })
       );
@@ -528,11 +648,18 @@ const Bookings: React.FC = () => {
 
   const handleOpenInternalNotesModal = async (booking: BookingsPageBooking) => {
     setSelectedBookingForNotes(booking);
-    // Fetch current internal notes
+    // Use cache first for instant loading, fallback to API if needed
     try {
-      const response = await bookingService.getBookingById(Number(booking.id));
-      if (response.success && response.data) {
-        setInternalNotesText(response.data.internal_notes || '');
+      const cachedBooking = await bookingCacheService.getBookingFromCache(Number(booking.id));
+      if (cachedBooking) {
+        console.log('[Bookings] Loaded internal notes from cache');
+        setInternalNotesText(cachedBooking.internal_notes || '');
+      } else {
+        // Fallback to API if not in cache
+        const response = await bookingService.getBookingById(Number(booking.id));
+        if (response.success && response.data) {
+          setInternalNotesText(response.data.internal_notes || '');
+        }
       }
     } catch (error) {
       console.error('Error fetching booking details:', error);
@@ -565,6 +692,12 @@ const Bookings: React.FC = () => {
             : booking
         );
         setBookings(updatedBookings);
+        
+        // Update cache with new internal notes
+        if (response.data) {
+          await bookingCacheService.updateBookingInCache(response.data);
+        }
+        
         alert('Internal notes saved successfully!');
         handleCloseInternalNotesModal();
       } else {
@@ -810,13 +943,18 @@ const Bookings: React.FC = () => {
     try {
       setProcessingPayment(true);
 
-      // Get booking details to find customer_id and location_id
-      const bookingResponse = await bookingService.getBookingById(Number(selectedBookingForPayment.id));
-      if (!bookingResponse.success || !bookingResponse.data) {
-        throw new Error('Failed to get booking details');
+      // Get booking details from cache first, fallback to API
+      let booking = await bookingCacheService.getBookingFromCache(Number(selectedBookingForPayment.id));
+      
+      if (!booking) {
+        // Fallback to API if not in cache
+        const bookingResponse = await bookingService.getBookingById(Number(selectedBookingForPayment.id));
+        if (!bookingResponse.success || !bookingResponse.data) {
+          throw new Error('Failed to get booking details');
+        }
+        booking = bookingResponse.data;
       }
 
-      const booking = bookingResponse.data;
       const customerId = booking.customer_id || null; // Allow null for guest bookings
       const locationId = booking.location_id;
 
@@ -845,11 +983,16 @@ const Bookings: React.FC = () => {
       const newAmountPaid = selectedBookingForPayment.amountPaid + amount;
       const newPaymentStatus: BookingsPageBooking['paymentStatus'] = newAmountPaid >= selectedBookingForPayment.totalAmount ? 'paid' : 'partial';
 
-      await bookingService.updateBooking(Number(selectedBookingForPayment.id), {
+      const updateResponse = await bookingService.updateBooking(Number(selectedBookingForPayment.id), {
         amount_paid: newAmountPaid,
         payment_status: newPaymentStatus,
         status: 'confirmed', // Set status to confirmed when payment is made
       });
+
+      // Update cache with updated booking
+      if (updateResponse?.data) {
+        await bookingCacheService.updateBookingInCache(updateResponse.data);
+      }
 
       // Update local state
       const updatedBookings = bookings.map(booking =>
@@ -861,7 +1004,7 @@ const Bookings: React.FC = () => {
 
       alert('Payment processed successfully!');
       handleClosePaymentModal();
-      loadBookings(); // Reload to get fresh data
+      // No need to reload - cache and local state are already updated
     } catch (error) {
       console.error('Error processing payment:', error);
       alert('Failed to process payment. Please try again.');
@@ -1114,8 +1257,9 @@ const Bookings: React.FC = () => {
                     const now = new Date();
                     now.setHours(0, 0, 0, 0); // Reset to start of today
                     
-                    const dateA = new Date(a.date);
-                    const dateB = new Date(b.date);
+                    // Use parseLocalDate to avoid timezone issues with ISO date strings
+                    const dateA = parseLocalDate(a.date);
+                    const dateB = parseLocalDate(b.date);
                     dateA.setHours(0, 0, 0, 0);
                     dateB.setHours(0, 0, 0, 0);
                     
@@ -1165,7 +1309,7 @@ const Bookings: React.FC = () => {
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <div className="font-medium text-gray-900">
-                          {new Date(booking.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                          {parseLocalDate(booking.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                         </div>
                         <div className="text-xs text-gray-500">{formatTime12Hour(booking.time)}</div>
                       </td>
@@ -1707,18 +1851,6 @@ const Bookings: React.FC = () => {
                   loading={processingPayment}
                 >
                   {processingPayment ? 'Processing...' : 'Process Payment'}
-                </StandardButton>
-              </div>
-
-              {/* Bottom Close Button */}
-              <div className="mt-6 pt-4 border-t border-gray-200">
-                <StandardButton
-                  variant="secondary"
-                  size="md"
-                  fullWidth
-                  onClick={() => handleClosePaymentModal()}
-                >
-                  Close
                 </StandardButton>
               </div>
             </div>

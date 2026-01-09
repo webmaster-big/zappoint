@@ -13,6 +13,9 @@ import {
     packageService,
     categoryService
 } from '../../../services';
+import { roomCacheService } from '../../../services/RoomCacheService';
+import { packageCacheService } from '../../../services/PackageCacheService';
+import { addOnCacheService } from '../../../services/AddOnCacheService';
 import type { Category } from '../../../services/CategoryService';
 import { formatTimeRange, formatDurationDisplay } from '../../../utils/timeFormat';
 import type { 
@@ -106,11 +109,24 @@ const EditPackage: React.FC = () => {
             }
 
             try {
+                // Check caches first before making API calls
+                const cachedRooms = await roomCacheService.getCachedRooms();
+                const cachedAddOns = await addOnCacheService.getCachedAddOns();
+                
+                // Only fetch from API if cache is empty
+                const roomsPromise = (cachedRooms && cachedRooms.length > 0) 
+                    ? Promise.resolve({ data: { rooms: cachedRooms } })
+                    : roomService.getRooms();
+                    
+                const addOnsPromise = (cachedAddOns && cachedAddOns.length > 0)
+                    ? Promise.resolve({ data: { add_ons: cachedAddOns } })
+                    : addOnService.getAddOns();
+                
                 // Step 1: Fetch all reference data first
                 const [attractionsRes, addOnsRes, roomsRes, promosRes, giftCardsRes, categoriesRes] = await Promise.all([
                     attractionService.getAttractions(),
-                    addOnService.getAddOns(),
-                    roomService.getRooms(),
+                    addOnsPromise,
+                    roomsPromise,
                     promoService.getPromos(),
                     giftCardService.getGiftCards(),
                     categoryService.getCategories()
@@ -129,12 +145,30 @@ const EditPackage: React.FC = () => {
                     name: addon.name,
                     price: addon.price || 0
                 })) || [];
+                
+                // Cache add-ons if we fetched from API (not from cache)
+                if (!cachedAddOns || cachedAddOns.length === 0) {
+                    const addOnsList = addOnsRes.data?.add_ons || [];
+                    if (addOnsList.length > 0) {
+                        await addOnCacheService.cacheAddOns(addOnsList);
+                    }
+                }
 
-                const roomsData = roomsRes.data?.rooms?.map(room => ({
+                // Rooms data - use the result from cache or API
+                let roomsData: CreatePackageRoom[] = [];
+                const roomsList = roomsRes.data?.rooms || [];
+                roomsData = roomsList.map((room: any) => ({
                     id: room.id,
                     name: room.name,
                     area_group: room.area_group || undefined
-                })) || [];
+                }));
+                
+                // Cache rooms if we fetched from API (not from cache)
+                if (!cachedRooms || cachedRooms.length === 0) {
+                    if (roomsList.length > 0) {
+                        await roomCacheService.cacheRooms(roomsList);
+                    }
+                }
 
                 const promosData = promosRes.data?.promos?.filter(promo => 
                     promo.status === "active" && !promo.deleted
@@ -166,13 +200,18 @@ const EditPackage: React.FC = () => {
                 setCategories(categoriesData);
 
                 // Step 2: Now fetch the package data
+                console.log('Fetching package with ID:', id);
                 const response = await packageService.getPackage(parseInt(id));
+                console.log('Package API response:', response);
+                
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const pkg = response.data as any; // Using 'any' to handle time slot fields that may not be in type yet
                 
                 console.log("Loaded package data:", pkg);
                 
-                if (!pkg) {
+                // Check if response was successful but data is empty
+                if (!pkg || !pkg.id) {
+                    console.error('Package data is empty or missing ID');
                     setNotFound(true);
                     setLoading(false);
                     return;
@@ -273,10 +312,27 @@ const EditPackage: React.FC = () => {
                 }
 
                 setLoading(false);
-            } catch (error) {
+            } catch (error: unknown) {
                 console.error("Error loading data:", error);
-                showToast("Failed to load package data", "error");
-                setNotFound(true);
+                
+                // Type guard for axios errors
+                const axiosError = error as { response?: { status?: number; data?: { message?: string } }; message?: string };
+                
+                // Check if it's a 404 (package not found) vs other errors
+                if (axiosError.response?.status === 404) {
+                    showToast("Package not found", "error");
+                    setNotFound(true);
+                } else {
+                    // For other errors, show the error but don't mark as not found
+                    const errorMsg = axiosError.response?.data?.message || axiosError.message || "Failed to load package data";
+                    showToast(errorMsg, "error");
+                    console.error("Error details:", {
+                        status: axiosError.response?.status,
+                        message: errorMsg,
+                        error: error
+                    });
+                    // Don't set notFound for general errors - user might want to retry
+                }
                 setLoading(false);
             }
         };
@@ -633,6 +689,11 @@ const EditPackage: React.FC = () => {
                 }
             }
             
+            // Update in cache
+            if (response.success && response.data) {
+                await packageCacheService.updatePackageInCache(response.data);
+            }
+            
             showToast("Package updated successfully!", "success");
             
             // Navigate back after a short delay
@@ -688,16 +749,27 @@ const EditPackage: React.FC = () => {
     if (notFound) {
         return (
             <div className="flex items-center justify-center min-h-screen">
-                <div className="text-center">
+                <div className="text-center max-w-md mx-auto px-4">
                     <h2 className="text-2xl font-bold text-gray-900 mb-4">Package Not Found</h2>
-                    <p className="text-gray-600 mb-6">The package you're looking for doesn't exist.</p>
-                    <Link
-                        to="/packages"
-                        className={`inline-flex items-center gap-2 bg-${themeColor}-700 hover:bg-${fullColor} text-white px-6 py-2 rounded-lg font-semibold`}
-                    >
-                        <ArrowLeft size={18} />
-                        Back to Packages
-                    </Link>
+                    <p className="text-gray-600 mb-6">
+                        The package with ID {id} doesn't exist or you don't have permission to access it.
+                    </p>
+                    <div className="flex gap-3 justify-center">
+                        <Link
+                            to="/packages"
+                            className={`inline-flex items-center gap-2 bg-${themeColor}-700 hover:bg-${fullColor} text-white px-6 py-2 rounded-lg font-semibold`}
+                        >
+                            <ArrowLeft size={18} />
+                            Back to Packages
+                        </Link>
+                        <StandardButton
+                            onClick={() => window.location.reload()}
+                            variant="secondary"
+                            size="md"
+                        >
+                            Retry
+                        </StandardButton>
+                    </div>
                 </div>
             </div>
         );

@@ -23,11 +23,12 @@ import {
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import bookingService, { type Booking } from '../../../services/bookingService';
+import { bookingCacheService } from '../../../services/BookingCacheService';
 import { createPayment, PAYMENT_TYPE } from '../../../services/PaymentService';
 import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
 import { getStoredUser } from '../../../utils/storage';
-import { formatDurationDisplay, convertTo12Hour } from '../../../utils/timeFormat';
+import { formatDurationDisplay, convertTo12Hour, parseLocalDate } from '../../../utils/timeFormat';
 
 interface ScanResult {
   bookingId: number;
@@ -64,6 +65,20 @@ const CheckIn: React.FC = () => {
   const loadBookings = useCallback(async () => {
     try {
       setLoading(true);
+      
+      // Check cache first for faster loading
+      const cachedBookings = await bookingCacheService.getFilteredBookingsFromCache({
+        booking_date: selectedDate,
+        user_id: getStoredUser()?.id,
+      });
+      
+      if (cachedBookings && cachedBookings.length > 0) {
+        setBookings(cachedBookings);
+        setLoading(false);
+        return;
+      }
+      
+      // If no cache, fetch from API
       const response = await bookingService.getBookings({
         booking_date: selectedDate,
         per_page: 100,
@@ -72,6 +87,8 @@ const CheckIn: React.FC = () => {
       
       if (response.success && response.data) {
         setBookings(response.data.bookings);
+        // Cache the fetched bookings
+        await bookingCacheService.cacheBookings(response.data.bookings);
       }
     } catch (error) {
       console.error('Error loading bookings:', error);
@@ -346,6 +363,11 @@ const CheckIn: React.FC = () => {
       const checkInResponse = await bookingService.checkInBooking(verifiedBooking.reference_number, userId);
       
       if (checkInResponse.success) {
+        // Sync the updated booking to cache
+        if (checkInResponse.data) {
+          await bookingCacheService.updateBookingInCache(checkInResponse.data);
+        }
+        
         setScanResult({
           bookingId: verifiedBooking.id,
           booking: checkInResponse.data,
@@ -381,6 +403,11 @@ const CheckIn: React.FC = () => {
       const response = await bookingService.checkInBooking(booking.reference_number, userId);
       
       if (response.success) {
+        // Sync the updated booking to cache
+        if (response.data) {
+          await bookingCacheService.updateBookingInCache(response.data);
+        }
+        
         setToast({ message: 'Check-in successful!', type: 'success' });
         // Reload bookings
         loadBookings();
@@ -484,24 +511,39 @@ const CheckIn: React.FC = () => {
       const newAmountPaid = Number(selectedBookingForPayment.amount_paid || 0) + amount;
       const newPaymentStatus = newAmountPaid >= Number(selectedBookingForPayment.total_amount) ? 'paid' : 'partial';
 
-      await bookingService.updateBooking(selectedBookingForPayment.id, {
+      const updateResponse = await bookingService.updateBooking(selectedBookingForPayment.id, {
         amount_paid: newAmountPaid,
         payment_status: newPaymentStatus,
         status: 'confirmed', // Set status to confirmed when payment is made
       });
 
+      // Update cache with the new payment information
+      if (updateResponse.success && updateResponse.data) {
+        await bookingCacheService.updateBookingInCache(updateResponse.data);
+      }
+
       setToast({ message: 'Payment processed successfully!', type: 'success' });
       handleClosePaymentModal();
       
-      // Reload bookings
+      // Reload bookings from cache (much faster)
       await loadBookings();
       
       // Reopen verification modal with updated booking if it was from there
       if (verifiedBooking && verifiedBooking.id === selectedBookingForPayment.id) {
-        const updatedBookingResponse = await bookingService.getBookingById(selectedBookingForPayment.id);
-        if (updatedBookingResponse.success) {
-          setVerifiedBooking(updatedBookingResponse.data);
+        // Get updated booking from cache first
+        const cachedBooking = await bookingCacheService.getBookingFromCache(selectedBookingForPayment.id);
+        
+        if (cachedBooking) {
+          setVerifiedBooking(cachedBooking);
           setShowVerificationModal(true);
+        } else {
+          // Fallback to API if not in cache
+          const updatedBookingResponse = await bookingService.getBookingById(selectedBookingForPayment.id);
+          if (updatedBookingResponse.success) {
+            await bookingCacheService.updateBookingInCache(updatedBookingResponse.data);
+            setVerifiedBooking(updatedBookingResponse.data);
+            setShowVerificationModal(true);
+          }
         }
       }
     } catch (error) {
@@ -919,7 +961,7 @@ const CheckIn: React.FC = () => {
                       <div>
                         <p className="text-xs text-gray-500">Date & Time</p>
                         <p className="font-medium text-gray-800">
-                          {new Date(verifiedBooking.booking_date).toLocaleDateString()} at {convertTo12Hour(verifiedBooking.booking_time)}
+                          {parseLocalDate(verifiedBooking.booking_date).toLocaleDateString()} at {convertTo12Hour(verifiedBooking.booking_time)}
                         </p>
                       </div>
                     </div>
@@ -1406,7 +1448,7 @@ const CheckIn: React.FC = () => {
                       <div>
                         <p className="text-xs text-gray-500">Date & Time</p>
                         <p className="font-medium text-gray-800">
-                          {new Date(selectedBooking.booking_date).toLocaleDateString()} at {convertTo12Hour(selectedBooking.booking_time)}
+                          {parseLocalDate(selectedBooking.booking_date).toLocaleDateString()} at {convertTo12Hour(selectedBooking.booking_time)}
                         </p>
                       </div>
                     </div>

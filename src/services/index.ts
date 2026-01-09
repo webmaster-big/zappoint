@@ -11,6 +11,13 @@ import { userService } from './UserService';
 import { locationService } from './LocationService';
 import { dayOffService } from './DayOffService';
 
+// Cache service exports
+export { bookingCacheService } from './BookingCacheService';
+export { roomCacheService } from './RoomCacheService';
+export { packageCacheService } from './PackageCacheService';
+export { addOnCacheService } from './AddOnCacheService';
+export { attractionCacheService } from './AttractionCacheService';
+
 // Service exports for easy importing
 export { packageService } from './PackageService';
 export type { Package, PackageFilters, CreatePackageData, UpdatePackageData } from './PackageService';

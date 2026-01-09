@@ -15,6 +15,10 @@ import {
     locationService,
     categoryService
 } from '../../../services';
+import { roomCacheService } from '../../../services/RoomCacheService';
+import { packageCacheService } from '../../../services/PackageCacheService';
+import { addOnCacheService } from '../../../services/AddOnCacheService';
+import { attractionCacheService } from '../../../services/AttractionCacheService';
 import type { Category } from '../../../services/CategoryService';
 import type { AvailabilitySchedule } from '../../../services/PackageService';
 import { formatTimeRange, formatDurationDisplay } from '../../../utils/timeFormat';
@@ -93,10 +97,33 @@ const CreatePackage: React.FC = () => {
                 if (selectedLocation !== null && selectedLocation !== undefined) {
                     params.location_id = selectedLocation;
                 }
+                
+                // Check caches first before making API calls
+                const cacheFilters = selectedLocation ? { location_id: selectedLocation } : {};
+                
+                const [cachedRooms, cachedAttractions, cachedAddOns] = await Promise.all([
+                    roomCacheService.getFilteredRoomsFromCache(cacheFilters),
+                    attractionCacheService.getFilteredAttractionsFromCache({ ...cacheFilters, is_active: true }),
+                    addOnCacheService.getFilteredAddOnsFromCache({ ...cacheFilters, is_active: true })
+                ]);
+                
+                // Only fetch from API if cache is empty
+                const roomsPromise = (cachedRooms && cachedRooms.length > 0) 
+                    ? Promise.resolve({ data: { rooms: cachedRooms } })
+                    : roomService.getRooms(params);
+                    
+                const attractionsPromise = (cachedAttractions && cachedAttractions.length > 0)
+                    ? Promise.resolve({ data: { attractions: cachedAttractions } })
+                    : attractionService.getAttractions(params);
+                    
+                const addOnsPromise = (cachedAddOns && cachedAddOns.length > 0)
+                    ? Promise.resolve({ data: { add_ons: cachedAddOns } })
+                    : addOnService.getAddOns(params);
+                
                 const [attractionsRes, addOnsRes, roomsRes, promosRes, giftCardsRes, categoriesRes] = await Promise.all([
-                    attractionService.getAttractions(params),
-                    addOnService.getAddOns(params),
-                    roomService.getRooms(params),
+                    attractionsPromise,
+                    addOnsPromise,
+                    roomsPromise,
                     promoService.getPromos(),
                     giftCardService.getGiftCards(),
                     categoryService.getCategories()
@@ -116,11 +143,37 @@ const CreatePackage: React.FC = () => {
                     price: addon.price || 0
                 })) || [];
 
-                const roomsData = roomsRes.data?.rooms?.map(room => ({
+                // Rooms data - use the result from cache or API
+                let roomsData: CreatePackageRoom[] = [];
+                const roomsList = roomsRes.data?.rooms || [];
+                roomsData = roomsList.map((room: any) => ({
                     id: room.id,
                     name: room.name,
                     area_group: room.area_group || undefined
-                })) || [];
+                }));
+                
+                // Cache data if we fetched from API (not from cache)
+                if (!cachedRooms || cachedRooms.length === 0) {
+                    if (roomsList.length > 0) {
+                        await roomCacheService.cacheRooms(roomsList);
+                    }
+                }
+                
+                // Cache attractions if fetched from API
+                if (!cachedAttractions || cachedAttractions.length === 0) {
+                    const attractionsList = attractionsRes.data?.attractions || [];
+                    if (attractionsList.length > 0) {
+                        await attractionCacheService.cacheAttractions(attractionsList);
+                    }
+                }
+                
+                // Cache add-ons if fetched from API
+                if (!cachedAddOns || cachedAddOns.length === 0) {
+                    const addOnsList = addOnsRes.data?.add_ons || [];
+                    if (addOnsList.length > 0) {
+                        await addOnCacheService.cacheAddOns(addOnsList);
+                    }
+                }
 
                 const promosData = promosRes.data?.promos?.filter(promo => 
                     promo.status === "active" && !promo.deleted
@@ -530,6 +583,11 @@ const CreatePackage: React.FC = () => {
                     setSubmitting(false);
                     return;
                 }
+            }
+            
+            // Add to cache
+            if (packageResponse.success && packageResponse.data) {
+                await packageCacheService.addPackageToCache(packageResponse.data);
             }
             
             showToast("Package created successfully!", "success");

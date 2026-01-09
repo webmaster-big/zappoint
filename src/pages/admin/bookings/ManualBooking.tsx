@@ -1,8 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Save, Plus, Minus } from 'lucide-react';
+import QRCode from 'qrcode';
 import { useThemeColor } from '../../../hooks/useThemeColor';
-import bookingService from '../../../services/bookingService';
+import Toast from '../../../components/ui/Toast';
+import bookingService, { type CreateBookingData } from '../../../services/bookingService';
+import { bookingCacheService } from '../../../services/BookingCacheService';
+import { packageCacheService } from '../../../services/PackageCacheService';
 import EmptyStateModal from '../../../components/ui/EmptyStateModal';
 import StandardButton from '../../../components/ui/StandardButton';
 import roomService from '../../../services/RoomService';
@@ -10,6 +14,27 @@ import { locationService } from '../../../services/LocationService';
 import LocationSelector from '../../../components/admin/LocationSelector';
 import { getStoredUser, getImageUrl } from '../../../utils/storage';
 import { formatDurationDisplay } from '../../../utils/timeFormat';
+
+// Extended booking data interface for manual booking (includes guest of honor fields)
+interface ExtendedBookingData extends CreateBookingData {
+  guest_of_honor_name?: string;
+  guest_of_honor_age?: number;
+  guest_of_honor_gender?: 'male' | 'female' | 'other';
+  skip_date_validation?: boolean;
+  is_manual_entry?: boolean;
+}
+
+// Helper function to sort rooms numerically (extracts numbers from room names)
+const sortRoomsNumerically = (rooms: any[]): any[] => {
+  return [...rooms].sort((a, b) => {
+    // Extract numbers from room names (e.g., "Room 1" -> 1, "Space 10" -> 10)
+    const numA = parseInt(a.name.replace(/\D/g, '')) || 0;
+    const numB = parseInt(b.name.replace(/\D/g, '')) || 0;
+    if (numA !== numB) return numA - numB;
+    // If no numbers or same numbers, sort alphabetically
+    return a.name.localeCompare(b.name);
+  });
+};
 
 const ManualBooking: React.FC = () => {
   const navigate = useNavigate();
@@ -26,6 +51,8 @@ const ManualBooking: React.FC = () => {
   const [selectedAttractions, setSelectedAttractions] = useState<{ [id: number]: number }>({});
   const [creatingRoom, setCreatingRoom] = useState(false);
   const [sendEmail, setSendEmail] = useState(true);
+  const [calculatedTotal, setCalculatedTotal] = useState(0);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [form, setForm] = useState<{
     customerName: string;
     email: string;
@@ -37,7 +64,7 @@ const ManualBooking: React.FC = () => {
     participants: number;
     paymentMethod: 'cash' | 'card' | 'paylater';
     paymentStatus: 'paid' | 'partial' | 'pending';
-    status: 'completed' | 'confirmed' | 'pending';
+    status: 'pending' | 'confirmed' | 'checked-in' | 'completed' | 'cancelled';
     notes: string;
     totalAmount: string;
     amountPaid: string;
@@ -102,6 +129,19 @@ const ManualBooking: React.FC = () => {
         return;
       }
 
+      // Try cache first for faster loading
+      const cacheFilters = selectedLocation !== null 
+        ? { location_id: selectedLocation, status: 'active' as const }
+        : { status: 'active' as const };
+      
+      const cachedPackages = await packageCacheService.getFilteredPackagesFromCache(cacheFilters);
+      
+      if (cachedPackages && cachedPackages.length > 0) {
+        console.log('📦 Using cached packages:', cachedPackages.length);
+        setPackages(cachedPackages);
+        return;
+      }
+
       // Use the same method as OnsiteBooking - backend will filter based on user role
       const params: any = {user_id: user.id};
       if (selectedLocation !== null) {
@@ -115,6 +155,11 @@ const ManualBooking: React.FC = () => {
         const pkgs = Array.isArray(response.data.packages) ? response.data.packages : [];
         setPackages(pkgs);
         
+        // Cache the packages for future use
+        if (pkgs.length > 0) {
+          await packageCacheService.cachePackages(pkgs);
+        }
+        
         // Show modal if no packages available
         if (pkgs.length === 0) {
           setShowEmptyModal(true);
@@ -127,6 +172,7 @@ const ManualBooking: React.FC = () => {
       console.error('Error loading packages:', error);
       setPackages([]);
       setShowEmptyModal(true);
+      setToast({ message: 'Failed to load packages', type: 'error' });
     }
   };
 
@@ -135,8 +181,17 @@ const ManualBooking: React.FC = () => {
       const response = await bookingService.getPackageById(packageId);
       console.log('📦 Package data received:', response.data);
       setPkg(response.data);
+      
+      // Set participants to package minimum if current value is less
+      if (response.data?.min_participants && form.participants < response.data.min_participants) {
+        setForm(prev => ({
+          ...prev,
+          participants: response.data.min_participants || 1
+        }));
+      }
     } catch (error) {
       console.error('Error loading package details:', error);
+      setToast({ message: 'Failed to load package details', type: 'error' });
     }
   };
 
@@ -178,7 +233,7 @@ const ManualBooking: React.FC = () => {
       const user = getStoredUser();
       
       if (!user?.location_id) {
-        alert('User location not found');
+        setToast({ message: 'User location not found', type: 'error' });
         return;
       }
 
@@ -221,12 +276,14 @@ const ManualBooking: React.FC = () => {
       }
     } catch (error: any) {
       console.error('Error creating Space:', error);
-      alert('Failed to create Space: ' + (error.response?.data?.message || error.message));
+      const errorMsg = error.response?.data?.message || error.message || 'Failed to create Space';
+      setToast({ message: errorMsg, type: 'error' });
     } finally {
       setCreatingRoom(false);
     }
   };
 
+  // Calculate total - now updates state for better reactivity
   const calculateTotal = () => {
     if (!pkg) return 0;
 
@@ -281,16 +338,30 @@ const ManualBooking: React.FC = () => {
     return total;
   };
 
+  // Recalculate total whenever relevant values change
+  useEffect(() => {
+    if (pkg) {
+      const total = calculateTotal();
+      setCalculatedTotal(total);
+    }
+  }, [pkg, form.participants, selectedAddOns, selectedAttractions]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!form.customerName || !form.email || !form.packageId || !form.bookingDate || !form.bookingTime) {
-      alert('Please fill in all required fields');
+      setToast({ message: 'Please fill in all required fields', type: 'error' });
       return;
     }
 
     if (!pkg) {
-      alert('Please select a valid package');
+      setToast({ message: 'Please select a valid package', type: 'error' });
+      return;
+    }
+
+    // Validate space selection if spaces are available for the package
+    if (pkg.rooms && pkg.rooms.length > 0 && !form.roomId) {
+      setToast({ message: 'Please select a space for this booking', type: 'error' });
       return;
     }
 
@@ -303,27 +374,85 @@ const ManualBooking: React.FC = () => {
       const finalAmountPaid = form.paymentMethod === 'paylater' ? 0 : (form.amountPaid ? Number(form.amountPaid) : 
         (form.paymentStatus === 'paid' ? finalTotalAmount : (form.paymentStatus === 'partial' ? finalTotalAmount / 2 : 0)));
       
-      // Prepare add-ons with price_at_booking
-      const additionalAddons = Object.entries(selectedAddOns).map(([id, quantity]) => {
-        const addOn = pkg.add_ons?.find((a: any) => a.id === parseInt(id));
-        return {
-          addon_id: parseInt(id),
-          quantity: quantity,
-          price_at_booking: addOn?.price || 0
-        };
-      });
-
-      // Prepare attractions with price_at_booking
-      const additionalAttractions = Object.entries(selectedAttractions).map(([id, quantity]) => {
-        const attraction = pkg.attractions?.find((a: any) => a.id === parseInt(id));
-        return {
-          attraction_id: parseInt(id),
-          quantity: quantity,
-          price_at_booking: attraction?.price || 0
-        };
+      console.log('📦 Building additional attractions/addons...', {
+        selectedAttractions,
+        selectedAddOns,
+        pkgAttractions: pkg?.attractions,
+        pkgAddOns: pkg?.add_ons
       });
       
-      const bookingData = {
+      // Prepare add-ons with price_at_booking - filter out zero quantities and validate
+      const additionalAddons = Object.entries(selectedAddOns)
+        .filter(([, quantity]) => quantity > 0)
+        .map(([id, quantity]) => {
+          const addOn = pkg.add_ons?.find((a: any) => a.id === parseInt(id));
+          const addonId = parseInt(id);
+          
+          if (isNaN(addonId) || !addOn) {
+            console.warn(`⚠️ Invalid add-on ID or not found: ${id}, available:`, pkg.add_ons?.map((a: any) => a.id));
+            return null;
+          }
+          
+          // price_at_booking is unit price, backend calculates total with quantity
+          const unitPrice = Number(addOn.price);
+          console.log(`✅ Add-on found: ${addOn.name}, price: ${unitPrice}, quantity: ${quantity}`);
+          
+          return {
+            addon_id: addonId,
+            quantity: quantity,
+            price_at_booking: unitPrice
+          };
+        })
+        .filter((item): item is { addon_id: number; quantity: number; price_at_booking: number } => item !== null);
+
+      // Prepare attractions with price_at_booking - filter out zero quantities and validate
+      const additionalAttractions = Object.entries(selectedAttractions)
+        .filter(([, quantity]) => quantity > 0)
+        .map(([id, quantity]) => {
+          const attraction = pkg.attractions?.find((a: any) => a.id === parseInt(id));
+          const attractionId = parseInt(id);
+          
+          if (isNaN(attractionId) || !attraction) {
+            console.warn(`⚠️ Invalid attraction ID or not found: ${id}, available:`, pkg.attractions?.map((a: any) => a.id));
+            return null;
+          }
+          
+          // price_at_booking is unit price, backend calculates total with quantity
+          const unitPrice = Number(attraction.price);
+          console.log(`✅ Attraction found: ${attraction.name}, price: ${unitPrice}, quantity: ${quantity}`);
+          
+          return {
+            attraction_id: attractionId,
+            quantity: quantity,
+            price_at_booking: unitPrice
+          };
+        })
+        .filter((item): item is { attraction_id: number; quantity: number; price_at_booking: number } => item !== null);
+      
+      // Calculate duration - convert days to hours if needed (API only accepts minutes, hours, or hours and minutes)
+      const durationValue = pkg.duration ? Number(pkg.duration) : 2;
+      const durationUnitRaw = pkg.duration_unit || 'hours';
+      let finalDuration = durationValue;
+      let finalDurationUnit: 'minutes' | 'hours' | 'hours and minutes' = 'hours';
+      
+      if (durationUnitRaw.toLowerCase() === 'days') {
+        finalDuration = durationValue * 24;
+        finalDurationUnit = 'hours';
+      } else if (durationUnitRaw.toLowerCase() === 'minutes') {
+        finalDuration = durationValue;
+        finalDurationUnit = 'minutes';
+      } else if (durationUnitRaw === 'hours and minutes') {
+        finalDuration = durationValue;
+        finalDurationUnit = 'hours and minutes';
+      } else {
+        finalDuration = durationValue;
+        finalDurationUnit = 'hours';
+      }
+      
+      // Determine location_id: use selected location (for company admin) or user's location
+      const locationId = selectedLocation || user?.location_id || 1;
+      
+      const bookingData: ExtendedBookingData = {
         guest_name: form.customerName,
         guest_email: form.email,
         guest_phone: form.phone,
@@ -333,37 +462,137 @@ const ManualBooking: React.FC = () => {
         booking_date: form.bookingDate,
         booking_time: form.bookingTime,
         participants: form.participants,
-        duration: pkg.duration,
-        duration_unit: pkg.duration_unit,
+        duration: finalDuration,
+        duration_unit: finalDurationUnit,
         total_amount: finalTotalAmount,
         amount_paid: finalAmountPaid,
-        payment_method: form.paymentMethod,
-        payment_status: form.paymentStatus,
-        status: form.status,
-        notes: form.notes,
-        location_id: user?.location_id,
+        payment_method: form.paymentMethod as 'cash' | 'card' | 'paylater',
+        payment_status: form.paymentStatus as 'paid' | 'partial' | 'pending',
+        status: form.status as 'pending' | 'confirmed' | 'checked-in' | 'completed' | 'cancelled',
+        notes: form.notes || undefined,
+        location_id: locationId,
         created_by: user?.id,
         additional_addons: additionalAddons.length > 0 ? additionalAddons : undefined,
         additional_attractions: additionalAttractions.length > 0 ? additionalAttractions : undefined,
-        send_email: sendEmail,
         guest_of_honor_name: pkg.has_guest_of_honor && form.guestOfHonorName ? form.guestOfHonorName : undefined,
         guest_of_honor_age: pkg.has_guest_of_honor && form.guestOfHonorAge ? parseInt(form.guestOfHonorAge) : undefined,
         guest_of_honor_gender: pkg.has_guest_of_honor && form.guestOfHonorGender ? form.guestOfHonorGender as 'male' | 'female' | 'other' : undefined,
+        skip_date_validation: true, // Allow past dates for manual booking records
+        is_manual_entry: true, // Flag this as a manually entered historical record
       };
 
-      console.log('Creating past booking record:', bookingData);
+      console.log('📤 Sending manual booking request:', bookingData);
+      console.log('🎟️ Additional attractions:', additionalAttractions);
+      console.log('➕ Additional add-ons:', additionalAddons);
+      console.log('\n🔍 === BOOKING REQUEST VALIDATION ===');
+      console.log('✅ guest_name:', bookingData.guest_name || '❌ MISSING');
+      console.log('✅ guest_email:', bookingData.guest_email || '❌ MISSING');
+      console.log('✅ package_id:', bookingData.package_id || '❌ MISSING');
+      console.log('✅ room_id:', bookingData.room_id ? `${bookingData.room_id}` : '⚠️ OPTIONAL');
+      console.log('✅ booking_time:', bookingData.booking_time || '❌ MISSING');
+      console.log('✅ booking_date:', bookingData.booking_date || '❌ MISSING');
+      console.log('✅ participants:', bookingData.participants || '❌ MISSING');
+      console.log('✅ location_id:', bookingData.location_id || '❌ MISSING');
+      console.log('💰 Pricing:', {
+        total_amount: bookingData.total_amount,
+        amount_paid: bookingData.amount_paid,
+        payment_method: bookingData.payment_method,
+        payment_status: bookingData.payment_status
+      });
+      console.log('================================\n');
       
       const response = await bookingService.createBooking(bookingData);
       
-      if (response.success) {
-        alert('Past booking recorded successfully!');
-        navigate('/bookings');
+      console.log('✅ Booking creation response:', response);
+      
+      if (response.success && response.data) {
+        const bookingId = response.data.id;
+        const referenceNumber = response.data.reference_number;
+        
+        console.log('✅ Booking created:', { bookingId, referenceNumber });
+        
+        // Add the new booking to cache
+        await bookingCacheService.addBookingToCache(response.data);
+        
+        // Generate QR code with the reference number
+        try {
+          const qrCodeBase64 = await QRCode.toDataURL(referenceNumber, {
+            width: 300,
+            margin: 2,
+            color: { dark: '#000000', light: '#FFFFFF' }
+          });
+          
+          console.log('📱 QR Code generated for reference:', referenceNumber);
+          
+          // Store QR code with email preference - this triggers email sending
+          const qrResponse = await bookingService.storeQrCode(bookingId, qrCodeBase64, sendEmail);
+          console.log('✅ QR code stored with response:', qrResponse);
+          console.log('✅ Email preference sent:', sendEmail);
+        } catch (qrError) {
+          console.error('⚠️ Failed to generate/store QR code:', qrError);
+          // Don't fail the entire process if QR code fails
+        }
+        
+        const emailStatus = sendEmail ? ' Confirmation email sent.' : '';
+        const successMsg = `Past booking recorded successfully! Reference: ${referenceNumber}${emailStatus}`;
+        setToast({ message: successMsg, type: 'success' });
+        
+        // Navigate after short delay to show toast
+        setTimeout(() => {
+          navigate('/bookings');
+        }, 1500);
       } else {
-        alert('Failed to create booking: ' + (response.message || 'Unknown error'));
+        const errorMsg = response.message || 'Unknown error occurred';
+        console.error('Booking creation failed:', errorMsg);
+        setToast({ message: `Failed to create booking: ${errorMsg}`, type: 'error' });
       }
-    } catch (error: any) {
-      console.error('Error creating past booking:', error);
-      alert('Error creating booking: ' + (error.response?.data?.message || error.message || 'Unknown error'));
+    } catch (error: unknown) {
+      console.error('❌ Error creating past booking:', error);
+      const err = error as { 
+        response?: { 
+          data?: { 
+            message?: string; 
+            error?: string; 
+            errors?: Record<string, string[]>;
+            id?: number 
+          };
+          status?: number;
+        }; 
+        message?: string 
+      };
+      
+      // Log detailed error info for debugging
+      if (err.response) {
+        console.error('Response status:', err.response.status);
+        console.error('Response data:', err.response.data);
+      }
+      
+      // Extract error message from various possible locations
+      let errorMsg = 'Unknown error';
+      if (err.response?.data?.message) {
+        errorMsg = err.response.data.message;
+      } else if (err.response?.data?.error) {
+        errorMsg = err.response.data.error;
+      } else if (err.response?.data?.errors) {
+        // Handle Laravel validation errors
+        const validationErrors = Object.entries(err.response.data.errors)
+          .map(([field, messages]) => `${field}: ${messages.join(', ')}`)
+          .join('; ');
+        errorMsg = validationErrors;
+      } else if (err.message) {
+        errorMsg = err.message;
+      }
+      
+      // Check if error response actually contains booking data (false error)
+      if (err.response?.data?.id) {
+        console.log('Booking may have been created despite error response');
+        setToast({ message: 'Booking may have been recorded. Please check the bookings list to confirm.', type: 'info' });
+        setTimeout(() => {
+          navigate('/bookings');
+        }, 2000);
+      } else {
+        setToast({ message: `Error creating booking: ${errorMsg}`, type: 'error' });
+      }
     } finally {
       setLoading(false);
     }
@@ -578,6 +807,7 @@ const ManualBooking: React.FC = () => {
                             required
                             className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring--500 focus:border-transparent transition-all"
                           />
+                          <p className="text-xs text-gray-500 mt-1">Past dates allowed for historical records</p>
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-2">Time *</label>
@@ -638,10 +868,10 @@ const ManualBooking: React.FC = () => {
                         <div>
                           <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
                             <div className={`h-1 w-1 rounded-full bg-${themeColor}-600`}></div>
-                            Room Selection *
+                            Space Selection *
                           </h3>
                           <div className="flex flex-wrap gap-2">
-                            {Array.isArray(pkg.rooms) && pkg.rooms.map((room: any) => (
+                            {Array.isArray(pkg.rooms) && sortRoomsNumerically(pkg.rooms).map((room: any) => (
                               <StandardButton
                                 type="button"
                                 key={room.id}
@@ -731,7 +961,7 @@ const ManualBooking: React.FC = () => {
                                   <span className="text-xs text-gray-500">{addOn.pricing_type === 'per_person' ? 'per person' : 'per unit'}</span>
                                 </div>
                                 
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-1">
                                   <StandardButton
                                     type="button"
                                     variant="secondary"
@@ -742,7 +972,23 @@ const ManualBooking: React.FC = () => {
                                   >
                                     {''}
                                   </StandardButton>
-                                  <span className="font-bold text-sm text-gray-900 min-w-[30px] text-center">{quantity}</span>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    value={quantity}
+                                    onChange={(e) => {
+                                      const newQty = parseInt(e.target.value) || 0;
+                                      if (newQty === 0) {
+                                        setSelectedAddOns(prev => {
+                                          const { [addOn.id]: removed, ...rest } = prev;
+                                          return rest;
+                                        });
+                                      } else {
+                                        setSelectedAddOns(prev => ({ ...prev, [addOn.id]: newQty }));
+                                      }
+                                    }}
+                                    className="w-14 text-center font-bold text-sm text-gray-900 border border-gray-300 rounded px-1 py-1"
+                                  />
                                   <StandardButton
                                     type="button"
                                     variant="primary"
@@ -785,7 +1031,7 @@ const ManualBooking: React.FC = () => {
                                   <span className="text-xs text-gray-500">{attraction.pricing_type === 'per_person' ? 'per person' : 'per unit'}</span>
                                 </div>
                                 
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-1">
                                   <StandardButton
                                     type="button"
                                     variant="secondary"
@@ -796,7 +1042,23 @@ const ManualBooking: React.FC = () => {
                                   >
                                     {''}
                                   </StandardButton>
-                                  <span className="font-bold text-sm text-gray-900 min-w-[30px] text-center">{quantity}</span>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    value={quantity}
+                                    onChange={(e) => {
+                                      const newQty = parseInt(e.target.value) || 0;
+                                      if (newQty === 0) {
+                                        setSelectedAttractions(prev => {
+                                          const { [attraction.id]: removed, ...rest } = prev;
+                                          return rest;
+                                        });
+                                      } else {
+                                        setSelectedAttractions(prev => ({ ...prev, [attraction.id]: newQty }));
+                                      }
+                                    }}
+                                    className="w-14 text-center font-bold text-sm text-gray-900 border border-gray-300 rounded px-1 py-1"
+                                  />
                                   <StandardButton
                                     type="button"
                                     variant="primary"
@@ -940,7 +1202,7 @@ const ManualBooking: React.FC = () => {
                     <div className={`bg-${themeColor}-50 border border-${themeColor}-200 rounded-lg p-4`}>
                       <div className="flex justify-between items-center">
                         <span className="text-sm font-medium text-gray-700">Calculated Total</span>
-                        <span className={`text-2xl font-bold text-${fullColor}`}>${Number(calculateTotal() || 0).toFixed(2)}</span>
+                        <span className={`text-2xl font-bold text-${fullColor}`}>${Number(calculatedTotal || 0).toFixed(2)}</span>
                       </div>
                     </div>
 
@@ -954,7 +1216,7 @@ const ManualBooking: React.FC = () => {
                         onChange={handleInputChange}
                         step="0.01"
                         min="0"
-                        placeholder={`${Number(calculateTotal() || 0).toFixed(2)}`}
+                        placeholder={`${Number(calculatedTotal || 0).toFixed(2)}`}
                         className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
                       />
                       <p className="text-xs text-gray-500 mt-1">Leave blank to use calculated total</p>
@@ -1122,6 +1384,15 @@ const ManualBooking: React.FC = () => {
           )}
         </div>
       </form>
+
+      {/* Toast Notification */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
 
       {/* Empty State Modal */}
       <EmptyStateModal

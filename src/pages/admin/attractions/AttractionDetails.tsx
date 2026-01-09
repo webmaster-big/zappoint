@@ -14,6 +14,7 @@ import {
 import StandardButton from '../../../components/ui/StandardButton';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { attractionService } from '../../../services/AttractionService';
+import { attractionCacheService } from '../../../services/AttractionCacheService';
 import { ASSET_URL } from '../../../utils/storage';
 import Toast from '../../../components/ui/Toast';
 import { extractIdFromSlug } from '../../../utils/slug';
@@ -61,8 +62,24 @@ const AttractionDetails = () => {
     if (!attractionId) return;
     try {
       setLoading(true);
+      
+      // Check cache first for instant loading
+      const cachedAttraction = await attractionCacheService.getAttractionFromCache(attractionId);
+      
+      if (cachedAttraction) {
+        setAttraction(cachedAttraction as Attraction);
+        setLoading(false);
+        return;
+      }
+      
+      // If not in cache, fetch from API
       const response = await attractionService.getAttraction(attractionId);
       setAttraction(response.data as Attraction);
+      
+      // Update cache with fetched data
+      if (response.data) {
+        await attractionCacheService.updateAttractionInCache(response.data);
+      }
     } catch (error) {
       console.error('Error loading attraction details:', error);
       setToast({ message: 'Failed to load attraction details', type: 'error' });
@@ -76,6 +93,10 @@ const AttractionDetails = () => {
       if (!attractionId) return;
       try {
         await attractionService.deleteAttraction(attractionId);
+        
+        // Remove from cache
+        await attractionCacheService.removeAttractionFromCache(attractionId);
+        
         setToast({ message: 'Attraction deleted successfully', type: 'success' });
         setTimeout(() => navigate('/attractions'), 1500);
       } catch (error) {

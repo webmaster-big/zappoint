@@ -19,8 +19,17 @@ import {
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import bookingService, { type Booking } from '../../../services/bookingService';
+import { bookingCacheService } from '../../../services/BookingCacheService';
 import { formatDurationDisplay, convertTo12Hour } from '../../../utils/timeFormat';
 import StandardButton from '../../../components/ui/StandardButton';
+
+// Helper function to parse ISO date string (YYYY-MM-DD) in local timezone
+// Avoids UTC offset issues that cause date to show as previous day
+const parseLocalDate = (isoDateString: string): Date => {
+  if (!isoDateString) return new Date();
+  const [year, month, day] = isoDateString.split('T')[0].split('-').map(Number);
+  return new Date(year, month - 1, day);
+};
 
 const ViewBooking: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
@@ -34,7 +43,7 @@ const ViewBooking: React.FC = () => {
   const [qrCodeData, setQrCodeData] = useState<string | null>(null);
   const [showQRModal, setShowQRModal] = useState(false);
 
-  // Load booking data from backend
+  // Load booking data - try cache first, then API
   useEffect(() => {
     const loadBooking = async () => {
       if (!id && !referenceNumber) {
@@ -44,19 +53,30 @@ const ViewBooking: React.FC = () => {
       }
 
       try {
-        let bookingData;
+        let bookingData: Booking | null = null;
         
-        // Prefer reference number lookup if available
-        if (referenceNumber) {
-          const response = await bookingService.getBookings({ reference_number: referenceNumber });
-          if (response.success && response.data && response.data.bookings.length > 0) {
-            bookingData = response.data.bookings[0];
+        // Try to get from cache first by ID
+        if (id) {
+          const cached = await bookingCacheService.getBookingFromCache(Number(id));
+          if (cached) {
+            bookingData = cached as Booking;
           }
-        } else if (id) {
-          // Fallback to ID lookup
-          const response = await bookingService.getBookingById(Number(id));
-          if (response.success && response.data) {
-            bookingData = response.data;
+        }
+        
+        // If not in cache, fetch from API
+        if (!bookingData) {
+          // Prefer reference number lookup if available
+          if (referenceNumber) {
+            const response = await bookingService.getBookings({ reference_number: referenceNumber });
+            if (response.success && response.data && response.data.bookings.length > 0) {
+              bookingData = response.data.bookings[0];
+            }
+          } else if (id) {
+            // Fallback to ID lookup
+            const response = await bookingService.getBookingById(Number(id));
+            if (response.success && response.data) {
+              bookingData = response.data;
+            }
           }
         }
 
@@ -251,7 +271,7 @@ const ViewBooking: React.FC = () => {
                 <div>
                   <p className="text-sm text-gray-500">Date & Time</p>
                   <p className="font-medium text-gray-900">
-                    {new Date(booking.booking_date).toLocaleDateString('en-US', { 
+                    {parseLocalDate(booking.booking_date).toLocaleDateString('en-US', { 
                       weekday: 'long', 
                       year: 'numeric', 
                       month: 'long', 

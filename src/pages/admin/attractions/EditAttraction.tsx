@@ -4,6 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import type { CreateAttractionsFormData } from '../../../types/createAttractions.types';
 import { attractionService } from '../../../services/AttractionService';
+import { attractionCacheService } from '../../../services/AttractionCacheService';
 import type { UpdateAttractionData } from '../../../services/AttractionService';
 import Toast from '../../../components/ui/Toast';
 import { ASSET_URL, getStoredUser } from '../../../utils/storage';
@@ -313,6 +314,11 @@ const EditAttraction = () => {
       const response = await attractionService.updateAttraction(Number(id), attractionData);
       
       console.log('Attraction updated:', response);
+      
+      // Update cache with the updated attraction
+      if (response.success && response.data) {
+        await attractionCacheService.updateAttractionInCache(response.data);
+      }
       
       setToast({ message: 'Attraction updated successfully!', type: 'success' });
       

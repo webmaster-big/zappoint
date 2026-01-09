@@ -22,8 +22,10 @@ import CounterAnimation from '../../components/ui/CounterAnimation';
 import StandardButton from '../../components/ui/StandardButton';
 import { getStoredUser } from '../../utils/storage';
 import bookingService from '../../services/bookingService';
+import { bookingCacheService } from '../../services/BookingCacheService';
 import MetricsService from '../../services/MetricsService';
 import { useThemeColor } from '../../hooks/useThemeColor';
+import { parseLocalDate } from '../../utils/timeFormat';
 
 const AttendantDashboard: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
@@ -114,6 +116,7 @@ const AttendantDashboard: React.FC = () => {
    const weekDates = getWeekDates(currentWeek);
 
    // Fetch weekly calendar data (changes when week changes)
+   // Uses cache service for faster loading, syncs in background
    useEffect(() => {
      const fetchWeeklyData = async () => {
        if (!locationId) return;
@@ -122,16 +125,28 @@ const AttendantDashboard: React.FC = () => {
          const weekStart = weekDates[0];
          const weekEnd = weekDates[6];
          
-         // Fetch bookings for the selected week
-         const bookingsResponse = await bookingService.getBookings({
+         const bookingParams = {
            location_id: locationId,
            date_from: weekStart.toISOString().split('T')[0],
            date_to: weekEnd.toISOString().split('T')[0],
-           per_page: 100,
-         });
+         };
          
-         const bookings = bookingsResponse.data.bookings || [];
-         setWeeklyBookings(bookings);
+         // Try to get from cache first
+         const cachedBookings = await bookingCacheService.getFilteredBookingsFromCache(bookingParams);
+         
+         if (cachedBookings && cachedBookings.length > 0) {
+           setWeeklyBookings(cachedBookings);
+         } else {
+           // No cache, fetch from API
+           const bookingsResponse = await bookingService.getBookings({
+             ...bookingParams,
+             per_page: 100,
+           });
+           const bookings = bookingsResponse.data.bookings || [];
+           setWeeklyBookings(bookings);
+           // Cache the fetched bookings
+           await bookingCacheService.cacheBookings(bookings, { locationId });
+         }
          
        } catch (error) {
          console.error('Error fetching weekly data:', error);
@@ -193,7 +208,7 @@ const AttendantDashboard: React.FC = () => {
 
    const monthDays = getMonthDays(currentMonth);
 
-   // Fetch monthly calendar data (changes when month changes)
+   // Fetch monthly calendar data (changes when month changes) - USE CACHE FIRST
    useEffect(() => {
      const fetchMonthlyData = async () => {
        if (!locationId || calendarView !== 'month') return;
@@ -204,16 +219,31 @@ const AttendantDashboard: React.FC = () => {
          const monthStart = new Date(year, month, 1);
          const monthEnd = new Date(year, month + 1, 0);
          
-         // Fetch bookings for the selected month
-         const bookingsResponse = await bookingService.getBookings({
-           location_id: locationId,
+         const dateParams = {
            date_from: monthStart.toISOString().split('T')[0],
            date_to: monthEnd.toISOString().split('T')[0],
-           per_page: 500,
-         });
+         };
          
-         const bookings = bookingsResponse.data.bookings || [];
-         setMonthlyBookings(bookings);
+         // Try cache first for instant loading
+         let bookings = await bookingCacheService.getFilteredBookingsFromCache(dateParams);
+         
+         if (bookings && bookings.length > 0) {
+           // Filter by location
+           bookings = bookings.filter(b => b.location_id === locationId);
+           setMonthlyBookings(bookings);
+         } else {
+           // No cache, fetch from API
+           const bookingsResponse = await bookingService.getBookings({
+             location_id: locationId,
+             ...dateParams,
+             per_page: 500,
+           });
+           
+           bookings = bookingsResponse.data.bookings || [];
+           setMonthlyBookings(bookings);
+           // Cache for next time
+           await bookingCacheService.cacheBookings(bookings);
+         }
          
        } catch (error) {
          console.error('Error fetching monthly data:', error);
@@ -226,7 +256,7 @@ const AttendantDashboard: React.FC = () => {
    // Get bookings count for a specific day
    const getBookingsForDay = (date: Date) => {
      return monthlyBookings.filter(booking => {
-       const bookingDate = new Date(booking.booking_date);
+       const bookingDate = parseLocalDate(booking.booking_date);
        return bookingDate.toDateString() === date.toDateString();
      });
    };
@@ -272,7 +302,7 @@ const AttendantDashboard: React.FC = () => {
 
    // Filter bookings for the current week
    const bookingsThisWeek = weeklyBookings.filter(booking => {
-     const bookingDate = new Date(booking.booking_date);
+     const bookingDate = parseLocalDate(booking.booking_date);
      return weekDates.some(date => date.toDateString() === bookingDate.toDateString());
    });
 
@@ -499,7 +529,7 @@ const AttendantDashboard: React.FC = () => {
                            const dateStr = date.toDateString();
                            const bookingsForCell = bookingsThisWeek.filter(
                              booking => {
-                               const bookingDate = new Date(booking.booking_date);
+                               const bookingDate = parseLocalDate(booking.booking_date);
                                const [bookingHour, bookingMinute] = booking.booking_time.split(':');
                                return bookingDate.toDateString() === dateStr && 
                                       `${bookingHour}:${bookingMinute}` === timeSlot;
@@ -925,7 +955,7 @@ const AttendantDashboard: React.FC = () => {
                      <td className="px-4 py-3">
                        <div className="flex flex-col">
                          <span className="text-sm text-gray-900">
-                           {booking.booking_date ? new Date(booking.booking_date).toLocaleDateString('en-US', { 
+                           {booking.booking_date ? parseLocalDate(booking.booking_date).toLocaleDateString('en-US', { 
                              month: 'short', 
                              day: 'numeric',
                              year: 'numeric'

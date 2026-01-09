@@ -105,13 +105,24 @@ const EntertainmentLandingPage = () => {
         // Transform grouped packages to match component format
         // Note: availability_schedules is fetched separately when modal opens since grouped endpoint doesn't include it
         const transformedPackages: PackageType[] = packagesResponse.data.map((pkg: GroupedPackage) => {
+          // Format participants display with fallbacks
+          const minGuests = pkg.min_participants || 1;
+          const maxGuests = pkg.max_guests || minGuests;
+          
+          let participantsText: string;
+          if (maxGuests > minGuests) {
+            participantsText = `Starts at ${minGuests} guests (up to ${maxGuests})`;
+          } else {
+            participantsText = `${minGuests} guests`;
+          }
+          
           return {
             id: pkg.booking_links[0]?.package_id || 0,
             name: pkg.name,
             description: pkg.description,
             price: pkg.price,
             duration: pkg.duration === 0 || !pkg.duration ? 'Unlimited' : formatDurationDisplay(pkg.duration, pkg.duration_unit),
-            participants: `Up to ${pkg.max_guests} guests`,
+            participants: participantsText,
             includes: [], // This would need to be added to backend if needed
             rating: 4.8, // Default rating, backend doesn't return this yet
             image: Array.isArray(pkg.image) ? pkg.image[0] : pkg.image,
@@ -120,6 +131,9 @@ const EntertainmentLandingPage = () => {
             bookingLinks: pkg.booking_links,
             availability_schedules: undefined, // Will be loaded when modal opens
             package_type: pkg.package_type || 'regular',
+            min_participants: pkg.min_participants,
+            max_guests: pkg.max_guests,
+            price_per_additional: pkg.price_per_additional,
           };
         });
         setPackages(transformedPackages);
@@ -959,22 +973,18 @@ const EntertainmentLandingPage = () => {
               </div>
 
               {/* Details Grid */}
-              <div className="grid grid-cols-2 gap-2 mb-4">
+              <div className="grid grid-cols-1 gap-2 mb-4">
                 <div className="bg-gray-50 p-2.5">
                   <div className="flex items-center gap-1.5 text-gray-500 mb-0.5">
                     <Users size={12} />
                     <span className="text-xs">Group Size</span>
                   </div>
                   <div className="text-sm font-bold text-gray-900">{selectedPackage.participants}</div>
-                </div>
-                <div className="bg-green-50 p-2.5">
-                  <div className="flex items-center gap-1.5 text-green-600 mb-0.5">
-                    <DollarSign size={12} />
-                    <span className="text-xs">Per Person</span>
-                  </div>
-                  <div className="text-sm font-bold text-green-700">
-                    ${(selectedPackage.price / parseInt(selectedPackage.participants.match(/\d+/)?.[0] || '1')).toFixed(2)}
-                  </div>
+                  {selectedPackage.price_per_additional && selectedPackage.price_per_additional > 0 && (
+                    <div className="text-xs text-gray-600 mt-1">
+                      +${selectedPackage.price_per_additional} per additional guest
+                    </div>
+                  )}
                 </div>
               </div>
 

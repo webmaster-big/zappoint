@@ -1,4 +1,18 @@
 /**
+ * Parses an ISO date string (YYYY-MM-DD) as a local date to avoid timezone issues.
+ * Using new Date("2026-01-06") parses as UTC midnight, which can show as the previous day
+ * in timezones behind UTC (like EST). This function parses in local timezone instead.
+ * @param isoDateString - Date in ISO format (e.g., "2026-01-06" or "2026-01-06T00:00:00")
+ * @returns Date object in local timezone
+ */
+export function parseLocalDate(isoDateString: string): Date {
+  if (!isoDateString) return new Date();
+  // Strip time portion if present and split the date part
+  const [year, month, day] = isoDateString.split('T')[0].split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
+
+/**
  * Converts 24-hour time format to 12-hour format with AM/PM
  * @param time24 - Time in 24-hour format (e.g., "17:00" or "17:00:00")
  * @returns Time in 12-hour format (e.g., "5:00 PM")
