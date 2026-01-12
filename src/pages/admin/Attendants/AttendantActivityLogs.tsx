@@ -109,6 +109,56 @@ const AttendantActivityLogs = () => {
     return colors[userType] || `bg-${themeColor}-100 text-${fullColor}`;
   };
 
+  // Format detailed activity description
+  const formatActivityDescription = (log: AttendantActivityLogsLog) => {
+    const action = log.action.replace('_', ' ');
+    const resourceType = log.resourceType;
+    const resourceName = log.resourceName || 'Unknown';
+    const resourceId = log.resourceId ? `#${log.resourceId}` : '';
+    
+    // Build a more detailed description based on action and resource type
+    let description = '';
+    
+    switch (log.action) {
+      case 'created':
+        description = `Created ${resourceType} "${resourceName}" ${resourceId}`;
+        break;
+      case 'updated':
+        description = `Updated ${resourceType} "${resourceName}" ${resourceId}`;
+        break;
+      case 'deleted':
+        description = `Deleted ${resourceType} "${resourceName}" ${resourceId}`;
+        break;
+      case 'viewed':
+        description = `Viewed ${resourceType} "${resourceName}" ${resourceId}`;
+        break;
+      case 'checked_in':
+        description = `Checked in customer for ${resourceType} "${resourceName}" ${resourceId}`;
+        break;
+      case 'checked_out':
+        description = `Checked out customer from ${resourceType} "${resourceName}" ${resourceId}`;
+        break;
+      case 'purchased':
+        description = `Processed purchase of ${resourceType} "${resourceName}" ${resourceId}`;
+        break;
+      case 'logged_in':
+        description = `Logged into the system`;
+        break;
+      case 'logged_out':
+        description = `Logged out of the system`;
+        break;
+      default:
+        description = `${action.charAt(0).toUpperCase() + action.slice(1)} ${resourceType} "${resourceName}" ${resourceId}`;
+    }
+    
+    // Add original details if they provide additional context
+    if (log.details && log.details !== description && !description.includes(log.details)) {
+      description += ` - ${log.details}`;
+    }
+    
+    return description;
+  };
+
   // Helper function to check if a date is today
   const isToday = (date: Date) => {
     const today = new Date();
@@ -941,21 +991,24 @@ const AttendantActivityLogs = () => {
                         <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getUserTypeColors(log.userType)}`}>
                           {log.userType?.split('_').map((word: string) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
                         </span>
-                        <span className="text-gray-400">•</span>
-                        <span className="text-sm text-gray-600">{log.details}</span>
                       </div>
+                      
+                      {/* Detailed Description */}
+                      <p className="text-sm text-gray-700 mb-2 leading-relaxed">
+                        {formatActivityDescription(log)}
+                      </p>
                       
                       <div className="flex items-center gap-3 mt-2 flex-wrap">
                         <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getResourceTypeColors(log.resourceType)}`}>
                           {log.resourceType.charAt(0).toUpperCase() + log.resourceType.slice(1)}
                         </span>
-                        <span className="text-xs text-gray-500 capitalize">
-                          {log.action.replace('_', ' ')}
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getSeverityColors(log.severity)}`}>
+                          {log.severity.charAt(0).toUpperCase() + log.severity.slice(1)}
                         </span>
-                        {log.resourceName && (
+                        {log.resourceId && (
                           <>
                             <span className="text-gray-400">•</span>
-                            <span className="text-xs text-gray-600">{log.resourceName}</span>
+                            <span className="text-xs text-gray-600 font-mono">ID: {log.resourceId}</span>
                           </>
                         )}
                         <span className="text-gray-400">•</span>

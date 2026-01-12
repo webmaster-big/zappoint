@@ -2641,7 +2641,7 @@ const Bookings: React.FC = () => {
                 </p>
               </div>
 
-              <div className="p-4 max-h-[50vh] overflow-y-auto">
+              <div className="p-4 max-h-[50vh] overflow-y-auto relative">
                 {loadingPackages ? (
                   <div className="flex justify-center items-center py-8">
                     <div className={`animate-spin rounded-full h-8 w-8 border-b-2 border-${fullColor}`}></div>
@@ -2659,7 +2659,7 @@ const Bookings: React.FC = () => {
                           pkg.name === selectedBookingForEdit.packageName
                             ? `border-${themeColor}-500 bg-${themeColor}-50`
                             : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                        }`}
+                        } ${savingPackage ? 'opacity-50 cursor-not-allowed' : ''}`}
                       >
                         <div className="flex items-center justify-between">
                           <div>
@@ -2673,6 +2673,16 @@ const Bookings: React.FC = () => {
                         </div>
                       </button>
                     ))}
+                  </div>
+                )}
+                
+                {/* Loading Overlay */}
+                {savingPackage && (
+                  <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center rounded-lg">
+                    <div className="text-center">
+                      <div className={`animate-spin rounded-full h-10 w-10 border-b-2 border-${fullColor} mx-auto mb-2`}></div>
+                      <p className="text-sm font-medium text-gray-700">Updating package...</p>
+                    </div>
                   </div>
                 )}
               </div>
@@ -2702,7 +2712,7 @@ const Bookings: React.FC = () => {
                 </p>
               </div>
 
-              <div className="p-4 max-h-[50vh] overflow-y-auto">
+              <div className="p-4 max-h-[50vh] overflow-y-auto relative">
                 {loadingRooms ? (
                   <div className="flex justify-center items-center py-8">
                     <div className={`animate-spin rounded-full h-8 w-8 border-b-2 border-${fullColor}`}></div>
@@ -2720,7 +2730,7 @@ const Bookings: React.FC = () => {
                           room.name === selectedBookingForEdit.room
                             ? `border-${themeColor}-500 bg-${themeColor}-50`
                             : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                        }`}
+                        } ${savingRoom ? 'opacity-50 cursor-not-allowed' : ''}`}
                       >
                         <div className="flex items-center justify-between">
                           <div>
@@ -2738,6 +2748,16 @@ const Bookings: React.FC = () => {
                         </div>
                       </button>
                     ))}
+                  </div>
+                )}
+                
+                {/* Loading Overlay */}
+                {savingRoom && (
+                  <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center rounded-lg">
+                    <div className="text-center">
+                      <div className={`animate-spin rounded-full h-10 w-10 border-b-2 border-${fullColor} mx-auto mb-2`}></div>
+                      <p className="text-sm font-medium text-gray-700">Updating room...</p>
+                    </div>
                   </div>
                 )}
               </div>
