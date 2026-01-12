@@ -637,20 +637,18 @@ const ManageAddons = () => {
                         ${Number(addon.price).toFixed(2)}
                       </span>
                     </div>
-                    <div className="flex gap-1">
+                    <div className="flex gap-2">
                       <StandardButton
                         onClick={() => handleEdit(addon)}
                         variant="ghost"
-                        size="sm"
-                        className="p-1.5"
+                        size="md"
                         icon={Edit}
                         title="Edit add-on"
                       />
                       <StandardButton
                         onClick={() => handleDelete(addon.id)}
                         variant="danger"
-                        size="sm"
-                        className="p-1.5"
+                        size="md"
                         icon={Trash2}
                         title="Delete add-on"
                       />

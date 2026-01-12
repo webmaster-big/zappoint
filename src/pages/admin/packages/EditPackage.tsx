@@ -16,6 +16,7 @@ import {
 import { roomCacheService } from '../../../services/RoomCacheService';
 import { packageCacheService } from '../../../services/PackageCacheService';
 import { addOnCacheService } from '../../../services/AddOnCacheService';
+import { attractionCacheService } from '../../../services/AttractionCacheService';
 import type { Category } from '../../../services/CategoryService';
 import { formatTimeRange, formatDurationDisplay } from '../../../utils/timeFormat';
 import type { 
@@ -112,6 +113,7 @@ const EditPackage: React.FC = () => {
                 // Check caches first before making API calls
                 const cachedRooms = await roomCacheService.getCachedRooms();
                 const cachedAddOns = await addOnCacheService.getCachedAddOns();
+                const cachedAttractions = await attractionCacheService.getCachedAttractions();
                 
                 // Only fetch from API if cache is empty
                 const roomsPromise = (cachedRooms && cachedRooms.length > 0) 
@@ -121,10 +123,14 @@ const EditPackage: React.FC = () => {
                 const addOnsPromise = (cachedAddOns && cachedAddOns.length > 0)
                     ? Promise.resolve({ data: { add_ons: cachedAddOns } })
                     : addOnService.getAddOns();
+
+                const attractionsPromise = (cachedAttractions && cachedAttractions.length > 0)
+                    ? Promise.resolve({ data: { attractions: cachedAttractions } })
+                    : attractionService.getAttractions();
                 
                 // Step 1: Fetch all reference data first
                 const [attractionsRes, addOnsRes, roomsRes, promosRes, giftCardsRes, categoriesRes] = await Promise.all([
-                    attractionService.getAttractions(),
+                    attractionsPromise,
                     addOnsPromise,
                     roomsPromise,
                     promoService.getPromos(),
@@ -139,6 +145,14 @@ const EditPackage: React.FC = () => {
                     price: attr.price || 0,
                     unit: attr.unit || ''
                 })) || [];
+
+                // Cache attractions if we fetched from API (not from cache)
+                if (!cachedAttractions || cachedAttractions.length === 0) {
+                    const attractionsList = attractionsRes.data?.attractions || [];
+                    if (attractionsList.length > 0) {
+                        await attractionCacheService.cacheAttractions(attractionsList);
+                    }
+                }
 
                 const addOnsData = addOnsRes.data?.add_ons?.map(addon => ({
                     id: addon.id,
