@@ -12,6 +12,7 @@ export interface LocationActivityLogsActivityLog {
   resourceId?: string;
   resourceName?: string;
   details: string;
+  metadata?: Record<string, any>;
   timestamp: string;
   severity: 'info' | 'success' | 'warning' | 'error';
 }

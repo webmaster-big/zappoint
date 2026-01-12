@@ -109,16 +109,79 @@ const AttendantActivityLogs = () => {
     return colors[userType] || `bg-${themeColor}-100 text-${fullColor}`;
   };
 
-  // Format detailed activity description
+  // Format detailed activity description with metadata
   const formatActivityDescription = (log: AttendantActivityLogsLog) => {
     const action = log.action.replace('_', ' ');
     const resourceType = log.resourceType;
     const resourceName = log.resourceName || 'Unknown';
     const resourceId = log.resourceId ? `#${log.resourceId}` : '';
+    const metadata = log.metadata || {};
     
     // Build a more detailed description based on action and resource type
     let description = '';
+    const metadataDetails: string[] = [];
     
+    // Parse useful metadata fields naturally
+    if (metadata.old_value !== undefined && metadata.new_value !== undefined) {
+      metadataDetails.push(`Changed from "${metadata.old_value}" to "${metadata.new_value}"`);
+    }
+    
+    if (metadata.changes) {
+      try {
+        const changes = typeof metadata.changes === 'string' ? JSON.parse(metadata.changes) : metadata.changes;
+        const changeList = Object.entries(changes).map(([key, value]: [string, unknown]) => {
+          const fieldName = key.replace(/_/g, ' ');
+          if (typeof value === 'object' && value !== null && 'old' in value && 'new' in value) {
+            const typedValue = value as { old: unknown; new: unknown };
+            return `${fieldName}: "${typedValue.old}" → "${typedValue.new}"`;
+          }
+          return `${fieldName}: ${value}`;
+        });
+        if (changeList.length > 0) {
+          metadataDetails.push(changeList.join(', '));
+        }
+      } catch {
+        // If parsing fails, skip
+      }
+    }
+    
+    if (metadata.quantity) {
+      metadataDetails.push(`Quantity: ${metadata.quantity}`);
+    }
+    
+    if (metadata.amount || metadata.price) {
+      const amount = metadata.amount || metadata.price;
+      metadataDetails.push(`Amount: $${parseFloat(String(amount)).toFixed(2)}`);
+    }
+    
+    if (metadata.participants) {
+      metadataDetails.push(`${metadata.participants} participants`);
+    }
+    
+    if (metadata.guest_name) {
+      metadataDetails.push(`Guest: ${metadata.guest_name}`);
+    }
+    
+    if (metadata.booking_date || metadata.date) {
+      const date = metadata.booking_date || metadata.date;
+      metadataDetails.push(`Date: ${date}`);
+    }
+    
+    if (metadata.time || metadata.booking_time) {
+      const time = metadata.time || metadata.booking_time;
+      metadataDetails.push(`Time: ${time}`);
+    }
+    
+    if (metadata.status) {
+      metadataDetails.push(`Status: ${metadata.status}`);
+    }
+    
+    if (metadata.reference_number || metadata.reference) {
+      const ref = metadata.reference_number || metadata.reference;
+      metadataDetails.push(`Ref: ${ref}`);
+    }
+    
+    // Build description based on action
     switch (log.action) {
       case 'created':
         description = `Created ${resourceType} "${resourceName}" ${resourceId}`;
@@ -143,17 +206,40 @@ const AttendantActivityLogs = () => {
         break;
       case 'logged_in':
         description = `Logged into the system`;
+        if (metadata.ip_address) {
+          metadataDetails.push(`from IP: ${metadata.ip_address}`);
+        }
         break;
       case 'logged_out':
         description = `Logged out of the system`;
+        break;
+      case 'approved':
+        description = `Approved ${resourceType} "${resourceName}" ${resourceId}`;
+        break;
+      case 'rejected':
+        description = `Rejected ${resourceType} "${resourceName}" ${resourceId}`;
+        if (metadata.reason) {
+          metadataDetails.push(`Reason: ${metadata.reason}`);
+        }
+        break;
+      case 'managed':
+        description = `Managed ${resourceType} "${resourceName}" ${resourceId}`;
+        break;
+      case 'reported':
+        description = `Generated report for ${resourceType} "${resourceName}" ${resourceId}`;
         break;
       default:
         description = `${action.charAt(0).toUpperCase() + action.slice(1)} ${resourceType} "${resourceName}" ${resourceId}`;
     }
     
-    // Add original details if they provide additional context
-    if (log.details && log.details !== description && !description.includes(log.details)) {
-      description += ` - ${log.details}`;
+    // Append metadata details naturally
+    if (metadataDetails.length > 0) {
+      description += ` • ${metadataDetails.join(' • ')}`;
+    }
+    
+    // Add original details if they provide additional context and aren't redundant
+    if (log.details && log.details !== description && !description.includes(log.details) && log.details.length > 0) {
+      description += ` • ${log.details}`;
     }
     
     return description;
@@ -210,7 +296,8 @@ const AttendantActivityLogs = () => {
   const metrics = getLocationMetrics();
 
   const loadLogs = useCallback(async () => {
-    if (filteredLogs.length === 0) {
+    const hasLogs = filteredLogs.length > 0;
+    if (!hasLogs) {
       setLoading(true);
     } else {
       setIsRefreshing(true);
@@ -291,7 +378,7 @@ const AttendantActivityLogs = () => {
         const pagination = data.data?.pagination || {};
         
         // Transform API data to match component structure
-        const transformedLogs = activityLogs.map((log: any) => ({
+        const transformedLogs = activityLogs.map((log: { id?: number; user_id?: number; user?: { first_name?: string; last_name?: string; email?: string; role?: string }; action?: string; category?: string; entity_type?: string; entity_id?: number; metadata?: Record<string, unknown>; description?: string; created_at?: string }) => ({
           id: log.id?.toString() || '',
           userId: log.user_id?.toString() || 'system',
           attendantId: log.user_id?.toString() || 'system',
@@ -302,10 +389,11 @@ const AttendantActivityLogs = () => {
           action: log.action || 'unknown',
           resourceType: log.category || log.entity_type || 'general',
           resourceId: log.entity_id?.toString() || '',
-          resourceName: log.metadata?.resource_name || log.entity_type || '',
+          resourceName: log.metadata?.resource_name as string || log.entity_type || '',
           details: log.description || '',
           timestamp: log.created_at || new Date().toISOString(),
-          severity: determineSeverity(log.action || '')
+          severity: determineSeverity(log.action || ''),
+          metadata: log.metadata || {}
         }));
         
         setFilteredLogs(transformedLogs);
@@ -327,7 +415,7 @@ const AttendantActivityLogs = () => {
       setLoading(false);
       setIsRefreshing(false);
     }
-  }, [itemsPerPage, currentPage, userLocationId, filters]);
+  }, [itemsPerPage, currentPage, userLocationId, filters, filteredLogs.length]);
 
   // Load initial data
   useEffect(() => {
@@ -427,12 +515,30 @@ const AttendantActivityLogs = () => {
       params.append('sort_order', 'desc');
 
       // Fetch all pages
-      let allLogs: any[] = [];
-      let currentPage = 1;
+      interface ActivityLogRaw {
+        id?: number;
+        user_id?: number;
+        user?: {
+          first_name?: string;
+          last_name?: string;
+          email?: string;
+          role?: string;
+        };
+        action?: string;
+        category?: string;
+        entity_type?: string;
+        entity_id?: number;
+        metadata?: Record<string, unknown>;
+        description?: string;
+        created_at?: string;
+      }
+      
+      let allLogs: ActivityLogRaw[] = [];
+      let currentExportPage = 1;
       let hasMorePages = true;
 
       while (hasMorePages) {
-        params.set('page', currentPage.toString());
+        params.set('page', currentExportPage.toString());
         
         const response = await fetch(`${API_BASE_URL}/activity-logs?${params.toString()}`, {
           headers: {
@@ -448,15 +554,15 @@ const AttendantActivityLogs = () => {
           
           allLogs = [...allLogs, ...activityLogs];
           
-          hasMorePages = currentPage < pagination.last_page;
-          currentPage++;
+          hasMorePages = currentExportPage < pagination.last_page;
+          currentExportPage++;
         } else {
           hasMorePages = false;
         }
       }
 
       // Transform logs
-      const transformedLogs = allLogs.map((log: any) => ({
+      const transformedLogs = allLogs.map((log: ActivityLogRaw) => ({
         timestamp: log.created_at || new Date().toISOString(),
         attendantName: log.user?.first_name && log.user?.last_name 
           ? `${log.user.first_name} ${log.user.last_name}` 
@@ -465,9 +571,10 @@ const AttendantActivityLogs = () => {
         userId: log.user_id?.toString() || 'system',
         action: log.action || 'unknown',
         resourceType: log.category || log.entity_type || 'general',
-        resourceName: log.metadata?.resource_name || log.entity_type || '',
+        resourceName: log.metadata?.resource_name as string || log.entity_type || '',
         details: log.description || '',
-        severity: determineSeverity(log.action || '')
+        severity: determineSeverity(log.action || ''),
+        metadata: log.metadata || {}
       }));
 
       // Generate CSV

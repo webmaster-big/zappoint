@@ -123,6 +123,142 @@ const LocationActivityLogs = () => {
     return colors[userType] || `bg-${themeColor}-100 text-${fullColor}`;
   };
 
+  // Format detailed activity description with metadata
+  const formatActivityDescription = (log: LocationActivityLogsActivityLog) => {
+    const action = log.action.replace('_', ' ');
+    const resourceType = log.resourceType;
+    const resourceName = log.resourceName || 'Unknown';
+    const resourceId = log.resourceId ? `#${log.resourceId}` : '';
+    const metadata = log.metadata || {};
+    
+    // Build a more detailed description based on action and resource type
+    let description = '';
+    const metadataDetails: string[] = [];
+    
+    // Parse useful metadata fields naturally
+    if (metadata.old_value !== undefined && metadata.new_value !== undefined) {
+      metadataDetails.push(`Changed from "${metadata.old_value}" to "${metadata.new_value}"`);
+    }
+    
+    if (metadata.changes) {
+      try {
+        const changes = typeof metadata.changes === 'string' ? JSON.parse(metadata.changes) : metadata.changes;
+        const changeList = Object.entries(changes).map(([key, value]: [string, unknown]) => {
+          const fieldName = key.replace(/_/g, ' ');
+          if (typeof value === 'object' && value !== null && 'old' in value && 'new' in value) {
+            const typedValue = value as { old: unknown; new: unknown };
+            return `${fieldName}: "${typedValue.old}" → "${typedValue.new}"`;
+          }
+          return `${fieldName}: ${value}`;
+        });
+        if (changeList.length > 0) {
+          metadataDetails.push(changeList.join(', '));
+        }
+      } catch {
+        // If parsing fails, skip
+      }
+    }
+    
+    if (metadata.quantity) {
+      metadataDetails.push(`Quantity: ${metadata.quantity}`);
+    }
+    
+    if (metadata.amount || metadata.price) {
+      const amount = metadata.amount || metadata.price;
+      metadataDetails.push(`Amount: $${parseFloat(String(amount)).toFixed(2)}`);
+    }
+    
+    if (metadata.participants) {
+      metadataDetails.push(`${metadata.participants} participants`);
+    }
+    
+    if (metadata.guest_name) {
+      metadataDetails.push(`Guest: ${metadata.guest_name}`);
+    }
+    
+    if (metadata.booking_date || metadata.date) {
+      const date = metadata.booking_date || metadata.date;
+      metadataDetails.push(`Date: ${date}`);
+    }
+    
+    if (metadata.time || metadata.booking_time) {
+      const time = metadata.time || metadata.booking_time;
+      metadataDetails.push(`Time: ${time}`);
+    }
+    
+    if (metadata.status) {
+      metadataDetails.push(`Status: ${metadata.status}`);
+    }
+    
+    if (metadata.reference_number || metadata.reference) {
+      const ref = metadata.reference_number || metadata.reference;
+      metadataDetails.push(`Ref: ${ref}`);
+    }
+    
+    // Build description based on action
+    switch (log.action) {
+      case 'created':
+        description = `Created ${resourceType} "${resourceName}" ${resourceId}`;
+        break;
+      case 'updated':
+        description = `Updated ${resourceType} "${resourceName}" ${resourceId}`;
+        break;
+      case 'deleted':
+        description = `Deleted ${resourceType} "${resourceName}" ${resourceId}`;
+        break;
+      case 'viewed':
+        description = `Viewed ${resourceType} "${resourceName}" ${resourceId}`;
+        break;
+      case 'checked_in':
+        description = `Checked in customer for ${resourceType} "${resourceName}" ${resourceId}`;
+        break;
+      case 'checked_out':
+        description = `Checked out customer from ${resourceType} "${resourceName}" ${resourceId}`;
+        break;
+      case 'purchased':
+        description = `Processed purchase of ${resourceType} "${resourceName}" ${resourceId}`;
+        break;
+      case 'logged_in':
+        description = `Logged into the system`;
+        if (metadata.ip_address) {
+          metadataDetails.push(`from IP: ${metadata.ip_address}`);
+        }
+        break;
+      case 'logged_out':
+        description = `Logged out of the system`;
+        break;
+      case 'approved':
+        description = `Approved ${resourceType} "${resourceName}" ${resourceId}`;
+        break;
+      case 'rejected':
+        description = `Rejected ${resourceType} "${resourceName}" ${resourceId}`;
+        if (metadata.reason) {
+          metadataDetails.push(`Reason: ${metadata.reason}`);
+        }
+        break;
+      case 'managed':
+        description = `Managed ${resourceType} "${resourceName}" ${resourceId}`;
+        break;
+      case 'reported':
+        description = `Generated report for ${resourceType} "${resourceName}" ${resourceId}`;
+        break;
+      default:
+        description = `${action.charAt(0).toUpperCase() + action.slice(1)} ${resourceType} "${resourceName}" ${resourceId}`;
+    }
+    
+    // Append metadata details naturally
+    if (metadataDetails.length > 0) {
+      description += ` • ${metadataDetails.join(' • ')}`;
+    }
+    
+    // Add original details if they provide additional context and aren't redundant
+    if (log.details && log.details !== description && !description.includes(log.details) && log.details.length > 0) {
+      description += ` • ${log.details}`;
+    }
+    
+    return description;
+  };
+
   const isToday = (date: Date) => {
     const today = new Date();
     return date.getDate() === today.getDate() &&
@@ -196,7 +332,8 @@ const LocationActivityLogs = () => {
 
   const loadLogs = useCallback(async () => {
     // Only show full loading spinner on initial load
-    if (filteredLogs.length === 0) {
+    const hasLogs = filteredLogs.length > 0;
+    if (!hasLogs) {
       setLoading(true);
     } else {
       setIsRefreshing(true);
@@ -292,8 +429,31 @@ const LocationActivityLogs = () => {
         const activityLogs = data.data?.activity_logs || [];
         const pagination = data.data?.pagination || {};
         
+        // Define type for raw API logs
+        interface ActivityLogRaw {
+          id?: number;
+          user_id?: number;
+          user?: {
+            first_name?: string;
+            last_name?: string;
+            email?: string;
+            role?: string;
+            position?: string;
+          };
+          location?: {
+            name?: string;
+          };
+          action?: string;
+          category?: string;
+          entity_type?: string;
+          entity_id?: number;
+          metadata?: Record<string, unknown>;
+          description?: string;
+          created_at?: string;
+        }
+        
         // Transform API data to match component structure
-        let transformedLogs = activityLogs.map((log: any) => ({
+        let transformedLogs = activityLogs.map((log: ActivityLogRaw) => ({
           id: log.id?.toString() || '',
           userId: log.user_id?.toString() || 'system',
           userName: log.user?.first_name && log.user?.last_name 
@@ -305,8 +465,9 @@ const LocationActivityLogs = () => {
           action: log.action || 'unknown',
           resourceType: log.category || log.entity_type || 'general',
           resourceId: log.entity_id?.toString() || '',
-          resourceName: log.metadata?.resource_name || log.entity_type || '',
+          resourceName: log.metadata?.resource_name as string || log.entity_type || '',
           details: log.description || '',
+          metadata: log.metadata || {},
           timestamp: log.created_at || new Date().toISOString(),
           severity: determineSeverity(log.action || '')
         }));
@@ -344,7 +505,7 @@ const LocationActivityLogs = () => {
       setLoading(false);
       setIsRefreshing(false);
     }
-  }, [itemsPerPage, currentPage, selectedLocation, locations, filters]);
+  }, [itemsPerPage, currentPage, selectedLocation, locations, filters, filteredLogs.length]);
 
   // Load initial data
   useEffect(() => {
@@ -353,7 +514,6 @@ const LocationActivityLogs = () => {
       // loadLogs will be called by the second useEffect when locations are loaded
     };
     initializeData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only run once on mount
 
   // Reload logs when filters or location change (but not on page change for client-side filtering)
@@ -504,12 +664,33 @@ const LocationActivityLogs = () => {
       params.append('sort_order', 'desc');
 
       // Fetch all pages
-      let allLogs: any[] = [];
-      let currentPage = 1;
+      interface ActivityLogRawExport {
+        id?: number;
+        user_id?: number;
+        user?: {
+          first_name?: string;
+          last_name?: string;
+          email?: string;
+          role?: string;
+        };
+        location?: {
+          name?: string;
+        };
+        action?: string;
+        category?: string;
+        entity_type?: string;
+        entity_id?: number;
+        metadata?: Record<string, unknown>;
+        description?: string;
+        created_at?: string;
+      }
+      
+      let allLogs: ActivityLogRawExport[] = [];
+      let currentExportPage = 1;
       let hasMorePages = true;
 
       while (hasMorePages) {
-        params.set('page', currentPage.toString());
+        params.set('page', currentExportPage.toString());
         
         const response = await fetch(`${API_BASE_URL}/activity-logs?${params.toString()}`, {
           headers: {
@@ -525,15 +706,28 @@ const LocationActivityLogs = () => {
           
           allLogs = [...allLogs, ...activityLogs];
           
-          hasMorePages = currentPage < pagination.last_page;
-          currentPage++;
+          hasMorePages = currentExportPage < pagination.last_page;
+          currentExportPage++;
         } else {
           hasMorePages = false;
         }
       }
 
       // Transform and filter logs
-      let transformedLogs = allLogs.map((log: any) => ({
+      interface TransformedLog {
+        timestamp: string;
+        location: string;
+        userName: string;
+        userType: string;
+        userId: string;
+        action: string;
+        resourceType: string;
+        resourceName: string;
+        details: string;
+        severity: string;
+      }
+      
+      let transformedLogs: TransformedLog[] = allLogs.map((log: ActivityLogRawExport) => ({
         timestamp: log.created_at || new Date().toISOString(),
         location: log.location?.name || (log.user?.role === 'company_admin' ? 'All Locations' : 'Unknown'),
         userName: log.user?.first_name && log.user?.last_name 
@@ -543,19 +737,19 @@ const LocationActivityLogs = () => {
         userId: log.user_id?.toString() || 'system',
         action: log.action || 'unknown',
         resourceType: log.category || log.entity_type || 'general',
-        resourceName: log.metadata?.resource_name || log.entity_type || '',
+        resourceName: log.metadata?.resource_name as string || log.entity_type || '',
         details: log.description || '',
         severity: determineSeverity(log.action || '')
       }));
 
       // Apply client-side user type filter
       if (exportFilters.userType !== 'all') {
-        transformedLogs = transformedLogs.filter((log: any) => log.userType === exportFilters.userType);
+        transformedLogs = transformedLogs.filter((log: TransformedLog) => log.userType === exportFilters.userType);
       }
 
       // Apply client-side user filter if backend doesn't support multiple user_id
       if (exportSelectedUsers.length > 0) {
-        transformedLogs = transformedLogs.filter((log: any) => 
+        transformedLogs = transformedLogs.filter((log: TransformedLog) => 
           exportSelectedUsers.includes(log.userId)
         );
       }
@@ -1272,21 +1466,24 @@ const LocationActivityLogs = () => {
                             </span>
                           </>
                         )}
-                        <span className="text-gray-400">•</span>
-                        <span className="text-sm text-gray-600">{log.details}</span>
                       </div>
+                      
+                      {/* Detailed Description */}
+                      <p className="text-sm text-gray-700 mb-2 leading-relaxed">
+                        {formatActivityDescription(log)}
+                      </p>
                       
                       <div className="flex items-center gap-3 mt-2 flex-wrap">
                         <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getResourceTypeColors(log.resourceType)}`}>
                           {log.resourceType.charAt(0).toUpperCase() + log.resourceType.slice(1)}
                         </span>
-                        <span className="text-xs text-gray-500 capitalize">
-                          {log.action.replace('_', ' ')}
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getSeverityColors(log.severity)}`}>
+                          {log.severity.charAt(0).toUpperCase() + log.severity.slice(1)}
                         </span>
-                        {log.resourceName && (
+                        {log.resourceId && (
                           <>
                             <span className="text-gray-400">•</span>
-                            <span className="text-xs text-gray-600">{log.resourceName}</span>
+                            <span className="text-xs text-gray-600 font-mono">ID: {log.resourceId}</span>
                           </>
                         )}
                         <span className="text-gray-400">•</span>

@@ -154,8 +154,7 @@ const Bookings: React.FC = () => {
     pending: 'bg-yellow-100 text-yellow-800',
     confirmed: `bg-${themeColor}-100 text-${fullColor}`,
     cancelled: 'bg-red-100 text-red-800',
-    completed: 'bg-green-100 text-green-800',
-    'checked-in': `bg-${themeColor}-100 text-${fullColor}`
+    'checked-in': 'bg-green-100 text-green-800'
   };
 
   const paymentColors = {
@@ -548,12 +547,6 @@ const Bookings: React.FC = () => {
       // Find the booking
       const booking = bookings.find(b => b.id === id);
       if (!booking) return;
-      
-      // If confirming a booking and amount paid doesn't match total, show payment modal
-      if (newStatus === 'confirmed' && booking.amountPaid < booking.totalAmount) {
-        handleOpenPaymentModal(booking);
-        return;
-      }
 
       const response = await bookingService.updateBooking(Number(id), { status: newStatus });
       
@@ -1265,8 +1258,6 @@ const Bookings: React.FC = () => {
           let response;
           if (newStatus === 'checked-in') {
             response = await bookingService.checkInBooking(id);
-          } else if (newStatus === 'completed') {
-            response = await bookingService.completeBooking(Number(id));
           } else if (newStatus === 'cancelled') {
             response = await bookingService.cancelBooking(Number(id));
           } else {
@@ -1811,7 +1802,6 @@ const Bookings: React.FC = () => {
                     <option value="pending">Pending</option>
                     <option value="confirmed">Confirmed</option>
                     <option value="checked-in">Checked In</option>
-                    <option value="completed">Completed</option>
                     <option value="cancelled">Cancelled</option>
                   </select>
                 </div>
@@ -1873,7 +1863,6 @@ const Bookings: React.FC = () => {
                 <option value="">Change Status</option>
                 <option value="confirmed">Confirm</option>
                 <option value="checked-in">Check In</option>
-                <option value="completed">Mark Complete</option>
                 <option value="cancelled">Cancel</option>
               </select>
               <StandardButton
@@ -1941,13 +1930,12 @@ const Bookings: React.FC = () => {
                     if (isPastA && !isPastB) return 1;
                     if (!isPastA && isPastB) return -1;
                     
-                    // Define priority order: pending/confirmed first, then checked-in/completed/cancelled last
+                    // Define priority order: pending/confirmed first, then checked-in/cancelled last
                     const statusPriority: Record<string, number> = {
                       'pending': 1,
                       'confirmed': 2,
                       'checked-in': 3,
-                      'completed': 4,
-                      'cancelled': 5
+                      'cancelled': 4
                     };
                     
                     const priorityA = statusPriority[a.status] || 999;
@@ -2058,12 +2046,11 @@ const Bookings: React.FC = () => {
                         <select
                           value={booking.status}
                           onChange={(e) => handleStatusChange(booking.id, e.target.value as BookingsPageBooking['status'])}
-                          className={`text-xs font-medium px-2 py-1 rounded-full ${statusColors[booking.status]} border-none focus:ring-2 focus:ring-${themeColor}-600`}
+                          className={`text-xs font-medium px-2 py-1 rounded-full ${statusColors[booking.status as keyof typeof statusColors] || 'bg-gray-100 text-gray-800'} border-none focus:ring-2 focus:ring-${themeColor}-600`}
                         >
                           <option value="pending">Pending</option>
                           <option value="confirmed">Confirmed</option>
                           <option value="checked-in">Checked In</option>
-                          <option value="completed">Completed</option>
                           <option value="cancelled">Cancelled</option>
                         </select>
                       </td>
@@ -2101,7 +2088,7 @@ const Bookings: React.FC = () => {
                               {''}
                             </StandardButton>
                           )}
-                          {booking.status !== 'checked-in' && booking.status !== 'completed' && booking.paymentStatus === 'paid' && (
+                          {booking.status !== 'checked-in' && booking.paymentStatus === 'paid' && (
                             <StandardButton
                               variant="success"
                               size="sm"
@@ -2355,7 +2342,7 @@ const Bookings: React.FC = () => {
                 <div>
                   <h3 className="text-sm font-semibold text-gray-900 mb-3">Status</h3>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    {['pending', 'confirmed', 'checked-in', 'completed', 'cancelled'].map(status => (
+                    {['pending', 'confirmed', 'checked-in', 'cancelled'].map(status => (
                       <label key={status} className="flex items-center">
                         <input
                           type="checkbox"
