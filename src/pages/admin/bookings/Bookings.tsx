@@ -1,5 +1,5 @@
 // src/pages/admin/bookings/Bookings.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
   Eye, 
@@ -15,7 +15,12 @@ import {
   Users,
   Download,
   Plus,
-  FileText
+  FileText,
+  Check,
+  X,
+  Edit3,
+  Clock,
+  Home
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import StandardButton from '../../../components/ui/StandardButton';
@@ -29,6 +34,10 @@ import LocationSelector from '../../../components/admin/LocationSelector';
 import { getStoredUser, API_BASE_URL } from '../../../utils/storage';
 import { formatDurationDisplay } from '../../../utils/timeFormat';
 import { MapPin } from 'lucide-react';
+import { packageService, type Package as PackageType } from '../../../services/PackageService';
+import { roomService, type Room } from '../../../services/RoomService';
+import { packageCacheService } from '../../../services/PackageCacheService';
+import { roomCacheService } from '../../../services/RoomCacheService';
 
 // Convert 24-hour time to 12-hour format with AM/PM
 const formatTime12Hour = (time24: string): string => {
@@ -98,6 +107,48 @@ const Bookings: React.FC = () => {
   const isCompanyAdmin = currentUser?.role === 'company_admin';
   const [selectedLocation, setSelectedLocation] = useState<number | null>(null);
 
+  // Inline editing state
+  const [editingCell, setEditingCell] = useState<{ bookingId: string; field: string } | null>(null);
+  const [editValue, setEditValue] = useState<string>('');
+  const [savingCell, setSavingCell] = useState<{ bookingId: string; field: string } | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Package/Room selection modal states
+  const [showPackageModal, setShowPackageModal] = useState(false);
+  const [showRoomModal, setShowRoomModal] = useState(false);
+  const [selectedBookingForEdit, setSelectedBookingForEdit] = useState<BookingsPageBooking | null>(null);
+  const [availablePackages, setAvailablePackages] = useState<PackageType[]>([]);
+  const [availableRooms, setAvailableRooms] = useState<Room[]>([]);
+  const [loadingPackages, setLoadingPackages] = useState(false);
+  const [loadingRooms, setLoadingRooms] = useState(false);
+  const [savingPackage, setSavingPackage] = useState(false);
+  const [savingRoom, setSavingRoom] = useState(false);
+
+  // Duration editing state
+  const [showDurationModal, setShowDurationModal] = useState(false);
+  const [durationValue, setDurationValue] = useState<number>(2);
+  const [durationUnit, setDurationUnit] = useState<'hours' | 'minutes'>('hours');
+  const [savingDuration, setSavingDuration] = useState(false);
+
+  // Date/Time editing state
+  const [showDateModal, setShowDateModal] = useState(false);
+  const [showTimeModal, setShowTimeModal] = useState(false);
+  const [dateValue, setDateValue] = useState<string>('');
+  const [timeValue, setTimeValue] = useState<string>('');
+  const [savingDate, setSavingDate] = useState(false);
+  const [savingTime, setSavingTime] = useState(false);
+
+  // Editable fields configuration
+  const editableFields = [
+    { key: 'customerName', label: 'Customer Name', type: 'text', apiField: 'guest_name' },
+    { key: 'email', label: 'Email', type: 'email', apiField: 'guest_email' },
+    { key: 'phone', label: 'Phone', type: 'tel', apiField: 'guest_phone' },
+    { key: 'participants', label: 'Participants', type: 'number', apiField: 'participants' },
+    { key: 'totalAmount', label: 'Total Amount', type: 'number', apiField: 'total_amount' },
+    { key: 'amountPaid', label: 'Amount Paid', type: 'number', apiField: 'amount_paid' },
+    { key: 'notes', label: 'Notes', type: 'text', apiField: 'notes' },
+  ];
+
   // Status and payment colors
   const statusColors = {
     pending: 'bg-yellow-100 text-yellow-800',
@@ -155,6 +206,10 @@ const Bookings: React.FC = () => {
   // Load bookings from backend API
   useEffect(() => {
     loadLocations();
+    
+    // Warm up package and room caches in background for faster modal loading
+    packageCacheService.warmupCache();
+    roomCacheService.warmupCache();
   }, []);
   
   useEffect(() => {
@@ -490,17 +545,29 @@ const Bookings: React.FC = () => {
 
   const handleStatusChange = async (id: string, newStatus: BookingsPageBooking['status']) => {
     try {
-
-        const response = await bookingService.updateBooking(Number(id), { status: newStatus });
+      // Find the booking
+      const booking = bookings.find(b => b.id === id);
+      if (!booking) return;
       
-        // Sync the updated booking to cache
-        if (response.data) {
-          await bookingCacheService.updateBookingInCache(response.data);
-        }
+      // If confirming a booking and amount paid doesn't match total, show payment modal
+      if (newStatus === 'confirmed' && booking.amountPaid < booking.totalAmount) {
+        handleOpenPaymentModal(booking);
+        return;
+      }
+
+      const response = await bookingService.updateBooking(Number(id), { status: newStatus });
+      
+      // Sync the updated booking to cache
+      if (response.data) {
+        await bookingCacheService.updateBookingInCache(response.data);
+      }
+      
+      // Log activity
+      await logBookingActivity(booking, 'update', `Status changed to ${newStatus}`);
       
       // Update local state
-      const updatedBookings = bookings.map(booking =>
-        booking.id === id ? { ...booking, status: newStatus } : booking
+      const updatedBookings = bookings.map(b =>
+        b.id === id ? { ...b, status: newStatus } : b
       );
       setBookings(updatedBookings);
     } catch (error) {
@@ -515,8 +582,14 @@ const Bookings: React.FC = () => {
       const booking = bookings.find(b => b.id === id);
       if (!booking) return;
       
+      // If trying to set to 'paid' but amount paid doesn't match total, show payment modal
+      if (newPaymentStatus === 'paid' && booking.amountPaid < booking.totalAmount) {
+        handleOpenPaymentModal(booking);
+        return;
+      }
+      
       // Build update payload - if setting to 'paid', also update amount_paid to match total
-      const updatePayload: any = { payment_status: newPaymentStatus };
+      const updatePayload: Record<string, unknown> = { payment_status: newPaymentStatus };
       
       if (newPaymentStatus === 'paid') {
         // When marking as paid, set amount_paid to full total amount
@@ -531,10 +604,13 @@ const Bookings: React.FC = () => {
         await bookingCacheService.updateBookingInCache(response.data);
       }
       
+      // Log activity
+      await logBookingActivity(booking, 'update', `Payment status changed to ${newPaymentStatus}`);
+      
       // Update local state
       const updatedBookings = bookings.map(b => {
         if (b.id === id) {
-          const updates: any = { paymentStatus: newPaymentStatus };
+          const updates: Partial<BookingsPageBooking> = { paymentStatus: newPaymentStatus };
           if (newPaymentStatus === 'paid') {
             updates.amountPaid = b.totalAmount;
           }
@@ -547,6 +623,593 @@ const Bookings: React.FC = () => {
       console.error('Error updating payment status:', error);
       alert('Failed to update payment status. Please try again.');
     }
+  };
+
+  // Activity logging function
+  const logBookingActivity = async (
+    booking: BookingsPageBooking, 
+    action: string, 
+    description: string,
+    locationId?: number
+  ) => {
+    try {
+      const user = getStoredUser();
+      if (!user) return;
+
+      // Get location_id from booking cache if not provided
+      let bookingLocationId = locationId;
+      if (!bookingLocationId) {
+        const cachedBooking = await bookingCacheService.getBookingFromCache(Number(booking.id));
+        bookingLocationId = cachedBooking?.location_id;
+      }
+
+      await fetch(`${API_BASE_URL}/activity-logs`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${user.token}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          user_id: user.id,
+          location_id: bookingLocationId,
+          action: action,
+          entity_type: 'booking',
+          entity_id: Number(booking.id),
+          category: 'booking',
+          description: description,
+          metadata: {
+            resource_name: `Booking #${booking.referenceNumber}`,
+            customer_name: booking.customerName,
+            package_name: booking.packageName
+          }
+        })
+      });
+    } catch (error) {
+      console.error('Error logging activity:', error);
+      // Don't throw - logging errors shouldn't block the main operation
+    }
+  };
+
+  // Package modal functions
+  const handleOpenPackageModal = async (booking: BookingsPageBooking) => {
+    setSelectedBookingForEdit(booking);
+    setShowPackageModal(true);
+    setLoadingPackages(true);
+    
+    try {
+      // Get location_id from booking cache
+      const cachedBooking = await bookingCacheService.getBookingFromCache(Number(booking.id));
+      const locationId = cachedBooking?.location_id;
+      
+      if (locationId) {
+        // Try to get packages from cache first for faster loading
+        const cachedPackages = await packageCacheService.getCachedPackages();
+        
+        if (cachedPackages && cachedPackages.length > 0) {
+          // Filter cached packages by location and active status
+          const filteredPackages = cachedPackages.filter(
+            (pkg: PackageType) => pkg.location_id === locationId && pkg.is_active
+          );
+          setAvailablePackages(filteredPackages);
+          setLoadingPackages(false);
+          
+          // Sync in background to keep cache fresh
+          packageCacheService.syncInBackground({ location_id: locationId, is_active: true });
+        } else {
+          // No cache, fetch from API and cache the result
+          const packages = await packageCacheService.fetchAndCachePackages({ 
+            location_id: locationId, 
+            is_active: true 
+          });
+          const filteredPackages = packages.filter(
+            (pkg: PackageType) => pkg.location_id === locationId && pkg.is_active
+          );
+          setAvailablePackages(filteredPackages);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading packages:', error);
+      // Fallback to direct API call if cache fails
+      try {
+        const cachedBooking = await bookingCacheService.getBookingFromCache(Number(booking.id));
+        const locationId = cachedBooking?.location_id;
+        if (locationId) {
+          const response = await packageService.getPackages({ location_id: locationId, is_active: true });
+          if (response.success && response.data) {
+            setAvailablePackages(response.data.packages || []);
+          }
+        }
+      } catch (fallbackError) {
+        console.error('Fallback package loading failed:', fallbackError);
+      }
+    } finally {
+      setLoadingPackages(false);
+    }
+  };
+
+  const handleClosePackageModal = () => {
+    setShowPackageModal(false);
+    setSelectedBookingForEdit(null);
+    setAvailablePackages([]);
+  };
+
+  const handleSelectPackage = async (pkg: PackageType) => {
+    if (!selectedBookingForEdit) return;
+    
+    setSavingPackage(true);
+    try {
+      const response = await bookingService.updateBooking(Number(selectedBookingForEdit.id), {
+        package_id: pkg.id
+      });
+      
+      if (response.success || response.data) {
+        if (response.data) {
+          await bookingCacheService.updateBookingInCache(response.data);
+        }
+        
+        // Log activity
+        await logBookingActivity(
+          selectedBookingForEdit, 
+          'update', 
+          `Package changed to ${pkg.name}`
+        );
+        
+        // Update local state
+        setBookings(prev =>
+          prev.map(b => 
+            b.id === selectedBookingForEdit.id 
+              ? { ...b, packageName: pkg.name, activity: pkg.category || 'Package Booking' }
+              : b
+          )
+        );
+        
+        handleClosePackageModal();
+      }
+    } catch (error) {
+      console.error('Error updating package:', error);
+      alert('Failed to update package. Please try again.');
+    } finally {
+      setSavingPackage(false);
+    }
+  };
+
+  // Room modal functions
+  const handleOpenRoomModal = async (booking: BookingsPageBooking) => {
+    setSelectedBookingForEdit(booking);
+    setShowRoomModal(true);
+    setLoadingRooms(true);
+    
+    try {
+      // Get location_id from booking cache
+      const cachedBooking = await bookingCacheService.getBookingFromCache(Number(booking.id));
+      const locationId = cachedBooking?.location_id;
+      
+      if (locationId) {
+        // Try to get rooms from cache first for faster loading
+        const cachedRooms = await roomCacheService.getCachedRooms();
+        
+        if (cachedRooms && cachedRooms.length > 0) {
+          // Filter cached rooms by location and availability status
+          const filteredRooms = cachedRooms.filter(
+            (room: Room) => room.location_id === locationId && room.is_available
+          );
+          setAvailableRooms(filteredRooms);
+          setLoadingRooms(false);
+          
+          // Sync in background to keep cache fresh
+          roomCacheService.syncInBackground({ location_id: locationId, is_available: true });
+        } else {
+          // No cache, fetch from API and cache the result
+          const rooms = await roomCacheService.fetchAndCacheRooms({ 
+            location_id: locationId, 
+            is_available: true 
+          });
+          const filteredRooms = rooms.filter(
+            (room: Room) => room.location_id === locationId && room.is_available
+          );
+          setAvailableRooms(filteredRooms);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading rooms:', error);
+      // Fallback to direct API call if cache fails
+      try {
+        const cachedBooking = await bookingCacheService.getBookingFromCache(Number(booking.id));
+        const locationId = cachedBooking?.location_id;
+        if (locationId) {
+          const response = await roomService.getRooms({ location_id: locationId, is_available: true });
+          if (response.success && response.data) {
+            setAvailableRooms(response.data.rooms || []);
+          }
+        }
+      } catch (fallbackError) {
+        console.error('Fallback room loading failed:', fallbackError);
+      }
+    } finally {
+      setLoadingRooms(false);
+    }
+  };
+
+  const handleCloseRoomModal = () => {
+    setShowRoomModal(false);
+    setSelectedBookingForEdit(null);
+    setAvailableRooms([]);
+  };
+
+  const handleSelectRoom = async (room: Room) => {
+    if (!selectedBookingForEdit) return;
+    
+    setSavingRoom(true);
+    try {
+      const response = await bookingService.updateBooking(Number(selectedBookingForEdit.id), {
+        room_id: room.id
+      });
+      
+      if (response.success || response.data) {
+        if (response.data) {
+          await bookingCacheService.updateBookingInCache(response.data);
+        }
+        
+        // Log activity
+        await logBookingActivity(
+          selectedBookingForEdit, 
+          'update', 
+          `Room changed to ${room.name}`
+        );
+        
+        // Update local state
+        setBookings(prev =>
+          prev.map(b => 
+            b.id === selectedBookingForEdit.id 
+              ? { ...b, room: room.name }
+              : b
+          )
+        );
+        
+        handleCloseRoomModal();
+      }
+    } catch (error) {
+      console.error('Error updating room:', error);
+      alert('Failed to update room. Please try again.');
+    } finally {
+      setSavingRoom(false);
+    }
+  };
+
+  // Duration modal functions
+  const handleOpenDurationModal = (booking: BookingsPageBooking) => {
+    setSelectedBookingForEdit(booking);
+    // Parse existing duration if available
+    const durationMatch = booking.duration?.match(/(\d+)\s*(hour|minute|hr|min)/i);
+    if (durationMatch) {
+      setDurationValue(parseInt(durationMatch[1], 10));
+      setDurationUnit(durationMatch[2].toLowerCase().startsWith('min') ? 'minutes' : 'hours');
+    } else {
+      setDurationValue(2);
+      setDurationUnit('hours');
+    }
+    setShowDurationModal(true);
+  };
+
+  const handleCloseDurationModal = () => {
+    setShowDurationModal(false);
+    setSelectedBookingForEdit(null);
+    setDurationValue(2);
+    setDurationUnit('hours');
+  };
+
+  const handleSaveDuration = async () => {
+    if (!selectedBookingForEdit) return;
+    
+    setSavingDuration(true);
+    try {
+      const response = await bookingService.updateBooking(Number(selectedBookingForEdit.id), {
+        duration: durationValue,
+        duration_unit: durationUnit
+      });
+      
+      if (response.success || response.data) {
+        if (response.data) {
+          await bookingCacheService.updateBookingInCache(response.data);
+        }
+        
+        // Log activity
+        await logBookingActivity(
+          selectedBookingForEdit, 
+          'update', 
+          `Duration changed to ${durationValue} ${durationUnit}`
+        );
+        
+        // Update local state
+        const formattedDuration = formatDurationDisplay(durationValue, durationUnit);
+        setBookings(prev =>
+          prev.map(b => 
+            b.id === selectedBookingForEdit.id 
+              ? { ...b, duration: formattedDuration }
+              : b
+          )
+        );
+        
+        handleCloseDurationModal();
+      }
+    } catch (error) {
+      console.error('Error updating duration:', error);
+      alert('Failed to update duration. Please try again.');
+    } finally {
+      setSavingDuration(false);
+    }
+  };
+
+  // Date modal functions
+  const handleOpenDateModal = (booking: BookingsPageBooking) => {
+    setSelectedBookingForEdit(booking);
+    setDateValue(booking.date);
+    setShowDateModal(true);
+  };
+
+  const handleCloseDateModal = () => {
+    setShowDateModal(false);
+    setSelectedBookingForEdit(null);
+    setDateValue('');
+  };
+
+  const handleSaveDate = async () => {
+    if (!selectedBookingForEdit || !dateValue) return;
+    
+    setSavingDate(true);
+    try {
+      const response = await bookingService.updateBooking(Number(selectedBookingForEdit.id), {
+        booking_date: dateValue
+      });
+      
+      if (response.success || response.data) {
+        if (response.data) {
+          await bookingCacheService.updateBookingInCache(response.data);
+        }
+        
+        // Log activity
+        await logBookingActivity(
+          selectedBookingForEdit, 
+          'update', 
+          `Date changed to ${dateValue}`
+        );
+        
+        // Update local state
+        setBookings(prev =>
+          prev.map(b => 
+            b.id === selectedBookingForEdit.id 
+              ? { ...b, date: dateValue }
+              : b
+          )
+        );
+        
+        handleCloseDateModal();
+      }
+    } catch (error) {
+      console.error('Error updating date:', error);
+      alert('Failed to update date. Please try again.');
+    } finally {
+      setSavingDate(false);
+    }
+  };
+
+  // Time modal functions
+  const handleOpenTimeModal = (booking: BookingsPageBooking) => {
+    setSelectedBookingForEdit(booking);
+    setTimeValue(booking.time);
+    setShowTimeModal(true);
+  };
+
+  const handleCloseTimeModal = () => {
+    setShowTimeModal(false);
+    setSelectedBookingForEdit(null);
+    setTimeValue('');
+  };
+
+  const handleSaveTime = async () => {
+    if (!selectedBookingForEdit || !timeValue) return;
+    
+    setSavingTime(true);
+    try {
+      const response = await bookingService.updateBooking(Number(selectedBookingForEdit.id), {
+        booking_time: timeValue
+      });
+      
+      if (response.success || response.data) {
+        if (response.data) {
+          await bookingCacheService.updateBookingInCache(response.data);
+        }
+        
+        // Log activity
+        await logBookingActivity(
+          selectedBookingForEdit, 
+          'update', 
+          `Time changed to ${formatTime12Hour(timeValue)}`
+        );
+        
+        // Update local state
+        setBookings(prev =>
+          prev.map(b => 
+            b.id === selectedBookingForEdit.id 
+              ? { ...b, time: timeValue }
+              : b
+          )
+        );
+        
+        handleCloseTimeModal();
+      }
+    } catch (error) {
+      console.error('Error updating time:', error);
+      alert('Failed to update time. Please try again.');
+    } finally {
+      setSavingTime(false);
+    }
+  };
+
+  // Inline editing functions
+  const startEditing = (bookingId: string, field: string, currentValue: string | number) => {
+    setEditingCell({ bookingId, field });
+    setEditValue(String(currentValue ?? ''));
+    setTimeout(() => inputRef.current?.focus(), 0);
+  };
+
+  const cancelEdit = () => {
+    setEditingCell(null);
+    setEditValue('');
+  };
+
+  const handleEditKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      saveEdit();
+    } else if (e.key === 'Escape') {
+      cancelEdit();
+    }
+  };
+
+  const saveEdit = async () => {
+    if (!editingCell) return;
+
+    const booking = bookings.find(b => b.id === editingCell.bookingId);
+    if (!booking) return;
+
+    const fieldConfig = editableFields.find(f => f.key === editingCell.field);
+    if (!fieldConfig) return;
+
+    const oldValue = booking[editingCell.field as keyof BookingsPageBooking];
+    const oldValueStr = String(oldValue ?? '');
+
+    // Skip if no change
+    if (editValue === oldValueStr) {
+      setEditingCell(null);
+      setEditValue('');
+      return;
+    }
+
+    setSavingCell(editingCell);
+
+    try {
+      // Prepare update payload
+      let updateValue: string | number | null = editValue;
+      
+      // Handle numeric fields
+      if (['participants', 'totalAmount', 'amountPaid'].includes(editingCell.field)) {
+        updateValue = editValue ? parseFloat(editValue) : 0;
+      } else if (editValue === '') {
+        updateValue = null;
+      }
+
+      const payload = {
+        [fieldConfig.apiField]: updateValue,
+      };
+
+      const response = await bookingService.updateBooking(Number(editingCell.bookingId), payload);
+
+      if (response.success || response.data) {
+        // Update cache
+        if (response.data) {
+          await bookingCacheService.updateBookingInCache(response.data);
+        }
+
+        // Log activity
+        await logBookingActivity(
+          booking, 
+          'update', 
+          `${fieldConfig.label} updated from "${oldValueStr}" to "${editValue}"`
+        );
+
+        // Update local state with proper field mapping
+        setBookings(prev =>
+          prev.map(b => {
+            if (b.id === editingCell.bookingId) {
+              const updates: Partial<BookingsPageBooking> = {};
+              
+              // Map API field back to local field
+              if (editingCell.field === 'customerName') {
+                updates.customerName = editValue;
+              } else if (editingCell.field === 'email') {
+                updates.email = editValue;
+              } else if (editingCell.field === 'phone') {
+                updates.phone = editValue;
+              } else if (editingCell.field === 'participants') {
+                updates.participants = Number(editValue) || 0;
+              } else if (editingCell.field === 'totalAmount') {
+                updates.totalAmount = Number(editValue) || 0;
+              } else if (editingCell.field === 'amountPaid') {
+                updates.amountPaid = Number(editValue) || 0;
+              } else if (editingCell.field === 'notes') {
+                updates.notes = editValue;
+              }
+              
+              return { ...b, ...updates };
+            }
+            return b;
+          })
+        );
+      }
+    } catch (error) {
+      console.error('Error updating booking:', error);
+      alert('Failed to update booking. Please try again.');
+    } finally {
+      setSavingCell(null);
+      setEditingCell(null);
+      setEditValue('');
+    }
+  };
+
+  // Render editable cell
+  const renderEditableCell = (
+    booking: BookingsPageBooking, 
+    field: string, 
+    displayValue: React.ReactNode,
+    className: string = ''
+  ) => {
+    const isEditing = editingCell?.bookingId === booking.id && editingCell?.field === field;
+    const isSaving = savingCell?.bookingId === booking.id && savingCell?.field === field;
+    const fieldConfig = editableFields.find(f => f.key === field);
+
+    if (isEditing) {
+      return (
+        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+          <input
+            ref={inputRef}
+            type={fieldConfig?.type || 'text'}
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            onKeyDown={handleEditKeyDown}
+            className={`w-full px-1.5 py-0.5 text-xs border border-${themeColor}-400 rounded bg-white text-gray-900 focus:outline-none focus:ring-1 focus:ring-${themeColor}-500`}
+            disabled={isSaving}
+            autoFocus
+          />
+          <button
+            onClick={(e) => { e.stopPropagation(); saveEdit(); }}
+            className="p-0.5 text-green-600 hover:text-green-700"
+            disabled={isSaving}
+          >
+            <Check className="w-3 h-3" />
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); cancelEdit(); }}
+            className="p-0.5 text-red-600 hover:text-red-700"
+            disabled={isSaving}
+          >
+            <X className="w-3 h-3" />
+          </button>
+        </div>
+      );
+    }
+
+    return (
+      <div
+        className={`group cursor-pointer flex items-center gap-1 hover:bg-gray-100 rounded px-1 py-0.5 -mx-1 min-h-[20px] ${className}`}
+        onClick={() => startEditing(booking.id, field, booking[field as keyof BookingsPageBooking] as string | number)}
+        title="Click to edit"
+      >
+        <span className="truncate">{displayValue || <span className="text-gray-400 italic">—</span>}</span>
+        <Edit3 className="w-2.5 h-2.5 text-gray-400 opacity-0 group-hover:opacity-100 flex-shrink-0" />
+      </div>
+    );
   };
 
   const handleBulkDelete = async () => {
@@ -994,6 +1657,14 @@ const Bookings: React.FC = () => {
         await bookingCacheService.updateBookingInCache(updateResponse.data);
       }
 
+      // Log activity
+      await logBookingActivity(
+        selectedBookingForPayment, 
+        'payment', 
+        `Payment of $${amount.toFixed(2)} processed via ${paymentMethod}. New total paid: $${newAmountPaid.toFixed(2)}`,
+        locationId
+      );
+
       // Update local state
       const updatedBookings = bookings.map(booking =>
         booking.id === selectedBookingForPayment.id
@@ -1308,20 +1979,56 @@ const Bookings: React.FC = () => {
                         />
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <div className="font-medium text-gray-900">
-                          {parseLocalDate(booking.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        <div 
+                          className="font-medium text-gray-900 group cursor-pointer flex items-center gap-1 hover:bg-gray-100 rounded px-1 py-0.5 -mx-1"
+                          onClick={() => handleOpenDateModal(booking)}
+                          title="Click to change date"
+                        >
+                          <Calendar className="w-3 h-3 text-gray-400 mr-1" />
+                          <span>{parseLocalDate(booking.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                          <Edit3 className="w-2.5 h-2.5 text-gray-400 opacity-0 group-hover:opacity-100 flex-shrink-0" />
                         </div>
-                        <div className="text-xs text-gray-500">{formatTime12Hour(booking.time)}</div>
+                        <div 
+                          className="text-xs text-gray-500 group cursor-pointer flex items-center gap-1 hover:bg-gray-100 rounded px-1 py-0.5 -mx-1"
+                          onClick={() => handleOpenTimeModal(booking)}
+                          title="Click to change time"
+                        >
+                          <Clock className="w-3 h-3 text-gray-400 mr-1" />
+                          <span>{formatTime12Hour(booking.time)}</span>
+                          <Edit3 className="w-2.5 h-2.5 text-gray-400 opacity-0 group-hover:opacity-100 flex-shrink-0" />
+                        </div>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <div className="font-medium text-gray-900">{booking.customerName}</div>
-                        <div className="text-xs text-gray-500">{booking.email}</div>
-                        <div className="text-xs text-gray-500">{booking.phone}</div>
+                        <div className="font-medium text-gray-900">
+                          {renderEditableCell(booking, 'customerName', booking.customerName)}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {renderEditableCell(booking, 'email', booking.email)}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {renderEditableCell(booking, 'phone', booking.phone)}
+                        </div>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <div className="font-medium text-gray-900">{booking.packageName}</div>
+                        <div 
+                          className="font-medium text-gray-900 group cursor-pointer flex items-center gap-1 hover:bg-gray-100 rounded px-1 py-0.5 -mx-1"
+                          onClick={() => handleOpenPackageModal(booking)}
+                          title="Click to change package"
+                        >
+                          <Package className="w-3 h-3 text-gray-400 mr-1" />
+                          <span>{booking.packageName}</span>
+                          <Edit3 className="w-2.5 h-2.5 text-gray-400 opacity-0 group-hover:opacity-100 flex-shrink-0" />
+                        </div>
                         <div className="text-xs text-gray-500">{booking.activity}</div>
-                        <div className={`text-xs text-${fullColor}`}>{booking.room}</div>
+                        <div 
+                          className={`text-xs text-${fullColor} group cursor-pointer flex items-center gap-1 hover:bg-gray-100 rounded px-1 py-0.5 -mx-1`}
+                          onClick={() => handleOpenRoomModal(booking)}
+                          title="Click to change room"
+                        >
+                          <Home className="w-2.5 h-2.5 text-gray-400 mr-0.5" />
+                          <span>{booking.room}</span>
+                          <Edit3 className="w-2.5 h-2.5 text-gray-400 opacity-0 group-hover:opacity-100 flex-shrink-0" />
+                        </div>
                         {booking.attractions && booking.attractions.length > 0 && (
                           <div className="text-xs text-gray-500 mt-1">
                             Includes: {booking.attractions.map(a => `${a.name} (${a.quantity})`).join(', ')}
@@ -1334,10 +2041,18 @@ const Bookings: React.FC = () => {
                         <MapPin className={`inline-block mr-1 text-${fullColor} h-4 w-4 `} /> {booking.location || <span className="text-gray-600 ">-</span>}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                        {booking.duration || <span className="text-gray-600 ">-</span>}
+                        <div 
+                          className="group cursor-pointer flex items-center gap-1 hover:bg-gray-100 rounded px-1 py-0.5 -mx-1"
+                          onClick={() => handleOpenDurationModal(booking)}
+                          title="Click to edit duration"
+                        >
+                          <Clock className="w-3 h-3 text-gray-400 mr-1" />
+                          <span>{booking.duration || '-'}</span>
+                          <Edit3 className="w-2.5 h-2.5 text-gray-400 opacity-0 group-hover:opacity-100 flex-shrink-0" />
+                        </div>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                        {booking.participants}
+                        {renderEditableCell(booking, 'participants', booking.participants)}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <select
@@ -1909,6 +2624,293 @@ const Bookings: React.FC = () => {
                   loading={savingInternalNotes}
                 >
                   {savingInternalNotes ? 'Saving...' : 'Save Notes'}
+                </StandardButton>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Package Selection Modal */}
+        {showPackageModal && selectedBookingForEdit && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-backdrop-fade" onClick={handleClosePackageModal}>
+            <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full mx-4 max-h-[80vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+              <div className={`p-6 border-b border-gray-100 bg-${themeColor}-50`}>
+                <h2 className="text-xl font-bold text-gray-900">Select Package</h2>
+                <p className="text-sm text-gray-600 mt-1">
+                  Booking: {selectedBookingForEdit.referenceNumber}
+                </p>
+              </div>
+
+              <div className="p-4 max-h-[50vh] overflow-y-auto">
+                {loadingPackages ? (
+                  <div className="flex justify-center items-center py-8">
+                    <div className={`animate-spin rounded-full h-8 w-8 border-b-2 border-${fullColor}`}></div>
+                  </div>
+                ) : availablePackages.length === 0 ? (
+                  <p className="text-center text-gray-500 py-8">No packages available</p>
+                ) : (
+                  <div className="space-y-2">
+                    {availablePackages.map((pkg) => (
+                      <button
+                        key={pkg.id}
+                        onClick={() => handleSelectPackage(pkg)}
+                        disabled={savingPackage}
+                        className={`w-full text-left p-4 rounded-lg border transition-colors ${
+                          pkg.name === selectedBookingForEdit.packageName
+                            ? `border-${themeColor}-500 bg-${themeColor}-50`
+                            : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="font-medium text-gray-900">{pkg.name}</div>
+                            <div className="text-xs text-gray-500">{pkg.category}</div>
+                          </div>
+                          <div className="text-right">
+                            <div className="font-semibold text-gray-900">${Number(pkg.price || 0).toFixed(2)}</div>
+                            <div className="text-xs text-gray-500">{pkg.duration} {pkg.duration_unit}</div>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="p-4 border-t border-gray-100 flex justify-end">
+                <StandardButton
+                  variant="secondary"
+                  size="md"
+                  onClick={handleClosePackageModal}
+                  disabled={savingPackage}
+                >
+                  Cancel
+                </StandardButton>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Room Selection Modal */}
+        {showRoomModal && selectedBookingForEdit && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-backdrop-fade" onClick={handleCloseRoomModal}>
+            <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full mx-4 max-h-[80vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+              <div className={`p-6 border-b border-gray-100 bg-${themeColor}-50`}>
+                <h2 className="text-xl font-bold text-gray-900">Select Room/Table</h2>
+                <p className="text-sm text-gray-600 mt-1">
+                  Booking: {selectedBookingForEdit.referenceNumber}
+                </p>
+              </div>
+
+              <div className="p-4 max-h-[50vh] overflow-y-auto">
+                {loadingRooms ? (
+                  <div className="flex justify-center items-center py-8">
+                    <div className={`animate-spin rounded-full h-8 w-8 border-b-2 border-${fullColor}`}></div>
+                  </div>
+                ) : availableRooms.length === 0 ? (
+                  <p className="text-center text-gray-500 py-8">No rooms available</p>
+                ) : (
+                  <div className="space-y-2">
+                    {availableRooms.map((room) => (
+                      <button
+                        key={room.id}
+                        onClick={() => handleSelectRoom(room)}
+                        disabled={savingRoom}
+                        className={`w-full text-left p-4 rounded-lg border transition-colors ${
+                          room.name === selectedBookingForEdit.room
+                            ? `border-${themeColor}-500 bg-${themeColor}-50`
+                            : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="font-medium text-gray-900">{room.name}</div>
+                            {room.area_group && (
+                              <div className="text-xs text-gray-500">{room.area_group}</div>
+                            )}
+                          </div>
+                          {room.capacity && (
+                            <div className="text-sm text-gray-600">
+                              <Users className="inline-block w-4 h-4 mr-1" />
+                              {room.capacity}
+                            </div>
+                          )}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="p-4 border-t border-gray-100 flex justify-end">
+                <StandardButton
+                  variant="secondary"
+                  size="md"
+                  onClick={handleCloseRoomModal}
+                  disabled={savingRoom}
+                >
+                  Cancel
+                </StandardButton>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Duration Edit Modal */}
+        {showDurationModal && selectedBookingForEdit && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-backdrop-fade" onClick={handleCloseDurationModal}>
+            <div className="bg-white rounded-xl shadow-2xl max-w-sm w-full mx-4" onClick={(e) => e.stopPropagation()}>
+              <div className={`p-6 border-b border-gray-100 bg-${themeColor}-50`}>
+                <h2 className="text-xl font-bold text-gray-900">Edit Duration</h2>
+                <p className="text-sm text-gray-600 mt-1">
+                  Booking: {selectedBookingForEdit.referenceNumber}
+                </p>
+              </div>
+
+              <div className="p-6 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Duration
+                  </label>
+                  <div className="flex gap-3">
+                    <input
+                      type="number"
+                      min="1"
+                      value={durationValue}
+                      onChange={(e) => setDurationValue(parseInt(e.target.value, 10) || 1)}
+                      className={`flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
+                    />
+                    <select
+                      value={durationUnit}
+                      onChange={(e) => setDurationUnit(e.target.value as 'hours' | 'minutes')}
+                      className={`px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
+                    >
+                      <option value="hours">Hours</option>
+                      <option value="minutes">Minutes</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-6 border-t border-gray-100 flex gap-3 justify-end">
+                <StandardButton
+                  variant="secondary"
+                  size="md"
+                  onClick={handleCloseDurationModal}
+                  disabled={savingDuration}
+                >
+                  Cancel
+                </StandardButton>
+                <StandardButton
+                  variant="primary"
+                  size="md"
+                  onClick={handleSaveDuration}
+                  disabled={savingDuration}
+                  loading={savingDuration}
+                >
+                  {savingDuration ? 'Saving...' : 'Save Duration'}
+                </StandardButton>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Date Edit Modal */}
+        {showDateModal && selectedBookingForEdit && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-backdrop-fade" onClick={handleCloseDateModal}>
+            <div className="bg-white rounded-xl shadow-2xl max-w-sm w-full mx-4" onClick={(e) => e.stopPropagation()}>
+              <div className={`p-6 border-b border-gray-100 bg-${themeColor}-50`}>
+                <h2 className="text-xl font-bold text-gray-900">Edit Date</h2>
+                <p className="text-sm text-gray-600 mt-1">
+                  Booking: {selectedBookingForEdit.referenceNumber}
+                </p>
+              </div>
+
+              <div className="p-6 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Booking Date
+                  </label>
+                  <input
+                    type="date"
+                    value={dateValue}
+                    onChange={(e) => setDateValue(e.target.value)}
+                    className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
+                  />
+                </div>
+                <p className="text-sm text-gray-500">
+                  Current: {selectedBookingForEdit.date ? parseLocalDate(selectedBookingForEdit.date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : 'Not set'}
+                </p>
+              </div>
+
+              <div className="p-6 border-t border-gray-100 flex gap-3 justify-end">
+                <StandardButton
+                  variant="secondary"
+                  size="md"
+                  onClick={handleCloseDateModal}
+                  disabled={savingDate}
+                >
+                  Cancel
+                </StandardButton>
+                <StandardButton
+                  variant="primary"
+                  size="md"
+                  onClick={handleSaveDate}
+                  disabled={savingDate || !dateValue}
+                  loading={savingDate}
+                >
+                  {savingDate ? 'Saving...' : 'Save Date'}
+                </StandardButton>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Time Edit Modal */}
+        {showTimeModal && selectedBookingForEdit && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-backdrop-fade" onClick={handleCloseTimeModal}>
+            <div className="bg-white rounded-xl shadow-2xl max-w-sm w-full mx-4" onClick={(e) => e.stopPropagation()}>
+              <div className={`p-6 border-b border-gray-100 bg-${themeColor}-50`}>
+                <h2 className="text-xl font-bold text-gray-900">Edit Time</h2>
+                <p className="text-sm text-gray-600 mt-1">
+                  Booking: {selectedBookingForEdit.referenceNumber}
+                </p>
+              </div>
+
+              <div className="p-6 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Booking Time
+                  </label>
+                  <input
+                    type="time"
+                    value={timeValue}
+                    onChange={(e) => setTimeValue(e.target.value)}
+                    className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
+                  />
+                </div>
+                <p className="text-sm text-gray-500">
+                  Current: {selectedBookingForEdit.time ? formatTime12Hour(selectedBookingForEdit.time) : 'Not set'}
+                </p>
+              </div>
+
+              <div className="p-6 border-t border-gray-100 flex gap-3 justify-end">
+                <StandardButton
+                  variant="secondary"
+                  size="md"
+                  onClick={handleCloseTimeModal}
+                  disabled={savingTime}
+                >
+                  Cancel
+                </StandardButton>
+                <StandardButton
+                  variant="primary"
+                  size="md"
+                  onClick={handleSaveTime}
+                  disabled={savingTime || !timeValue}
+                  loading={savingTime}
+                >
+                  {savingTime ? 'Saving...' : 'Save Time'}
                 </StandardButton>
               </div>
             </div>

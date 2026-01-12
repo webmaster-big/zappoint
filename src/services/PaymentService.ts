@@ -537,6 +537,232 @@ export const processCardPayment = async (
 };
 
 /**
+ * Party Summary Export Filter Options
+ */
+export interface PartySummaryFilters {
+  date?: string; // Single date Y-m-d
+  start_date?: string;
+  end_date?: string;
+  week?: 'current' | 'next' | string;
+  location_id?: number;
+  package_id?: number;
+  room_id?: number;
+  status?: string;
+  view_mode?: 'detailed' | 'compact';
+}
+
+/**
+ * Export party summaries for staff organization (full booking details + notes)
+ * Provides detailed printable summaries for staff to organize and prepare for parties
+ * 
+ * @param filters - Export filters
+ * @param stream - true to view in browser, false to download
+ */
+export const exportPartySummaries = async (
+  filters: PartySummaryFilters,
+  stream: boolean = false
+): Promise<void> => {
+  const token = getStoredUser()?.token;
+  const params = new URLSearchParams();
+  
+  if (filters.date) params.append('date', filters.date);
+  if (filters.start_date) params.append('start_date', filters.start_date);
+  if (filters.end_date) params.append('end_date', filters.end_date);
+  if (filters.week) params.append('week', filters.week);
+  if (filters.location_id) params.append('location_id', filters.location_id.toString());
+  if (filters.package_id) params.append('package_id', filters.package_id.toString());
+  if (filters.room_id) params.append('room_id', filters.room_id.toString());
+  if (filters.status) params.append('status', filters.status);
+  if (filters.view_mode) params.append('view_mode', filters.view_mode);
+  if (stream) params.append('stream', 'true');
+  
+  const response = await fetch(`${API_BASE_URL}/payments/party-summaries/export?${params.toString()}`, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+  
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to export party summaries');
+  }
+  
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  
+  if (stream) {
+    window.open(url, '_blank');
+  } else {
+    const link = document.createElement('a');
+    link.href = url;
+    // Generate filename based on filters
+    let filename = 'party-summaries';
+    if (filters.date) {
+      filename += '-' + filters.date;
+    } else if (filters.start_date && filters.end_date) {
+      filename += '-' + filters.start_date + '-to-' + filters.end_date;
+    } else if (filters.week) {
+      filename += '-week-' + filters.week;
+    }
+    filename += '.pdf';
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+};
+
+/**
+ * Export party summaries for a specific day (shortcut)
+ * 
+ * @param date - Date string (Y-m-d)
+ * @param stream - true to view in browser, false to download
+ */
+export const exportPartySummariesForDay = async (
+  date: string,
+  stream: boolean = false
+): Promise<void> => {
+  const token = getStoredUser()?.token;
+  const params = new URLSearchParams();
+  if (stream) params.append('stream', 'true');
+  
+  const url = `${API_BASE_URL}/payments/party-summaries/day/${date}${params.toString() ? '?' + params.toString() : ''}`;
+  
+  const response = await fetch(url, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+  
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to export party summaries for day');
+  }
+  
+  const blob = await response.blob();
+  const blobUrl = URL.createObjectURL(blob);
+  
+  if (stream) {
+    window.open(blobUrl, '_blank');
+  } else {
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = `party-summaries-${date}.pdf`;
+    link.click();
+    URL.revokeObjectURL(blobUrl);
+  }
+};
+
+/**
+ * Export party summaries for a specific week (shortcut)
+ * 
+ * @param week - 'current', 'next', or date string
+ * @param stream - true to view in browser, false to download
+ */
+export const exportPartySummariesForWeek = async (
+  week: 'current' | 'next' | string = 'current',
+  stream: boolean = false
+): Promise<void> => {
+  const token = getStoredUser()?.token;
+  const params = new URLSearchParams();
+  if (stream) params.append('stream', 'true');
+  
+  const url = `${API_BASE_URL}/payments/party-summaries/week/${week}${params.toString() ? '?' + params.toString() : ''}`;
+  
+  const response = await fetch(url, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+  
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to export party summaries for week');
+  }
+  
+  const blob = await response.blob();
+  const blobUrl = URL.createObjectURL(blob);
+  
+  if (stream) {
+    window.open(blobUrl, '_blank');
+  } else {
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = `party-summaries-week-${week}.pdf`;
+    link.click();
+    URL.revokeObjectURL(blobUrl);
+  }
+};
+
+/**
+ * Package Invoice Export Filter Options
+ */
+export interface PackageInvoiceFilters {
+  package_id: number; // Required
+  date?: string;
+  start_date?: string;
+  end_date?: string;
+  location_id?: number;
+  status?: 'pending' | 'completed' | 'failed' | 'refunded';
+}
+
+/**
+ * Export package-specific invoices (all invoices for bookings of a specific package)
+ * Lists all payment invoices grouped by package in a consistent invoice format
+ * 
+ * @param filters - Export filters (package_id is required)
+ * @param stream - true to view in browser, false to download
+ */
+export const exportPackageInvoices = async (
+  filters: PackageInvoiceFilters,
+  stream: boolean = false
+): Promise<void> => {
+  const token = getStoredUser()?.token;
+  const params = new URLSearchParams();
+  
+  // package_id is required
+  params.append('package_id', filters.package_id.toString());
+  
+  if (filters.date) params.append('date', filters.date);
+  if (filters.start_date) params.append('start_date', filters.start_date);
+  if (filters.end_date) params.append('end_date', filters.end_date);
+  if (filters.location_id) params.append('location_id', filters.location_id.toString());
+  if (filters.status) params.append('status', filters.status);
+  if (stream) params.append('stream', 'true');
+  
+  const response = await fetch(`${API_BASE_URL}/payments/package-invoices/export?${params.toString()}`, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+  
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to export package invoices');
+  }
+  
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  
+  if (stream) {
+    window.open(url, '_blank');
+  } else {
+    const link = document.createElement('a');
+    link.href = url;
+    // Generate filename based on filters
+    let filename = `package-invoices-${filters.package_id}`;
+    if (filters.date) {
+      filename += '-' + filters.date;
+    } else if (filters.start_date && filters.end_date) {
+      filename += '-' + filters.start_date + '-to-' + filters.end_date;
+    }
+    filename += '.pdf';
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+};
+
+/**
  * Validate card number using Luhn algorithm
  * 
  * @param cardNumber - Card number to validate
@@ -622,6 +848,12 @@ export default {
   validateCardNumber,
   formatCardNumber,
   getCardType,
+  // Party Summary exports
+  exportPartySummaries,
+  exportPartySummariesForDay,
+  exportPartySummariesForWeek,
+  // Package Invoice exports
+  exportPackageInvoices,
   PAYMENT_TYPE,
 };
 
