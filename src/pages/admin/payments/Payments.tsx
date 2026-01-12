@@ -33,12 +33,8 @@ import {
   exportInvoicesForDay,
   exportInvoicesForWeek,
   exportBulkInvoices,
-  exportPartySummaries,
-  exportPartySummariesForDay,
-  exportPartySummariesForWeek,
   exportPackageInvoices,
   type InvoiceExportFilters,
-  type PartySummaryFilters,
   type PackageInvoiceFilters
 } from '../../../services/PaymentService';
 import { locationService } from '../../../services/LocationService';
@@ -92,13 +88,6 @@ const Payments: React.FC = () => {
     view_mode: 'report'
   });
   const [exportDate, setExportDate] = useState<string>(new Date().toISOString().split('T')[0]);
-
-  // Party Summary Export Modal state
-  const [showPartySummaryModal, setShowPartySummaryModal] = useState(false);
-  const [partySummaryMode, setPartySummaryMode] = useState<'custom' | 'today' | 'current_week' | 'next_week'>('today');
-  const [partySummaryFilters, setPartySummaryFilters] = useState<PartySummaryFilters>({
-    view_mode: 'detailed'
-  });
 
   // Package Invoice Export Modal state
   const [showPackageInvoiceModal, setShowPackageInvoiceModal] = useState(false);
@@ -547,53 +536,6 @@ const Payments: React.FC = () => {
     }
   };
 
-  // Open Party Summary Modal
-  const handleOpenPartySummaryModal = () => {
-    const newFilters: PartySummaryFilters = {
-      view_mode: 'detailed'
-    };
-    
-    // Apply current location filter
-    if (selectedLocation) {
-      newFilters.location_id = parseInt(selectedLocation);
-    } else if (isLocationManager && currentUser?.location_id) {
-      newFilters.location_id = currentUser.location_id;
-    }
-    
-    setPartySummaryFilters(newFilters);
-    setPartySummaryMode('today');
-    setShowPartySummaryModal(true);
-  };
-
-  // Handle Party Summary Export
-  const handlePartySummaryExport = async (stream: boolean = false) => {
-    try {
-      setIsExporting(true);
-      setToast({ message: stream ? 'Opening party summaries...' : 'Generating party summaries...', type: 'info' });
-      
-      if (partySummaryMode === 'today') {
-        const today = new Date().toISOString().split('T')[0];
-        await exportPartySummariesForDay(today, stream);
-      } else if (partySummaryMode === 'current_week') {
-        await exportPartySummariesForWeek('current', stream);
-      } else if (partySummaryMode === 'next_week') {
-        await exportPartySummariesForWeek('next', stream);
-      } else {
-        // Custom mode - use all filters
-        await exportPartySummaries(partySummaryFilters, stream);
-      }
-      
-      setToast({ message: `Party summaries ${stream ? 'opened' : 'downloaded'} successfully`, type: 'success' });
-      setShowPartySummaryModal(false);
-    } catch (error: unknown) {
-      console.error('Error exporting party summaries:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to export party summaries';
-      setToast({ message: errorMessage, type: 'error' });
-    } finally {
-      setIsExporting(false);
-    }
-  };
-
   // Open Package Invoice Modal
   const handleOpenPackageInvoiceModal = async () => {
     setShowPackageInvoiceModal(true);
@@ -739,15 +681,6 @@ const Payments: React.FC = () => {
             icon={Download}
           >
             Export CSV
-          </StandardButton>
-          <StandardButton
-            variant="secondary"
-            size="md"
-            onClick={handleOpenPartySummaryModal}
-            icon={Calendar}
-            disabled={isExporting}
-          >
-            Party Summaries
           </StandardButton>
           <StandardButton
             variant="secondary"
@@ -1432,183 +1365,6 @@ const Payments: React.FC = () => {
               <StandardButton
                 variant="primary"
                 onClick={() => handleExportFromModal(false)}
-                icon={Download}
-                disabled={isExporting}
-              >
-                {isExporting ? 'Exporting...' : 'Download PDF'}
-              </StandardButton>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Party Summary Export Modal */}
-      {showPartySummaryModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-              <div className="flex items-center gap-3">
-                <div className={`p-2 rounded-lg bg-${themeColor}-100`}>
-                  <Calendar className={`w-5 h-5 text-${fullColor}`} />
-                </div>
-                <div>
-                  <h2 className="text-lg font-semibold text-gray-900">Party Summaries</h2>
-                  <p className="text-xs text-gray-500">Staff organization sheets with booking details</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowPartySummaryModal(false)}
-                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            <div className="px-6 py-4 space-y-4">
-              {/* Export Mode Selection */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Time Period</label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    onClick={() => setPartySummaryMode('today')}
-                    className={`px-4 py-2 text-sm font-medium rounded-lg border transition-colors ${
-                      partySummaryMode === 'today'
-                        ? `bg-${fullColor} text-white border-${fullColor}`
-                        : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
-                    }`}
-                  >
-                    Today
-                  </button>
-                  <button
-                    onClick={() => setPartySummaryMode('current_week')}
-                    className={`px-4 py-2 text-sm font-medium rounded-lg border transition-colors ${
-                      partySummaryMode === 'current_week'
-                        ? `bg-${fullColor} text-white border-${fullColor}`
-                        : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
-                    }`}
-                  >
-                    This Week
-                  </button>
-                  <button
-                    onClick={() => setPartySummaryMode('next_week')}
-                    className={`px-4 py-2 text-sm font-medium rounded-lg border transition-colors ${
-                      partySummaryMode === 'next_week'
-                        ? `bg-${fullColor} text-white border-${fullColor}`
-                        : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
-                    }`}
-                  >
-                    Next Week
-                  </button>
-                  <button
-                    onClick={() => setPartySummaryMode('custom')}
-                    className={`px-4 py-2 text-sm font-medium rounded-lg border transition-colors ${
-                      partySummaryMode === 'custom'
-                        ? `bg-${fullColor} text-white border-${fullColor}`
-                        : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
-                    }`}
-                  >
-                    Custom Range
-                  </button>
-                </div>
-              </div>
-
-              {/* Custom Filters */}
-              {partySummaryMode === 'custom' && (
-                <div className="space-y-3 p-4 bg-gray-50 rounded-lg">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">Start Date</label>
-                      <input
-                        type="date"
-                        value={partySummaryFilters.start_date || ''}
-                        onChange={(e) => setPartySummaryFilters(prev => ({ ...prev, start_date: e.target.value }))}
-                        className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">End Date</label>
-                      <input
-                        type="date"
-                        value={partySummaryFilters.end_date || ''}
-                        onChange={(e) => setPartySummaryFilters(prev => ({ ...prev, end_date: e.target.value }))}
-                        className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Status Filter</label>
-                    <select
-                      value={partySummaryFilters.status || ''}
-                      onChange={(e) => setPartySummaryFilters(prev => ({ ...prev, status: e.target.value || undefined }))}
-                      className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
-                    >
-                      <option value="">All (except cancelled)</option>
-                      <option value="pending">Pending</option>
-                      <option value="confirmed">Confirmed</option>
-                      <option value="checked-in">Checked In</option>
-                      <option value="completed">Completed</option>
-                    </select>
-                  </div>
-                </div>
-              )}
-
-              {/* View Mode Selection */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Report Detail</label>
-                <div className="flex gap-3">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="partySummaryViewMode"
-                      value="detailed"
-                      checked={partySummaryFilters.view_mode === 'detailed'}
-                      onChange={() => setPartySummaryFilters(prev => ({ ...prev, view_mode: 'detailed' }))}
-                      className={`text-${fullColor} focus:ring-${themeColor}-600`}
-                    />
-                    <span className="text-sm text-gray-700">Detailed</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="partySummaryViewMode"
-                      value="compact"
-                      checked={partySummaryFilters.view_mode === 'compact'}
-                      onChange={() => setPartySummaryFilters(prev => ({ ...prev, view_mode: 'compact' }))}
-                      className={`text-${fullColor} focus:ring-${themeColor}-600`}
-                    />
-                    <span className="text-sm text-gray-700">Compact</span>
-                  </label>
-                </div>
-                <p className="text-xs text-gray-500 mt-1">
-                  {partySummaryFilters.view_mode === 'detailed' 
-                    ? 'Full booking details with customer info, notes, and add-ons' 
-                    : 'Condensed view with essential party information only'}
-                </p>
-              </div>
-            </div>
-
-            {/* Modal Footer */}
-            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50">
-              <StandardButton
-                variant="ghost"
-                onClick={() => setShowPartySummaryModal(false)}
-                disabled={isExporting}
-              >
-                Cancel
-              </StandardButton>
-              <StandardButton
-                variant="secondary"
-                onClick={() => handlePartySummaryExport(true)}
-                icon={Eye}
-                disabled={isExporting}
-              >
-                View in Browser
-              </StandardButton>
-              <StandardButton
-                variant="primary"
-                onClick={() => handlePartySummaryExport(false)}
                 icon={Download}
                 disabled={isExporting}
               >
