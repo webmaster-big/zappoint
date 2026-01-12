@@ -2708,7 +2708,9 @@ const Bookings: React.FC = () => {
                   <p className="text-center text-gray-500 py-8">No rooms available</p>
                 ) : (
                   <div className="space-y-2">
-                    {availableRooms.map((room) => (
+                    {availableRooms
+                      .sort((a, b) => a.name.localeCompare(b.name))
+                      .map((room) => (
                       <button
                         key={room.id}
                         onClick={() => handleSelectRoom(room)}
