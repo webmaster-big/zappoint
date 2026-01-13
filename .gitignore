@@ -25,3 +25,4 @@ dist-ssr
 
 # Documentation files
 *.md
+\n# Ignore markdown files\n*.md
