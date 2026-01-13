@@ -583,7 +583,7 @@ const ManageAttractions = () => {
   }
 
   return (
-    <div className="min-h-screen px-6 py-8">
+    <div className="px-6 py-8">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
         <div>

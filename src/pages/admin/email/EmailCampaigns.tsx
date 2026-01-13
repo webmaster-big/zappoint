@@ -202,18 +202,14 @@ const EmailCampaigns: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen p-4 md:p-8 space-y-8">
+    <div className="px-6 py-8">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-2">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-1">
-            Email Campaigns
-          </h1>
-          <p className="text-sm text-gray-600">
-            Send bulk emails to customers and staff
-          </p>
+          <h1 className="text-3xl font-bold text-gray-900">Email Campaigns</h1>
+          <p className="text-gray-600 mt-2">Send bulk emails to customers and staff</p>
         </div>
-        <div className="flex items-center gap-3 mt-4 md:mt-0">
+        <div className="flex items-center gap-3 mt-4 sm:mt-0">
           <Link to="/admin/email/templates">
             <StandardButton variant="secondary" icon={Mail}>
               Templates

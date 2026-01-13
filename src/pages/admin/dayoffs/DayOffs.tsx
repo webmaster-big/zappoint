@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Edit2, Trash2, Calendar, MapPin, CheckSquare, Square, Plus, X, CalendarOff, RefreshCw, ChevronLeft, ChevronRight, Clock, Building2, Package as PackageIcon, DoorOpen, Layers } from 'lucide-react';
+import { Search, Edit2, Trash2, Calendar, MapPin, CheckSquare, Square, Plus, X, CalendarOff, RefreshCw, ChevronLeft, ChevronRight, Clock, Building2, Package as PackageIcon, DoorOpen, Layers, LayoutGrid, List } from 'lucide-react';
 import StandardButton from '../../../components/ui/StandardButton';
 import Toast from '../../../components/ui/Toast';
 import { dayOffService, locationService, packageService, roomService } from '../../../services';
@@ -88,6 +88,17 @@ const DayOffs: React.FC = () => {
     const showToast = (message: string, type?: "success" | "error" | "info") => {
         setToast({ message, type });
         setTimeout(() => setToast(null), 3000);
+    };
+
+    // View mode state (card or table) with localStorage persistence
+    const [viewMode, setViewMode] = useState<'card' | 'table'>(() => {
+        const saved = localStorage.getItem('dayoffs_view_mode');
+        return (saved === 'table' || saved === 'card') ? saved : 'card';
+    });
+
+    const toggleViewMode = (mode: 'card' | 'table') => {
+        setViewMode(mode);
+        localStorage.setItem('dayoffs_view_mode', mode);
     };
 
     // Fetch locations for company_admin
@@ -711,10 +722,10 @@ const DayOffs: React.FC = () => {
     return (
         <div className="px-6 py-8">
             {/* Page Header with Action Buttons */}
-            <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Day Offs</h1>
-                    <p className="text-gray-600 mt-1">Manage blocked dates and holidays for your locations</p>
+                    <h1 className="text-3xl font-bold text-gray-900">Day Offs</h1>
+                    <p className="text-gray-600 mt-2">Manage blocked dates and holidays for your locations</p>
                 </div>
                 <div className="flex items-center gap-2">
                     {dayOffs.length > 0 && (
@@ -762,7 +773,7 @@ const DayOffs: React.FC = () => {
             </div>
 
             {/* Main Content */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
                 {/* Selection Info Bar */}
                 {selectionMode && dayOffs.length > 0 && (
                     <div className={`mb-4 p-3 bg-${themeColor}-50 border border-${themeColor}-200 rounded-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3`}>
@@ -886,133 +897,331 @@ const DayOffs: React.FC = () => {
                             </div>
                         </div>
 
-                        {/* Results count */}
-                        <div className="text-sm text-gray-500">
-                            Showing {dayOffs.length} day off{dayOffs.length !== 1 ? 's' : ''}
+                        {/* Results count and View Toggle */}
+                        <div className="flex items-center justify-between">
+                            <div className="text-sm text-gray-500">
+                                Showing {dayOffs.length} day off{dayOffs.length !== 1 ? 's' : ''}
+                            </div>
+                            
+                            {/* View Toggle */}
+                            <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+                                <button
+                                    onClick={() => toggleViewMode('card')}
+                                    className={`p-1.5 rounded transition-all ${
+                                        viewMode === 'card' 
+                                            ? `bg-white shadow text-${fullColor}` 
+                                            : 'text-gray-500 hover:text-gray-700'
+                                    }`}
+                                    title="Card View"
+                                >
+                                    <LayoutGrid className="w-4 h-4" />
+                                </button>
+                                <button
+                                    onClick={() => toggleViewMode('table')}
+                                    className={`p-1.5 rounded transition-all ${
+                                        viewMode === 'table' 
+                                            ? `bg-white shadow text-${fullColor}` 
+                                            : 'text-gray-500 hover:text-gray-700'
+                                    }`}
+                                    title="Table View"
+                                >
+                                    <List className="w-4 h-4" />
+                                </button>
+                            </div>
                         </div>
                     </div>
                 )}
 
-                {/* Day Offs Grid */}
+                {/* Day Offs Display */}
                 {loading ? (
                     <div className="flex justify-center items-center py-12">
                         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-300"></div>
                     </div>
                 ) : dayOffs.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                        {dayOffs.map((dayOff) => {
-                            const closureType = getClosureTypeLabel(dayOff);
-                            const blockingScopeBadge = getBlockingScopeBadge(dayOff);
-                            const isPast = isPastDate(dayOff.date);
-                            
-                            return (
-                                <div 
-                                    key={dayOff.id} 
-                                    className={`relative border rounded-lg p-3 transition-all ${
-                                        selectionMode 
-                                            ? 'cursor-pointer hover:shadow-md hover:-translate-y-0.5' 
-                                            : 'hover:shadow-sm'
-                                    } ${
-                                        selectedDayOffIds.has(dayOff.id)
-                                            ? `border-${fullColor} bg-${themeColor}-50 shadow-md`
-                                            : isPast
-                                                ? 'border-gray-200 bg-gray-50/50'
-                                                : 'border-gray-200 bg-white hover:border-gray-300'
-                                    }`}
-                                    onClick={() => selectionMode && toggleDayOffSelection(dayOff.id)}
-                                >
-                                    {/* Top Row: Date + Actions */}
-                                    <div className="flex items-start justify-between mb-2">
-                                        <div className="flex items-center gap-2 min-w-0 flex-1">
-                                            {selectionMode ? (
-                                                selectedDayOffIds.has(dayOff.id) ? (
-                                                    <CheckSquare className={`w-4 h-4 flex-shrink-0 text-${fullColor}`} />
-                                                ) : (
-                                                    <Square className="w-4 h-4 flex-shrink-0 text-gray-400" />
-                                                )
-                                            ) : (
-                                                <Calendar className={`w-4 h-4 flex-shrink-0 ${isPast ? 'text-gray-400' : `text-${fullColor}`}`} style={!isPast ? { color: fullColor } : undefined} />
-                                            )}
-                                            <h3 className="font-semibold text-sm text-gray-900 truncate">
-                                                {new Date(dayOff.date).toLocaleDateString('en-US', { 
-                                                    month: 'short', 
-                                                    day: 'numeric', 
-                                                    year: 'numeric' 
-                                                })}
-                                            </h3>
-                                            {dayOff.is_recurring && (
-                                                <span title="Recurring annually">
-                                                    <RefreshCw className="w-3.5 h-3.5 flex-shrink-0 text-purple-500" />
-                                                </span>
-                                            )}
-                                            {isPast && (
-                                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-200 text-gray-600 flex-shrink-0">Past</span>
-                                            )}
-                                        </div>
-                                        {!selectionMode && (
-                                            <div className="flex gap-0.5 flex-shrink-0 ml-2">
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        handleEditClick(dayOff);
-                                                    }}
-                                                    className="p-1 rounded hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors"
-                                                    title="Edit"
-                                                >
-                                                    <Edit2 className="w-3.5 h-3.5" />
-                                                </button>
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        handleDeleteDayOff(dayOff.id, formatDate(dayOff.date));
-                                                    }}
-                                                    className="p-1 rounded hover:bg-red-50 text-gray-500 hover:text-red-600 transition-colors"
-                                                    title="Delete"
-                                                >
-                                                    <Trash2 className="w-3.5 h-3.5" />
-                                                </button>
+                    <>
+                        {/* Card View */}
+                        {viewMode === 'card' && (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {dayOffs.map((dayOff) => {
+                                    const closureType = getClosureTypeLabel(dayOff);
+                                    const blockingScopeBadge = getBlockingScopeBadge(dayOff);
+                                    const isPast = isPastDate(dayOff.date);
+                                    
+                                    return (
+                                        <div 
+                                            key={dayOff.id} 
+                                            className={`relative border rounded-xl p-4 transition-all ${
+                                                selectionMode 
+                                                    ? 'cursor-pointer hover:shadow-lg hover:-translate-y-1' 
+                                                    : 'hover:shadow-md'
+                                            } ${
+                                                selectedDayOffIds.has(dayOff.id)
+                                                    ? `border-${fullColor} bg-${themeColor}-50 shadow-lg ring-2 ring-${fullColor}/20`
+                                                    : isPast
+                                                        ? 'border-gray-200 bg-gray-50/50'
+                                                        : 'border-gray-200 bg-white hover:border-gray-300'
+                                            }`}
+                                            onClick={() => selectionMode && toggleDayOffSelection(dayOff.id)}
+                                        >
+                                            {/* Header Row: Date + Actions */}
+                                            <div className="flex items-start justify-between mb-3">
+                                                <div className="flex items-center gap-3 min-w-0 flex-1">
+                                                    {selectionMode ? (
+                                                        selectedDayOffIds.has(dayOff.id) ? (
+                                                            <CheckSquare className={`w-5 h-5 flex-shrink-0 text-${fullColor}`} />
+                                                        ) : (
+                                                            <Square className="w-5 h-5 flex-shrink-0 text-gray-400" />
+                                                        )
+                                                    ) : (
+                                                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${isPast ? 'bg-gray-100' : `bg-${themeColor}-100`}`}>
+                                                            <Calendar className={`w-5 h-5 ${isPast ? 'text-gray-400' : `text-${fullColor}`}`} style={!isPast ? { color: fullColor } : undefined} />
+                                                        </div>
+                                                    )}
+                                                    <div className="min-w-0">
+                                                        <h3 className="font-semibold text-base text-gray-900 truncate">
+                                                            {new Date(dayOff.date).toLocaleDateString('en-US', { 
+                                                                weekday: 'short',
+                                                                month: 'short', 
+                                                                day: 'numeric', 
+                                                                year: 'numeric' 
+                                                            })}
+                                                        </h3>
+                                                        <div className="flex items-center gap-2 mt-0.5">
+                                                            {dayOff.is_recurring && (
+                                                                <span className="inline-flex items-center gap-1 text-xs text-purple-600">
+                                                                    <RefreshCw className="w-3 h-3" />
+                                                                    Recurring
+                                                                </span>
+                                                            )}
+                                                            {isPast && (
+                                                                <span className="text-xs px-2 py-0.5 rounded-full bg-gray-200 text-gray-600">Past</span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                {!selectionMode && (
+                                                    <div className="flex gap-1 flex-shrink-0 ml-2">
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleEditClick(dayOff);
+                                                            }}
+                                                            className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors"
+                                                            title="Edit"
+                                                        >
+                                                            <Edit2 className="w-4 h-4" />
+                                                        </button>
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleDeleteDayOff(dayOff.id, formatDate(dayOff.date));
+                                                            }}
+                                                            className="p-2 rounded-lg hover:bg-red-50 text-gray-500 hover:text-red-600 transition-colors"
+                                                            title="Delete"
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                    </div>
+                                                )}
                                             </div>
-                                        )}
-                                    </div>
 
-                                    {/* Badges Row */}
-                                    <div className="flex items-center gap-1 flex-wrap mb-2">
-                                        {blockingScopeBadge && (
-                                            <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium ${blockingScopeBadge.color}`}>
-                                                <blockingScopeBadge.icon className="w-2.5 h-2.5" />
-                                                {blockingScopeBadge.label}
-                                            </span>
-                                        )}
-                                        {closureType ? (
-                                            <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium ${closureType.color}`}>
-                                                <Clock className="w-2.5 h-2.5" />
-                                                {closureType.label}
-                                            </span>
-                                        ) : (
-                                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-600">
-                                                Full Day
-                                            </span>
-                                        )}
-                                    </div>
+                                            {/* Badges Row */}
+                                            <div className="flex items-center gap-2 flex-wrap mb-3">
+                                                {blockingScopeBadge && (
+                                                    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium ${blockingScopeBadge.color}`}>
+                                                        <blockingScopeBadge.icon className="w-3 h-3" />
+                                                        {blockingScopeBadge.label}
+                                                    </span>
+                                                )}
+                                                {closureType ? (
+                                                    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium ${closureType.color}`}>
+                                                        <Clock className="w-3 h-3" />
+                                                        {closureType.label}
+                                                    </span>
+                                                ) : (
+                                                    <span className="inline-flex items-center px-2 py-1 rounded-lg text-xs font-medium bg-gray-100 text-gray-600">
+                                                        Full Day
+                                                    </span>
+                                                )}
+                                            </div>
 
-                                    {/* Reason & Location */}
-                                    {(dayOff.reason || dayOff.location) && (
-                                        <div className="text-xs text-gray-500 space-y-0.5">
-                                            {dayOff.reason && (
-                                                <p className="line-clamp-1">{dayOff.reason}</p>
-                                            )}
-                                            {dayOff.location && (
-                                                <div className="flex items-center gap-1">
-                                                    <MapPin className="w-3 h-3 flex-shrink-0" />
-                                                    <span className="truncate">{dayOff.location.name}</span>
+                                            {/* Reason & Location */}
+                                            {(dayOff.reason || dayOff.location) && (
+                                                <div className="text-sm text-gray-500 space-y-1 pt-2 border-t border-gray-100">
+                                                    {dayOff.reason && (
+                                                        <p className="line-clamp-2">{dayOff.reason}</p>
+                                                    )}
+                                                    {dayOff.location && (
+                                                        <div className="flex items-center gap-1.5">
+                                                            <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
+                                                            <span className="truncate">{dayOff.location.name}</span>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             )}
                                         </div>
-                                    )}
+                                    );
+                                })}
+                            </div>
+                        )}
+
+                        {/* Table View */}
+                        {viewMode === 'table' && (
+                            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                                <div className="overflow-x-auto">
+                                    <table className="w-full">
+                                        <thead className="bg-gray-50 border-b border-gray-200">
+                                            <tr>
+                                                {selectionMode && (
+                                                    <th className="w-12 px-4 py-3 text-left">
+                                                        <button
+                                                            onClick={() => {
+                                                                if (selectedDayOffIds.size === dayOffs.length) {
+                                                                    setSelectedDayOffIds(new Set());
+                                                                } else {
+                                                                    setSelectedDayOffIds(new Set(dayOffs.map(d => d.id)));
+                                                                }
+                                                            }}
+                                                            className="text-gray-500 hover:text-gray-700"
+                                                        >
+                                                            {selectedDayOffIds.size === dayOffs.length ? (
+                                                                <CheckSquare className="w-4 h-4" />
+                                                            ) : (
+                                                                <Square className="w-4 h-4" />
+                                                            )}
+                                                        </button>
+                                                    </th>
+                                                )}
+                                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Date</th>
+                                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Scope</th>
+                                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Type</th>
+                                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Reason</th>
+                                                {isCompanyAdmin && (
+                                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Location</th>
+                                                )}
+                                                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider w-24">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-100">
+                                            {dayOffs.map((dayOff) => {
+                                                const closureType = getClosureTypeLabel(dayOff);
+                                                const blockingScopeBadge = getBlockingScopeBadge(dayOff);
+                                                const isPast = isPastDate(dayOff.date);
+                                                
+                                                return (
+                                                    <tr 
+                                                        key={dayOff.id} 
+                                                        className={`transition-colors ${
+                                                            selectionMode ? 'cursor-pointer' : ''
+                                                        } ${
+                                                            selectedDayOffIds.has(dayOff.id)
+                                                                ? `bg-${themeColor}-50`
+                                                                : isPast
+                                                                    ? 'bg-gray-50/50 text-gray-500'
+                                                                    : 'hover:bg-gray-50'
+                                                        }`}
+                                                        onClick={() => selectionMode && toggleDayOffSelection(dayOff.id)}
+                                                    >
+                                                        {selectionMode && (
+                                                            <td className="px-4 py-3">
+                                                                {selectedDayOffIds.has(dayOff.id) ? (
+                                                                    <CheckSquare className={`w-4 h-4 text-${fullColor}`} />
+                                                                ) : (
+                                                                    <Square className="w-4 h-4 text-gray-400" />
+                                                                )}
+                                                            </td>
+                                                        )}
+                                                        <td className="px-4 py-3">
+                                                            <div className="flex items-center gap-2">
+                                                                <Calendar className={`w-4 h-4 ${isPast ? 'text-gray-400' : `text-${fullColor}`}`} style={!isPast ? { color: fullColor } : undefined} />
+                                                                <span className={`font-medium ${isPast ? 'text-gray-500' : 'text-gray-900'}`}>
+                                                                    {new Date(dayOff.date).toLocaleDateString('en-US', { 
+                                                                        weekday: 'short',
+                                                                        month: 'short', 
+                                                                        day: 'numeric', 
+                                                                        year: 'numeric' 
+                                                                    })}
+                                                                </span>
+                                                                {dayOff.is_recurring && (
+                                                                    <span title="Recurring annually">
+                                                                        <RefreshCw className="w-3.5 h-3.5 text-purple-500" />
+                                                                    </span>
+                                                                )}
+                                                                {isPast && (
+                                                                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-200 text-gray-600">Past</span>
+                                                                )}
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-4 py-3">
+                                                            {blockingScopeBadge && (
+                                                                <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium ${blockingScopeBadge.color}`}>
+                                                                    <blockingScopeBadge.icon className="w-3 h-3" />
+                                                                    {blockingScopeBadge.label}
+                                                                </span>
+                                                            )}
+                                                        </td>
+                                                        <td className="px-4 py-3">
+                                                            {closureType ? (
+                                                                <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium ${closureType.color}`}>
+                                                                    <Clock className="w-3 h-3" />
+                                                                    {closureType.label}
+                                                                </span>
+                                                            ) : (
+                                                                <span className="inline-flex items-center px-2 py-1 rounded-lg text-xs font-medium bg-gray-100 text-gray-600">
+                                                                    Full Day
+                                                                </span>
+                                                            )}
+                                                        </td>
+                                                        <td className="px-4 py-3">
+                                                            <span className="text-sm text-gray-600 line-clamp-1 max-w-[200px]">
+                                                                {dayOff.reason || '—'}
+                                                            </span>
+                                                        </td>
+                                                        {isCompanyAdmin && (
+                                                            <td className="px-4 py-3">
+                                                                {dayOff.location && (
+                                                                    <div className="flex items-center gap-1.5 text-sm text-gray-600">
+                                                                        <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
+                                                                        <span className="truncate max-w-[150px]">{dayOff.location.name}</span>
+                                                                    </div>
+                                                                )}
+                                                            </td>
+                                                        )}
+                                                        <td className="px-4 py-3 text-right">
+                                                            {!selectionMode && (
+                                                                <div className="flex items-center justify-end gap-1">
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            handleEditClick(dayOff);
+                                                                        }}
+                                                                        className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors"
+                                                                        title="Edit"
+                                                                    >
+                                                                        <Edit2 className="w-4 h-4" />
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            handleDeleteDayOff(dayOff.id, formatDate(dayOff.date));
+                                                                        }}
+                                                                        className="p-1.5 rounded-lg hover:bg-red-50 text-gray-500 hover:text-red-600 transition-colors"
+                                                                        title="Delete"
+                                                                    >
+                                                                        <Trash2 className="w-4 h-4" />
+                                                                    </button>
+                                                                </div>
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
                                 </div>
-                            );
-                        })}
-                    </div>
+                            </div>
+                        )}
+                    </>
                 ) : (
                     <div className="flex flex-col items-center py-16">
                         <div className={`w-16 h-16 rounded-full bg-${themeColor}-100 flex items-center justify-center mb-4`}>

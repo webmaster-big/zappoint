@@ -17,7 +17,6 @@ import {
   MapPin,
   User,
   Settings,
-  Building,
   X
 } from 'lucide-react';
 import StandardButton from '../../components/ui/StandardButton';
@@ -891,21 +890,18 @@ const LocationActivityLogs = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="flex items-center justify-center h-64">
         <div className={`animate-spin rounded-full h-12 w-12 border-b-2 border-${fullColor}`}></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 px-6 py-8">
+    <div className="px-6 py-8">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-            <Building className={`w-8 h-8 text-${fullColor}`} />
-            Location Activity Logs
-          </h1>
+          <h1 className="text-3xl font-bold text-gray-900">Location Activity Logs</h1>
           <p className="text-gray-600 mt-2">
             Track activities across all locations, managers, and attendants
           </p>

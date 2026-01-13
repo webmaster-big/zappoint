@@ -240,10 +240,10 @@ const GiftCard: React.FC = () => {
   return (
     <div className="px-6 py-8">
       {/* Page Header with Action Buttons */}
-      <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Gift Cards</h1>
-          <p className="text-gray-600 mt-1">Create and manage gift cards for your customers</p>
+          <h1 className="text-3xl font-bold text-gray-900">Gift Cards</h1>
+          <p className="text-gray-600 mt-2">Create and manage gift cards for your customers</p>
         </div>
         <StandardButton
           variant="primary"
@@ -256,7 +256,7 @@ const GiftCard: React.FC = () => {
       </div>
 
       {/* Main Content */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
 
         {/* Filter Section */}
         <div className="mb-6 space-y-4">

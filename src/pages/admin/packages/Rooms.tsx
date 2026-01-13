@@ -536,10 +536,10 @@ const Rooms: React.FC = () => {
     return (
         <div className="px-6 py-8">
             {/* Page Header with Action Buttons */}
-            <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Space</h1>
-                    <p className="text-gray-600 mt-1">Manage your facility Spaces and their availability</p>
+                    <h1 className="text-3xl font-bold text-gray-900">Spaces</h1>
+                    <p className="text-gray-600 mt-2">Manage your facility Spaces and their availability</p>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
                     {getUniqueAreaGroups().length > 0 && (
@@ -577,7 +577,7 @@ const Rooms: React.FC = () => {
             </div>
 
             {/* Main Content */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
                 {/* Selection Info Bar */}
                 {selectionMode && rooms.length > 0 && (
                     <div className={`mb-4 p-3 bg-${themeColor}-50 border border-${themeColor}-200 rounded-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3`}>

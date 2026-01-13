@@ -203,8 +203,7 @@ class DayOffService {
    */
   async createDayOff(data: CreateDayOffData): Promise<ApiResponse<DayOff>> {
     const response = await api.post('/day-offs', data);
-    this.invalidateCacheByPattern('dayoffs_list');
-    this.invalidateCacheByPattern(`location_${data.location_id}`);
+    this.invalidateCacheByPattern('dayoffs_');
     return response.data;
   }
 

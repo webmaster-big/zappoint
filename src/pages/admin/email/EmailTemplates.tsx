@@ -202,18 +202,14 @@ const EmailTemplates: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen p-4 md:p-8 space-y-8">
+    <div className="px-6 py-8">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-2">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-1">
-            Email Templates
-          </h1>
-          <p className="text-sm text-gray-600">
-            Create and manage reusable email templates
-          </p>
+          <h1 className="text-3xl font-bold text-gray-900">Email Templates</h1>
+          <p className="text-gray-600 mt-2">Create and manage reusable email templates</p>
         </div>
-        <div className="flex items-center gap-3 mt-4 md:mt-0">
+        <div className="flex items-center gap-3 mt-4 sm:mt-0">
           <StandardButton
             variant="secondary"
             icon={RefreshCcw}
@@ -231,7 +227,7 @@ const EmailTemplates: React.FC = () => {
       </div>
 
       {/* Statistics Cards - Dashboard Style */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 flex flex-col gap-2 hover:shadow-md transition-shadow min-h-[120px]">
           <div className="flex items-center gap-2">
             <div className={`p-2 rounded-lg bg-${themeColor}-100`}>
