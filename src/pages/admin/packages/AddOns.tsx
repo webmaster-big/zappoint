@@ -26,7 +26,9 @@ const ManageAddons = () => {
   const [formData, setFormData] = useState({
     name: '',
     price: '',
-    image: ''
+    image: '',
+    min_quantity: '1',
+    max_quantity: ''
   });
   const [loading, setLoading] = useState(false);
 
@@ -131,6 +133,8 @@ const ManageAddons = () => {
               price: addon.price || 0,
               image: imageFull,
               location: addon.location && typeof addon.location === 'object' ? addon.location : null,
+              min_quantity: addon.min_quantity,
+              max_quantity: addon.max_quantity,
             };
           });
           console.log('[AddOns] Loaded from cache:', formattedAddons.length, 'add-ons');
@@ -164,6 +168,8 @@ const ManageAddons = () => {
             price: addon.price || 0,
             image: imageFull,
             location: addon.location && typeof addon.location === 'object' ? addon.location : null,
+            min_quantity: addon.min_quantity,
+            max_quantity: addon.max_quantity,
           };
         });
         setAddons(formattedAddons);
@@ -222,6 +228,8 @@ const ManageAddons = () => {
           price: price,
           description: '',
           is_active: true,
+          min_quantity: formData.min_quantity ? parseInt(formData.min_quantity) : 1,
+          max_quantity: formData.max_quantity ? parseInt(formData.max_quantity) : null,
         };
         
         // Add image only if it's a new base64 image (not the existing URL)
@@ -248,6 +256,8 @@ const ManageAddons = () => {
                   price: result.data.price || 0,
                   image: result.data.image ? (result.data.image.startsWith('http') ? result.data.image : `${ASSET_URL}${result.data.image}`) : addon.image,
                   location: result.data.location && typeof result.data.location === 'object' ? result.data.location : addon.location,
+                  min_quantity: result.data.min_quantity,
+                  max_quantity: result.data.max_quantity,
                 }
               : addon
           ));
@@ -281,6 +291,8 @@ const ManageAddons = () => {
           price: price,
           description: '',
           is_active: true,
+          min_quantity: formData.min_quantity ? parseInt(formData.min_quantity) : 1,
+          max_quantity: formData.max_quantity ? parseInt(formData.max_quantity) : null,
         };
         
         // Add image if provided
@@ -304,6 +316,8 @@ const ManageAddons = () => {
             price: result.data.price || 0,
             image: result.data.image ? (result.data.image.startsWith('http') ? result.data.image : `${ASSET_URL}${result.data.image}`) : '',
             location: result.data.location && typeof result.data.location === 'object' ? result.data.location : null,
+            min_quantity: result.data.min_quantity,
+            max_quantity: result.data.max_quantity,
           };
           setAddons(prev => [...prev, newAddon]);
           
@@ -337,7 +351,9 @@ const ManageAddons = () => {
     setFormData({
       name: addon.name,
       price: addon.price.toString(),
-      image: imageUrl
+      image: imageUrl,
+      min_quantity: addon.min_quantity?.toString() || '1',
+      max_quantity: addon.max_quantity?.toString() || ''
     });
     setShowModal(true);
   };
@@ -368,7 +384,9 @@ const ManageAddons = () => {
     setFormData({
       name: '',
       price: '',
-      image: ''
+      image: '',
+      min_quantity: '1',
+      max_quantity: ''
     });
     setEditingAddon(null);
   };
@@ -880,6 +898,40 @@ const ManageAddons = () => {
                       placeholder="0.00"
                       required
                     />
+                  </div>
+                </div>
+
+                {/* Quantity Limits */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Min Quantity
+                    </label>
+                    <input
+                      type="number"
+                      name="min_quantity"
+                      min="1"
+                      value={formData.min_quantity}
+                      onChange={handleInputChange}
+                      className={`w-full border border-gray-200 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 outline-none`}
+                      placeholder="1"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Minimum selectable quantity</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Max Quantity
+                    </label>
+                    <input
+                      type="number"
+                      name="max_quantity"
+                      min="1"
+                      value={formData.max_quantity}
+                      onChange={handleInputChange}
+                      className={`w-full border border-gray-200 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 outline-none`}
+                      placeholder="No limit"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Leave empty for no limit</p>
                   </div>
                 </div>
 
