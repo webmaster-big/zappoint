@@ -80,6 +80,18 @@ export type {
   CompanyAnalyticsResponse
 } from './AnalyticsService';
 
+// Contact service exports
+export { contactService } from './ContactService';
+export type {
+  Contact,
+  ContactFilters,
+  ContactCreateData,
+  ContactUpdateData,
+  ContactStatistics,
+  BulkImportData,
+  BulkUpdateData
+} from './ContactService';
+
 // Common API response types
 export type { ApiResponse, PaginatedResponse } from './PackageService';
 

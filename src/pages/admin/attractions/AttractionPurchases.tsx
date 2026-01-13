@@ -560,20 +560,20 @@ const ManagePurchases = () => {
         <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
           <div className="relative flex-1 max-w-lg">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search className="h-4 w-4 text-gray-400" />
+              <Search className="h-4 w-4 text-gray-600" />
             </div>
             <input
               type="text"
               placeholder="Search purchases..."
               value={filters.search}
               onChange={(e) => handleFilterChange('search', e.target.value)}
-              className={`pl-9 pr-3 py-2 border border-gray-200 rounded-lg w-full focus:ring-2 focus:ring-${themeColor}-400 focus:border-${themeColor}-400`}
+              className={`pl-9 pr-3 py-1.5 border border-gray-200 rounded-lg w-full text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
             />
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-1">
             <StandardButton
               variant="secondary"
-              size="md"
+              size="sm"
               onClick={() => setShowFilters(!showFilters)}
               icon={Filter}
             >
@@ -581,7 +581,7 @@ const ManagePurchases = () => {
             </StandardButton>
             <StandardButton
               variant="secondary"
-              size="md"
+              size="sm"
               onClick={loadPurchases}
               icon={RefreshCcw}
             >
@@ -592,14 +592,14 @@ const ManagePurchases = () => {
 
         {/* Advanced Filters */}
         {showFilters && (
-          <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
               <div>
-                <label className="block text-sm font-medium text-gray-800 mb-1">Status</label>
+                <label className="block text-xs font-medium text-gray-800 mb-1">Status</label>
                 <select
                   value={filters.status}
                   onChange={(e) => handleFilterChange('status', e.target.value)}
-                  className={`w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-400 focus:border-${themeColor}-400`}
+                  className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                 >
                   <option value="all">All Statuses</option>
                   <option value="confirmed">Confirmed</option>
@@ -609,11 +609,11 @@ const ManagePurchases = () => {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-800 mb-1">Payment Method</label>
+                <label className="block text-xs font-medium text-gray-800 mb-1">Payment Method</label>
                 <select
                   value={filters.paymentMethod}
                   onChange={(e) => handleFilterChange('paymentMethod', e.target.value)}
-                  className={`w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-400 focus:border-${themeColor}-400`}
+                  className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                 >
                   <option value="all">All Methods</option>
                   <option value="credit_card">Credit Card</option>
@@ -621,11 +621,11 @@ const ManagePurchases = () => {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-800 mb-1">Date Range</label>
+                <label className="block text-xs font-medium text-gray-800 mb-1">Date Range</label>
                 <select
                   value={filters.dateRange}
                   onChange={(e) => handleFilterChange('dateRange', e.target.value)}
-                  className={`w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-400 focus:border-${themeColor}-400`}
+                  className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                 >
                   <option value="all">All Time</option>
                   <option value="today">Today</option>
@@ -634,7 +634,7 @@ const ManagePurchases = () => {
                 </select>
               </div>
             </div>
-            <div className="mt-4 flex justify-end">
+            <div className="mt-3 flex justify-end">
               <StandardButton
                 variant="ghost"
                 size="sm"
@@ -678,32 +678,32 @@ const ManagePurchases = () => {
       {/* Purchases Table */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead className="text-xs text-gray-800 uppercase bg-gray-50 border-b">
+          <table className="w-full">
+            <thead className="bg-gray-50 border-b border-gray-100">
               <tr>
-                <th scope="col" className="px-6 py-4 font-medium w-12">
+                <th scope="col" className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-12">
                   <input
                     type="checkbox"
                     checked={selectedPurchases.length === currentPurchases.length && currentPurchases.length > 0}
                     onChange={handleSelectAll}
-                    className={`rounded border-gray-300 text-${fullColor} focus:ring-${themeColor}-400`}
+                    className={`rounded border-gray-300 text-${fullColor} focus:ring-${themeColor}-600`}
                   />
                 </th>
-                <th scope="col" className="px-6 py-4 font-medium">Customer</th>
-                <th scope="col" className="px-6 py-4 font-medium">Attraction</th>
-                <th scope="col" className="px-6 py-4 font-medium">Quantity</th>
-                <th scope="col" className="px-6 py-4 font-medium">Total</th>
-                <th scope="col" className="px-6 py-4 font-medium">Paid</th>
-                <th scope="col" className="px-6 py-4 font-medium">Payment</th>
-                <th scope="col" className="px-6 py-4 font-medium">Date</th>
-                <th scope="col" className="px-6 py-4 font-medium">Status</th>
-                <th scope="col" className="px-6 py-4 font-medium">Actions</th>
+                <th scope="col" className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Customer</th>
+                <th scope="col" className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Attraction</th>
+                <th scope="col" className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Quantity</th>
+                <th scope="col" className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Total</th>
+                <th scope="col" className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Paid</th>
+                <th scope="col" className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Payment</th>
+                <th scope="col" className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Date</th>
+                <th scope="col" className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
+                <th scope="col" className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {currentPurchases.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="px-6 py-8 text-center text-gray-800">
+                  <td colSpan={10} className="px-4 py-8 text-center text-sm text-gray-600">
                     No purchases found
                   </td>
                 </tr>
@@ -711,46 +711,46 @@ const ManagePurchases = () => {
                 currentPurchases.map((purchase) => {
                   return (
                     <tr key={purchase.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-4 py-4 whitespace-nowrap">
                         <input
                           type="checkbox"
                           checked={selectedPurchases.includes(purchase.id)}
                           onChange={() => handleSelectPurchase(purchase.id)}
-                          className={`rounded border-gray-300 text-${fullColor} focus:ring-${themeColor}-400`}
+                          className={`rounded border-gray-300 text-${fullColor} focus:ring-${themeColor}-600`}
                         />
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-4 py-4">
                         <div>
-                          <div className="font-medium text-gray-900">{purchase.customerName}</div>
+                          <div className="text-sm font-medium text-gray-900">{purchase.customerName}</div>
                           <div className="text-xs text-gray-600 mt-1">{purchase.email}</div>
                           <div className="text-xs text-gray-500 mt-1">{purchase.phone}</div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
                         {purchase.attractionName}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
                         {purchase.quantity}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
                         ${purchase.totalAmount.toFixed(2)}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
                         <span className={purchase.amountPaid >= purchase.totalAmount ? 'text-green-600 font-semibold' : 'text-orange-600'}>
                           ${purchase.amountPaid.toFixed(2)}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
                         <span className="capitalize">{purchase.paymentMethod.replace('_', ' ')}</span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
                         {formatDate(purchase.createdAt)}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-4 py-4 whitespace-nowrap">
                         <select
                           value={purchase.status}
                           onChange={(e) => handleStatusChange(purchase.id, e.target.value as AttractionPurchasesPurchase['status'])}
-                          className={`text-xs font-medium px-3 py-1 rounded-full ${statusConfig[purchase.status].color} border-none focus:ring-2 focus:ring-${themeColor}-400`}
+                          className={`text-xs font-medium px-3 py-1 rounded-full ${statusConfig[purchase.status].color} border-none focus:ring-2 focus:ring-${themeColor}-600`}
                         >
                           <option value="confirmed">Confirmed</option>
                           <option value="pending">Pending</option>
@@ -758,34 +758,31 @@ const ManagePurchases = () => {
                           <option value="refunded">Refunded</option>
                         </select>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center gap-3">
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="flex items-center gap-1">
                           {purchase.status === 'pending' && (
-                            <StandardButton
-                              variant="ghost"
-                              size="sm"
+                            <button
                               onClick={() => handleOpenPaymentModal(purchase)}
-                              icon={DollarSign}
+                              className="p-2 text-green-600 hover:text-green-700 hover:bg-green-50 rounded-lg transition-colors"
+                              title="Process Payment"
                             >
-                              {''}
-                            </StandardButton>
+                              <DollarSign className="h-4 w-4" />
+                            </button>
                           )}
                           <Link
                             to={`/attractions/purchases/${purchase.id}`}
-                            className={`text-${fullColor} hover:text-${themeColor}-900`}
+                            className={`p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors`}
                             title="View Details"
                           >
                             <Eye className="h-4 w-4" />
                           </Link>
-                          <StandardButton
-                            variant="ghost"
-                            size="sm"
+                          <button
                             onClick={() => handleDeletePurchase(purchase.id)}
-                            icon={Trash2}
-                            className="text-red-600 hover:text-red-800"
+                            className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Delete"
                           >
-                            {''}
-                          </StandardButton>
+                            <Trash2 className="h-4 w-4" />
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -798,9 +795,9 @@ const ManagePurchases = () => {
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="bg-white px-6 py-4 border-t border-gray-100">
+          <div className="bg-white px-4 py-4 border-t border-gray-100">
             <div className="flex items-center justify-between">
-              <div className="text-sm text-gray-800">
+              <div className="text-sm text-gray-600">
                 Showing <span className="font-medium">{indexOfFirstItem + 1}</span> to{' '}
                 <span className="font-medium">
                   {Math.min(indexOfLastItem, filteredPurchases.length)}
@@ -810,7 +807,7 @@ const ManagePurchases = () => {
               <div className="flex gap-2">
                 <StandardButton
                   variant="secondary"
-                  size="md"
+                  size="sm"
                   onClick={() => paginate(Math.max(1, currentPage - 1))}
                   disabled={currentPage === 1}
                 >
@@ -820,7 +817,7 @@ const ManagePurchases = () => {
                   <StandardButton
                     key={page}
                     variant={currentPage === page ? 'primary' : 'secondary'}
-                    size="md"
+                    size="sm"
                     onClick={() => paginate(page)}
                   >
                     {page}
@@ -828,7 +825,7 @@ const ManagePurchases = () => {
                 ))}
                 <StandardButton
                   variant="secondary"
-                  size="md"
+                  size="sm"
                   onClick={() => paginate(Math.min(totalPages, currentPage + 1))}
                   disabled={currentPage === totalPages}
                 >

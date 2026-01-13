@@ -298,88 +298,89 @@ const CustomPackages: React.FC = () => {
       </div>
 
       {/* Main Content */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         {/* Filters */}
-        <div className="flex flex-wrap gap-4 mb-6 pb-4 border-b border-gray-100">
-          {/* Package Type Filter */}
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-gray-500" />
-            <select
-              value={filterType}
-              onChange={(e) => setFilterType(e.target.value)}
-              className={`rounded-md border border-gray-200 px-3 py-1.5 text-sm bg-white focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
-            >
-              <option value="all">All Types</option>
-              {packageTypes.filter(t => t !== 'all').map((type) => (
-                <option key={type} value={type}>
-                  {type.charAt(0).toUpperCase() + type.slice(1)}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Category Filter */}
-          <div className="flex items-center gap-2">
-            <Tag className="w-4 h-4 text-gray-500" />
-            <select
-              value={filterCategory}
-              onChange={(e) => setFilterCategory(e.target.value)}
-              className={`rounded-md border border-gray-200 px-3 py-1.5 text-sm bg-white focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
-            >
-              <option value="all">All Categories</option>
-              {categories.filter(c => c !== 'all').map((cat) => (
-                <option key={cat} value={cat}>{cat}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Location Filter (for company admin) */}
-          {isCompanyAdmin && uniqueLocations.length > 0 && (
-            <div className="flex items-center gap-2">
-              <MapPin className="w-4 h-4 text-gray-500" />
+        <div className="mb-6">
+          {/* Search Bar */}
+          <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+            <div className="relative flex-1 max-w-lg">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Search className="h-4 w-4 text-gray-600" />
+              </div>
+              <input
+                type="text"
+                placeholder="Search packages..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className={`pl-9 pr-3 py-1.5 border border-gray-200 rounded-lg w-full text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
+              />
+            </div>
+            
+            <div className="flex gap-1 items-center flex-wrap">
+              {/* Package Type Filter */}
               <select
-                value={filterLocation}
-                onChange={(e) => setFilterLocation(e.target.value)}
-                className={`rounded-md border border-gray-200 px-3 py-1.5 text-sm bg-white focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
+                value={filterType}
+                onChange={(e) => setFilterType(e.target.value)}
+                className={`px-2 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
               >
-                <option value="all">All Locations</option>
-                {uniqueLocations.map((loc) => (
-                  <option key={loc.id} value={loc.id}>{loc.name}</option>
+                <option value="all">All Types</option>
+                {packageTypes.filter(t => t !== 'all').map((type) => (
+                  <option key={type} value={type}>
+                    {type.charAt(0).toUpperCase() + type.slice(1)}
+                  </option>
                 ))}
               </select>
-            </div>
-          )}
 
-          {/* Sort */}
-          <div className="flex items-center gap-2 ml-auto">
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              className="rounded-md border border-gray-200 px-3 py-1.5 text-sm bg-white"
-            >
-              <option value="name">Sort by Name</option>
-              <option value="price">Sort by Price</option>
-              <option value="category">Sort by Category</option>
-              <option value="type">Sort by Type</option>
-            </select>
-            <button
-              onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-              className="px-2 py-1.5 rounded-md border border-gray-200 text-sm hover:bg-gray-50"
-            >
-              {sortOrder === 'asc' ? '↑' : '↓'}
-            </button>
+              {/* Category Filter */}
+              <select
+                value={filterCategory}
+                onChange={(e) => setFilterCategory(e.target.value)}
+                className={`px-2 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
+              >
+                <option value="all">All Categories</option>
+                {categories.filter(c => c !== 'all').map((cat) => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+              </select>
+
+              {/* Location Filter (for company admin) */}
+              {isCompanyAdmin && uniqueLocations.length > 0 && (
+                <select
+                  value={filterLocation}
+                  onChange={(e) => setFilterLocation(e.target.value)}
+                  className={`px-2 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
+                >
+                  <option value="all">All Locations</option>
+                  {uniqueLocations.map((loc) => (
+                    <option key={loc.id} value={loc.id}>{loc.name}</option>
+                  ))}
+                </select>
+              )}
+
+              {/* Sort */}
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className={`px-2 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
+              >
+                <option value="name">Sort: Name</option>
+                <option value="price">Sort: Price</option>
+                <option value="category">Sort: Category</option>
+                <option value="type">Sort: Type</option>
+              </select>
+              <StandardButton
+                onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                variant="secondary"
+                size="sm"
+              >
+                {sortOrder === 'asc' ? '↑' : '↓'}
+              </StandardButton>
+            </div>
           </div>
 
-          {/* Search */}
-          <div className="relative w-full sm:w-64">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-            <input
-              type="text"
-              placeholder="Search packages..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className={`w-full pl-9 pr-4 py-1.5 rounded-md border border-gray-200 text-sm focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
-            />
+          {/* Results count */}
+          <div className="text-sm text-gray-500 mt-3">
+            Showing {filteredPackages.length} of {packages.length} custom package{packages.length !== 1 ? 's' : ''}
           </div>
         </div>
 
