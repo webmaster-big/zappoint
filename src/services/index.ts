@@ -17,7 +17,6 @@ export { roomCacheService } from './RoomCacheService';
 export { packageCacheService } from './PackageCacheService';
 export { addOnCacheService } from './AddOnCacheService';
 export { attractionCacheService } from './AttractionCacheService';
-export { customerCacheService } from './CustomerCacheService';
 
 // Service exports for easy importing
 export { packageService } from './PackageService';

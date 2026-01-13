@@ -27,6 +27,8 @@ interface DayOffWithTime {
   time_start?: string | null;
   time_end?: string | null;
   reason?: string;
+  package_ids?: number[] | null;  // If set, only applies to these packages
+  room_ids?: number[] | null;     // If set, only blocks these rooms
 }
 import { formatDurationDisplay } from '../../../utils/timeFormat';
 import { loadAcceptJS, processCardPayment, validateCardNumber, formatCardNumber, getCardType, createPayment } from '../../../services/PaymentService';
@@ -171,15 +173,28 @@ const OnsiteBooking: React.FC = () => {
 
   // Helper function to check if a time slot conflicts with a partial day off
   const isTimeSlotRestricted = (slotStartTime: string, slotEndTime: string): boolean => {
-    if (!bookingData.date || dayOffsWithTime.length === 0) return false;
+    if (!bookingData.date || dayOffsWithTime.length === 0 || !selectedPackage) return false;
     
-    // Find partial day off for the selected date
+    // Find partial day off for the selected date that applies to this package
     const selectedDateObj = parseLocalDate(bookingData.date);
-    const partialDayOff = dayOffsWithTime.find(dayOff => 
-      dayOff.date.getFullYear() === selectedDateObj.getFullYear() &&
-      dayOff.date.getMonth() === selectedDateObj.getMonth() &&
-      dayOff.date.getDate() === selectedDateObj.getDate()
-    );
+    const partialDayOff = dayOffsWithTime.find(dayOff => {
+      // Check date match
+      if (dayOff.date.getFullYear() !== selectedDateObj.getFullYear() ||
+          dayOff.date.getMonth() !== selectedDateObj.getMonth() ||
+          dayOff.date.getDate() !== selectedDateObj.getDate()) {
+        return false;
+      }
+      
+      // Check if this day off applies to the selected package
+      // If package_ids is null/empty, it applies to all packages
+      if (dayOff.package_ids && dayOff.package_ids.length > 0) {
+        if (!dayOff.package_ids.includes(selectedPackage.id)) {
+          return false; // This day off doesn't apply to the selected package
+        }
+      }
+      
+      return true;
+    });
     
     if (!partialDayOff) return false;
     
@@ -208,6 +223,30 @@ const OnsiteBooking: React.FC = () => {
     
     return false;
   };
+
+  // Helper function to check if a day off applies to the selected package
+  const dayOffAppliesToPackage = (dayOff: { package_ids?: number[] | null }, packageId: number): boolean => {
+    // If package_ids is null or empty, it applies to all packages (location-wide)
+    if (!dayOff.package_ids || dayOff.package_ids.length === 0) {
+      return true;
+    }
+    // Otherwise, check if the package is in the list
+    return dayOff.package_ids.includes(packageId);
+  };
+
+  // Compute filtered day offs based on selected package
+  // This is needed because the DatePicker doesn't know about the package context
+  const filteredDayOffs = React.useMemo(() => {
+    if (!selectedPackage) return dayOffs;
+    // dayOffs array only contains location-wide full day offs, so no filtering needed
+    return dayOffs;
+  }, [dayOffs, selectedPackage]);
+
+  const filteredDayOffsWithTime = React.useMemo(() => {
+    if (!selectedPackage) return dayOffsWithTime;
+    // Filter day offs that apply to the selected package
+    return dayOffsWithTime.filter(d => dayOffAppliesToPackage(d, selectedPackage.id));
+  }, [dayOffsWithTime, selectedPackage]);
 
   // Filter available time slots based on partial day offs
   const filteredTimeSlots = availableTimeSlots.filter(slot => 
@@ -273,17 +312,13 @@ const OnsiteBooking: React.FC = () => {
               pricingType: a.pricing_type as 'per_person' | 'per_unit',
               category: a.category || '',
               maxCapacity: a.max_capacity || 0,
-              image: Array.isArray(a.image) ? a.image[0] : a.image,
-              min_quantity: a.min_quantity,
-              max_quantity: a.max_quantity
+              image: Array.isArray(a.image) ? a.image[0] : a.image
             })) || [],
             addOns: pkg.add_ons?.map((a: any) => ({
               id: a.id,
               name: a.name,
               price: Number(a.price),
-              image: Array.isArray(a.image) ? a.image[0] : a.image,
-              min_quantity: a.min_quantity,
-              max_quantity: a.max_quantity
+              image: Array.isArray(a.image) ? a.image[0] : a.image
             })) || [],
             rooms: pkg.rooms?.map((r: any) => ({
               id: r.id,
@@ -375,18 +410,14 @@ const OnsiteBooking: React.FC = () => {
               pricingType: a.pricing_type as 'per_person' | 'per_unit',
               category: a.category || '',
               maxCapacity: a.max_capacity || 0,
-              image: Array.isArray(a.image) ? a.image[0] : a.image,
-              min_quantity: a.min_quantity,
-              max_quantity: a.max_quantity
+              image: Array.isArray(a.image) ? a.image[0] : a.image
             })) || [],
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             addOns: pkg.add_ons?.map((a: any) => ({
               id: a.id,
               name: a.name,
               price: Number(a.price),
-              image: Array.isArray(a.image) ? a.image[0] : a.image,
-              min_quantity: a.min_quantity,
-              max_quantity: a.max_quantity
+              image: Array.isArray(a.image) ? a.image[0] : a.image
             })) || [],
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             rooms: pkg.rooms?.map((r: any) => ({
@@ -603,64 +634,54 @@ const OnsiteBooking: React.FC = () => {
         if (response.success && response.data) {
           // Convert day off dates to Date objects
           // Also handle recurring day offs (same month/day each year)
-          const fullDayOffDates: Date[] = [];
-          const partialDayOffs: DayOffWithTime[] = [];
+          // Store all day offs with their package_ids for filtering
+          const allDayOffs: DayOffWithTime[] = [];
           const today = new Date();
           
           response.data.forEach((dayOff: DayOff) => {
             const offDate = new Date(dayOff.date);
             const hasTimeRestriction = dayOff.time_start || dayOff.time_end;
             
+            // Common day off data
+            const dayOffData = {
+              time_start: hasTimeRestriction ? dayOff.time_start : null,
+              time_end: hasTimeRestriction ? dayOff.time_end : null,
+              reason: dayOff.reason,
+              package_ids: dayOff.package_ids || null,
+              room_ids: dayOff.room_ids || null
+            };
+            
             if (dayOff.is_recurring) {
               // For recurring, add for current year and next year
               const currentYearDate = new Date(today.getFullYear(), offDate.getMonth(), offDate.getDate());
               const nextYearDate = new Date(today.getFullYear() + 1, offDate.getMonth(), offDate.getDate());
               
-              if (hasTimeRestriction) {
-                // Partial day off - store with time info
-                if (currentYearDate >= today) {
-                  partialDayOffs.push({
-                    date: currentYearDate,
-                    time_start: dayOff.time_start,
-                    time_end: dayOff.time_end,
-                    reason: dayOff.reason
-                  });
-                }
-                partialDayOffs.push({
-                  date: nextYearDate,
-                  time_start: dayOff.time_start,
-                  time_end: dayOff.time_end,
-                  reason: dayOff.reason
-                });
-              } else {
-                // Full day off
-                if (currentYearDate >= today) {
-                  fullDayOffDates.push(currentYearDate);
-                }
-                fullDayOffDates.push(nextYearDate);
+              if (currentYearDate >= today) {
+                allDayOffs.push({ ...dayOffData, date: currentYearDate });
               }
+              allDayOffs.push({ ...dayOffData, date: nextYearDate });
             } else {
               // Non-recurring, just add the date if it's not in the past
               if (offDate >= today) {
-                if (hasTimeRestriction) {
-                  // Partial day off
-                  partialDayOffs.push({
-                    date: offDate,
-                    time_start: dayOff.time_start,
-                    time_end: dayOff.time_end,
-                    reason: dayOff.reason
-                  });
-                } else {
-                  // Full day off
-                  fullDayOffDates.push(offDate);
-                }
+                allDayOffs.push({ ...dayOffData, date: offDate });
               }
             }
           });
           
+          // Separate full day offs (for calendar blocking) and partial day offs (for time slot filtering)
+          // Full day offs are those without time restrictions AND apply to all packages (location-wide)
+          const fullDayOffDates = allDayOffs
+            .filter(d => !d.time_start && !d.time_end && !d.package_ids && !d.room_ids)
+            .map(d => d.date);
+          
+          // Partial or resource-specific day offs need full info for filtering
+          const partialOrSpecificDayOffs = allDayOffs.filter(d => 
+            d.time_start || d.time_end || d.package_ids || d.room_ids
+          );
+          
           setDayOffs(fullDayOffDates);
-          setDayOffsWithTime(partialDayOffs);
-          console.log('📅 Day offs loaded:', fullDayOffDates.length, 'full days,', partialDayOffs.length, 'partial days');
+          setDayOffsWithTime(partialOrSpecificDayOffs);
+          console.log('📅 Day offs loaded:', fullDayOffDates.length, 'full location-wide days,', partialOrSpecificDayOffs.length, 'partial/resource-specific days');
         }
       } catch (error) {
         console.error('Error fetching day offs:', error);
@@ -772,9 +793,6 @@ const OnsiteBooking: React.FC = () => {
   };
 
   const handleAttractionToggle = (attractionId: string) => {
-    const attraction = selectedPackage?.attractions?.find(a => String(a.id) === attractionId);
-    const minQty = attraction?.min_quantity ?? 1;
-    
     setBookingData(prev => {
       const existingIndex = prev.selectedAttractions.findIndex(a => a.id === attractionId);
       
@@ -785,23 +803,17 @@ const OnsiteBooking: React.FC = () => {
           selectedAttractions: prev.selectedAttractions.filter(a => a.id !== attractionId)
         };
       } else {
-        // Add attraction with min_quantity or default 1
+        // Add attraction with default quantity 1
         return {
           ...prev,
-          selectedAttractions: [...prev.selectedAttractions, { id: attractionId, quantity: minQty }]
+          selectedAttractions: [...prev.selectedAttractions, { id: attractionId, quantity: 1 }]
         };
       }
     });
   };
 
   const handleAttractionQuantityChange = (attractionId: string, quantity: number) => {
-    const attraction = selectedPackage?.attractions?.find(a => String(a.id) === attractionId);
-    const minQty = attraction?.min_quantity ?? 1;
-    const maxQty = attraction?.max_quantity ?? 99;
-    
-    // Enforce min/max limits
-    if (quantity < minQty) return;
-    if (quantity > maxQty) quantity = maxQty;
+    if (quantity < 1) return;
     
     setBookingData(prev => ({
       ...prev,
@@ -812,9 +824,6 @@ const OnsiteBooking: React.FC = () => {
   };
 
   const handleAddOnToggle = (addOnName: string) => {
-    const addOn = selectedPackage?.addOns.find(a => a.name === addOnName);
-    const minQty = addOn?.min_quantity ?? 1;
-    
     setBookingData(prev => {
       const existingIndex = prev.selectedAddOns.findIndex(a => a.name === addOnName);
       if (existingIndex >= 0) {
@@ -824,6 +833,9 @@ const OnsiteBooking: React.FC = () => {
           selectedAddOns: prev.selectedAddOns.filter(a => a.name !== addOnName)
         };
       } else {
+        // Find the add-on to get its ID
+        const addOn = selectedPackage?.addOns.find(a => a.name === addOnName);
+        
         console.log('🔍 Adding add-on:', { 
           addOnName, 
           foundAddOn: addOn, 
@@ -831,13 +843,13 @@ const OnsiteBooking: React.FC = () => {
           allAddOns: selectedPackage?.addOns 
         });
         
-        // Add add-on with ID, name, and min_quantity or default 1
+        // Add add-on with ID, name, default quantity 1
         return {
           ...prev,
           selectedAddOns: [...prev.selectedAddOns, { 
             id: addOn?.id, 
             name: addOnName, 
-            quantity: minQty 
+            quantity: 1 
           }]
         };
       }
@@ -845,13 +857,7 @@ const OnsiteBooking: React.FC = () => {
   };
 
   const handleAddOnQuantityChange = (addOnName: string, quantity: number) => {
-    const addOn = selectedPackage?.addOns.find(a => a.name === addOnName);
-    const minQty = addOn?.min_quantity ?? 1;
-    const maxQty = addOn?.max_quantity ?? 99;
-    
-    // Enforce min/max limits
-    if (quantity < minQty) return;
-    if (quantity > maxQty) quantity = maxQty;
+    if (quantity < 1) return;
     
     setBookingData(prev => ({
       ...prev,
@@ -1807,8 +1813,8 @@ const OnsiteBooking: React.FC = () => {
               selectedDate={bookingData.date}
               availableDates={availableDates}
               onChange={(date) => setBookingData(prev => ({ ...prev, date }))}
-              dayOffs={dayOffs}
-              dayOffsWithTime={dayOffsWithTime}
+              dayOffs={filteredDayOffs}
+              dayOffsWithTime={filteredDayOffsWithTime}
             />
           </div>
 
@@ -1973,8 +1979,6 @@ const OnsiteBooking: React.FC = () => {
             {selectedPackage.attractions.map(attraction => {
             const isSelected = bookingData.selectedAttractions.some(a => a.id === String(attraction.id));
             const selectedQty = bookingData.selectedAttractions.find(a => a.id === String(attraction.id))?.quantity || 0;
-            const minQty = attraction.min_quantity ?? 1;
-            const maxQty = attraction.max_quantity ?? 99;
             
             return (
               <div
@@ -2002,14 +2006,6 @@ const OnsiteBooking: React.FC = () => {
                       <span className={`text-lg font-bold text-${fullColor}`}>${attraction.price}</span>
                       <span className="text-xs text-gray-500">{attraction.pricingType === 'per_person' ? 'per person' : 'per unit'}</span>
                     </div>
-                    {/* Show quantity limits */}
-                    {(minQty > 1 || maxQty < 99) && (
-                      <p className="text-xs text-gray-400 mt-1">
-                        {minQty > 1 && `Min: ${minQty}`}
-                        {minQty > 1 && maxQty < 99 && ' • '}
-                        {maxQty < 99 && `Max: ${maxQty}`}
-                      </p>
-                    )}
                   </div>
                   <StandardButton
                     type="button"
@@ -2031,19 +2027,15 @@ const OnsiteBooking: React.FC = () => {
                         size="sm"
                         icon={Minus}
                         onClick={() => handleAttractionQuantityChange(String(attraction.id), selectedQty - 1)}
-                        disabled={selectedQty <= minQty}
                       >
                         {''}
                       </StandardButton>
                       <input
                         type="number"
-                        min={minQty}
-                        max={maxQty}
+                        min="1"
                         value={selectedQty}
                         onChange={(e) => {
-                          let newQty = parseInt(e.target.value) || minQty;
-                          if (newQty > maxQty) newQty = maxQty;
-                          if (newQty < minQty) newQty = minQty;
+                          const newQty = parseInt(e.target.value) || 1;
                           handleAttractionQuantityChange(String(attraction.id), newQty);
                         }}
                         className="w-16 text-center font-bold text-lg text-gray-900 border border-gray-300 rounded px-2 py-1"
@@ -2054,7 +2046,6 @@ const OnsiteBooking: React.FC = () => {
                         size="sm"
                         icon={Plus}
                         onClick={() => handleAttractionQuantityChange(String(attraction.id), selectedQty + 1)}
-                        disabled={selectedQty >= maxQty}
                       >
                         {''}
                       </StandardButton>
@@ -2076,8 +2067,6 @@ const OnsiteBooking: React.FC = () => {
             {selectedPackage.addOns.map(addOn => {
               const isSelected = bookingData.selectedAddOns.some(a => a.name === addOn.name);
               const selectedQty = bookingData.selectedAddOns.find(a => a.name === addOn.name)?.quantity || 0;
-              const minQty = addOn.min_quantity ?? 1;
-              const maxQty = addOn.max_quantity ?? 99;
               return (
                 <div
                   key={addOn.name}
@@ -2100,14 +2089,6 @@ const OnsiteBooking: React.FC = () => {
                       <div className="flex-1">
                         <h4 className="font-semibold text-gray-900">{addOn.name}</h4>
                         <p className={`text-lg font-bold text-${fullColor} mt-1`}>${addOn.price}</p>
-                        {/* Show quantity limits */}
-                        {(minQty > 1 || maxQty < 99) && (
-                          <p className="text-xs text-gray-400 mt-1">
-                            {minQty > 1 && `Min: ${minQty}`}
-                            {minQty > 1 && maxQty < 99 && ' • '}
-                            {maxQty < 99 && `Max: ${maxQty}`}
-                          </p>
-                        )}
                       </div>
                       <StandardButton
                         type="button"
@@ -2128,19 +2109,15 @@ const OnsiteBooking: React.FC = () => {
                             size="sm"
                             icon={Minus}
                             onClick={() => handleAddOnQuantityChange(addOn.name, selectedQty - 1)}
-                            disabled={selectedQty <= minQty}
                           >
                             {''}
                           </StandardButton>
                           <input
                             type="number"
-                            min={minQty}
-                            max={maxQty}
+                            min="1"
                             value={selectedQty}
                             onChange={(e) => {
-                              let newQty = parseInt(e.target.value) || minQty;
-                              if (newQty > maxQty) newQty = maxQty;
-                              if (newQty < minQty) newQty = minQty;
+                              const newQty = parseInt(e.target.value) || 1;
                               handleAddOnQuantityChange(addOn.name, newQty);
                             }}
                             className="w-16 text-center font-bold text-lg text-gray-900 border border-gray-300 rounded px-2 py-1"
@@ -2151,7 +2128,6 @@ const OnsiteBooking: React.FC = () => {
                             size="sm"
                             icon={Plus}
                             onClick={() => handleAddOnQuantityChange(addOn.name, selectedQty + 1)}
-                            disabled={selectedQty >= maxQty}
                           >
                             {''}
                           </StandardButton>

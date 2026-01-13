@@ -13,6 +13,8 @@ interface DayOffWithTime {
   time_start?: string | null;
   time_end?: string | null;
   reason?: string;
+  package_ids?: number[] | null;  // If set, only applies to these packages
+  room_ids?: number[] | null;     // If set, only blocks these rooms
 }
 import { loadAcceptJS, processCardPayment, validateCardNumber, formatCardNumber, getCardType, updatePayment, PAYMENT_TYPE } from '../../../services/PaymentService';
 import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
@@ -296,8 +298,8 @@ const BookPackage: React.FC = () => {
         if (response.success && response.data) {
           // Convert day off dates to Date objects
           // Also handle recurring day offs (same month/day each year)
-          const fullDayOffDates: Date[] = [];
-          const partialDayOffs: DayOffWithTime[] = [];
+          // Store all day offs with their package_ids for filtering
+          const allDayOffs: DayOffWithTime[] = [];
           const today = new Date();
           const futureLimit = new Date();
           futureLimit.setFullYear(futureLimit.getFullYear() + 1); // Look 1 year ahead
@@ -306,56 +308,46 @@ const BookPackage: React.FC = () => {
             const offDate = new Date(dayOff.date);
             const hasTimeRestriction = dayOff.time_start || dayOff.time_end;
             
+            // Common day off data
+            const dayOffData = {
+              time_start: hasTimeRestriction ? dayOff.time_start : null,
+              time_end: hasTimeRestriction ? dayOff.time_end : null,
+              reason: dayOff.reason,
+              package_ids: dayOff.package_ids || null,
+              room_ids: dayOff.room_ids || null
+            };
+            
             if (dayOff.is_recurring) {
               // For recurring, add for current year and next year
               const currentYearDate = new Date(today.getFullYear(), offDate.getMonth(), offDate.getDate());
               const nextYearDate = new Date(today.getFullYear() + 1, offDate.getMonth(), offDate.getDate());
               
-              if (hasTimeRestriction) {
-                // Partial day off - store with time info
-                if (currentYearDate >= today) {
-                  partialDayOffs.push({
-                    date: currentYearDate,
-                    time_start: dayOff.time_start,
-                    time_end: dayOff.time_end,
-                    reason: dayOff.reason
-                  });
-                }
-                partialDayOffs.push({
-                  date: nextYearDate,
-                  time_start: dayOff.time_start,
-                  time_end: dayOff.time_end,
-                  reason: dayOff.reason
-                });
-              } else {
-                // Full day off
-                if (currentYearDate >= today) {
-                  fullDayOffDates.push(currentYearDate);
-                }
-                fullDayOffDates.push(nextYearDate);
+              if (currentYearDate >= today) {
+                allDayOffs.push({ ...dayOffData, date: currentYearDate });
               }
+              allDayOffs.push({ ...dayOffData, date: nextYearDate });
             } else {
               // Non-recurring, just add the date if it's not in the past
               if (offDate >= today) {
-                if (hasTimeRestriction) {
-                  // Partial day off
-                  partialDayOffs.push({
-                    date: offDate,
-                    time_start: dayOff.time_start,
-                    time_end: dayOff.time_end,
-                    reason: dayOff.reason
-                  });
-                } else {
-                  // Full day off
-                  fullDayOffDates.push(offDate);
-                }
+                allDayOffs.push({ ...dayOffData, date: offDate });
               }
             }
           });
           
+          // Separate full day offs (for calendar blocking) and partial day offs (for time slot filtering)
+          // Full day offs are those without time restrictions AND apply to all packages (location-wide)
+          const fullDayOffDates = allDayOffs
+            .filter(d => !d.time_start && !d.time_end && !d.package_ids && !d.room_ids)
+            .map(d => d.date);
+          
+          // Partial or resource-specific day offs need full info for filtering
+          const partialOrSpecificDayOffs = allDayOffs.filter(d => 
+            d.time_start || d.time_end || d.package_ids || d.room_ids
+          );
+          
           setDayOffs(fullDayOffDates);
-          setDayOffsWithTime(partialDayOffs);
-          console.log('📅 Day offs loaded:', fullDayOffDates.length, 'full days,', partialDayOffs.length, 'partial days');
+          setDayOffsWithTime(partialOrSpecificDayOffs);
+          console.log('📅 Day offs loaded:', fullDayOffDates.length, 'full location-wide days,', partialOrSpecificDayOffs.length, 'partial/resource-specific days');
         }
       } catch (error) {
         console.error('Error fetching day offs:', error);
@@ -367,15 +359,28 @@ const BookPackage: React.FC = () => {
 
   // Helper function to check if a time slot conflicts with a partial day off
   const isTimeSlotRestricted = (slotStartTime: string, slotEndTime: string): boolean => {
-    if (!selectedDate || dayOffsWithTime.length === 0) return false;
+    if (!selectedDate || dayOffsWithTime.length === 0 || !pkg) return false;
     
-    // Find partial day off for the selected date
+    // Find partial day off for the selected date that applies to this package
     const selectedDateObj = parseLocalDate(selectedDate);
-    const partialDayOff = dayOffsWithTime.find(dayOff => 
-      dayOff.date.getFullYear() === selectedDateObj.getFullYear() &&
-      dayOff.date.getMonth() === selectedDateObj.getMonth() &&
-      dayOff.date.getDate() === selectedDateObj.getDate()
-    );
+    const partialDayOff = dayOffsWithTime.find(dayOff => {
+      // Check date match
+      if (dayOff.date.getFullYear() !== selectedDateObj.getFullYear() ||
+          dayOff.date.getMonth() !== selectedDateObj.getMonth() ||
+          dayOff.date.getDate() !== selectedDateObj.getDate()) {
+        return false;
+      }
+      
+      // Check if this day off applies to the selected package
+      // If package_ids is null/empty, it applies to all packages
+      if (dayOff.package_ids && dayOff.package_ids.length > 0) {
+        if (!dayOff.package_ids.includes(pkg.id)) {
+          return false; // This day off doesn't apply to the selected package
+        }
+      }
+      
+      return true;
+    });
     
     if (!partialDayOff) return false;
     
@@ -404,6 +409,25 @@ const BookPackage: React.FC = () => {
     
     return false;
   };
+
+  // Helper function to check if a day off applies to the selected package
+  const dayOffAppliesToPackage = (dayOff: { package_ids?: number[] | null }, packageId: number): boolean => {
+    // If package_ids is null or empty, it applies to all packages (location-wide)
+    if (!dayOff.package_ids || dayOff.package_ids.length === 0) {
+      return true;
+    }
+    // Otherwise, check if the package is in the list
+    return dayOff.package_ids.includes(packageId);
+  };
+
+  // Compute filtered day offs based on selected package
+  // dayOffs array only contains location-wide full day offs, so no filtering needed
+  // dayOffsWithTime needs to be filtered for package-specific blocks
+  const filteredDayOffsWithTime = React.useMemo(() => {
+    if (!pkg) return dayOffsWithTime;
+    // Filter day offs that apply to the selected package
+    return dayOffsWithTime.filter(d => dayOffAppliesToPackage(d, pkg.id));
+  }, [dayOffsWithTime, pkg]);
 
   // Filter available time slots based on partial day offs
   const filteredTimeSlots = availableTimeSlots.filter(slot => 
@@ -1363,7 +1387,7 @@ const BookPackage: React.FC = () => {
                         availableDates={availableDates}
                         onChange={(date) => setSelectedDate(date)}
                         dayOffs={dayOffs}
-                        dayOffsWithTime={dayOffsWithTime}
+                        dayOffsWithTime={filteredDayOffsWithTime}
                       />
                     </div>
                     

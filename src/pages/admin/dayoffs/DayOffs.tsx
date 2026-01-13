@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Edit2, Trash2, Calendar, MapPin, CheckSquare, Square, Plus, X, CalendarOff, RefreshCw, ChevronLeft, ChevronRight, Clock } from 'lucide-react';
+import { Search, Edit2, Trash2, Calendar, MapPin, CheckSquare, Square, Plus, X, CalendarOff, RefreshCw, ChevronLeft, ChevronRight, Clock, Building2, Package as PackageIcon, DoorOpen, Layers } from 'lucide-react';
 import StandardButton from '../../../components/ui/StandardButton';
 import Toast from '../../../components/ui/Toast';
-import { dayOffService, locationService } from '../../../services';
+import { dayOffService, locationService, packageService, roomService } from '../../../services';
 import LocationSelector from '../../../components/admin/LocationSelector';
-import type { DayOff, DayOffFilters } from '../../../services/DayOffService';
+import type { DayOff, DayOffFilters, BlockingScope } from '../../../services/DayOffService';
 import type { Location } from '../../../services/LocationService';
+import type { Package } from '../../../services/PackageService';
+import type { Room } from '../../../services/RoomService';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { getStoredUser } from '../../../utils/storage';
 
@@ -49,6 +51,27 @@ const DayOffs: React.FC = () => {
         time_start: '',  // Close starting at this time (partial day closure)
         time_end: ''     // Delayed opening until this time
     });
+
+    // Blocking scope state for create/edit form
+    const [blockingScope, setBlockingScope] = useState<BlockingScope>('location');
+    const [selectedPackageIds, setSelectedPackageIds] = useState<number[]>([]);
+    const [selectedRoomIds, setSelectedRoomIds] = useState<number[]>([]);
+    
+    // Available packages and spaces for selection (with caching)
+    const [availablePackages, setAvailablePackages] = useState<Package[]>([]);
+    const [availableRooms, setAvailableRooms] = useState<Room[]>([]); // Called "spaces" in UI
+    const [loadingResources, setLoadingResources] = useState(false);
+    const [resourcesCache, setResourcesCache] = useState<{
+        locationId: number | null;
+        packages: Package[];
+        rooms: Room[];
+        timestamp: number;
+    } | null>(null);
+    
+    // Bulk modal blocking scope state
+    const [bulkBlockingScope, setBulkBlockingScope] = useState<BlockingScope>('location');
+    const [bulkSelectedPackageIds, setBulkSelectedPackageIds] = useState<number[]>([]);
+    const [bulkSelectedRoomIds, setBulkSelectedRoomIds] = useState<number[]>([]);
 
     // Multi-select calendar state
     const [showBulkModal, setShowBulkModal] = useState(false);
@@ -130,6 +153,60 @@ const DayOffs: React.FC = () => {
         fetchDayOffs();
     }, [fetchDayOffs]);
 
+    // Fetch packages and spaces when modal location changes (with caching)
+    useEffect(() => {
+        const fetchPackagesAndRooms = async () => {
+            const locationId = isCompanyAdmin && modalLocationId 
+                ? modalLocationId 
+                : currentUser?.location_id;
+            
+            if (!locationId) return;
+            
+            // Check cache - valid for 2 minutes
+            const CACHE_TTL = 120000;
+            if (resourcesCache && 
+                resourcesCache.locationId === locationId && 
+                Date.now() - resourcesCache.timestamp < CACHE_TTL) {
+                console.log('📦 Using cached packages/spaces for location', locationId);
+                setAvailablePackages(resourcesCache.packages);
+                setAvailableRooms(resourcesCache.rooms);
+                return;
+            }
+            
+            setLoadingResources(true);
+            try {
+                const [packagesRes, roomsRes] = await Promise.all([
+                    packageService.getPackages({ location_id: locationId, is_active: true, per_page: 100 }),
+                    roomService.getRooms({ location_id: locationId, is_available: true, per_page: 100 })
+                ]);
+                
+                const packages = packagesRes.success && packagesRes.data?.packages ? packagesRes.data.packages : [];
+                const rooms = roomsRes.success && roomsRes.data?.rooms ? roomsRes.data.rooms : [];
+                
+                setAvailablePackages(packages);
+                setAvailableRooms(rooms);
+                
+                // Update cache
+                setResourcesCache({
+                    locationId,
+                    packages,
+                    rooms,
+                    timestamp: Date.now()
+                });
+                
+                console.log('📥 Fetched and cached packages/spaces for location', locationId);
+            } catch (error) {
+                console.error('Error fetching packages/spaces:', error);
+            } finally {
+                setLoadingResources(false);
+            }
+        };
+        
+        if (showCreateModal || showEditModal || showBulkModal) {
+            fetchPackagesAndRooms();
+        }
+    }, [modalLocationId, showCreateModal, showEditModal, showBulkModal, isCompanyAdmin, currentUser?.location_id, resourcesCache]);
+
     // Handle form input changes
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { name, value, type } = e.target;
@@ -151,11 +228,24 @@ const DayOffs: React.FC = () => {
             time_end: ''
         });
         setSelectedDayOff(null);
+        setBlockingScope('location');
+        setSelectedPackageIds([]);
+        setSelectedRoomIds([]);
     };
 
     // Handle create day off
     const handleCreateDayOff = async (e: React.FormEvent) => {
         e.preventDefault();
+        
+        // Validate blocking scope selections
+        if ((blockingScope === 'packages' || blockingScope === 'both') && selectedPackageIds.length === 0) {
+            showToast('Please select at least one package', 'error');
+            return;
+        }
+        if ((blockingScope === 'rooms' || blockingScope === 'both') && selectedRoomIds.length === 0) {
+            showToast('Please select at least one space', 'error');
+            return;
+        }
         
         try {
             // Use modal location for company_admin, default to user's location_id otherwise
@@ -163,13 +253,33 @@ const DayOffs: React.FC = () => {
                 ? modalLocationId 
                 : (currentUser?.location_id || 1);
             
+            // Determine package_ids and room_ids based on blocking scope
+            let package_ids: number[] | null = null;
+            let room_ids: number[] | null = null;
+            
+            switch (blockingScope) {
+                case 'packages':
+                    package_ids = selectedPackageIds;
+                    break;
+                case 'rooms':
+                    room_ids = selectedRoomIds;
+                    break;
+                case 'both':
+                    package_ids = selectedPackageIds;
+                    room_ids = selectedRoomIds;
+                    break;
+                // 'location' scope: both null = location-wide
+            }
+            
             await dayOffService.createDayOff({
                 location_id: locationId,
                 date: formData.date,
                 reason: formData.reason || undefined,
                 is_recurring: formData.is_recurring,
                 time_start: sanitizeTimeValue(formData.time_start),
-                time_end: sanitizeTimeValue(formData.time_end)
+                time_end: sanitizeTimeValue(formData.time_end),
+                package_ids,
+                room_ids
             });
             
             showToast('Day Off created successfully!', 'success');
@@ -188,16 +298,47 @@ const DayOffs: React.FC = () => {
         e.preventDefault();
         if (!selectedDayOff) return;
 
+        // Validate blocking scope selections
+        if ((blockingScope === 'packages' || blockingScope === 'both') && selectedPackageIds.length === 0) {
+            showToast('Please select at least one package', 'error');
+            return;
+        }
+        if ((blockingScope === 'rooms' || blockingScope === 'both') && selectedRoomIds.length === 0) {
+            showToast('Please select at least one space', 'error');
+            return;
+        }
+
         try {
+            // Determine package_ids and room_ids based on blocking scope
+            let package_ids: number[] | null = null;
+            let room_ids: number[] | null = null;
+            
+            switch (blockingScope) {
+                case 'packages':
+                    package_ids = selectedPackageIds;
+                    break;
+                case 'rooms':
+                    room_ids = selectedRoomIds;
+                    break;
+                case 'both':
+                    package_ids = selectedPackageIds;
+                    room_ids = selectedRoomIds;
+                    break;
+                // 'location' scope: both null = location-wide
+            }
+            
+            // Build update data with properly sanitized time values
             const updateData = {
                 date: formData.date,
                 reason: formData.reason || undefined,
                 is_recurring: formData.is_recurring,
                 time_start: sanitizeTimeValue(formData.time_start),
-                time_end: sanitizeTimeValue(formData.time_end)
+                time_end: sanitizeTimeValue(formData.time_end),
+                package_ids,
+                room_ids
             };
             
-            console.log('Updating day off with data:', updateData);
+            console.log('📤 Updating day off with data:', updateData, '| Form time values:', { time_start: formData.time_start, time_end: formData.time_end });
             
             await dayOffService.updateDayOff(selectedDayOff.id, updateData);
             
@@ -280,13 +421,61 @@ const DayOffs: React.FC = () => {
     // Handle edit click
     const handleEditClick = (dayOff: DayOff) => {
         setSelectedDayOff(dayOff);
+        
+        // Normalize time format - backend may return HH:mm:ss, but HTML time input needs HH:mm
+        const normalizeTime = (time: string | null | undefined): string => {
+            if (!time) return '';
+            // If it's HH:mm:ss format, extract just HH:mm
+            const match = time.match(/^(\d{2}:\d{2})/);
+            return match ? match[1] : time;
+        };
+        
+        const timeStart = normalizeTime(dayOff.time_start);
+        const timeEnd = normalizeTime(dayOff.time_end);
+        
+        console.log('📝 Loading day off for edit:', { 
+            id: dayOff.id, 
+            original_time_start: dayOff.time_start, 
+            original_time_end: dayOff.time_end,
+            normalized_time_start: timeStart,
+            normalized_time_end: timeEnd
+        });
+        
         setFormData({
             date: dayOff.date.split('T')[0], // Extract date part
             reason: dayOff.reason || '',
             is_recurring: dayOff.is_recurring,
-            time_start: dayOff.time_start || '',
-            time_end: dayOff.time_end || ''
+            time_start: timeStart,
+            time_end: timeEnd
         });
+        
+        // Determine blocking scope from package_ids and room_ids
+        const hasPackages = dayOff.package_ids && dayOff.package_ids.length > 0;
+        const hasRooms = dayOff.room_ids && dayOff.room_ids.length > 0;
+        
+        if (hasPackages && hasRooms) {
+            setBlockingScope('both');
+            setSelectedPackageIds(dayOff.package_ids || []);
+            setSelectedRoomIds(dayOff.room_ids || []);
+        } else if (hasPackages) {
+            setBlockingScope('packages');
+            setSelectedPackageIds(dayOff.package_ids || []);
+            setSelectedRoomIds([]);
+        } else if (hasRooms) {
+            setBlockingScope('rooms');
+            setSelectedPackageIds([]);
+            setSelectedRoomIds(dayOff.room_ids || []);
+        } else {
+            setBlockingScope('location');
+            setSelectedPackageIds([]);
+            setSelectedRoomIds([]);
+        }
+        
+        // Set modal location for fetching packages/rooms
+        if (dayOff.location_id) {
+            setModalLocationId(dayOff.location_id);
+        }
+        
         setShowEditModal(true);
     };
 
@@ -326,17 +515,26 @@ const DayOffs: React.FC = () => {
         return date < today;
     };
 
-    // Sanitize time value - convert empty strings to null and validate format
-    const sanitizeTimeValue = (time: string): string | null => {
-        if (!time || time.trim() === '') {
+    // Sanitize time value - convert empty strings to null and validate/normalize format
+    const sanitizeTimeValue = (time: string | null | undefined): string | null => {
+        // If explicitly null or undefined, return null
+        if (time === null || time === undefined) return null;
+        
+        // If empty string, return null (user cleared the field)
+        const trimmed = time.trim();
+        if (trimmed === '') {
             return null;
         }
-        // Validate HH:mm format
-        const timeRegex = /^([0-1][0-9]|2[0-3]):[0-5][0-9]$/;
-        if (!timeRegex.test(time.trim())) {
+        
+        // Accept both HH:mm and HH:mm:ss formats, normalize to HH:mm
+        const timeRegex = /^([0-1][0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$/;
+        if (!timeRegex.test(trimmed)) {
+            console.warn('⚠️ Invalid time format:', trimmed);
             return null; // Return null for invalid formats
         }
-        return time.trim();
+        
+        // Return only HH:mm part
+        return trimmed.substring(0, 5);
     };
 
     // Format time for display (24h to 12h format)
@@ -365,6 +563,27 @@ const DayOffs: React.FC = () => {
         }
         // Both set - specific time range
         return { label: `${formatTime(dayOff.time_start)} - ${formatTime(dayOff.time_end)}`, color: 'bg-yellow-100 text-yellow-700' };
+    };
+
+    // Get blocking scope badge info
+    const getBlockingScopeBadge = (dayOff: DayOff): { label: string; color: string; icon: typeof Building2 } | null => {
+        const hasPackages = dayOff.package_ids && dayOff.package_ids.length > 0;
+        const hasRooms = dayOff.room_ids && dayOff.room_ids.length > 0;
+        
+        if (!hasPackages && !hasRooms) {
+            return { label: 'Entire Location', color: 'bg-red-100 text-red-700', icon: Building2 };
+        }
+        if (hasPackages && hasRooms) {
+            const count = dayOff.package_ids!.length + dayOff.room_ids!.length;
+            return { label: `${count} Resources`, color: 'bg-purple-100 text-purple-700', icon: Layers };
+        }
+        if (hasPackages) {
+            return { label: `${dayOff.package_ids!.length} Package${dayOff.package_ids!.length > 1 ? 's' : ''}`, color: 'bg-amber-100 text-amber-700', icon: PackageIcon };
+        }
+        if (hasRooms) {
+            return { label: `${dayOff.room_ids!.length} Space${dayOff.room_ids!.length > 1 ? 's' : ''}`, color: 'bg-cyan-100 text-cyan-700', icon: DoorOpen };
+        }
+        return null;
     };
 
     // Bulk calendar helper functions
@@ -404,6 +623,16 @@ const DayOffs: React.FC = () => {
             setToast({ message: 'Please select at least one date', type: 'info' });
             return;
         }
+        
+        // Validate blocking scope selections
+        if ((bulkBlockingScope === 'packages' || bulkBlockingScope === 'both') && bulkSelectedPackageIds.length === 0) {
+            setToast({ message: 'Please select at least one package', type: 'error' });
+            return;
+        }
+        if ((bulkBlockingScope === 'rooms' || bulkBlockingScope === 'both') && bulkSelectedRoomIds.length === 0) {
+            setToast({ message: 'Please select at least one space', type: 'error' });
+            return;
+        }
 
         setBulkCreating(true);
         let successCount = 0;
@@ -416,6 +645,24 @@ const DayOffs: React.FC = () => {
             ? modalLocationId 
             : (currentUser?.location_id || 1);
 
+        // Determine package_ids and room_ids based on blocking scope
+        let package_ids: number[] | null = null;
+        let room_ids: number[] | null = null;
+        
+        switch (bulkBlockingScope) {
+            case 'packages':
+                package_ids = bulkSelectedPackageIds;
+                break;
+            case 'rooms':
+                room_ids = bulkSelectedRoomIds;
+                break;
+            case 'both':
+                package_ids = bulkSelectedPackageIds;
+                room_ids = bulkSelectedRoomIds;
+                break;
+            // 'location' scope: both null = location-wide
+        }
+
         for (const dateStr of sortedDates) {
             try {
                 await dayOffService.createDayOff({
@@ -424,7 +671,9 @@ const DayOffs: React.FC = () => {
                     reason: bulkReason || undefined,
                     is_recurring: bulkIsRecurring,
                     time_start: sanitizeTimeValue(bulkTimeStart),
-                    time_end: sanitizeTimeValue(bulkTimeEnd)
+                    time_end: sanitizeTimeValue(bulkTimeEnd),
+                    package_ids,
+                    room_ids
                 });
                 successCount++;
             } catch (error) {
@@ -451,6 +700,9 @@ const DayOffs: React.FC = () => {
         setBulkIsRecurring(false);
         setBulkTimeStart('');
         setBulkTimeEnd('');
+        setBulkBlockingScope('location');
+        setBulkSelectedPackageIds([]);
+        setBulkSelectedRoomIds([]);
     };
 
     const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
@@ -647,18 +899,19 @@ const DayOffs: React.FC = () => {
                         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-300"></div>
                     </div>
                 ) : dayOffs.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                         {dayOffs.map((dayOff) => {
                             const closureType = getClosureTypeLabel(dayOff);
+                            const blockingScopeBadge = getBlockingScopeBadge(dayOff);
                             const isPast = isPastDate(dayOff.date);
                             
                             return (
                                 <div 
                                     key={dayOff.id} 
-                                    className={`relative border rounded-xl p-4 transition-all h-[160px] flex flex-col ${
+                                    className={`relative border rounded-lg p-3 transition-all ${
                                         selectionMode 
-                                            ? 'cursor-pointer hover:shadow-lg hover:-translate-y-0.5' 
-                                            : 'hover:shadow-md'
+                                            ? 'cursor-pointer hover:shadow-md hover:-translate-y-0.5' 
+                                            : 'hover:shadow-sm'
                                     } ${
                                         selectedDayOffIds.has(dayOff.id)
                                             ? `border-${fullColor} bg-${themeColor}-50 shadow-md`
@@ -668,103 +921,94 @@ const DayOffs: React.FC = () => {
                                     }`}
                                     onClick={() => selectionMode && toggleDayOffSelection(dayOff.id)}
                                 >
-                                    {/* Selection Checkbox or Action Buttons */}
-                                    <div className="absolute top-3 right-3 flex gap-1">
-                                        {selectionMode ? (
-                                            selectedDayOffIds.has(dayOff.id) ? (
-                                                <CheckSquare className={`w-5 h-5 text-${fullColor}`} />
+                                    {/* Top Row: Date + Actions */}
+                                    <div className="flex items-start justify-between mb-2">
+                                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                                            {selectionMode ? (
+                                                selectedDayOffIds.has(dayOff.id) ? (
+                                                    <CheckSquare className={`w-4 h-4 flex-shrink-0 text-${fullColor}`} />
+                                                ) : (
+                                                    <Square className="w-4 h-4 flex-shrink-0 text-gray-400" />
+                                                )
                                             ) : (
-                                                <Square className="w-5 h-5 text-gray-400" />
-                                            )
-                                        ) : (
-                                            <>
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        handleEditClick(dayOff);
-                                                    }}
-                                                    className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-600 hover:text-gray-900 transition-colors"
-                                                    title="Edit"
-                                                >
-                                                    <Edit2 className="w-4 h-4" />
-                                                </button>
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        handleDeleteDayOff(dayOff.id, formatDate(dayOff.date));
-                                                    }}
-                                                    className="p-1.5 rounded-lg hover:bg-red-50 text-gray-600 hover:text-red-600 transition-colors"
-                                                    title="Delete"
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </button>
-                                            </>
-                                        )}
-                                    </div>
-
-                                    {/* Date Header */}
-                                    <div className="mb-3 pr-20">
-                                        <div className="flex items-center gap-2 mb-2">
-                                            <Calendar className={`w-4 h-4 ${isPast ? 'text-gray-400' : `text-${fullColor}`}`} />
-                                            <h3 className="font-semibold text-base text-gray-900">
+                                                <Calendar className={`w-4 h-4 flex-shrink-0 ${isPast ? 'text-gray-400' : `text-${fullColor}`}`} style={!isPast ? { color: fullColor } : undefined} />
+                                            )}
+                                            <h3 className="font-semibold text-sm text-gray-900 truncate">
                                                 {new Date(dayOff.date).toLocaleDateString('en-US', { 
                                                     month: 'short', 
                                                     day: 'numeric', 
                                                     year: 'numeric' 
                                                 })}
                                             </h3>
-                                        </div>
-
-                                        {/* Status Badges */}
-                                        <div className="flex items-center gap-1.5 flex-wrap">
-                                            {closureType ? (
-                                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium ${closureType.color}`}>
-                                                    <Clock className="w-3 h-3" />
-                                                    {closureType.label}
-                                                </span>
-                                            ) : (
-                                                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-red-100 text-red-700">
-                                                    Full Day Closure
-                                                </span>
-                                            )}
                                             {dayOff.is_recurring && (
-                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-purple-100 text-purple-700">
-                                                    <RefreshCw className="w-3 h-3" />
-                                                    Recurring
+                                                <span title="Recurring annually">
+                                                    <RefreshCw className="w-3.5 h-3.5 flex-shrink-0 text-purple-500" />
                                                 </span>
                                             )}
+                                            {isPast && (
+                                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-200 text-gray-600 flex-shrink-0">Past</span>
+                                            )}
                                         </div>
-                                    </div>
-
-                                    {/* Content Area */}
-                                    <div className="flex-1 min-h-0">
-                                        {dayOff.reason && (
-                                            <p className="text-sm text-gray-600 line-clamp-2 mb-2">
-                                                {dayOff.reason}
-                                            </p>
-                                        )}
-                                        {dayOff.location && (
-                                            <div className="flex items-center gap-1.5 text-xs text-gray-500">
-                                                <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
-                                                <span className="truncate">{dayOff.location.name}</span>
+                                        {!selectionMode && (
+                                            <div className="flex gap-0.5 flex-shrink-0 ml-2">
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleEditClick(dayOff);
+                                                    }}
+                                                    className="p-1 rounded hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors"
+                                                    title="Edit"
+                                                >
+                                                    <Edit2 className="w-3.5 h-3.5" />
+                                                </button>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleDeleteDayOff(dayOff.id, formatDate(dayOff.date));
+                                                    }}
+                                                    className="p-1 rounded hover:bg-red-50 text-gray-500 hover:text-red-600 transition-colors"
+                                                    title="Delete"
+                                                >
+                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                </button>
                                             </div>
                                         )}
                                     </div>
 
-                                    {/* Footer */}
-                                    <div className="flex items-center justify-between mt-auto pt-3 border-t border-gray-100">
-                                        <span className="text-xs text-gray-400">
-                                            {new Date(dayOff.created_at).toLocaleDateString('en-US', { 
-                                                month: 'short', 
-                                                day: 'numeric' 
-                                            })}
-                                        </span>
-                                        {isPast && (
-                                            <span className="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-600">
-                                                Past
+                                    {/* Badges Row */}
+                                    <div className="flex items-center gap-1 flex-wrap mb-2">
+                                        {blockingScopeBadge && (
+                                            <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium ${blockingScopeBadge.color}`}>
+                                                <blockingScopeBadge.icon className="w-2.5 h-2.5" />
+                                                {blockingScopeBadge.label}
+                                            </span>
+                                        )}
+                                        {closureType ? (
+                                            <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium ${closureType.color}`}>
+                                                <Clock className="w-2.5 h-2.5" />
+                                                {closureType.label}
+                                            </span>
+                                        ) : (
+                                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-600">
+                                                Full Day
                                             </span>
                                         )}
                                     </div>
+
+                                    {/* Reason & Location */}
+                                    {(dayOff.reason || dayOff.location) && (
+                                        <div className="text-xs text-gray-500 space-y-0.5">
+                                            {dayOff.reason && (
+                                                <p className="line-clamp-1">{dayOff.reason}</p>
+                                            )}
+                                            {dayOff.location && (
+                                                <div className="flex items-center gap-1">
+                                                    <MapPin className="w-3 h-3 flex-shrink-0" />
+                                                    <span className="truncate">{dayOff.location.name}</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
                             );
                         })}
@@ -836,9 +1080,9 @@ const DayOffs: React.FC = () => {
 
             {/* Create Modal */}
             {showCreateModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onClick={() => setShowCreateModal(false)}>
-                    <div className="bg-white rounded-lg shadow-xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
-                        <div className="p-6">
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 overflow-y-auto" onClick={() => setShowCreateModal(false)}>
+                    <div className="bg-white rounded-lg shadow-xl w-full max-w-lg my-8" onClick={(e) => e.stopPropagation()}>
+                        <div className="p-6 max-h-[85vh] overflow-y-auto">
                             <h2 className="text-xl font-semibold text-gray-900 mb-4">Add New Day Off</h2>
                             
                             <form onSubmit={handleCreateDayOff} className="space-y-4">
@@ -895,6 +1139,151 @@ const DayOffs: React.FC = () => {
                                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                         placeholder="e.g., Holiday, Maintenance, etc."
                                     />
+                                </div>
+
+                                {/* Blocking Scope Section */}
+                                <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                                    <label className="block text-sm font-medium text-gray-700 mb-3">
+                                        What should be blocked?
+                                    </label>
+                                    
+                                    <div className="grid grid-cols-2 gap-2 mb-4">
+                                        <button
+                                            type="button"
+                                            onClick={() => setBlockingScope('location')}
+                                            className={`flex items-center gap-2 p-3 rounded-lg border-2 transition-all text-left ${
+                                                blockingScope === 'location' 
+                                                    ? `border-${themeColor}-500 bg-${themeColor}-50` 
+                                                    : 'border-gray-200 hover:border-gray-300'
+                                            }`}
+                                            style={blockingScope === 'location' ? { borderColor: fullColor, backgroundColor: `${fullColor}10` } : undefined}
+                                        >
+                                            <Building2 className={`w-5 h-5 ${blockingScope === 'location' ? `text-${fullColor}` : 'text-gray-500'}`} style={blockingScope === 'location' ? { color: fullColor } : undefined} />
+                                            <div>
+                                                <div className="font-medium text-sm">Entire Location</div>
+                                                <div className="text-xs text-gray-500">All packages & rooms</div>
+                                            </div>
+                                        </button>
+                                        
+                                        <button
+                                            type="button"
+                                            onClick={() => setBlockingScope('packages')}
+                                            className={`flex items-center gap-2 p-3 rounded-lg border-2 transition-all text-left ${
+                                                blockingScope === 'packages' 
+                                                    ? `border-${themeColor}-500 bg-${themeColor}-50` 
+                                                    : 'border-gray-200 hover:border-gray-300'
+                                            }`}
+                                            style={blockingScope === 'packages' ? { borderColor: fullColor, backgroundColor: `${fullColor}10` } : undefined}
+                                        >
+                                            <PackageIcon className={`w-5 h-5 ${blockingScope === 'packages' ? `text-${fullColor}` : 'text-gray-500'}`} style={blockingScope === 'packages' ? { color: fullColor } : undefined} />
+                                            <div>
+                                                <div className="font-medium text-sm">Packages Only</div>
+                                                <div className="text-xs text-gray-500">Select packages</div>
+                                            </div>
+                                        </button>
+                                        
+                                        <button
+                                            type="button"
+                                            onClick={() => setBlockingScope('rooms')}
+                                            className={`flex items-center gap-2 p-3 rounded-lg border-2 transition-all text-left ${
+                                                blockingScope === 'rooms' 
+                                                    ? `border-${themeColor}-500 bg-${themeColor}-50` 
+                                                    : 'border-gray-200 hover:border-gray-300'
+                                            }`}
+                                            style={blockingScope === 'rooms' ? { borderColor: fullColor, backgroundColor: `${fullColor}10` } : undefined}
+                                        >
+                                            <DoorOpen className={`w-5 h-5 ${blockingScope === 'rooms' ? `text-${fullColor}` : 'text-gray-500'}`} style={blockingScope === 'rooms' ? { color: fullColor } : undefined} />
+                                            <div>
+                                                <div className="font-medium text-sm">Spaces Only</div>
+                                                <div className="text-xs text-gray-500">Select spaces</div>
+                                            </div>
+                                        </button>
+                                        
+                                        <button
+                                            type="button"
+                                            onClick={() => setBlockingScope('both')}
+                                            className={`flex items-center gap-2 p-3 rounded-lg border-2 transition-all text-left ${
+                                                blockingScope === 'both' 
+                                                    ? `border-${themeColor}-500 bg-${themeColor}-50` 
+                                                    : 'border-gray-200 hover:border-gray-300'
+                                            }`}
+                                            style={blockingScope === 'both' ? { borderColor: fullColor, backgroundColor: `${fullColor}10` } : undefined}
+                                        >
+                                            <Layers className={`w-5 h-5 ${blockingScope === 'both' ? `text-${fullColor}` : 'text-gray-500'}`} style={blockingScope === 'both' ? { color: fullColor } : undefined} />
+                                            <div>
+                                                <div className="font-medium text-sm">Both</div>
+                                                <div className="text-xs text-gray-500">Packages & rooms</div>
+                                            </div>
+                                        </button>
+                                    </div>
+                                    
+                                    {/* Package Selection */}
+                                    {(blockingScope === 'packages' || blockingScope === 'both') && (
+                                        <div className="mb-3">
+                                            <label className="block text-xs font-medium text-gray-600 mb-2">
+                                                Select Packages <span className="text-red-500">*</span>
+                                            </label>
+                                            {loadingResources ? (
+                                                <div className="text-sm text-gray-500">Loading packages...</div>
+                                            ) : availablePackages.length === 0 ? (
+                                                <div className="text-sm text-gray-500">No active packages found</div>
+                                            ) : (
+                                                <div className="max-h-32 overflow-y-auto border border-gray-200 rounded-lg bg-white">
+                                                    {availablePackages.map(pkg => (
+                                                        <label key={pkg.id} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b last:border-b-0">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={selectedPackageIds.includes(pkg.id)}
+                                                                onChange={(e) => {
+                                                                    if (e.target.checked) {
+                                                                        setSelectedPackageIds([...selectedPackageIds, pkg.id]);
+                                                                    } else {
+                                                                        setSelectedPackageIds(selectedPackageIds.filter(id => id !== pkg.id));
+                                                                    }
+                                                                }}
+                                                                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                            />
+                                                            <span className="text-sm text-gray-700">{pkg.name}</span>
+                                                        </label>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                    
+                                    {/* Room Selection */}
+                                    {(blockingScope === 'rooms' || blockingScope === 'both') && (
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-600 mb-2">
+                                                Select spaces <span className="text-red-500">*</span>
+                                            </label>
+                                            {loadingResources ? (
+                                                <div className="text-sm text-gray-500">Loading rooms...</div>
+                                            ) : availableRooms.length === 0 ? (
+                                                <div className="text-sm text-gray-500">No available spaces found</div>
+                                            ) : (
+                                                <div className="max-h-32 overflow-y-auto border border-gray-200 rounded-lg bg-white">
+                                                    {availableRooms.map(room => (
+                                                        <label key={room.id} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b last:border-b-0">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={selectedRoomIds.includes(room.id)}
+                                                                onChange={(e) => {
+                                                                    if (e.target.checked) {
+                                                                        setSelectedRoomIds([...selectedRoomIds, room.id]);
+                                                                    } else {
+                                                                        setSelectedRoomIds(selectedRoomIds.filter(id => id !== room.id));
+                                                                    }
+                                                                }}
+                                                                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                            />
+                                                            <span className="text-sm text-gray-700">{room.name}</span>
+                                                        </label>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Partial Day Closure Options */}
@@ -1002,9 +1391,9 @@ const DayOffs: React.FC = () => {
 
             {/* Edit Modal */}
             {showEditModal && selectedDayOff && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onClick={() => setShowEditModal(false)}>
-                    <div className="bg-white rounded-lg shadow-xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
-                        <div className="p-6">
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 overflow-y-auto" onClick={() => setShowEditModal(false)}>
+                    <div className="bg-white rounded-lg shadow-xl w-full max-w-lg my-8" onClick={(e) => e.stopPropagation()}>
+                        <div className="p-6 max-h-[85vh] overflow-y-auto">
                             <h2 className="text-xl font-semibold text-gray-900 mb-4">Edit Day Off</h2>
                             <form onSubmit={handleUpdateDayOff} className="space-y-4">
                                 <div>
@@ -1033,6 +1422,151 @@ const DayOffs: React.FC = () => {
                                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                         placeholder="e.g., Holiday, Maintenance, etc."
                                     />
+                                </div>
+
+                                {/* Blocking Scope Section */}
+                                <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                                    <label className="block text-sm font-medium text-gray-700 mb-3">
+                                        What should be blocked?
+                                    </label>
+                                    
+                                    <div className="grid grid-cols-2 gap-2 mb-4">
+                                        <button
+                                            type="button"
+                                            onClick={() => setBlockingScope('location')}
+                                            className={`flex items-center gap-2 p-3 rounded-lg border-2 transition-all text-left ${
+                                                blockingScope === 'location' 
+                                                    ? `border-${themeColor}-500 bg-${themeColor}-50` 
+                                                    : 'border-gray-200 hover:border-gray-300'
+                                            }`}
+                                            style={blockingScope === 'location' ? { borderColor: fullColor, backgroundColor: `${fullColor}10` } : undefined}
+                                        >
+                                            <Building2 className={`w-5 h-5 ${blockingScope === 'location' ? `text-${fullColor}` : 'text-gray-500'}`} style={blockingScope === 'location' ? { color: fullColor } : undefined} />
+                                            <div>
+                                                <div className="font-medium text-sm">Entire Location</div>
+                                                <div className="text-xs text-gray-500">All packages & rooms</div>
+                                            </div>
+                                        </button>
+                                        
+                                        <button
+                                            type="button"
+                                            onClick={() => setBlockingScope('packages')}
+                                            className={`flex items-center gap-2 p-3 rounded-lg border-2 transition-all text-left ${
+                                                blockingScope === 'packages' 
+                                                    ? `border-${themeColor}-500 bg-${themeColor}-50` 
+                                                    : 'border-gray-200 hover:border-gray-300'
+                                            }`}
+                                            style={blockingScope === 'packages' ? { borderColor: fullColor, backgroundColor: `${fullColor}10` } : undefined}
+                                        >
+                                            <PackageIcon className={`w-5 h-5 ${blockingScope === 'packages' ? `text-${fullColor}` : 'text-gray-500'}`} style={blockingScope === 'packages' ? { color: fullColor } : undefined} />
+                                            <div>
+                                                <div className="font-medium text-sm">Packages Only</div>
+                                                <div className="text-xs text-gray-500">Select packages</div>
+                                            </div>
+                                        </button>
+                                        
+                                        <button
+                                            type="button"
+                                            onClick={() => setBlockingScope('rooms')}
+                                            className={`flex items-center gap-2 p-3 rounded-lg border-2 transition-all text-left ${
+                                                blockingScope === 'rooms' 
+                                                    ? `border-${themeColor}-500 bg-${themeColor}-50` 
+                                                    : 'border-gray-200 hover:border-gray-300'
+                                            }`}
+                                            style={blockingScope === 'rooms' ? { borderColor: fullColor, backgroundColor: `${fullColor}10` } : undefined}
+                                        >
+                                            <DoorOpen className={`w-5 h-5 ${blockingScope === 'rooms' ? `text-${fullColor}` : 'text-gray-500'}`} style={blockingScope === 'rooms' ? { color: fullColor } : undefined} />
+                                            <div>
+                                                <div className="font-medium text-sm">Spaces Only</div>
+                                                <div className="text-xs text-gray-500">Select spaces</div>
+                                            </div>
+                                        </button>
+                                        
+                                        <button
+                                            type="button"
+                                            onClick={() => setBlockingScope('both')}
+                                            className={`flex items-center gap-2 p-3 rounded-lg border-2 transition-all text-left ${
+                                                blockingScope === 'both' 
+                                                    ? `border-${themeColor}-500 bg-${themeColor}-50` 
+                                                    : 'border-gray-200 hover:border-gray-300'
+                                            }`}
+                                            style={blockingScope === 'both' ? { borderColor: fullColor, backgroundColor: `${fullColor}10` } : undefined}
+                                        >
+                                            <Layers className={`w-5 h-5 ${blockingScope === 'both' ? `text-${fullColor}` : 'text-gray-500'}`} style={blockingScope === 'both' ? { color: fullColor } : undefined} />
+                                            <div>
+                                                <div className="font-medium text-sm">Both</div>
+                                                <div className="text-xs text-gray-500">Packages & rooms</div>
+                                            </div>
+                                        </button>
+                                    </div>
+                                    
+                                    {/* Package Selection */}
+                                    {(blockingScope === 'packages' || blockingScope === 'both') && (
+                                        <div className="mb-3">
+                                            <label className="block text-xs font-medium text-gray-600 mb-2">
+                                                Select Packages <span className="text-red-500">*</span>
+                                            </label>
+                                            {loadingResources ? (
+                                                <div className="text-sm text-gray-500">Loading packages...</div>
+                                            ) : availablePackages.length === 0 ? (
+                                                <div className="text-sm text-gray-500">No active packages found</div>
+                                            ) : (
+                                                <div className="max-h-32 overflow-y-auto border border-gray-200 rounded-lg bg-white">
+                                                    {availablePackages.map(pkg => (
+                                                        <label key={pkg.id} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b last:border-b-0">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={selectedPackageIds.includes(pkg.id)}
+                                                                onChange={(e) => {
+                                                                    if (e.target.checked) {
+                                                                        setSelectedPackageIds([...selectedPackageIds, pkg.id]);
+                                                                    } else {
+                                                                        setSelectedPackageIds(selectedPackageIds.filter(id => id !== pkg.id));
+                                                                    }
+                                                                }}
+                                                                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                            />
+                                                            <span className="text-sm text-gray-700">{pkg.name}</span>
+                                                        </label>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                    
+                                    {/* Room Selection */}
+                                    {(blockingScope === 'rooms' || blockingScope === 'both') && (
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-600 mb-2">
+                                                Select spaces <span className="text-red-500">*</span>
+                                            </label>
+                                            {loadingResources ? (
+                                                <div className="text-sm text-gray-500">Loading rooms...</div>
+                                            ) : availableRooms.length === 0 ? (
+                                                <div className="text-sm text-gray-500">No available spaces found</div>
+                                            ) : (
+                                                <div className="max-h-32 overflow-y-auto border border-gray-200 rounded-lg bg-white">
+                                                    {availableRooms.map(room => (
+                                                        <label key={room.id} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b last:border-b-0">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={selectedRoomIds.includes(room.id)}
+                                                                onChange={(e) => {
+                                                                    if (e.target.checked) {
+                                                                        setSelectedRoomIds([...selectedRoomIds, room.id]);
+                                                                    } else {
+                                                                        setSelectedRoomIds(selectedRoomIds.filter(id => id !== room.id));
+                                                                    }
+                                                                }}
+                                                                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                            />
+                                                            <span className="text-sm text-gray-700">{room.name}</span>
+                                                        </label>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Partial Day Closure Options */}
@@ -1270,6 +1804,156 @@ const DayOffs: React.FC = () => {
                                             placeholder="e.g., Holiday, Maintenance, etc."
                                             disabled={bulkCreating}
                                         />
+                                    </div>
+
+                                    {/* Blocking Scope Section */}
+                                    <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                                        <label className="block text-sm font-medium text-gray-700 mb-3">
+                                            What should be blocked? <span className="text-xs text-gray-500">(Applies to all selected dates)</span>
+                                        </label>
+                                        
+                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
+                                            <button
+                                                type="button"
+                                                onClick={() => setBulkBlockingScope('location')}
+                                                disabled={bulkCreating}
+                                                className={`flex items-center gap-2 p-3 rounded-lg border-2 transition-all text-left ${
+                                                    bulkBlockingScope === 'location' 
+                                                        ? `border-${themeColor}-500 bg-${themeColor}-50` 
+                                                        : 'border-gray-200 hover:border-gray-300'
+                                                }`}
+                                                style={bulkBlockingScope === 'location' ? { borderColor: fullColor, backgroundColor: `${fullColor}10` } : undefined}
+                                            >
+                                                <Building2 className={`w-5 h-5 ${bulkBlockingScope === 'location' ? `text-${fullColor}` : 'text-gray-500'}`} style={bulkBlockingScope === 'location' ? { color: fullColor } : undefined} />
+                                                <div>
+                                                    <div className="font-medium text-sm">Entire Location</div>
+                                                </div>
+                                            </button>
+                                            
+                                            <button
+                                                type="button"
+                                                onClick={() => setBulkBlockingScope('packages')}
+                                                disabled={bulkCreating}
+                                                className={`flex items-center gap-2 p-3 rounded-lg border-2 transition-all text-left ${
+                                                    bulkBlockingScope === 'packages' 
+                                                        ? `border-${themeColor}-500 bg-${themeColor}-50` 
+                                                        : 'border-gray-200 hover:border-gray-300'
+                                                }`}
+                                                style={bulkBlockingScope === 'packages' ? { borderColor: fullColor, backgroundColor: `${fullColor}10` } : undefined}
+                                            >
+                                                <PackageIcon className={`w-5 h-5 ${bulkBlockingScope === 'packages' ? `text-${fullColor}` : 'text-gray-500'}`} style={bulkBlockingScope === 'packages' ? { color: fullColor } : undefined} />
+                                                <div>
+                                                    <div className="font-medium text-sm">Packages Only</div>
+                                                </div>
+                                            </button>
+                                            
+                                            <button
+                                                type="button"
+                                                onClick={() => setBulkBlockingScope('rooms')}
+                                                disabled={bulkCreating}
+                                                className={`flex items-center gap-2 p-3 rounded-lg border-2 transition-all text-left ${
+                                                    bulkBlockingScope === 'rooms' 
+                                                        ? `border-${themeColor}-500 bg-${themeColor}-50` 
+                                                        : 'border-gray-200 hover:border-gray-300'
+                                                }`}
+                                                style={bulkBlockingScope === 'rooms' ? { borderColor: fullColor, backgroundColor: `${fullColor}10` } : undefined}
+                                            >
+                                                <DoorOpen className={`w-5 h-5 ${bulkBlockingScope === 'rooms' ? `text-${fullColor}` : 'text-gray-500'}`} style={bulkBlockingScope === 'rooms' ? { color: fullColor } : undefined} />
+                                                <div>
+                                                    <div className="font-medium text-sm">Spaces Only</div>
+                                                </div>
+                                            </button>
+                                            
+                                            <button
+                                                type="button"
+                                                onClick={() => setBulkBlockingScope('both')}
+                                                disabled={bulkCreating}
+                                                className={`flex items-center gap-2 p-3 rounded-lg border-2 transition-all text-left ${
+                                                    bulkBlockingScope === 'both' 
+                                                        ? `border-${themeColor}-500 bg-${themeColor}-50` 
+                                                        : 'border-gray-200 hover:border-gray-300'
+                                                }`}
+                                                style={bulkBlockingScope === 'both' ? { borderColor: fullColor, backgroundColor: `${fullColor}10` } : undefined}
+                                            >
+                                                <Layers className={`w-5 h-5 ${bulkBlockingScope === 'both' ? `text-${fullColor}` : 'text-gray-500'}`} style={bulkBlockingScope === 'both' ? { color: fullColor } : undefined} />
+                                                <div>
+                                                    <div className="font-medium text-sm">Both</div>
+                                                </div>
+                                            </button>
+                                        </div>
+                                        
+                                        {/* Package/Room Selection */}
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            {/* Package Selection */}
+                                            {(bulkBlockingScope === 'packages' || bulkBlockingScope === 'both') && (
+                                                <div>
+                                                    <label className="block text-xs font-medium text-gray-600 mb-2">
+                                                        Select Packages <span className="text-red-500">*</span>
+                                                    </label>
+                                                    {loadingResources ? (
+                                                        <div className="text-sm text-gray-500">Loading packages...</div>
+                                                    ) : availablePackages.length === 0 ? (
+                                                        <div className="text-sm text-gray-500">No active packages found</div>
+                                                    ) : (
+                                                        <div className="max-h-32 overflow-y-auto border border-gray-200 rounded-lg bg-white">
+                                                            {availablePackages.map(pkg => (
+                                                                <label key={pkg.id} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b last:border-b-0">
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        checked={bulkSelectedPackageIds.includes(pkg.id)}
+                                                                        onChange={(e) => {
+                                                                            if (e.target.checked) {
+                                                                                setBulkSelectedPackageIds([...bulkSelectedPackageIds, pkg.id]);
+                                                                            } else {
+                                                                                setBulkSelectedPackageIds(bulkSelectedPackageIds.filter(id => id !== pkg.id));
+                                                                            }
+                                                                        }}
+                                                                        disabled={bulkCreating}
+                                                                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                                    />
+                                                                    <span className="text-sm text-gray-700">{pkg.name}</span>
+                                                                </label>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                            
+                                            {/* Room Selection */}
+                                            {(bulkBlockingScope === 'rooms' || bulkBlockingScope === 'both') && (
+                                                <div>
+                                                    <label className="block text-xs font-medium text-gray-600 mb-2">
+                                                        Select spaces <span className="text-red-500">*</span>
+                                                    </label>
+                                                    {loadingResources ? (
+                                                        <div className="text-sm text-gray-500">Loading rooms...</div>
+                                                    ) : availableRooms.length === 0 ? (
+                                                        <div className="text-sm text-gray-500">No available spaces found</div>
+                                                    ) : (
+                                                        <div className="max-h-32 overflow-y-auto border border-gray-200 rounded-lg bg-white">
+                                                            {availableRooms.map(room => (
+                                                                <label key={room.id} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b last:border-b-0">
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        checked={bulkSelectedRoomIds.includes(room.id)}
+                                                                        onChange={(e) => {
+                                                                            if (e.target.checked) {
+                                                                                setBulkSelectedRoomIds([...bulkSelectedRoomIds, room.id]);
+                                                                            } else {
+                                                                                setBulkSelectedRoomIds(bulkSelectedRoomIds.filter(id => id !== room.id));
+                                                                            }
+                                                                        }}
+                                                                        disabled={bulkCreating}
+                                                                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                                    />
+                                                                    <span className="text-sm text-gray-700">{room.name}</span>
+                                                                </label>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
 
                                     {/* Partial Day Closure Options */}

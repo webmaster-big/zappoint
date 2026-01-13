@@ -24,6 +24,9 @@ api.interceptors.request.use(
   }
 );
 
+// Blocking scope type for UI
+export type BlockingScope = 'location' | 'packages' | 'rooms' | 'both';
+
 // Types
 export interface DayOff {
   id: number;
@@ -33,6 +36,8 @@ export interface DayOff {
   is_recurring: boolean;
   time_start?: string | null;  // Close starting at this time (e.g., "16:00" for close at 4 PM)
   time_end?: string | null;    // Delayed opening until this time (e.g., "16:00" for open at 4 PM)
+  package_ids?: number[] | null;  // Array of package IDs to block, null = all packages
+  room_ids?: number[] | null;     // Array of room IDs to block, null = all rooms
   created_at: string;
   updated_at: string;
   location?: {
@@ -53,6 +58,9 @@ export interface DayOffFilters {
   per_page?: number;
   page?: number;
   user_id?: number;
+  package_id?: number;         // Filter day offs that apply to this package
+  room_id?: number;            // Filter day offs that apply to this room
+  location_wide_only?: boolean; // Only return location-wide blocks
 }
 
 export interface CreateDayOffData {
@@ -62,6 +70,8 @@ export interface CreateDayOffData {
   is_recurring?: boolean;
   time_start?: string | null;  // Close starting at this time
   time_end?: string | null;    // Delayed opening until this time
+  package_ids?: number[] | null;  // Array of package IDs to block
+  room_ids?: number[] | null;     // Array of room IDs to block
 }
 
 export interface UpdateDayOffData {
@@ -71,6 +81,8 @@ export interface UpdateDayOffData {
   is_recurring?: boolean;
   time_start?: string | null;  // Close starting at this time
   time_end?: string | null;    // Delayed opening until this time
+  package_ids?: number[] | null;  // Array of package IDs to block
+  room_ids?: number[] | null;     // Array of room IDs to block
 }
 
 export interface CheckDateData {
@@ -107,12 +119,67 @@ export interface CheckDateResponse {
   };
 }
 
+// Cache configuration
+interface CacheEntry<T> {
+  data: T;
+  timestamp: number;
+}
+
+const CACHE_TTL = 60000; // 1 minute cache TTL
+
 class DayOffService {
+  private cache: Map<string, CacheEntry<unknown>> = new Map();
+
+  /**
+   * Get cached data or fetch fresh
+   */
+  private getCached<T>(key: string): T | null {
+    const entry = this.cache.get(key);
+    if (entry && Date.now() - entry.timestamp < CACHE_TTL) {
+      return entry.data as T;
+    }
+    this.cache.delete(key);
+    return null;
+  }
+
+  /**
+   * Set cache data
+   */
+  private setCache<T>(key: string, data: T): void {
+    this.cache.set(key, { data, timestamp: Date.now() });
+  }
+
+  /**
+   * Invalidate all cache entries
+   */
+  invalidateCache(): void {
+    this.cache.clear();
+  }
+
+  /**
+   * Invalidate cache entries matching a pattern
+   */
+  invalidateCacheByPattern(pattern: string): void {
+    for (const key of this.cache.keys()) {
+      if (key.includes(pattern)) {
+        this.cache.delete(key);
+      }
+    }
+  }
+
   /**
    * Get all day offs with optional filters
    */
   async getDayOffs(filters?: DayOffFilters): Promise<PaginatedResponse<DayOff>> {
+    const cacheKey = `dayoffs_list_${JSON.stringify(filters || {})}`;
+    const cached = this.getCached<PaginatedResponse<DayOff>>(cacheKey);
+    if (cached) {
+      console.log('📦 Returning cached day offs list');
+      return cached;
+    }
+
     const response = await api.get('/day-offs', { params: filters });
+    this.setCache(cacheKey, response.data);
     return response.data;
   }
 
@@ -120,7 +187,14 @@ class DayOffService {
    * Get a specific day off by ID
    */
   async getDayOff(id: number): Promise<ApiResponse<DayOff>> {
+    const cacheKey = `dayoff_${id}`;
+    const cached = this.getCached<ApiResponse<DayOff>>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     const response = await api.get(`/day-offs/${id}`);
+    this.setCache(cacheKey, response.data);
     return response.data;
   }
 
@@ -129,6 +203,8 @@ class DayOffService {
    */
   async createDayOff(data: CreateDayOffData): Promise<ApiResponse<DayOff>> {
     const response = await api.post('/day-offs', data);
+    this.invalidateCacheByPattern('dayoffs_list');
+    this.invalidateCacheByPattern(`location_${data.location_id}`);
     return response.data;
   }
 
@@ -137,6 +213,7 @@ class DayOffService {
    */
   async updateDayOff(id: number, data: UpdateDayOffData): Promise<ApiResponse<DayOff>> {
     const response = await api.put(`/day-offs/${id}`, data);
+    this.invalidateCache(); // Invalidate all cache on update
     return response.data;
   }
 
@@ -145,6 +222,7 @@ class DayOffService {
    */
   async deleteDayOff(id: number): Promise<ApiResponse<null>> {
     const response = await api.delete(`/day-offs/${id}`);
+    this.invalidateCache(); // Invalidate all cache on delete
     return response.data;
   }
 
@@ -152,7 +230,15 @@ class DayOffService {
    * Get day offs by location
    */
   async getDayOffsByLocation(locationId: number): Promise<ApiResponse<DayOff[]>> {
+    const cacheKey = `dayoffs_location_${locationId}`;
+    const cached = this.getCached<ApiResponse<DayOff[]>>(cacheKey);
+    if (cached) {
+      console.log('📦 Returning cached day offs for location', locationId);
+      return cached;
+    }
+
     const response = await api.get(`/day-offs/location/${locationId}`);
+    this.setCache(cacheKey, response.data);
     return response.data;
   }
 
@@ -169,6 +255,7 @@ class DayOffService {
    */
   async bulkDeleteDayOffs(ids: number[]): Promise<ApiResponse<{ deleted_count: number }>> {
     const response = await api.post('/day-offs/bulk-delete', { ids });
+    this.invalidateCache(); // Invalidate all cache on bulk delete
     return response.data;
   }
 }

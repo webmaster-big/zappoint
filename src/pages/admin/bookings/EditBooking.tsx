@@ -6,7 +6,6 @@ import { useThemeColor } from '../../../hooks/useThemeColor';
 import bookingService, { type Booking } from '../../../services/bookingService';
 import { bookingCacheService } from '../../../services/BookingCacheService';
 import packageService from '../../../services/PackageService';
-import { packageCacheService } from '../../../services/PackageCacheService';
 import type { Package as PackageType } from '../../../services/PackageService';
 import roomService from '../../../services/RoomService';
 import { roomCacheService } from '../../../services/RoomCacheService';
@@ -56,35 +55,16 @@ const EditBooking: React.FC = () => {
         let bookingData: Booking | null = null;
         
         if (referenceNumber) {
-          // Try cache first for reference number lookup
-          const cachedBookings = await bookingCacheService.getCachedBookings();
-          if (cachedBookings) {
-            bookingData = cachedBookings.find(b => b.reference_number === referenceNumber) || null;
-          }
-          
-          // Fallback to API if not in cache
-          if (!bookingData) {
-            const response = await bookingService.getBookings({ reference_number: referenceNumber });
-            if (response.success && response.data && response.data.bookings.length > 0) {
-              bookingData = response.data.bookings[0];
-              console.log('Loaded booking by reference number from API:', bookingData);
-            }
-          } else {
-            console.log('Loaded booking by reference number from cache:', bookingData);
+          const response = await bookingService.getBookings({ reference_number: referenceNumber });
+          if (response.success && response.data && response.data.bookings.length > 0) {
+            bookingData = response.data.bookings[0];
+
+            console.log('Loaded booking by reference number:', bookingData);
           }
         } else if (id) {
-          // Try cache first for ID lookup
-          const cachedBooking = await bookingCacheService.getBookingFromCache(Number(id));
-          if (cachedBooking) {
-            bookingData = cachedBooking;
-            console.log('Loaded booking by ID from cache:', bookingData);
-          } else {
-            // Fallback to API
-            const response = await bookingService.getBookingById(Number(id));
-            if (response.success && response.data) {
-              bookingData = response.data;
-              console.log('Loaded booking by ID from API:', bookingData);
-            }
+          const response = await bookingService.getBookingById(Number(id));
+          if (response.success && response.data) {
+            bookingData = response.data;
           }
         }
 
@@ -97,21 +77,10 @@ const EditBooking: React.FC = () => {
         setOriginalBooking(bookingData);
         setOriginalAmountPaid(Number(bookingData.amount_paid || 0));
 
-        // Load available packages - try cache first
-        const cachedPackages = await packageCacheService.getFilteredPackagesFromCache({ location_id: bookingData.location_id });
-        
-        if (cachedPackages && cachedPackages.length > 0) {
-          setAvailablePackages(cachedPackages);
-        } else {
-          // No cache, fetch from API
-          const packagesResponse = await packageService.getPackages({ location_id: bookingData.location_id });
-          if (packagesResponse.success && packagesResponse.data) {
-            setAvailablePackages(packagesResponse.data.packages || []);
-            // Cache the fetched packages
-            if (packagesResponse.data.packages && packagesResponse.data.packages.length > 0) {
-              await packageCacheService.cachePackages(packagesResponse.data.packages);
-            }
-          }
+        // Load available packages
+        const packagesResponse = await packageService.getPackages({ location_id: bookingData.location_id });
+        if (packagesResponse.success && packagesResponse.data) {
+          setAvailablePackages(packagesResponse.data.packages || []);
         }
 
         // Load all rooms from location - try cache first

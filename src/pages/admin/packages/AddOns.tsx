@@ -26,9 +26,7 @@ const ManageAddons = () => {
   const [formData, setFormData] = useState({
     name: '',
     price: '',
-    image: '',
-    min_quantity: '',
-    max_quantity: ''
+    image: ''
   });
   const [loading, setLoading] = useState(false);
 
@@ -130,8 +128,6 @@ const ManageAddons = () => {
               price: addon.price || 0,
               image: imageFull,
               location: addon.location && typeof addon.location === 'object' ? addon.location : null,
-              min_quantity: addon.min_quantity,
-              max_quantity: addon.max_quantity,
             };
           });
           console.log('[AddOns] Loaded from cache:', formattedAddons.length, 'add-ons');
@@ -165,8 +161,6 @@ const ManageAddons = () => {
             price: addon.price || 0,
             image: imageFull,
             location: addon.location && typeof addon.location === 'object' ? addon.location : null,
-            min_quantity: addon.min_quantity,
-            max_quantity: addon.max_quantity,
           };
         });
         setAddons(formattedAddons);
@@ -225,8 +219,6 @@ const ManageAddons = () => {
           price: price,
           description: '',
           is_active: true,
-          min_quantity: formData.min_quantity ? parseInt(formData.min_quantity) : null,
-          max_quantity: formData.max_quantity ? parseInt(formData.max_quantity) : null,
         };
         
         // Add image only if it's a new base64 image (not the existing URL)
@@ -253,8 +245,6 @@ const ManageAddons = () => {
                   price: result.data.price || 0,
                   image: result.data.image ? (result.data.image.startsWith('http') ? result.data.image : `${ASSET_URL}${result.data.image}`) : addon.image,
                   location: result.data.location && typeof result.data.location === 'object' ? result.data.location : addon.location,
-                  min_quantity: result.data.min_quantity,
-                  max_quantity: result.data.max_quantity,
                 }
               : addon
           ));
@@ -288,8 +278,6 @@ const ManageAddons = () => {
           price: price,
           description: '',
           is_active: true,
-          min_quantity: formData.min_quantity ? parseInt(formData.min_quantity) : null,
-          max_quantity: formData.max_quantity ? parseInt(formData.max_quantity) : null,
         };
         
         // Add image if provided
@@ -313,8 +301,6 @@ const ManageAddons = () => {
             price: result.data.price || 0,
             image: result.data.image ? (result.data.image.startsWith('http') ? result.data.image : `${ASSET_URL}${result.data.image}`) : '',
             location: result.data.location && typeof result.data.location === 'object' ? result.data.location : null,
-            min_quantity: result.data.min_quantity,
-            max_quantity: result.data.max_quantity,
           };
           setAddons(prev => [...prev, newAddon]);
           
@@ -348,9 +334,7 @@ const ManageAddons = () => {
     setFormData({
       name: addon.name,
       price: addon.price.toString(),
-      image: imageUrl,
-      min_quantity: addon.min_quantity?.toString() || '',
-      max_quantity: addon.max_quantity?.toString() || ''
+      image: imageUrl
     });
     setShowModal(true);
   };
@@ -381,9 +365,7 @@ const ManageAddons = () => {
     setFormData({
       name: '',
       price: '',
-      image: '',
-      min_quantity: '',
-      max_quantity: ''
+      image: ''
     });
     setEditingAddon(null);
   };
@@ -429,12 +411,12 @@ const ManageAddons = () => {
   };
 
   // Import functionality
-  const handleImport = async () => {
+  const handleImport = () => {
     try {
       const parsedData = JSON.parse(importData);
       
       if (!Array.isArray(parsedData)) {
-        showToast('Invalid JSON format. Please provide an array of add-ons.', 'error');
+        alert('Invalid JSON format. Please provide an array of add-ons.');
         return;
       }
 
@@ -444,70 +426,28 @@ const ManageAddons = () => {
       );
 
       if (!isValid) {
-        showToast('Invalid add-on data structure. Each add-on must have at least name and price.', 'error');
+        alert('Invalid add-on data structure. Each add-on must have at least name and price.');
         return;
       }
 
-      // Determine location_id based on role
-      let locationId: number | undefined;
-      if (isCompanyAdmin) {
-        if (!modalLocationId) {
-          showToast('Please select a location first', 'error');
-          return;
-        }
-        locationId = modalLocationId;
-      } else {
-        locationId = currentUser?.location_id;
-      }
-
-      // Prepare add-ons for bulk import with proper field mapping
-      const addOnsToImport = parsedData.map(addon => ({
-        location_id: locationId,
-        name: addon.name,
-        price: typeof addon.price === 'number' ? addon.price : parseFloat(addon.price),
-        description: addon.description || '',
-        image: addon.image || null,
-        is_active: addon.is_active ?? addon.isActive ?? true,
-        min_quantity: addon.min_quantity ?? addon.minQuantity ?? 1,
-        max_quantity: addon.max_quantity ?? addon.maxQuantity ?? null,
+      // Generate new IDs for imported add-ons to avoid conflicts
+      const importedAddons = parsedData.map(addon => ({
+        ...addon,
+        id: addon.id || `addon_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        price: typeof addon.price === 'number' ? addon.price : parseFloat(addon.price)
       }));
 
-      setLoading(true);
-      const response = await addOnService.bulkImport(addOnsToImport);
-      
-      if (response.success && response.data) {
-        // Add imported add-ons to state
-        const importedAddons: AddOnsAddon[] = response.data.imported.map(addon => ({
-          id: addon.id.toString(),
-          name: addon.name,
-          price: addon.price || 0,
-          image: addon.image ? (addon.image.startsWith('http') ? addon.image : `${ASSET_URL}${addon.image}`) : '',
-          location: addon.location && typeof addon.location === 'object' ? addon.location : null,
-          min_quantity: addon.min_quantity,
-          max_quantity: addon.max_quantity,
-        }));
-        
-        setAddons(prev => [...prev, ...importedAddons]);
-        
-        // Update cache with new add-ons
-        for (const addon of response.data.imported) {
-          await addOnCacheService.addAddOnToCache(addon);
-        }
-        
-        showToast(`Successfully imported ${response.data.imported_count} add-on(s)!`, 'success');
-        
-        if (response.data.failed_count > 0) {
-          showToast(`${response.data.failed_count} add-on(s) failed to import.`, 'info');
-        }
-      }
+      // Merge with existing add-ons
+      const updatedAddons = [...addons, ...importedAddons];
+      setAddons(updatedAddons);
+      localStorage.setItem('zapzone_addons', JSON.stringify(updatedAddons));
       
       setShowImportModal(false);
       setImportData('');
+      alert(`Successfully imported ${importedAddons.length} add-on(s)!`);
     } catch (error) {
+      alert('Error parsing JSON. Please check the format and try again.');
       console.error('Import error:', error);
-      showToast('Error importing add-ons. Please check the format and try again.', 'error');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -692,34 +632,25 @@ const ManageAddons = () => {
                     </div>
                   )}
                   <div className="mt-3 pt-3 border-t border-gray-100">
-                    <div className="flex justify-between items-center mb-2">
+                    <div className="flex justify-between items-center mb-3">
                       <span className="text-lg font-bold text-gray-900">
                         ${Number(addon.price).toFixed(2)}
                       </span>
                     </div>
-                    {/* Quantity Limits Display */}
-                    {(addon.min_quantity || addon.max_quantity) && (
-                      <div className="flex gap-2 mb-3 text-xs text-gray-500">
-                        {addon.min_quantity && addon.min_quantity > 0 && (
-                          <span className="bg-gray-100 px-2 py-0.5 rounded">Min: {addon.min_quantity}</span>
-                        )}
-                        {addon.max_quantity && addon.max_quantity > 0 && (
-                          <span className="bg-gray-100 px-2 py-0.5 rounded">Max: {addon.max_quantity}</span>
-                        )}
-                      </div>
-                    )}
-                    <div className="flex gap-2">
+                    <div className="flex gap-1">
                       <StandardButton
                         onClick={() => handleEdit(addon)}
                         variant="ghost"
-                        size="md"
+                        size="sm"
+                        className="p-1.5"
                         icon={Edit}
                         title="Edit add-on"
                       />
                       <StandardButton
                         onClick={() => handleDelete(addon.id)}
                         variant="danger"
-                        size="md"
+                        size="sm"
+                        className="p-1.5"
                         icon={Trash2}
                         title="Delete add-on"
                       />
@@ -905,42 +836,6 @@ const ManageAddons = () => {
                       placeholder="0.00"
                       required
                     />
-                  </div>
-                </div>
-
-                {/* Quantity Limits */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Min Quantity
-                    </label>
-                    <input
-                      type="number"
-                      name="min_quantity"
-                      min="0"
-                      step="1"
-                      value={formData.min_quantity}
-                      onChange={handleInputChange}
-                      className={`w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 outline-none`}
-                      placeholder="0"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">Minimum order quantity</p>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Max Quantity
-                    </label>
-                    <input
-                      type="number"
-                      name="max_quantity"
-                      min="0"
-                      step="1"
-                      value={formData.max_quantity}
-                      onChange={handleInputChange}
-                      className={`w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 outline-none`}
-                      placeholder="No limit"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">Maximum order quantity</p>
                   </div>
                 </div>
 
