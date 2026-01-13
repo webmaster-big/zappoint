@@ -35,6 +35,8 @@ export interface AddOn {
   created_at: string;
   updated_at: string;
   location?: string;
+  min_quantity?: number;
+  max_quantity?: number;
 }
 
 export interface AddOnFilters {
@@ -55,6 +57,8 @@ export interface CreateAddOnData {
   description?: string;
   image?: string;
   is_active?: boolean;
+  min_quantity?: number;
+  max_quantity?: number;
 }
 
 export type UpdateAddOnData = Partial<CreateAddOnData>;
@@ -156,6 +160,23 @@ class AddOnService {
    */
   async bulkDelete(ids: number[]): Promise<ApiResponse<null>> {
     const response = await api.post('/addons/bulk-delete', { ids });
+    return response.data;
+  }
+
+  /**
+   * Bulk import add-ons
+   */
+  async bulkImport(addOns: Array<{
+    location_id?: number;
+    name: string;
+    price: number;
+    description?: string;
+    image?: string;
+    is_active?: boolean;
+    min_quantity?: number;
+    max_quantity?: number;
+  }>): Promise<ApiResponse<{ imported: AddOn[]; imported_count: number; failed_count: number }>> {
+    const response = await api.post('/addons/bulk-import', { add_ons: addOns });
     return response.data;
   }
 }

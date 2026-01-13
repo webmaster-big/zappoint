@@ -273,13 +273,17 @@ const OnsiteBooking: React.FC = () => {
               pricingType: a.pricing_type as 'per_person' | 'per_unit',
               category: a.category || '',
               maxCapacity: a.max_capacity || 0,
-              image: Array.isArray(a.image) ? a.image[0] : a.image
+              image: Array.isArray(a.image) ? a.image[0] : a.image,
+              min_quantity: a.min_quantity,
+              max_quantity: a.max_quantity
             })) || [],
             addOns: pkg.add_ons?.map((a: any) => ({
               id: a.id,
               name: a.name,
               price: Number(a.price),
-              image: Array.isArray(a.image) ? a.image[0] : a.image
+              image: Array.isArray(a.image) ? a.image[0] : a.image,
+              min_quantity: a.min_quantity,
+              max_quantity: a.max_quantity
             })) || [],
             rooms: pkg.rooms?.map((r: any) => ({
               id: r.id,
@@ -371,14 +375,18 @@ const OnsiteBooking: React.FC = () => {
               pricingType: a.pricing_type as 'per_person' | 'per_unit',
               category: a.category || '',
               maxCapacity: a.max_capacity || 0,
-              image: Array.isArray(a.image) ? a.image[0] : a.image
+              image: Array.isArray(a.image) ? a.image[0] : a.image,
+              min_quantity: a.min_quantity,
+              max_quantity: a.max_quantity
             })) || [],
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             addOns: pkg.add_ons?.map((a: any) => ({
               id: a.id,
               name: a.name,
               price: Number(a.price),
-              image: Array.isArray(a.image) ? a.image[0] : a.image
+              image: Array.isArray(a.image) ? a.image[0] : a.image,
+              min_quantity: a.min_quantity,
+              max_quantity: a.max_quantity
             })) || [],
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             rooms: pkg.rooms?.map((r: any) => ({
@@ -764,6 +772,9 @@ const OnsiteBooking: React.FC = () => {
   };
 
   const handleAttractionToggle = (attractionId: string) => {
+    const attraction = selectedPackage?.attractions?.find(a => String(a.id) === attractionId);
+    const minQty = attraction?.min_quantity ?? 1;
+    
     setBookingData(prev => {
       const existingIndex = prev.selectedAttractions.findIndex(a => a.id === attractionId);
       
@@ -774,17 +785,23 @@ const OnsiteBooking: React.FC = () => {
           selectedAttractions: prev.selectedAttractions.filter(a => a.id !== attractionId)
         };
       } else {
-        // Add attraction with default quantity 1
+        // Add attraction with min_quantity or default 1
         return {
           ...prev,
-          selectedAttractions: [...prev.selectedAttractions, { id: attractionId, quantity: 1 }]
+          selectedAttractions: [...prev.selectedAttractions, { id: attractionId, quantity: minQty }]
         };
       }
     });
   };
 
   const handleAttractionQuantityChange = (attractionId: string, quantity: number) => {
-    if (quantity < 1) return;
+    const attraction = selectedPackage?.attractions?.find(a => String(a.id) === attractionId);
+    const minQty = attraction?.min_quantity ?? 1;
+    const maxQty = attraction?.max_quantity ?? 99;
+    
+    // Enforce min/max limits
+    if (quantity < minQty) return;
+    if (quantity > maxQty) quantity = maxQty;
     
     setBookingData(prev => ({
       ...prev,
@@ -795,6 +812,9 @@ const OnsiteBooking: React.FC = () => {
   };
 
   const handleAddOnToggle = (addOnName: string) => {
+    const addOn = selectedPackage?.addOns.find(a => a.name === addOnName);
+    const minQty = addOn?.min_quantity ?? 1;
+    
     setBookingData(prev => {
       const existingIndex = prev.selectedAddOns.findIndex(a => a.name === addOnName);
       if (existingIndex >= 0) {
@@ -804,9 +824,6 @@ const OnsiteBooking: React.FC = () => {
           selectedAddOns: prev.selectedAddOns.filter(a => a.name !== addOnName)
         };
       } else {
-        // Find the add-on to get its ID
-        const addOn = selectedPackage?.addOns.find(a => a.name === addOnName);
-        
         console.log('🔍 Adding add-on:', { 
           addOnName, 
           foundAddOn: addOn, 
@@ -814,13 +831,13 @@ const OnsiteBooking: React.FC = () => {
           allAddOns: selectedPackage?.addOns 
         });
         
-        // Add add-on with ID, name, default quantity 1
+        // Add add-on with ID, name, and min_quantity or default 1
         return {
           ...prev,
           selectedAddOns: [...prev.selectedAddOns, { 
             id: addOn?.id, 
             name: addOnName, 
-            quantity: 1 
+            quantity: minQty 
           }]
         };
       }
@@ -828,7 +845,13 @@ const OnsiteBooking: React.FC = () => {
   };
 
   const handleAddOnQuantityChange = (addOnName: string, quantity: number) => {
-    if (quantity < 1) return;
+    const addOn = selectedPackage?.addOns.find(a => a.name === addOnName);
+    const minQty = addOn?.min_quantity ?? 1;
+    const maxQty = addOn?.max_quantity ?? 99;
+    
+    // Enforce min/max limits
+    if (quantity < minQty) return;
+    if (quantity > maxQty) quantity = maxQty;
     
     setBookingData(prev => ({
       ...prev,
@@ -1950,6 +1973,8 @@ const OnsiteBooking: React.FC = () => {
             {selectedPackage.attractions.map(attraction => {
             const isSelected = bookingData.selectedAttractions.some(a => a.id === String(attraction.id));
             const selectedQty = bookingData.selectedAttractions.find(a => a.id === String(attraction.id))?.quantity || 0;
+            const minQty = attraction.min_quantity ?? 1;
+            const maxQty = attraction.max_quantity ?? 99;
             
             return (
               <div
@@ -1977,6 +2002,14 @@ const OnsiteBooking: React.FC = () => {
                       <span className={`text-lg font-bold text-${fullColor}`}>${attraction.price}</span>
                       <span className="text-xs text-gray-500">{attraction.pricingType === 'per_person' ? 'per person' : 'per unit'}</span>
                     </div>
+                    {/* Show quantity limits */}
+                    {(minQty > 1 || maxQty < 99) && (
+                      <p className="text-xs text-gray-400 mt-1">
+                        {minQty > 1 && `Min: ${minQty}`}
+                        {minQty > 1 && maxQty < 99 && ' • '}
+                        {maxQty < 99 && `Max: ${maxQty}`}
+                      </p>
+                    )}
                   </div>
                   <StandardButton
                     type="button"
@@ -1998,15 +2031,19 @@ const OnsiteBooking: React.FC = () => {
                         size="sm"
                         icon={Minus}
                         onClick={() => handleAttractionQuantityChange(String(attraction.id), selectedQty - 1)}
+                        disabled={selectedQty <= minQty}
                       >
                         {''}
                       </StandardButton>
                       <input
                         type="number"
-                        min="1"
+                        min={minQty}
+                        max={maxQty}
                         value={selectedQty}
                         onChange={(e) => {
-                          const newQty = parseInt(e.target.value) || 1;
+                          let newQty = parseInt(e.target.value) || minQty;
+                          if (newQty > maxQty) newQty = maxQty;
+                          if (newQty < minQty) newQty = minQty;
                           handleAttractionQuantityChange(String(attraction.id), newQty);
                         }}
                         className="w-16 text-center font-bold text-lg text-gray-900 border border-gray-300 rounded px-2 py-1"
@@ -2017,6 +2054,7 @@ const OnsiteBooking: React.FC = () => {
                         size="sm"
                         icon={Plus}
                         onClick={() => handleAttractionQuantityChange(String(attraction.id), selectedQty + 1)}
+                        disabled={selectedQty >= maxQty}
                       >
                         {''}
                       </StandardButton>
@@ -2038,6 +2076,8 @@ const OnsiteBooking: React.FC = () => {
             {selectedPackage.addOns.map(addOn => {
               const isSelected = bookingData.selectedAddOns.some(a => a.name === addOn.name);
               const selectedQty = bookingData.selectedAddOns.find(a => a.name === addOn.name)?.quantity || 0;
+              const minQty = addOn.min_quantity ?? 1;
+              const maxQty = addOn.max_quantity ?? 99;
               return (
                 <div
                   key={addOn.name}
@@ -2060,6 +2100,14 @@ const OnsiteBooking: React.FC = () => {
                       <div className="flex-1">
                         <h4 className="font-semibold text-gray-900">{addOn.name}</h4>
                         <p className={`text-lg font-bold text-${fullColor} mt-1`}>${addOn.price}</p>
+                        {/* Show quantity limits */}
+                        {(minQty > 1 || maxQty < 99) && (
+                          <p className="text-xs text-gray-400 mt-1">
+                            {minQty > 1 && `Min: ${minQty}`}
+                            {minQty > 1 && maxQty < 99 && ' • '}
+                            {maxQty < 99 && `Max: ${maxQty}`}
+                          </p>
+                        )}
                       </div>
                       <StandardButton
                         type="button"
@@ -2080,15 +2128,19 @@ const OnsiteBooking: React.FC = () => {
                             size="sm"
                             icon={Minus}
                             onClick={() => handleAddOnQuantityChange(addOn.name, selectedQty - 1)}
+                            disabled={selectedQty <= minQty}
                           >
                             {''}
                           </StandardButton>
                           <input
                             type="number"
-                            min="1"
+                            min={minQty}
+                            max={maxQty}
                             value={selectedQty}
                             onChange={(e) => {
-                              const newQty = parseInt(e.target.value) || 1;
+                              let newQty = parseInt(e.target.value) || minQty;
+                              if (newQty > maxQty) newQty = maxQty;
+                              if (newQty < minQty) newQty = minQty;
                               handleAddOnQuantityChange(addOn.name, newQty);
                             }}
                             className="w-16 text-center font-bold text-lg text-gray-900 border border-gray-300 rounded px-2 py-1"
@@ -2099,6 +2151,7 @@ const OnsiteBooking: React.FC = () => {
                             size="sm"
                             icon={Plus}
                             onClick={() => handleAddOnQuantityChange(addOn.name, selectedQty + 1)}
+                            disabled={selectedQty >= maxQty}
                           >
                             {''}
                           </StandardButton>

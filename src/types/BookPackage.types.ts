@@ -8,6 +8,8 @@ export interface BookPackageAttraction {
   description?: string;
   image?: string;
   is_active: boolean;
+  min_quantity?: number;
+  max_quantity?: number;
   pivot?: {
     package_id: number;
     attraction_id: number;
@@ -22,6 +24,8 @@ export interface BookPackageAddOn {
   description?: string;
   image?: string;
   is_active: boolean;
+  min_quantity?: number;
+  max_quantity?: number;
   pivot?: {
     package_id: number;
     add_on_id: number;

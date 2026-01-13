@@ -44,6 +44,8 @@ export interface Attraction {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  min_quantity?: number;
+  max_quantity?: number;
 }
 
 export interface AttractionFilters {

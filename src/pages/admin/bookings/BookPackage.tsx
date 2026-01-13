@@ -550,11 +550,38 @@ const BookPackage: React.FC = () => {
     };
   }, [selectedDate, pkg]);
 
-  // Handle add-on/attraction quantity change
+  // Handle add-on/attraction quantity change with min/max validation
   const handleAddOnQty = (id: number, qty: number) => {
+    const addOn = pkg?.add_ons.find(a => a.id === id);
+    const minQty = addOn?.min_quantity ?? 0;
+    const maxQty = addOn?.max_quantity ?? 99;
+    
+    // Enforce max limit
+    if (qty > maxQty) qty = maxQty;
+    
+    // If going from 0 to positive and min_quantity is set, use min_quantity
+    const currentQty = selectedAddOns[id] || 0;
+    if (currentQty === 0 && qty > 0 && minQty > 1) {
+      qty = minQty;
+    }
+    
     setSelectedAddOns((prev) => ({ ...prev, [id]: Math.max(0, qty) }));
   };
+  
   const handleAttractionQty = (id: number, qty: number) => {
+    const attraction = pkg?.attractions.find(a => a.id === id);
+    const minQty = attraction?.min_quantity ?? 0;
+    const maxQty = attraction?.max_quantity ?? 99;
+    
+    // Enforce max limit
+    if (qty > maxQty) qty = maxQty;
+    
+    // If going from 0 to positive and min_quantity is set, use min_quantity
+    const currentQty = selectedAttractions[id] || 0;
+    if (currentQty === 0 && qty > 0 && minQty > 1) {
+      qty = minQty;
+    }
+    
     setSelectedAttractions((prev) => ({ ...prev, [id]: Math.max(0, qty) }));
   };
 
@@ -1430,7 +1457,12 @@ const BookPackage: React.FC = () => {
                   <div className="border border-gray-200 rounded-xl p-4 md:p-5">
                     <label className="block font-medium mb-3 text-gray-800 text-xs md:text-sm uppercase tracking-wide">Additional Attractions</label>
                     <div className="space-y-4">
-                      {pkg.attractions.map((attraction) => (
+                      {pkg.attractions.map((attraction) => {
+                        const minQty = attraction.min_quantity ?? 0;
+                        const maxQty = attraction.max_quantity ?? 99;
+                        const currentQty = selectedAttractions[attraction.id] || 0;
+                        
+                        return (
                         <div key={attraction.id} className="flex items-center justify-between p-2 md:p-3 bg-gray-50 rounded-lg gap-2 md:gap-4">
                           {attraction.image && (
                             <img 
@@ -1444,30 +1476,45 @@ const BookPackage: React.FC = () => {
                             <span className="block text-xs text-gray-500 mt-0.5">
                               ${Number(attraction.price).toFixed(2)}
                             </span>
+                            {/* Show quantity limits */}
+                            {(minQty > 1 || maxQty < 99) && (
+                              <span className="block text-xs text-gray-400 mt-0.5">
+                                {minQty > 1 && `Min: ${minQty}`}
+                                {minQty > 1 && maxQty < 99 && ' • '}
+                                {maxQty < 99 && `Max: ${maxQty}`}
+                              </span>
+                            )}
                           </div>
                           <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
                             <button 
-                              className="w-7 h-7 md:w-8 md:h-8 rounded-md bg-white border border-gray-300 text-gray-800 flex items-center justify-center text-sm font-semibold shadow-sm"
-                              onClick={() => handleAttractionQty(attraction.id, (selectedAttractions[attraction.id] || 0) - 1)}
+                              className="w-7 h-7 md:w-8 md:h-8 rounded-md bg-white border border-gray-300 text-gray-800 flex items-center justify-center text-sm font-semibold shadow-sm disabled:opacity-50"
+                              onClick={() => handleAttractionQty(attraction.id, currentQty - 1)}
+                              disabled={currentQty <= 0}
                             >
                               -
                             </button>
                             <input 
                               type="number" 
-                              min={0} 
-                              value={selectedAttractions[attraction.id] || 0} 
-                              onChange={e => handleAttractionQty(attraction.id, Number(e.target.value))} 
+                              min={0}
+                              max={maxQty}
+                              value={currentQty} 
+                              onChange={e => {
+                                let newQty = Number(e.target.value);
+                                if (newQty > maxQty) newQty = maxQty;
+                                handleAttractionQty(attraction.id, newQty);
+                              }} 
                               className="w-10 md:w-12 text-center rounded-md border border-gray-300 px-1 py-1 text-xs md:text-sm" 
                             />
                             <button 
-                              className="w-7 h-7 md:w-8 md:h-8 rounded-md bg-white border border-gray-300 text-gray-800 flex items-center justify-center text-sm font-semibold shadow-sm"
-                              onClick={() => handleAttractionQty(attraction.id, (selectedAttractions[attraction.id] || 0) + 1)}
+                              className="w-7 h-7 md:w-8 md:h-8 rounded-md bg-white border border-gray-300 text-gray-800 flex items-center justify-center text-sm font-semibold shadow-sm disabled:opacity-50"
+                              onClick={() => handleAttractionQty(attraction.id, currentQty + 1)}
+                              disabled={currentQty >= maxQty}
                             >
                               +
                             </button>
                           </div>
                         </div>
-                      ))}
+                      )})}
                     </div>
                   </div>
                 )}
@@ -1476,7 +1523,12 @@ const BookPackage: React.FC = () => {
                   <div className="border border-gray-200 rounded-xl p-4 md:p-5">
                     <label className="block font-medium mb-3 text-gray-800 text-xs md:text-sm uppercase tracking-wide">Add-ons</label>
                     <div className="space-y-4">
-                      {pkg.add_ons.map((addOn) => (
+                      {pkg.add_ons.map((addOn) => {
+                        const minQty = addOn.min_quantity ?? 0;
+                        const maxQty = addOn.max_quantity ?? 99;
+                        const currentQty = selectedAddOns[addOn.id] || 0;
+                        
+                        return (
                         <div key={addOn.id} className="flex items-center justify-between p-2 md:p-3 bg-gray-50 rounded-lg gap-2 md:gap-4">
                           {/* Add-on Image */}
                           <div className="w-12 h-12 md:w-16 md:h-16 flex-shrink-0 flex items-center justify-center bg-gray-100 rounded-md border border-gray-200 overflow-hidden">
@@ -1491,30 +1543,45 @@ const BookPackage: React.FC = () => {
                             <span className="block text-xs text-gray-500 mt-0.5">
                               ${Number(addOn.price).toFixed(2)} each
                             </span>
+                            {/* Show quantity limits */}
+                            {(minQty > 1 || maxQty < 99) && (
+                              <span className="block text-xs text-gray-400 mt-0.5">
+                                {minQty > 1 && `Min: ${minQty}`}
+                                {minQty > 1 && maxQty < 99 && ' • '}
+                                {maxQty < 99 && `Max: ${maxQty}`}
+                              </span>
+                            )}
                           </div>
                           <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
                             <button 
-                              className="w-7 h-7 md:w-8 md:h-8 rounded-md bg-white border border-gray-300 text-gray-800 flex items-center justify-center text-sm font-semibold shadow-sm"
-                              onClick={() => handleAddOnQty(addOn.id, (selectedAddOns[addOn.id] || 0) - 1)}
+                              className="w-7 h-7 md:w-8 md:h-8 rounded-md bg-white border border-gray-300 text-gray-800 flex items-center justify-center text-sm font-semibold shadow-sm disabled:opacity-50"
+                              onClick={() => handleAddOnQty(addOn.id, currentQty - 1)}
+                              disabled={currentQty <= 0}
                             >
                               -
                             </button>
                             <input 
                               type="number" 
-                              min={0} 
-                              value={selectedAddOns[addOn.id] || 0} 
-                              onChange={e => handleAddOnQty(addOn.id, Number(e.target.value))} 
+                              min={0}
+                              max={maxQty}
+                              value={currentQty} 
+                              onChange={e => {
+                                let newQty = Number(e.target.value);
+                                if (newQty > maxQty) newQty = maxQty;
+                                handleAddOnQty(addOn.id, newQty);
+                              }} 
                               className="w-10 md:w-12 text-center rounded-md border border-gray-300 px-1 py-1 text-xs md:text-sm" 
                             />
                             <button 
-                              className="w-7 h-7 md:w-8 md:h-8 rounded-md bg-white border border-gray-300 text-gray-800 flex items-center justify-center text-sm font-semibold shadow-sm"
-                              onClick={() => handleAddOnQty(addOn.id, (selectedAddOns[addOn.id] || 0) + 1)}
+                              className="w-7 h-7 md:w-8 md:h-8 rounded-md bg-white border border-gray-300 text-gray-800 flex items-center justify-center text-sm font-semibold shadow-sm disabled:opacity-50"
+                              onClick={() => handleAddOnQty(addOn.id, currentQty + 1)}
+                              disabled={currentQty >= maxQty}
                             >
                               +
                             </button>
                           </div>
                         </div>
-                      ))}
+                      )})}
                     </div>
                   </div>
                 )}

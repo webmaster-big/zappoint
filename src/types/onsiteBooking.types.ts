@@ -12,6 +12,8 @@ export interface OnsiteBookingAddOn {
   name: string;
   price: number;
   image?: string;
+  min_quantity?: number;
+  max_quantity?: number;
 }
 
 export interface OnsiteBookingAttraction {
@@ -21,6 +23,8 @@ export interface OnsiteBookingAttraction {
   description?: string;
   pricingType?: string;
   image?: string;
+  min_quantity?: number;
+  max_quantity?: number;
 }
 
 export interface OnsiteBookingAvailabilitySchedule {

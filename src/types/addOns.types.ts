@@ -6,4 +6,6 @@ export interface AddOnsAddon {
   price: number;
   image: string;
   location: { id?: number; name?: string } | null;
+  min_quantity?: number;
+  max_quantity?: number;
 }

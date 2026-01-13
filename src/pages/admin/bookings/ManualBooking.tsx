@@ -204,23 +204,59 @@ const ManualBooking: React.FC = () => {
   };
 
   const handleAddOnChange = (addOnId: number, change: number) => {
+    const addOn = pkg?.add_ons?.find((a: any) => a.id === addOnId);
+    const minQty = addOn?.min_quantity ?? 0;
+    const maxQty = addOn?.max_quantity ?? 99; // Default max to prevent unrealistic quantities
+    
     setSelectedAddOns(prev => {
-      const newValue = (prev[addOnId] || 0) + change;
+      const currentValue = prev[addOnId] || 0;
+      let newValue = currentValue + change;
+      
+      // Enforce max quantity limit
+      if (newValue > maxQty) {
+        newValue = maxQty;
+      }
+      
+      // If decreasing and going to 0 or below, remove the item
       if (newValue <= 0) {
-        const { [addOnId]: removed, ...rest } = prev;
+        const { [addOnId]: _removed, ...rest } = prev;
         return rest;
       }
+      
+      // If setting for first time and min_quantity is set, use min_quantity
+      if (currentValue === 0 && change > 0 && minQty > 1) {
+        newValue = minQty;
+      }
+      
       return { ...prev, [addOnId]: newValue };
     });
   };
 
   const handleAttractionChange = (attractionId: number, change: number) => {
+    const attraction = pkg?.attractions?.find((a: any) => a.id === attractionId);
+    const minQty = attraction?.min_quantity ?? 0;
+    const maxQty = attraction?.max_quantity ?? 99; // Default max to prevent unrealistic quantities
+    
     setSelectedAttractions(prev => {
-      const newValue = (prev[attractionId] || 0) + change;
+      const currentValue = prev[attractionId] || 0;
+      let newValue = currentValue + change;
+      
+      // Enforce max quantity limit
+      if (newValue > maxQty) {
+        newValue = maxQty;
+      }
+      
+      // If decreasing and going to 0 or below, remove the item
       if (newValue <= 0) {
-        const { [attractionId]: removed, ...rest } = prev;
+        const { [attractionId]: _removed, ...rest } = prev;
         return rest;
       }
+      
+      // If setting for first time and min_quantity is set, use min_quantity
+      if (currentValue === 0 && change > 0 && minQty > 1) {
+        newValue = minQty;
+      }
+      
       return { ...prev, [attractionId]: newValue };
     });
   };
@@ -288,28 +324,19 @@ const ManualBooking: React.FC = () => {
     if (!pkg) return 0;
 
     let total = 0;
+    const minParticipants = pkg.min_participants || 1;
+    const pricePerAdditional = Number(pkg.price_per_additional || 0);
 
     if (pkg.pricing_type === 'per_person') {
-      // Per-person pricing: calculate base participants and additional participants separately
-      const baseParticipants = Math.min(form.participants, pkg.max_participants || form.participants);
-      const extraParticipants = Math.max(0, form.participants - (pkg.max_participants || 0));
-      
-      // Base participants at regular price
-      total += Number(pkg.price) * baseParticipants;
-      
-      // Additional participants at additional price (if set)
-      if (extraParticipants > 0 && pkg.price_per_additional) {
-        total += Number(pkg.price_per_additional) * extraParticipants;
-      } else if (extraParticipants > 0) {
-        // If no additional price set, use regular price for extra participants
-        total += Number(pkg.price) * extraParticipants;
-      }
+      // Per-person pricing: base price covers all participants
+      total += Number(pkg.price) * form.participants;
     } else {
-      // Fixed pricing: base price + additional charge for extra participants
-      total += Number(pkg.price);
-      const extraParticipants = Math.max(0, form.participants - (pkg.max_participants || 0));
-      if (extraParticipants > 0 && pkg.price_per_additional) {
-        total += Number(pkg.price_per_additional) * extraParticipants;
+      // Fixed pricing: base price covers min_participants, charge extra for participants beyond min
+      if (form.participants <= minParticipants) {
+        total += Number(pkg.price);
+      } else {
+        const extraParticipants = form.participants - minParticipants;
+        total += Number(pkg.price) + (extraParticipants * pricePerAdditional);
       }
     }
 
@@ -831,16 +858,18 @@ const ManualBooking: React.FC = () => {
                             required
                             className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring--500 focus:border-transparent transition-all"
                           />
-                          {pkg && form.participants > (pkg.max_participants || 0) && pkg.price_per_additional && (
+                          {pkg && pkg.pricing_type !== 'per_person' && form.participants > (pkg.min_participants || 1) && pkg.price_per_additional && (
                             <p className="text-xs text-amber-600 mt-1.5 flex items-center gap-1">
                               <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
                                 <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                               </svg>
-                              {form.participants - pkg.max_participants} additional participant{form.participants - pkg.max_participants > 1 ? 's' : ''} @ ${pkg.price_per_additional} each
+                              {form.participants - (pkg.min_participants || 1)} additional participant{form.participants - (pkg.min_participants || 1) > 1 ? 's' : ''} @ ${pkg.price_per_additional} each
                             </p>
                           )}
                           {pkg && (
-                            <p className="text-xs text-gray-500 mt-1">Max: {pkg.max_participants} participants</p>
+                            <p className="text-xs text-gray-500 mt-1">
+                              Min: {pkg.min_participants || 1} • Max: {pkg.max_participants} participants
+                            </p>
                           )}
                         </div>
                         <div>
@@ -937,6 +966,8 @@ const ManualBooking: React.FC = () => {
                         {Array.isArray(pkg.add_ons) && pkg.add_ons.map((addOn: any) => {
                           const isSelected = selectedAddOns[addOn.id] > 0;
                           const quantity = selectedAddOns[addOn.id] || 0;
+                          const minQty = addOn.min_quantity ?? 1;
+                          const maxQty = addOn.max_quantity ?? 99;
                           
                           return (
                             <div
@@ -956,10 +987,18 @@ const ManualBooking: React.FC = () => {
                               )}
                               <div className="p-3">
                                 <h4 className="font-semibold text-sm text-gray-900 line-clamp-1 mb-1">{addOn.name}</h4>
-                                <div className="flex items-baseline gap-2 mb-3">
+                                <div className="flex items-baseline gap-2 mb-1">
                                   <span className={`text-base font-bold text-${themeColor}-600`}>${addOn.price}</span>
                                   <span className="text-xs text-gray-500">{addOn.pricing_type === 'per_person' ? 'per person' : 'per unit'}</span>
                                 </div>
+                                {/* Show quantity limits */}
+                                {(minQty > 1 || maxQty < 99) && (
+                                  <p className="text-xs text-gray-400 mb-2">
+                                    {minQty > 1 && `Min: ${minQty}`}
+                                    {minQty > 1 && maxQty < 99 && ' • '}
+                                    {maxQty < 99 && `Max: ${maxQty}`}
+                                  </p>
+                                )}
                                 
                                 <div className="flex items-center gap-1">
                                   <StandardButton
@@ -975,12 +1014,15 @@ const ManualBooking: React.FC = () => {
                                   <input
                                     type="number"
                                     min="0"
+                                    max={maxQty}
                                     value={quantity}
                                     onChange={(e) => {
-                                      const newQty = parseInt(e.target.value) || 0;
+                                      let newQty = parseInt(e.target.value) || 0;
+                                      // Enforce max limit
+                                      if (newQty > maxQty) newQty = maxQty;
                                       if (newQty === 0) {
                                         setSelectedAddOns(prev => {
-                                          const { [addOn.id]: removed, ...rest } = prev;
+                                          const { [addOn.id]: _removed, ...rest } = prev;
                                           return rest;
                                         });
                                       } else {
@@ -995,6 +1037,7 @@ const ManualBooking: React.FC = () => {
                                     size="sm"
                                     icon={Plus}
                                     onClick={() => handleAddOnChange(addOn.id, 1)}
+                                    disabled={quantity >= maxQty}
                                   >
                                     {''}
                                   </StandardButton>
@@ -1007,6 +1050,8 @@ const ManualBooking: React.FC = () => {
                         {Array.isArray(pkg.attractions) && pkg.attractions.map((attraction: any) => {
                           const isSelected = selectedAttractions[attraction.id] > 0;
                           const quantity = selectedAttractions[attraction.id] || 0;
+                          const minQty = attraction.min_quantity ?? 1;
+                          const maxQty = attraction.max_quantity ?? 99;
                           
                           return (
                             <div
@@ -1026,10 +1071,18 @@ const ManualBooking: React.FC = () => {
                               )}
                               <div className="p-3">
                                 <h4 className="font-semibold text-sm text-gray-900 line-clamp-1 mb-1">{attraction.name}</h4>
-                                <div className="flex items-baseline gap-2 mb-3">
+                                <div className="flex items-baseline gap-2 mb-1">
                                   <span className={`text-base font-bold text-${themeColor}-600`}>${attraction.price}</span>
                                   <span className="text-xs text-gray-500">{attraction.pricing_type === 'per_person' ? 'per person' : 'per unit'}</span>
                                 </div>
+                                {/* Show quantity limits */}
+                                {(minQty > 1 || maxQty < 99) && (
+                                  <p className="text-xs text-gray-400 mb-2">
+                                    {minQty > 1 && `Min: ${minQty}`}
+                                    {minQty > 1 && maxQty < 99 && ' • '}
+                                    {maxQty < 99 && `Max: ${maxQty}`}
+                                  </p>
+                                )}
                                 
                                 <div className="flex items-center gap-1">
                                   <StandardButton
@@ -1045,12 +1098,15 @@ const ManualBooking: React.FC = () => {
                                   <input
                                     type="number"
                                     min="0"
+                                    max={maxQty}
                                     value={quantity}
                                     onChange={(e) => {
-                                      const newQty = parseInt(e.target.value) || 0;
+                                      let newQty = parseInt(e.target.value) || 0;
+                                      // Enforce max limit
+                                      if (newQty > maxQty) newQty = maxQty;
                                       if (newQty === 0) {
                                         setSelectedAttractions(prev => {
-                                          const { [attraction.id]: removed, ...rest } = prev;
+                                          const { [attraction.id]: _removed, ...rest } = prev;
                                           return rest;
                                         });
                                       } else {
@@ -1065,6 +1121,7 @@ const ManualBooking: React.FC = () => {
                                     size="sm"
                                     icon={Plus}
                                     onClick={() => handleAttractionChange(attraction.id, 1)}
+                                    disabled={quantity >= maxQty}
                                   >
                                     {''}
                                   </StandardButton>
@@ -1125,45 +1182,32 @@ const ManualBooking: React.FC = () => {
                     <div className="space-y-2 text-sm">
                       {/* Package Price */}
                       {pkg.pricing_type === 'per_person' ? (
+                        <div className="flex justify-between text-gray-700">
+                          <span>Package ({form.participants} × ${pkg.price})</span>
+                          <span className="font-medium">${(Number(pkg.price) * form.participants).toFixed(2)}</span>
+                        </div>
+                      ) : (
                         <>
                           {(() => {
-                            const baseParticipants = Math.min(form.participants, pkg.max_participants || form.participants);
-                            const extraParticipants = Math.max(0, form.participants - (pkg.max_participants || 0));
+                            const minParticipants = pkg.min_participants || 1;
+                            const extraParticipants = Math.max(0, form.participants - minParticipants);
+                            const pricePerAdditional = Number(pkg.price_per_additional || 0);
                             
                             return (
                               <>
                                 <div className="flex justify-between text-gray-700">
-                                  <span>Package ({baseParticipants} × ${pkg.price})</span>
-                                  <span className="font-medium">${(Number(pkg.price) * baseParticipants).toFixed(2)}</span>
+                                  <span>Package (base price, up to {minParticipants})</span>
+                                  <span className="font-medium">${Number(pkg.price).toFixed(2)}</span>
                                 </div>
-                                {extraParticipants > 0 && pkg.price_per_additional && (
+                                {extraParticipants > 0 && pricePerAdditional > 0 && (
                                   <div className="flex justify-between text-amber-700">
-                                    <span>Additional participants ({extraParticipants} × ${pkg.price_per_additional})</span>
-                                    <span className="font-medium">${(Number(pkg.price_per_additional) * extraParticipants).toFixed(2)}</span>
-                                  </div>
-                                )}
-                                {extraParticipants > 0 && !pkg.price_per_additional && (
-                                  <div className="flex justify-between text-gray-700">
-                                    <span>Additional participants ({extraParticipants} × ${pkg.price})</span>
-                                    <span className="font-medium">${(Number(pkg.price) * extraParticipants).toFixed(2)}</span>
+                                    <span>Additional participants ({extraParticipants} × ${pricePerAdditional})</span>
+                                    <span className="font-medium">${(pricePerAdditional * extraParticipants).toFixed(2)}</span>
                                   </div>
                                 )}
                               </>
                             );
                           })()}
-                        </>
-                      ) : (
-                        <>
-                          <div className="flex justify-between text-gray-700">
-                            <span>Package (base price)</span>
-                            <span className="font-medium">${Number(pkg.price).toFixed(2)}</span>
-                          </div>
-                          {form.participants > (pkg.max_participants || 0) && pkg.price_per_additional && (
-                            <div className="flex justify-between text-amber-700">
-                              <span>Additional participants ({form.participants - pkg.max_participants} × ${pkg.price_per_additional})</span>
-                              <span className="font-medium">${(Number(pkg.price_per_additional) * (form.participants - pkg.max_participants)).toFixed(2)}</span>
-                            </div>
-                          )}
                         </>
                       )}
 
