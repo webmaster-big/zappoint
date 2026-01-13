@@ -853,8 +853,20 @@ const ManualBooking: React.FC = () => {
                             type="number"
                             name="participants"
                             value={form.participants}
-                            onChange={handleInputChange}
+                            onChange={(e) => {
+                              let value = parseInt(e.target.value) || 1;
+                              // Enforce max_participants as hard upper limit
+                              if (pkg?.max_participants && value > pkg.max_participants) {
+                                value = pkg.max_participants;
+                              }
+                              // Enforce minimum of 1
+                              if (value < 1) {
+                                value = 1;
+                              }
+                              setForm(prev => ({ ...prev, participants: value }));
+                            }}
                             min="1"
+                            max={pkg?.max_participants}
                             required
                             className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring--500 focus:border-transparent transition-all"
                           />

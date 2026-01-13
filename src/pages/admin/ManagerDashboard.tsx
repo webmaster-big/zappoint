@@ -7,7 +7,6 @@ import {
   ChevronRight,
   ChevronLeft,
   Plus,
-  Download,
   Zap,
   TrendingUp,
   Ticket,
@@ -87,6 +86,47 @@ const LocationManagerDashboard: React.FC = () => {
       setLocationId(user.location_id);
     }
   }, []);
+
+  // Background sync: Fetch fresh bookings data on component mount
+  // This ensures the cache is always up-to-date when user visits the dashboard
+  useEffect(() => {
+    if (!locationId) return;
+    
+    const syncBookingsInBackground = async () => {
+      try {
+        console.log('🔄 [ManagerDashboard] Background sync: Fetching fresh bookings...');
+        
+        // Fetch all bookings from API (last 30 days + next 30 days for comprehensive cache)
+        const today = new Date();
+        const thirtyDaysAgo = new Date(today);
+        thirtyDaysAgo.setDate(today.getDate() - 30);
+        const thirtyDaysAhead = new Date(today);
+        thirtyDaysAhead.setDate(today.getDate() + 30);
+        
+        const bookingsResponse = await bookingService.getBookings({
+          location_id: locationId,
+          date_from: thirtyDaysAgo.toISOString().split('T')[0],
+          date_to: thirtyDaysAhead.toISOString().split('T')[0],
+          per_page: 500,
+        });
+        
+        const bookings = bookingsResponse.data.bookings || [];
+        console.log('✅ [ManagerDashboard] Background sync: Fetched', bookings.length, 'bookings');
+        
+        // Update cache with fresh data
+        if (bookings.length > 0) {
+          await bookingCacheService.cacheBookings(bookings, { locationId });
+          console.log('✅ [ManagerDashboard] Background sync: Cache updated');
+        }
+      } catch (error) {
+        console.error('⚠️ [ManagerDashboard] Background sync failed:', error);
+        // Don't throw - this is a background operation
+      }
+    };
+    
+    // Run sync in background (don't block UI)
+    syncBookingsInBackground();
+  }, [locationId]);
 
   // Fetch metrics data (only on mount and location change)
   // PERFORMANCE OPTIMIZATION: Cache-first loading with background refresh
@@ -353,16 +393,16 @@ const LocationManagerDashboard: React.FC = () => {
     return weekDates.some(date => date.toDateString() === bookingDate.toDateString());
   });
 
-  // Quick actions for Location Manager
+  // Quick actions for Location Manager - 8 items for clean grid
   const quickActions = [
     { title: 'New Booking', icon: Plus, link: '/bookings/create' },
-    { title: 'Booking Check-in', icon: CheckCircle, link: '/bookings/check-in' },
-    { title: 'Calendar View', icon: Calendar, link: '/bookings/calendar' },
-    { title: 'Create Package', icon: Package, link: '/packages/create' },
-    { title: 'Manage Attendants', icon: Users, link: '/manager/attendants' },
+    { title: 'Calendar', icon: Calendar, link: '/bookings/calendar' },
+    { title: 'Check-in', icon: CheckCircle, link: '/bookings/check-in' },
+    { title: 'Packages', icon: Package, link: '/packages' },
+    { title: 'Attractions', icon: Ticket, link: '/attractions' },
+    { title: 'Attendants', icon: Users, link: '/manager/attendants' },
     { title: 'Analytics', icon: TrendingUp, link: '/manager/analytics' },
-    { title: 'Create Attraction', icon: Ticket, link: '/attractions/create' },
-    { title: 'Attraction Check-in', icon: Download, link: '/attractions/check-in' },
+    { title: 'Payments', icon: DollarSign, link: '/manager/payments' },
   ];
 
   // Status colors (for bookings)

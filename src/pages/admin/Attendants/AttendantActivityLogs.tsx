@@ -149,17 +149,24 @@ const AttendantActivityLogs = () => {
       metadataDetails.push(`Quantity: ${metadata.quantity}`);
     }
     
-    if (metadata.amount || metadata.price) {
-      const amount = metadata.amount || metadata.price;
+    if (metadata.amount || metadata.price || metadata.total_price) {
+      const amount = metadata.amount || metadata.price || metadata.total_price;
       metadataDetails.push(`Amount: $${parseFloat(String(amount)).toFixed(2)}`);
     }
     
-    if (metadata.participants) {
-      metadataDetails.push(`${metadata.participants} participants`);
+    if (metadata.participants || metadata.num_participants) {
+      const participants = metadata.participants || metadata.num_participants;
+      metadataDetails.push(`${participants} participants`);
     }
     
-    if (metadata.guest_name) {
-      metadataDetails.push(`Guest: ${metadata.guest_name}`);
+    if (metadata.guest_name || metadata.customer_name) {
+      const name = metadata.guest_name || metadata.customer_name;
+      metadataDetails.push(`Guest: ${name}`);
+    }
+    
+    if (metadata.customer_email || metadata.email) {
+      const email = metadata.customer_email || metadata.email;
+      metadataDetails.push(`Email: ${email}`);
     }
     
     if (metadata.booking_date || metadata.date) {
@@ -167,18 +174,67 @@ const AttendantActivityLogs = () => {
       metadataDetails.push(`Date: ${date}`);
     }
     
-    if (metadata.time || metadata.booking_time) {
-      const time = metadata.time || metadata.booking_time;
+    if (metadata.time || metadata.booking_time || metadata.time_slot) {
+      const time = metadata.time || metadata.booking_time || metadata.time_slot;
       metadataDetails.push(`Time: ${time}`);
     }
     
-    if (metadata.status) {
-      metadataDetails.push(`Status: ${metadata.status}`);
+    if (metadata.status || metadata.booking_status) {
+      const status = metadata.status || metadata.booking_status;
+      metadataDetails.push(`Status: ${status}`);
     }
     
-    if (metadata.reference_number || metadata.reference) {
-      const ref = metadata.reference_number || metadata.reference;
+    if (metadata.reference_number || metadata.reference || metadata.booking_reference) {
+      const ref = metadata.reference_number || metadata.reference || metadata.booking_reference;
       metadataDetails.push(`Ref: ${ref}`);
+    }
+    
+    if (metadata.package_name) {
+      metadataDetails.push(`Package: ${metadata.package_name}`);
+    }
+    
+    if (metadata.attraction_name) {
+      metadataDetails.push(`Attraction: ${metadata.attraction_name}`);
+    }
+    
+    if (metadata.add_ons && Array.isArray(metadata.add_ons) && metadata.add_ons.length > 0) {
+      const addOnNames = metadata.add_ons.map((a: { name?: string }) => a.name || 'Unknown').join(', ');
+      metadataDetails.push(`Add-ons: ${addOnNames}`);
+    }
+    
+    if (metadata.payment_method) {
+      metadataDetails.push(`Payment: ${metadata.payment_method}`);
+    }
+    
+    if (metadata.location_name || metadata.location) {
+      const location = metadata.location_name || metadata.location;
+      metadataDetails.push(`Location: ${location}`);
+    }
+    
+    if (metadata.room_name || metadata.room) {
+      const room = metadata.room_name || metadata.room;
+      metadataDetails.push(`Room: ${room}`);
+    }
+    
+    if (metadata.duration || metadata.duration_minutes) {
+      const duration = metadata.duration || metadata.duration_minutes;
+      metadataDetails.push(`Duration: ${duration} min`);
+    }
+    
+    if (metadata.promo_code || metadata.discount_code) {
+      const code = metadata.promo_code || metadata.discount_code;
+      metadataDetails.push(`Promo: ${code}`);
+    }
+    
+    if (metadata.discount_amount) {
+      metadataDetails.push(`Discount: $${parseFloat(String(metadata.discount_amount)).toFixed(2)}`);
+    }
+    
+    if (metadata.notes || metadata.special_requests) {
+      const notes = metadata.notes || metadata.special_requests;
+      if (notes.length <= 50) {
+        metadataDetails.push(`Notes: ${notes}`);
+      }
     }
     
     // Build description based on action
@@ -209,17 +265,27 @@ const AttendantActivityLogs = () => {
         if (metadata.ip_address) {
           metadataDetails.push(`from IP: ${metadata.ip_address}`);
         }
+        if (metadata.user_agent || metadata.browser) {
+          const browser = metadata.browser || metadata.user_agent;
+          if (browser.length <= 30) {
+            metadataDetails.push(`Browser: ${browser}`);
+          }
+        }
         break;
       case 'logged_out':
         description = `Logged out of the system`;
+        if (metadata.session_duration) {
+          metadataDetails.push(`Session: ${metadata.session_duration}`);
+        }
         break;
       case 'approved':
         description = `Approved ${resourceType} "${resourceName}" ${resourceId}`;
         break;
       case 'rejected':
         description = `Rejected ${resourceType} "${resourceName}" ${resourceId}`;
-        if (metadata.reason) {
-          metadataDetails.push(`Reason: ${metadata.reason}`);
+        if (metadata.reason || metadata.rejection_reason) {
+          const reason = metadata.reason || metadata.rejection_reason;
+          metadataDetails.push(`Reason: ${reason}`);
         }
         break;
       case 'managed':
@@ -227,6 +293,18 @@ const AttendantActivityLogs = () => {
         break;
       case 'reported':
         description = `Generated report for ${resourceType} "${resourceName}" ${resourceId}`;
+        break;
+      case 'cancelled':
+        description = `Cancelled ${resourceType} "${resourceName}" ${resourceId}`;
+        if (metadata.cancellation_reason) {
+          metadataDetails.push(`Reason: ${metadata.cancellation_reason}`);
+        }
+        break;
+      case 'refunded':
+        description = `Processed refund for ${resourceType} "${resourceName}" ${resourceId}`;
+        if (metadata.refund_amount) {
+          metadataDetails.push(`Refund: $${parseFloat(String(metadata.refund_amount)).toFixed(2)}`);
+        }
         break;
       default:
         description = `${action.charAt(0).toUpperCase() + action.slice(1)} ${resourceType} "${resourceName}" ${resourceId}`;
@@ -243,6 +321,111 @@ const AttendantActivityLogs = () => {
     }
     
     return description;
+  };
+
+  // Format metadata for CSV export - extracts all relevant fields into a readable string
+  const formatMetadataForExport = (metadata: Record<string, unknown> | undefined): Record<string, string> => {
+    if (!metadata || Object.keys(metadata).length === 0) {
+      return {
+        guest_name: '',
+        email: '',
+        reference: '',
+        amount: '',
+        participants: '',
+        date: '',
+        time: '',
+        status: '',
+        package: '',
+        location: '',
+        room: '',
+        payment_method: '',
+        promo_code: '',
+        discount: '',
+        notes: '',
+        changes: '',
+        extra_metadata: ''
+      };
+    }
+
+    const result: Record<string, string> = {
+      guest_name: String(metadata.guest_name || metadata.customer_name || ''),
+      email: String(metadata.customer_email || metadata.email || ''),
+      reference: String(metadata.reference_number || metadata.reference || metadata.booking_reference || ''),
+      amount: metadata.amount || metadata.price || metadata.total_price 
+        ? `$${parseFloat(String(metadata.amount || metadata.price || metadata.total_price)).toFixed(2)}` 
+        : '',
+      participants: String(metadata.participants || metadata.num_participants || ''),
+      date: String(metadata.booking_date || metadata.date || ''),
+      time: String(metadata.time || metadata.booking_time || metadata.time_slot || ''),
+      status: String(metadata.status || metadata.booking_status || ''),
+      package: String(metadata.package_name || ''),
+      location: String(metadata.location_name || metadata.location || ''),
+      room: String(metadata.room_name || metadata.room || ''),
+      payment_method: String(metadata.payment_method || ''),
+      promo_code: String(metadata.promo_code || metadata.discount_code || ''),
+      discount: metadata.discount_amount 
+        ? `$${parseFloat(String(metadata.discount_amount)).toFixed(2)}` 
+        : '',
+      notes: String(metadata.notes || metadata.special_requests || ''),
+      changes: '',
+      extra_metadata: ''
+    };
+
+    // Handle changes object
+    if (metadata.changes) {
+      try {
+        const changes = typeof metadata.changes === 'string' ? JSON.parse(metadata.changes) : metadata.changes;
+        const changeList = Object.entries(changes).map(([key, value]: [string, unknown]) => {
+          const fieldName = key.replace(/_/g, ' ');
+          if (typeof value === 'object' && value !== null && 'old' in value && 'new' in value) {
+            const typedValue = value as { old: unknown; new: unknown };
+            return `${fieldName}: ${typedValue.old} → ${typedValue.new}`;
+          }
+          return `${fieldName}: ${value}`;
+        });
+        result.changes = changeList.join('; ');
+      } catch {
+        result.changes = String(metadata.changes);
+      }
+    }
+
+    // Collect any extra metadata fields not already captured
+    const knownFields = [
+      'guest_name', 'customer_name', 'customer_email', 'email', 'reference_number', 
+      'reference', 'booking_reference', 'amount', 'price', 'total_price', 'participants',
+      'num_participants', 'booking_date', 'date', 'time', 'booking_time', 'time_slot',
+      'status', 'booking_status', 'package_name', 'location_name', 'location', 'room_name',
+      'room', 'payment_method', 'promo_code', 'discount_code', 'discount_amount', 'notes',
+      'special_requests', 'changes', 'resource_name', 'ip_address', 'user_agent', 'browser'
+    ];
+    
+    const extraFields: string[] = [];
+    Object.entries(metadata).forEach(([key, value]) => {
+      if (!knownFields.includes(key) && value !== null && value !== undefined && value !== '') {
+        if (typeof value === 'object') {
+          try {
+            extraFields.push(`${key}: ${JSON.stringify(value)}`);
+          } catch {
+            extraFields.push(`${key}: [object]`);
+          }
+        } else {
+          extraFields.push(`${key}: ${value}`);
+        }
+      }
+    });
+    result.extra_metadata = extraFields.join('; ');
+
+    return result;
+  };
+
+  // Escape CSV value to handle commas, quotes, and newlines
+  const escapeCSV = (value: string): string => {
+    if (!value) return '';
+    // If value contains comma, quote, or newline, wrap in quotes and escape internal quotes
+    if (value.includes(',') || value.includes('"') || value.includes('\n')) {
+      return `"${value.replace(/"/g, '""')}"`;
+    }
+    return value;
   };
 
   // Helper function to check if a date is today
@@ -577,20 +760,67 @@ const AttendantActivityLogs = () => {
         metadata: log.metadata || {}
       }));
 
-      // Generate CSV
-      const csvContent = [
-        ['Timestamp', 'Attendant', 'User Type', 'Action', 'Resource Type', 'Resource Name', 'Details', 'Severity'],
-        ...transformedLogs.map(log => [
-          new Date(log.timestamp).toLocaleString(),
-          log.attendantName,
-          log.userType,
-          log.action,
-          log.resourceType,
-          log.resourceName || '',
-          log.details,
-          log.severity
-        ])
-      ].map(row => row.join(',')).join('\n');
+      // Generate CSV with metadata columns
+      const csvHeaders = [
+        'Timestamp', 
+        'Attendant', 
+        'User Type', 
+        'Action', 
+        'Resource Type', 
+        'Resource Name', 
+        'Details', 
+        'Severity',
+        'Guest Name',
+        'Email',
+        'Reference',
+        'Amount',
+        'Participants',
+        'Date',
+        'Time',
+        'Status',
+        'Package',
+        'Location',
+        'Room',
+        'Payment Method',
+        'Promo Code',
+        'Discount',
+        'Notes',
+        'Changes',
+        'Extra Metadata'
+      ];
+
+      const csvRows = transformedLogs.map(log => {
+        const metadataFields = formatMetadataForExport(log.metadata);
+        return [
+          escapeCSV(new Date(log.timestamp).toLocaleString()),
+          escapeCSV(log.attendantName),
+          escapeCSV(log.userType),
+          escapeCSV(log.action),
+          escapeCSV(log.resourceType),
+          escapeCSV(log.resourceName || ''),
+          escapeCSV(log.details),
+          escapeCSV(log.severity),
+          escapeCSV(metadataFields.guest_name),
+          escapeCSV(metadataFields.email),
+          escapeCSV(metadataFields.reference),
+          escapeCSV(metadataFields.amount),
+          escapeCSV(metadataFields.participants),
+          escapeCSV(metadataFields.date),
+          escapeCSV(metadataFields.time),
+          escapeCSV(metadataFields.status),
+          escapeCSV(metadataFields.package),
+          escapeCSV(metadataFields.location),
+          escapeCSV(metadataFields.room),
+          escapeCSV(metadataFields.payment_method),
+          escapeCSV(metadataFields.promo_code),
+          escapeCSV(metadataFields.discount),
+          escapeCSV(metadataFields.notes),
+          escapeCSV(metadataFields.changes),
+          escapeCSV(metadataFields.extra_metadata)
+        ].join(',');
+      });
+
+      const csvContent = [csvHeaders.join(','), ...csvRows].join('\n');
 
       const blob = new Blob([csvContent], { type: 'text/csv' });
       const url = window.URL.createObjectURL(blob);

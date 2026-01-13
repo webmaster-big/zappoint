@@ -223,6 +223,44 @@ const CompanyDashboard: React.FC = () => {
     fetchLocations();
   }, []);
 
+  // Background sync: Fetch fresh bookings data on component mount
+  // This ensures the cache is always up-to-date when user visits the dashboard
+  useEffect(() => {
+    const syncBookingsInBackground = async () => {
+      try {
+        console.log('🔄 [CompanyDashboard] Background sync: Fetching fresh bookings...');
+        
+        // Fetch all bookings from API (last 30 days + next 30 days for comprehensive cache)
+        const today = new Date();
+        const thirtyDaysAgo = new Date(today);
+        thirtyDaysAgo.setDate(today.getDate() - 30);
+        const thirtyDaysAhead = new Date(today);
+        thirtyDaysAhead.setDate(today.getDate() + 30);
+        
+        const bookingsResponse = await bookingService.getBookings({
+          date_from: thirtyDaysAgo.toISOString().split('T')[0],
+          date_to: thirtyDaysAhead.toISOString().split('T')[0],
+          per_page: 500,
+        });
+        
+        const bookings = bookingsResponse.data.bookings || [];
+        console.log('✅ [CompanyDashboard] Background sync: Fetched', bookings.length, 'bookings');
+        
+        // Update cache with fresh data
+        if (bookings.length > 0) {
+          await bookingCacheService.cacheBookings(bookings);
+          console.log('✅ [CompanyDashboard] Background sync: Cache updated');
+        }
+      } catch (error) {
+        console.error('⚠️ [CompanyDashboard] Background sync failed:', error);
+        // Don't throw - this is a background operation
+      }
+    };
+    
+    // Run sync in background (don't block UI)
+    syncBookingsInBackground();
+  }, []);
+
   // Fetch metrics data when selectedLocation changes
   // PERFORMANCE OPTIMIZATION: Cache-first loading with background refresh
   // - Display cached metrics instantly
@@ -524,16 +562,16 @@ const CompanyDashboard: React.FC = () => {
 
   const groupedBookings = groupBookingsByTimeAndDay();
 
-  // Quick actions
+  // Quick actions - 8 items for clean grid
   const quickActions = [
     { title: 'New Booking', icon: Plus, link: '/bookings/create' },
-    { title: 'Analytics', icon: BarChart3, link: '/admin/analytics' },
-    { title: 'Manage Locations', icon: Building, link: '/admin/activity' },
-    { title: 'All Bookings', icon: Calendar, link: '/bookings' },
-    { title: 'Customers', icon: Users, link: '/customers' },
+    { title: 'Calendar', icon: Calendar, link: '/bookings/calendar' },
+    { title: 'Check-in', icon: Activity, link: '/bookings/check-in' },
     { title: 'Packages', icon: PackageIcon, link: '/packages' },
     { title: 'Attractions', icon: MapPin, link: '/attractions' },
-    { title: 'Calendar View', icon: TrendingUp, link: '/bookings/calendar' },
+    { title: 'Customers', icon: Users, link: '/customers' },
+    { title: 'Analytics', icon: BarChart3, link: '/admin/analytics' },
+    { title: 'Locations', icon: Building, link: '/admin/activity' },
   ];
 
   // Status colors (supporting both capitalized display and lowercase API values)

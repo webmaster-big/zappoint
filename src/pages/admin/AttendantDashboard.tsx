@@ -64,6 +64,47 @@ const AttendantDashboard: React.FC = () => {
      }
    }, []);
 
+   // Background sync: Fetch fresh bookings data on component mount
+   // This ensures the cache is always up-to-date when user visits the dashboard
+   useEffect(() => {
+     if (!locationId) return;
+     
+     const syncBookingsInBackground = async () => {
+       try {
+         console.log('🔄 [AttendantDashboard] Background sync: Fetching fresh bookings...');
+         
+         // Fetch all bookings from API (last 30 days + next 30 days for comprehensive cache)
+         const today = new Date();
+         const thirtyDaysAgo = new Date(today);
+         thirtyDaysAgo.setDate(today.getDate() - 30);
+         const thirtyDaysAhead = new Date(today);
+         thirtyDaysAhead.setDate(today.getDate() + 30);
+         
+         const bookingsResponse = await bookingService.getBookings({
+           location_id: locationId,
+           date_from: thirtyDaysAgo.toISOString().split('T')[0],
+           date_to: thirtyDaysAhead.toISOString().split('T')[0],
+           per_page: 500,
+         });
+         
+         const bookings = bookingsResponse.data.bookings || [];
+         console.log('✅ [AttendantDashboard] Background sync: Fetched', bookings.length, 'bookings');
+         
+         // Update cache with fresh data
+         if (bookings.length > 0) {
+           await bookingCacheService.cacheBookings(bookings, { locationId });
+           console.log('✅ [AttendantDashboard] Background sync: Cache updated');
+         }
+       } catch (error) {
+         console.error('⚠️ [AttendantDashboard] Background sync failed:', error);
+         // Don't throw - this is a background operation
+       }
+     };
+     
+     // Run sync in background (don't block UI)
+     syncBookingsInBackground();
+   }, [locationId]);
+
    // Fetch metrics data (only on mount and location change)
    // Uses cache-first approach: display cached data instantly, then refresh in background
    useEffect(() => {
@@ -323,16 +364,16 @@ const AttendantDashboard: React.FC = () => {
      return weekDates.some(date => date.toDateString() === bookingDate.toDateString());
    });
 
-   // Quick actions for attendant
+   // Quick actions for attendant - 8 items for clean grid
    const quickActions = [
-     { title: 'New Booking', icon: Plus, href: '/bookings/create' },
-     { title: 'Check-in', icon: QrCode, href: '/bookings/check-in' },
-     { title: 'Attraction Check-in', icon: Ticket, href: '/attractions/check-in' },
-     { title: 'Calendar', icon: Calendar, href: '/bookings/calendar' },
-     { title: 'Manage Bookings', icon: TrendingUp, href: '/bookings' },
-     { title: 'Customers', icon: Users, href: '/customers' },
-     { title: 'Manage Packages', icon: DollarSign, href: '/packages' },
-     { title: 'Attractions', icon: Ticket, href: '/attractions' },
+     { title: 'New Booking', icon: Plus, link: '/bookings/create' },
+     { title: 'Calendar', icon: Calendar, link: '/bookings/calendar' },
+     { title: 'Check-in', icon: QrCode, link: '/bookings/check-in' },
+     { title: 'Packages', icon: DollarSign, link: '/packages' },
+     { title: 'Attractions', icon: Ticket, link: '/attractions' },
+     { title: 'Ticket Check-in', icon: Ticket, link: '/attractions/check-in' },
+     { title: 'Customers', icon: Users, link: '/customers' },
+     { title: 'Bookings', icon: TrendingUp, link: '/bookings' },
    ];
 
    // Status colors (for bookings)
@@ -816,21 +857,21 @@ const AttendantDashboard: React.FC = () => {
          )}
 
          {/* Quick Actions */}
-         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-           <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-             <Zap className={`w-5 h-5 text-${fullColor}`} /> Quick Actions
+         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+           <h2 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
+             <Zap className={`w-4 h-4 text-${fullColor}`} /> Quick Actions
            </h2>
-           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-8 gap-3">
+           <div className="grid grid-cols-4 md:grid-cols-8 gap-2">
              {quickActions.map((action, index) => {
                const Icon = action.icon;
                return (
                  <Link
                    key={index}
-                   to={action.href}
-                   className={`flex flex-col items-center justify-center text-white py-6 px-4 rounded-xl font-semibold transition bg-${fullColor} hover:opacity-90 hover:scale-[1.03] active:scale-95`}
+                   to={action.link}
+                   className={`flex flex-col items-center justify-center bg-${fullColor} text-white py-2.5 px-1.5 rounded-lg text-xs font-medium transition hover:opacity-90 hover:scale-[1.02] active:scale-95`}
                  >
-                   <Icon size={24} />
-                   <span className="text-sm mt-2 text-center">{action.title}</span>
+                   <Icon size={16} />
+                   <span className="mt-1 text-center leading-tight">{action.title}</span>
                  </Link>
                );
              })}
