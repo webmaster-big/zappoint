@@ -189,48 +189,60 @@ const DatePicker: React.FC<DatePickerProps> = ({
 
       // Full day off takes precedence - make it unavailable
       // Partial day off still allows selecting the date
+      // Day off styling should ONLY apply to dates that are in the schedule (available)
       const isDisabled = !available || isPast || isFullOff;
+      
+      // Only consider day off styling if the date is actually on the schedule
+      const showFullDayOff = available && isFullOff;
+      const showPartialOff = available && partialOff && !isFullOff;
+      const showBreak = available && hasBreak && !isFullOff && !partialOff;
 
       // Build tooltip
       let tooltip: string | undefined;
-      if (isFullOff) {
+      if (showFullDayOff) {
         tooltip = 'Day Off - Unavailable';
-      } else if (partialOff) {
+      } else if (showPartialOff) {
         tooltip = partialInfo || 'Partial Day Off';
-      } else if (hasBreak) {
+      } else if (showBreak) {
         tooltip = breakInfo || undefined;
+      } else if (!available) {
+        tooltip = 'Not available on this day';
       }
 
       days.push(
         <button
           key={day}
           type="button"
-          onClick={() => !isFullOff && handleDateClick(day)}
+          onClick={() => !isDisabled && handleDateClick(day)}
           disabled={isDisabled}
           title={tooltip}
           className={`aspect-square w-full min-h-[44px] rounded-lg text-xs md:text-sm font-medium transition-all flex flex-col items-center justify-center relative ${
-            isFullOff
+            // First check if date is NOT on schedule - always show as unavailable (gray)
+            !available
+              ? isPast
+                ? 'text-gray-300 cursor-not-allowed'
+                : 'text-gray-400 cursor-not-allowed'
+              // Date IS on schedule - now check for day offs and other styling
+              : showFullDayOff
               ? 'bg-red-50 text-red-400 cursor-not-allowed border border-red-200'
-              : partialOff
+              : showPartialOff
               ? selected
                 ? 'bg-blue-600 text-white shadow-md ring-2 ring-blue-600 ring-offset-2'
                 : 'bg-orange-50 text-orange-700 hover:bg-orange-100 border border-orange-300 hover:scale-105'
               : selected
               ? 'bg-blue-600 text-white shadow-md ring-2 ring-blue-600 ring-offset-2'
-              : available && !isPast
-              ? hasBreak
+              : !isPast
+              ? showBreak
                 ? 'bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-300 hover:scale-105'
                 : 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 hover:scale-105'
-              : isPast
-              ? 'text-gray-300 cursor-not-allowed'
-              : 'text-gray-400 cursor-not-allowed'
+              : 'text-gray-300 cursor-not-allowed'
           }`}
         >
           <span>{day}</span>
-          {partialOff && !isFullOff && !selected && (
+          {showPartialOff && !selected && (
             <AlertCircle className="w-2.5 h-2.5 absolute bottom-0.5 right-0.5 text-orange-500" />
           )}
-          {hasBreak && !isFullOff && !partialOff && !selected && (
+          {showBreak && !selected && (
             <Clock className="w-2.5 h-2.5 absolute bottom-0.5 right-0.5 text-amber-500" />
           )}
         </button>
