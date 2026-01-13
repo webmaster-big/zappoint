@@ -9,9 +9,7 @@ import {
   FileText,
   Edit,
   Trash2,
-  Copy,
   Eye,
-  MoreVertical,
   ChevronLeft,
   ChevronRight,
   X,
@@ -54,7 +52,6 @@ const EmailTemplates: React.FC = () => {
   const [totalItems, setTotalItems] = useState(0);
   const [itemsPerPage] = useState(10);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
-  const [activeDropdown, setActiveDropdown] = useState<number | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
   const [previewTemplate, setPreviewTemplate] = useState<EmailTemplate | null>(null);
 
@@ -157,38 +154,6 @@ const EmailTemplates: React.FC = () => {
       setToast({ message: 'Failed to delete template', type: 'error' });
     } finally {
       setDeleteConfirm(null);
-    }
-  };
-
-  // Handle duplicate template
-  const handleDuplicate = async (id: number) => {
-    try {
-      const response = await emailCampaignService.duplicateTemplate(id);
-      if (response.success) {
-        setToast({ message: 'Template duplicated successfully', type: 'success' });
-        fetchTemplates();
-      }
-    } catch (error) {
-      console.error('Error duplicating template:', error);
-      setToast({ message: 'Failed to duplicate template', type: 'error' });
-    } finally {
-      setActiveDropdown(null);
-    }
-  };
-
-  // Handle status change
-  const handleStatusChange = async (id: number, newStatus: EmailTemplateStatus) => {
-    try {
-      const response = await emailCampaignService.updateTemplateStatus(id, newStatus);
-      if (response.success) {
-        setToast({ message: `Template ${newStatus === 'active' ? 'activated' : newStatus === 'archived' ? 'archived' : 'set to draft'}`, type: 'success' });
-        fetchTemplates();
-      }
-    } catch (error) {
-      console.error('Error updating status:', error);
-      setToast({ message: 'Failed to update template status', type: 'error' });
-    } finally {
-      setActiveDropdown(null);
     }
   };
 
@@ -516,70 +481,13 @@ const EmailTemplates: React.FC = () => {
                             >
                               <Edit className="w-4 h-4" />
                             </Link>
-                            <div className="relative">
-                              <button
-                                onClick={() => setActiveDropdown(activeDropdown === template.id ? null : template.id)}
-                                className="p-2 text-gray-600 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-                              >
-                                <MoreVertical className="w-4 h-4" />
-                              </button>
-                              {activeDropdown === template.id && (
-                                <>
-                                  {/* Backdrop to close dropdown */}
-                                  <div 
-                                    className="fixed inset-0 z-40" 
-                                    onClick={() => setActiveDropdown(null)}
-                                  />
-                                  <div className="absolute right-0 bottom-full mb-1 w-48 bg-white rounded-lg shadow-xl border border-gray-200 py-1 z-50">
-                                    <button
-                                      onClick={() => handleDuplicate(template.id)}
-                                      className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                                    >
-                                      <Copy className="w-4 h-4" />
-                                      Duplicate
-                                    </button>
-                                    {template.status !== 'active' && (
-                                      <button
-                                        onClick={() => handleStatusChange(template.id, 'active')}
-                                        className="w-full flex items-center gap-2 px-4 py-2 text-sm text-green-600 hover:bg-green-50"
-                                      >
-                                        <CheckCircle className="w-4 h-4" />
-                                        Set Active
-                                      </button>
-                                    )}
-                                    {template.status !== 'draft' && (
-                                      <button
-                                        onClick={() => handleStatusChange(template.id, 'draft')}
-                                        className="w-full flex items-center gap-2 px-4 py-2 text-sm text-yellow-600 hover:bg-yellow-50"
-                                      >
-                                        <Clock className="w-4 h-4" />
-                                        Set as Draft
-                                      </button>
-                                    )}
-                                    {template.status !== 'archived' && (
-                                      <button
-                                        onClick={() => handleStatusChange(template.id, 'archived')}
-                                        className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50"
-                                      >
-                                        <Archive className="w-4 h-4" />
-                                        Archive
-                                      </button>
-                                    )}
-                                    <hr className="my-1" />
-                                    <button
-                                      onClick={() => {
-                                        setDeleteConfirm(template.id);
-                                        setActiveDropdown(null);
-                                      }}
-                                      className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50"
-                                    >
-                                      <Trash2 className="w-4 h-4" />
-                                      Delete
-                                    </button>
-                                  </div>
-                                </>
-                              )}
-                            </div>
+                            <button
+                              onClick={() => setDeleteConfirm(template.id)}
+                              className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                              title="Delete"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -587,8 +495,6 @@ const EmailTemplates: React.FC = () => {
                   })}
                 </tbody>
               </table>
-              {/* Spacer to ensure dropdown visibility with few rows */}
-              {templates.length <= 3 && <div className="h-48" />}
             </div>
 
             {/* Mobile Cards */}
@@ -746,14 +652,6 @@ const EmailTemplates: React.FC = () => {
           message={toast.message}
           type={toast.type}
           onClose={() => setToast(null)}
-        />
-      )}
-
-      {/* Click outside to close dropdown */}
-      {activeDropdown && (
-        <div
-          className="fixed inset-0 z-0"
-          onClick={() => setActiveDropdown(null)}
         />
       )}
     </div>

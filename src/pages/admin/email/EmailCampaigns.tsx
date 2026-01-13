@@ -8,7 +8,6 @@ import {
   Filter,
   Send,
   Eye,
-  MoreVertical,
   ChevronLeft,
   ChevronRight,
   CheckCircle,
@@ -19,8 +18,7 @@ import {
   Mail,
   Users,
   BarChart3,
-  Trash2,
-  RotateCcw
+  Trash2
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { emailCampaignService } from '../../../services/EmailCampaignService';
@@ -54,7 +52,6 @@ const EmailCampaigns: React.FC = () => {
   const [totalItems, setTotalItems] = useState(0);
   const [itemsPerPage] = useState(10);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
-  const [activeDropdown, setActiveDropdown] = useState<number | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
   const [cancelConfirm, setCancelConfirm] = useState<number | null>(null);
   const [showFilters, setShowFilters] = useState(false);
@@ -172,22 +169,6 @@ const EmailCampaigns: React.FC = () => {
       setToast({ message: 'Failed to cancel campaign', type: 'error' });
     } finally {
       setCancelConfirm(null);
-    }
-  };
-
-  // Handle resend campaign
-  const handleResend = async (id: number, type: 'failed' | 'all') => {
-    try {
-      const response = await emailCampaignService.resendCampaign(id, type);
-      if (response.success) {
-        setToast({ message: `Resending emails to ${type === 'failed' ? 'failed recipients' : 'all recipients'}`, type: 'success' });
-        fetchCampaigns();
-      }
-    } catch (error) {
-      console.error('Error resending campaign:', error);
-      setToast({ message: 'Failed to resend campaign', type: 'error' });
-    } finally {
-      setActiveDropdown(null);
     }
   };
 
@@ -487,68 +468,24 @@ const EmailCampaigns: React.FC = () => {
                             >
                               <Eye className="w-4 h-4" />
                             </Link>
-                            <div className="relative">
+                            {(campaign.status === 'pending' || campaign.status === 'sending') && (
                               <button
-                                onClick={() => setActiveDropdown(activeDropdown === campaign.id ? null : campaign.id)}
-                                className="p-2 text-gray-600 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                                onClick={() => setCancelConfirm(campaign.id)}
+                                className="p-2 text-orange-600 hover:text-orange-700 hover:bg-orange-50 rounded-lg transition-colors"
+                                title="Cancel Campaign"
                               >
-                                <MoreVertical className="w-4 h-4" />
+                                <Ban className="w-4 h-4" />
                               </button>
-                              {activeDropdown === campaign.id && (
-                                <>
-                                  {/* Backdrop to close dropdown */}
-                                  <div 
-                                    className="fixed inset-0 z-40" 
-                                    onClick={() => setActiveDropdown(null)}
-                                  />
-                                  <div className="absolute right-0 bottom-full mb-1 w-48 bg-white rounded-lg shadow-xl border border-gray-200 py-1 z-50">
-                                    <Link
-                                      to={`/admin/email/campaigns/${campaign.id}`}
-                                      className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                                    >
-                                      <Eye className="w-4 h-4" />
-                                      View Details
-                                    </Link>
-                                    {campaign.status === 'completed' && campaign.failed_count > 0 && (
-                                      <button
-                                        onClick={() => handleResend(campaign.id, 'failed')}
-                                        className="w-full flex items-center gap-2 px-4 py-2 text-sm text-yellow-600 hover:bg-yellow-50"
-                                      >
-                                        <RotateCcw className="w-4 h-4" />
-                                        Resend Failed
-                                      </button>
-                                    )}
-                                    {(campaign.status === 'pending' || campaign.status === 'sending') && (
-                                      <button
-                                        onClick={() => {
-                                          setCancelConfirm(campaign.id);
-                                          setActiveDropdown(null);
-                                        }}
-                                        className="w-full flex items-center gap-2 px-4 py-2 text-sm text-orange-600 hover:bg-orange-50"
-                                      >
-                                        <Ban className="w-4 h-4" />
-                                        Cancel Campaign
-                                      </button>
-                                    )}
-                                    {(campaign.status === 'completed' || campaign.status === 'cancelled' || campaign.status === 'failed') && (
-                                      <>
-                                        <hr className="my-1" />
-                                        <button
-                                          onClick={() => {
-                                            setDeleteConfirm(campaign.id);
-                                            setActiveDropdown(null);
-                                          }}
-                                          className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50"
-                                        >
-                                          <Trash2 className="w-4 h-4" />
-                                          Delete
-                                        </button>
-                                      </>
-                                    )}
-                                  </div>
-                                </>
-                              )}
-                            </div>
+                            )}
+                            {(campaign.status === 'completed' || campaign.status === 'cancelled' || campaign.status === 'failed') && (
+                              <button
+                                onClick={() => setDeleteConfirm(campaign.id)}
+                                className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                                title="Delete"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -556,8 +493,6 @@ const EmailCampaigns: React.FC = () => {
                   })}
                 </tbody>
               </table>
-              {/* Spacer to ensure dropdown visibility with few rows */}
-              {campaigns.length <= 3 && <div className="h-48" />}
             </div>
 
             {/* Mobile Cards */}
@@ -705,14 +640,6 @@ const EmailCampaigns: React.FC = () => {
           message={toast.message}
           type={toast.type}
           onClose={() => setToast(null)}
-        />
-      )}
-
-      {/* Click outside to close dropdown */}
-      {activeDropdown && (
-        <div
-          className="fixed inset-0 z-0"
-          onClick={() => setActiveDropdown(null)}
         />
       )}
     </div>
