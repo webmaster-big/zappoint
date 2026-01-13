@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Search, Edit2, Trash2, Calendar, MapPin, CheckSquare, Square, Plus, X, CalendarOff, RefreshCw, ChevronLeft, ChevronRight, Clock, Building2, Package as PackageIcon, DoorOpen, Layers, LayoutGrid, List } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Search, Edit2, Trash2, Calendar, MapPin, CheckSquare, Square, Plus, X, CalendarOff, RefreshCw, ChevronLeft, ChevronRight, Clock, Building2, Package as PackageIcon, DoorOpen, Layers, LayoutGrid, List, Filter, RefreshCcw, Edit3, Check } from 'lucide-react';
 import StandardButton from '../../../components/ui/StandardButton';
 import Toast from '../../../components/ui/Toast';
 import { dayOffService, locationService, packageService, roomService } from '../../../services';
@@ -100,6 +100,15 @@ const DayOffs: React.FC = () => {
         setViewMode(mode);
         localStorage.setItem('dayoffs_view_mode', mode);
     };
+
+    // Advanced filters toggle state
+    const [showFilters, setShowFilters] = useState(false);
+
+    // Editable cell state
+    const [editingCell, setEditingCell] = useState<{ dayOffId: number; field: string } | null>(null);
+    const [editValue, setEditValue] = useState('');
+    const [savingCell, setSavingCell] = useState<{ dayOffId: number; field: string } | null>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
 
     // Fetch locations for company_admin
     useEffect(() => {
@@ -378,6 +387,130 @@ const DayOffs: React.FC = () => {
             console.error('Error deleting Day Off:', error);
             showToast('Error deleting Day Off', 'error');
         }
+    };
+
+    // Editable cell functions
+    const startEditing = (dayOffId: number, field: string, currentValue: string) => {
+        setEditingCell({ dayOffId, field });
+        setEditValue(currentValue || '');
+        setTimeout(() => inputRef.current?.focus(), 0);
+    };
+
+    const cancelEdit = () => {
+        setEditingCell(null);
+        setEditValue('');
+    };
+
+    const saveEdit = async () => {
+        if (!editingCell) return;
+        
+        setSavingCell(editingCell);
+        try {
+            const dayOff = dayOffs.find(d => d.id === editingCell.dayOffId);
+            if (!dayOff) return;
+
+            await dayOffService.updateDayOff(editingCell.dayOffId, {
+                date: dayOff.date,
+                reason: editingCell.field === 'reason' ? editValue : dayOff.reason,
+                is_recurring: dayOff.is_recurring,
+                time_start: dayOff.time_start || undefined,
+                time_end: dayOff.time_end || undefined,
+            });
+
+            // Update local state
+            setDayOffs(prev => prev.map(d => 
+                d.id === editingCell.dayOffId 
+                    ? { ...d, [editingCell.field]: editValue }
+                    : d
+            ));
+            showToast('Updated successfully!', 'success');
+        } catch (error) {
+            console.error('Error updating day off:', error);
+            showToast('Error updating day off', 'error');
+        } finally {
+            setSavingCell(null);
+            setEditingCell(null);
+            setEditValue('');
+        }
+    };
+
+    const handleEditKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            saveEdit();
+        } else if (e.key === 'Escape') {
+            cancelEdit();
+        }
+    };
+
+    // Render editable cell
+    const renderEditableCell = (
+        dayOff: DayOff, 
+        field: string, 
+        displayValue: React.ReactNode,
+        className: string = ''
+    ) => {
+        const isEditing = editingCell?.dayOffId === dayOff.id && editingCell?.field === field;
+        const isSaving = savingCell?.dayOffId === dayOff.id && savingCell?.field === field;
+
+        if (isEditing) {
+            return (
+                <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                    <input
+                        ref={inputRef}
+                        type="text"
+                        value={editValue}
+                        onChange={(e) => setEditValue(e.target.value)}
+                        onKeyDown={handleEditKeyDown}
+                        className={`w-full px-1.5 py-0.5 text-xs border border-${themeColor}-400 rounded bg-white text-gray-900 focus:outline-none focus:ring-1 focus:ring-${themeColor}-500`}
+                        disabled={isSaving}
+                        autoFocus
+                    />
+                    <button
+                        onClick={(e) => { e.stopPropagation(); saveEdit(); }}
+                        className="p-0.5 text-green-600 hover:text-green-700"
+                        disabled={isSaving}
+                    >
+                        <Check className="w-3 h-3" />
+                    </button>
+                    <button
+                        onClick={(e) => { e.stopPropagation(); cancelEdit(); }}
+                        className="p-0.5 text-red-600 hover:text-red-700"
+                        disabled={isSaving}
+                    >
+                        <X className="w-3 h-3" />
+                    </button>
+                </div>
+            );
+        }
+
+        return (
+            <div
+                className={`group cursor-pointer flex items-center gap-1 hover:bg-gray-100 rounded px-1 py-0.5 -mx-1 min-h-[20px] ${className}`}
+                onClick={(e) => {
+                    e.stopPropagation();
+                    const value = dayOff[field as keyof DayOff];
+                    startEditing(dayOff.id, field, typeof value === 'string' ? value : '');
+                }}
+                title="Click to edit"
+            >
+                <span className="truncate">{displayValue || <span className="text-gray-400 italic">—</span>}</span>
+                <Edit3 className="w-2.5 h-2.5 text-gray-400 opacity-0 group-hover:opacity-100 flex-shrink-0" />
+            </div>
+        );
+    };
+
+    // Clear filters function
+    const clearFilters = () => {
+        setFilters({
+            is_recurring: undefined,
+            upcoming_only: true,
+            sort_by: 'date',
+            sort_order: 'asc',
+            per_page: 20,
+            page: 1
+        });
+        setSearchTerm('');
     };
 
     // Toggle selection mode
@@ -808,97 +941,134 @@ const DayOffs: React.FC = () => {
 
                 {/* Search and Filter Section */}
                 {!loading && (
-                    <div className="mb-6 space-y-4">
-                        {/* Search Bar and Location Filter */}
-                        <div className="flex flex-col sm:flex-row gap-3">
-                            <div className="relative flex-1">
-                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <div className="mb-6">
+                        {/* Search Row */}
+                        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+                            <div className="relative flex-1 max-w-lg">
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <Search className="h-4 w-4 text-gray-600" />
+                                </div>
                                 <input
                                     type="text"
                                     placeholder="Search by date or reason..."
                                     value={searchTerm}
                                     onChange={handleSearch}
-                                    className={`w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 outline-none`}
+                                    className={`pl-9 pr-3 py-1.5 border border-gray-200 rounded-lg w-full text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                                 />
                             </div>
-                            
-                            {/* Location Filter for Company Admin */}
-                            {isCompanyAdmin && locations.length > 0 && (
-                                <div className="min-w-[200px]">
-                                    <LocationSelector
-                                        locations={locations.map(loc => ({
-                                            id: loc.id.toString(),
-                                            name: loc.name,
-                                            address: loc.address || '',
-                                            city: loc.city || '',
-                                            state: loc.state || ''
-                                        }))}
-                                        selectedLocation={selectedLocationId?.toString() || ''}
-                                        onLocationChange={(locationId) => {
-                                            setSelectedLocationId(locationId ? Number(locationId) : null);
-                                            setCurrentPage(1);
-                                        }}
-                                        themeColor={themeColor}
-                                        fullColor={fullColor}
-                                        variant="compact"
-                                        showAllOption={true}
-                                    />
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Filter and Sort Controls */}
-                        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-                            {/* Type Filter */}
-                            <div className="flex items-center gap-2 flex-wrap">
-                                <span className="text-sm font-medium text-gray-700">Filter:</span>
+                            <div className="flex gap-1">
                                 <StandardButton
-                                    variant={filters.upcoming_only === true ? "primary" : "secondary"}
-                                    size="sm"
-                                    onClick={() => handleFilterChange('upcoming_only', true)}
-                                >
-                                    Upcoming
-                                </StandardButton>
-                                <StandardButton
-                                    variant={filters.upcoming_only === false || filters.upcoming_only === undefined ? "primary" : "secondary"}
-                                    size="sm"
-                                    onClick={() => handleFilterChange('upcoming_only', undefined)}
-                                >
-                                    All Dates
-                                </StandardButton>
-                                <StandardButton
-                                    variant={filters.is_recurring === true ? "primary" : "secondary"}
-                                    size="sm"
-                                    onClick={() => handleFilterChange('is_recurring', filters.is_recurring === true ? undefined : true)}
-                                    icon={RefreshCw}
-                                >
-                                    Recurring Only
-                                </StandardButton>
-                            </div>
-
-                            {/* Sort Controls */}
-                            <div className="flex items-center gap-3">
-                                <span className="text-sm font-medium text-gray-700">Sort by:</span>
-                                <select
-                                    value={filters.sort_by || 'date'}
-                                    onChange={(e) => setFilters(prev => ({ ...prev, sort_by: e.target.value as 'date' | 'created_at' }))}
-                                    className={`px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 outline-none`}
-                                >
-                                    <option value="date">Date</option>
-                                    <option value="created_at">Created</option>
-                                </select>
-                                <StandardButton
-                                    onClick={() => setFilters(prev => ({ ...prev, sort_order: prev.sort_order === 'asc' ? 'desc' : 'asc' }))}
                                     variant="secondary"
                                     size="sm"
+                                    icon={Filter}
+                                    onClick={() => setShowFilters(!showFilters)}
                                 >
-                                    {filters.sort_order === 'asc' ? '↑ Asc' : '↓ Desc'}
+                                    Filters
+                                </StandardButton>
+                                <StandardButton
+                                    variant="secondary"
+                                    size="sm"
+                                    icon={RefreshCcw}
+                                    onClick={() => fetchDayOffs()}
+                                >
+                                    {''}
                                 </StandardButton>
                             </div>
                         </div>
 
+                        {/* Advanced Filters */}
+                        {showFilters && (
+                            <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-800 mb-1">Date Range</label>
+                                        <select
+                                            value={filters.upcoming_only === true ? 'upcoming' : 'all'}
+                                            onChange={(e) => handleFilterChange('upcoming_only', e.target.value === 'upcoming' ? true : undefined)}
+                                            className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
+                                        >
+                                            <option value="upcoming">Upcoming Only</option>
+                                            <option value="all">All Dates</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-800 mb-1">Type</label>
+                                        <select
+                                            value={filters.is_recurring === true ? 'recurring' : filters.is_recurring === false ? 'one-time' : 'all'}
+                                            onChange={(e) => {
+                                                const value = e.target.value;
+                                                handleFilterChange('is_recurring', value === 'recurring' ? true : value === 'one-time' ? false : undefined);
+                                            }}
+                                            className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
+                                        >
+                                            <option value="all">All Types</option>
+                                            <option value="recurring">Recurring Only</option>
+                                            <option value="one-time">One-time Only</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-800 mb-1">Sort By</label>
+                                        <select
+                                            value={filters.sort_by || 'date'}
+                                            onChange={(e) => setFilters(prev => ({ ...prev, sort_by: e.target.value as 'date' | 'created_at' }))}
+                                            className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
+                                        >
+                                            <option value="date">Date</option>
+                                            <option value="created_at">Created</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-800 mb-1">Sort Order</label>
+                                        <select
+                                            value={filters.sort_order || 'asc'}
+                                            onChange={(e) => setFilters(prev => ({ ...prev, sort_order: e.target.value as 'asc' | 'desc' }))}
+                                            className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
+                                        >
+                                            <option value="asc">Ascending</option>
+                                            <option value="desc">Descending</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                {/* Location Filter for Company Admin */}
+                                {isCompanyAdmin && locations.length > 0 && (
+                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mt-3">
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-800 mb-1">Location</label>
+                                            <LocationSelector
+                                                locations={locations.map(loc => ({
+                                                    id: loc.id.toString(),
+                                                    name: loc.name,
+                                                    address: loc.address || '',
+                                                    city: loc.city || '',
+                                                    state: loc.state || ''
+                                                }))}
+                                                selectedLocation={selectedLocationId?.toString() || ''}
+                                                onLocationChange={(locationId) => {
+                                                    setSelectedLocationId(locationId ? Number(locationId) : null);
+                                                    setCurrentPage(1);
+                                                }}
+                                                themeColor={themeColor}
+                                                fullColor={fullColor}
+                                                variant="compact"
+                                                showAllOption={true}
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+                                <div className="mt-3 flex justify-end">
+                                    <StandardButton
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={clearFilters}
+                                    >
+                                        Clear Filters
+                                    </StandardButton>
+                                </div>
+                            </div>
+                        )}
+
                         {/* Results count and View Toggle */}
-                        <div className="flex items-center justify-between">
+                        <div className="flex items-center justify-between mt-3">
                             <div className="text-sm text-gray-500">
                                 Showing {dayOffs.length} day off{dayOffs.length !== 1 ? 's' : ''}
                             </div>
@@ -1067,10 +1237,10 @@ const DayOffs: React.FC = () => {
 
                         {/* Table View */}
                         {viewMode === 'table' && (
-                            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                            <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
                                 <div className="overflow-x-auto">
                                     <table className="w-full">
-                                        <thead className="bg-gray-50 border-b border-gray-200">
+                                        <thead className="bg-gray-50 border-b border-gray-100">
                                             <tr>
                                                 {selectionMode && (
                                                     <th className="w-12 px-4 py-3 text-left">
@@ -1173,9 +1343,13 @@ const DayOffs: React.FC = () => {
                                                             )}
                                                         </td>
                                                         <td className="px-4 py-3">
-                                                            <span className="text-sm text-gray-600 line-clamp-1 max-w-[200px]">
-                                                                {dayOff.reason || '—'}
-                                                            </span>
+                                                            {renderEditableCell(
+                                                                dayOff,
+                                                                'reason',
+                                                                <span className="text-sm text-gray-600 line-clamp-1 max-w-[200px]">
+                                                                    {dayOff.reason || '—'}
+                                                                </span>
+                                                            )}
                                                         </td>
                                                         {isCompanyAdmin && (
                                                             <td className="px-4 py-3">

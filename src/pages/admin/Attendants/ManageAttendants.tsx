@@ -704,20 +704,20 @@ const ManageAttendants = () => {
         <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
           <div className="relative flex-1 max-w-lg">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search className="h-4 w-4 text-gray-400" />
+              <Search className="h-4 w-4 text-gray-600" />
             </div>
             <input
               type="text"
               placeholder="Search attendants..."
               value={filters.search}
               onChange={(e) => handleFilterChange('search', e.target.value)}
-              className={`pl-9 pr-3 py-2 border border-gray-200 rounded-lg w-full focus:ring-2 focus:ring-${themeColor}-400 focus:border-${themeColor}-400`}
+              className={`pl-9 pr-3 py-1.5 border border-gray-200 rounded-lg w-full text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
             />
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-1">
             <StandardButton
               variant="secondary"
-              size="md"
+              size="sm"
               icon={Filter}
               onClick={() => setShowFilters(!showFilters)}
             >
@@ -725,23 +725,25 @@ const ManageAttendants = () => {
             </StandardButton>
             <StandardButton
               variant="secondary"
-              size="md"
+              size="sm"
               icon={RefreshCcw}
               onClick={loadAttendants}
-            />
+            >
+              {''}
+            </StandardButton>
           </div>
         </div>
 
         {/* Advanced Filters */}
         {showFilters && (
-          <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium text-gray-800 mb-1">Status</label>
+                <label className="block text-xs font-medium text-gray-800 mb-1">Status</label>
                 <select
                   value={filters.status}
                   onChange={(e) => handleFilterChange('status', e.target.value)}
-                  className={`w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-400 focus:border-${themeColor}-400`}
+                  className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                 >
                   <option value="all">All Statuses</option>
                   <option value="active">Active</option>
@@ -749,11 +751,11 @@ const ManageAttendants = () => {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-800 mb-1">Department</label>
+                <label className="block text-xs font-medium text-gray-800 mb-1">Department</label>
                 <select
                   value={filters.department}
                   onChange={(e) => handleFilterChange('department', e.target.value)}
-                  className={`w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-400 focus:border-${themeColor}-400`}
+                  className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                 >
                   <option value="all">All Departments</option>
                   {getUniqueDepartments().map(dept => (
@@ -762,7 +764,7 @@ const ManageAttendants = () => {
                 </select>
               </div>
             </div>
-            <div className="mt-4 flex justify-end">
+            <div className="mt-3 flex justify-end">
               <StandardButton
                 variant="ghost"
                 size="sm"

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Edit, Trash2, Utensils, Download, Upload, X, CheckSquare, Square } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Utensils, Download, Upload, X, CheckSquare, Square, Filter, RefreshCcw } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import StandardButton from '../../../components/ui/StandardButton';
 import { addOnService, locationService } from '../../../services';
@@ -31,6 +31,9 @@ const ManageAddons = () => {
   const [loading, setLoading] = useState(false);
 
   console.log("Form Data:", formData);
+  
+  // Advanced filters toggle state
+  const [showFilters, setShowFilters] = useState(false);
   
   // Location filtering for company_admin
   const currentUser = getStoredUser();
@@ -524,46 +527,87 @@ const ManageAddons = () => {
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
 
         {/* Search and Filter Section */}
-        <div className="mb-6 space-y-4">
-          <div className="flex flex-col sm:flex-row gap-3">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+        <div className="mb-6">
+          {/* Search Row */}
+          <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+            <div className="relative flex-1 max-w-lg">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Search className="h-4 w-4 text-gray-600" />
+              </div>
               <input
                 type="text"
                 placeholder="Search add-ons by name..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className={`w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 outline-none`}
+                className={`pl-9 pr-3 py-1.5 border border-gray-200 rounded-lg w-full text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
               />
             </div>
-            
-            {/* Location Filter for Company Admin */}
-            {isCompanyAdmin && locations.length > 0 && (
-              <div className="min-w-[200px]">
-                <LocationSelector
-                  locations={locations.map(loc => ({
-                    id: loc.id.toString(),
-                    name: loc.name,
-                    address: loc.address || '',
-                    city: loc.city || '',
-                    state: loc.state || ''
-                  }))}
-                  selectedLocation={selectedLocationId?.toString() || ''}
-                  onLocationChange={(locationId) => {
-                    setSelectedLocationId(locationId ? Number(locationId) : null);
-                    setCurrentPage(1);
-                  }}
-                  themeColor={themeColor}
-                  fullColor={fullColor}
-                  variant="compact"
-                  showAllOption={true}
-                />
-              </div>
-            )}
+            <div className="flex gap-1">
+              <StandardButton
+                variant="secondary"
+                size="sm"
+                icon={Filter}
+                onClick={() => setShowFilters(!showFilters)}
+              >
+                Filters
+              </StandardButton>
+              <StandardButton
+                variant="secondary"
+                size="sm"
+                icon={RefreshCcw}
+                onClick={() => loadAddons()}
+              >
+                {''}
+              </StandardButton>
+            </div>
           </div>
+
+          {/* Advanced Filters */}
+          {showFilters && (
+            <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                {/* Location Filter for Company Admin */}
+                {isCompanyAdmin && locations.length > 0 && (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-800 mb-1">Location</label>
+                    <LocationSelector
+                      locations={locations.map(loc => ({
+                        id: loc.id.toString(),
+                        name: loc.name,
+                        address: loc.address || '',
+                        city: loc.city || '',
+                        state: loc.state || ''
+                      }))}
+                      selectedLocation={selectedLocationId?.toString() || ''}
+                      onLocationChange={(locationId) => {
+                        setSelectedLocationId(locationId ? Number(locationId) : null);
+                        setCurrentPage(1);
+                      }}
+                      themeColor={themeColor}
+                      fullColor={fullColor}
+                      variant="compact"
+                      showAllOption={true}
+                    />
+                  </div>
+                )}
+              </div>
+              <div className="mt-3 flex justify-end">
+                <StandardButton
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setSearchTerm('');
+                    setSelectedLocationId(null);
+                  }}
+                >
+                  Clear Filters
+                </StandardButton>
+              </div>
+            </div>
+          )}
           
           {/* Results count */}
-          <div className="text-sm text-gray-500">
+          <div className="text-sm text-gray-500 mt-3">
             Showing {filteredAddons.length} add-on{filteredAddons.length !== 1 ? 's' : ''}
           </div>
         </div>

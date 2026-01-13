@@ -1198,38 +1198,46 @@ const AttendantActivityLogs = () => {
         <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
           <div className="relative flex-1 max-w-lg">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search className="h-4 w-4 text-gray-400" />
+              <Search className="h-4 w-4 text-gray-600" />
             </div>
             <input
               type="text"
               placeholder="Search activities..."
               value={filters.search}
               onChange={(e) => handleFilterChange('search', e.target.value)}
-              className={`pl-9 pr-3 py-2 border border-gray-200 rounded-lg w-full focus:ring-2 focus:ring-${themeColor}-400 focus:border-${themeColor}-400`}
+              className={`pl-9 pr-3 py-1.5 border border-gray-200 rounded-lg w-full text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
             />
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-1">
             <StandardButton
               onClick={() => setShowFilters(!showFilters)}
               variant="secondary"
-              size="md"
+              size="sm"
               icon={Filter}
             >
               Filters
+            </StandardButton>
+            <StandardButton
+              onClick={loadLogs}
+              variant="secondary"
+              size="sm"
+              icon={RefreshCcw}
+            >
+              {''}
             </StandardButton>
           </div>
         </div>
 
         {/* Advanced Filters */}
         {showFilters && (
-          <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
               <div>
-                <label className="block text-sm font-medium text-gray-800 mb-1">Action</label>
+                <label className="block text-xs font-medium text-gray-800 mb-1">Action</label>
                 <select
                   value={filters.action}
                   onChange={(e) => handleFilterChange('action', e.target.value)}
-                  className={`w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-400 focus:border-${themeColor}-400`}
+                  className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                 >
                   <option value="all">All Actions</option>
                   {getUniqueActions().map(action => (
@@ -1240,11 +1248,11 @@ const AttendantActivityLogs = () => {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-800 mb-1">Resource Type</label>
+                <label className="block text-xs font-medium text-gray-800 mb-1">Resource Type</label>
                 <select
                   value={filters.resourceType}
                   onChange={(e) => handleFilterChange('resourceType', e.target.value)}
-                  className={`w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-400 focus:border-${themeColor}-400`}
+                  className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                 >
                   <option value="all">All Types</option>
                   {getUniqueResourceTypes().map(type => (
@@ -1255,11 +1263,11 @@ const AttendantActivityLogs = () => {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-800 mb-1">Attendant</label>
+                <label className="block text-xs font-medium text-gray-800 mb-1">Attendant</label>
                 <select
                   value={filters.attendant}
                   onChange={(e) => handleFilterChange('attendant', e.target.value)}
-                  className={`w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-400 focus:border-${themeColor}-400`}
+                  className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                 >
                   <option value="all">All Attendants</option>
                   {getUniqueAttendants().map(attendant => (
@@ -1270,11 +1278,11 @@ const AttendantActivityLogs = () => {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-800 mb-1">Date Range</label>
+                <label className="block text-xs font-medium text-gray-800 mb-1">Date Range</label>
                 <select
                   value={filters.dateRange}
                   onChange={(e) => handleFilterChange('dateRange', e.target.value)}
-                  className={`w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-400 focus:border-${themeColor}-400`}
+                  className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                 >
                   <option value="all">All Time</option>
                   <option value="today">Today</option>
@@ -1284,7 +1292,7 @@ const AttendantActivityLogs = () => {
                 </select>
               </div>
             </div>
-            <div className="mt-4 flex justify-end">
+            <div className="mt-3 flex justify-end">
               <StandardButton
                 onClick={clearFilters}
                 variant="ghost"

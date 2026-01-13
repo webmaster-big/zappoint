@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Edit2, Trash2, Users, MapPin, CheckSquare, Square, Plus, X, Clock, Layers, Timer } from 'lucide-react';
+import { Search, Edit2, Trash2, Users, MapPin, CheckSquare, Square, Plus, X, Clock, Layers, Timer, Filter, RefreshCcw } from 'lucide-react';
 
 // Break time type
 interface BreakTime {
@@ -50,6 +50,9 @@ const Rooms: React.FC = () => {
     // Bulk selection state
     const [selectionMode, setSelectionMode] = useState(false);
     const [selectedRoomIds, setSelectedRoomIds] = useState<Set<number>>(new Set());
+    
+    // Advanced filters toggle state
+    const [showFilters, setShowFilters] = useState(false);
     
     // Location filtering for company_admin
     const currentUser = getStoredUser();
@@ -528,6 +531,18 @@ const Rooms: React.FC = () => {
         setCurrentPage(1);
     };
 
+    // Clear filters function
+    const clearFilters = () => {
+        setFilters({
+            is_available: undefined,
+            sort_by: 'name',
+            sort_order: 'asc',
+            per_page: 20,
+            page: 1
+        });
+        setSearchTerm('');
+    };
+
     // Pagination
     const handlePageChange = (page: number) => {
         setCurrentPage(page);
@@ -610,102 +625,127 @@ const Rooms: React.FC = () => {
                     </div>
                 )}
 
-                {/* Search and Filter Section - Always visible */}
+                {/* Search and Filter Section */}
                 {!loading && (
-                    <div className="mb-6 space-y-4">
-                            {/* Search Bar and Location Filter */}
-                            <div className="flex flex-col sm:flex-row gap-3">
-                                <div className="relative flex-1">
-                                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                                    <input
-                                        type="text"
-                                        placeholder="Search Spaces by name..."
-                                        value={searchTerm}
-                                        onChange={handleSearch}
-                                        className={`w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 outline-none`}
-                                    />
+                    <div className="mb-6">
+                        {/* Search Row */}
+                        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+                            <div className="relative flex-1 max-w-lg">
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <Search className="h-4 w-4 text-gray-600" />
                                 </div>
-                                
-                                {/* Location Filter for Company Admin */}
-                                {isCompanyAdmin && locations.length > 0 && (
-                                    <div className="min-w-[200px]">
-                                        <LocationSelector
-                                            locations={locations.map(loc => ({
-                                                id: loc.id.toString(),
-                                                name: loc.name,
-                                                address: loc.address || '',
-                                                city: loc.city || '',
-                                                state: loc.state || ''
-                                            }))}
-                                            selectedLocation={selectedLocationId?.toString() || ''}
-                                            onLocationChange={(locationId) => {
-                                                setSelectedLocationId(locationId ? Number(locationId) : null);
-                                                setCurrentPage(1);
-                                            }}
-                                            themeColor={themeColor}
-                                            fullColor={fullColor}
-                                            variant="compact"
-                                            showAllOption={true}
-                                        />
-                                    </div>
-                                )}
+                                <input
+                                    type="text"
+                                    placeholder="Search Spaces by name..."
+                                    value={searchTerm}
+                                    onChange={handleSearch}
+                                    className={`pl-9 pr-3 py-1.5 border border-gray-200 rounded-lg w-full text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
+                                />
                             </div>
-
-                            {/* Filter and Sort Controls */}
-                            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-                                {/* Status Filter */}
-                                <div className="flex items-center gap-2 flex-wrap">
-                                    <span className="text-sm font-medium text-gray-700">Status:</span>
-                                    <StandardButton
-                                        variant={filters.is_available === undefined ? "primary" : "secondary"}
-                                        size="sm"
-                                        onClick={() => handleFilterChange('is_available', undefined)}
-                                    >
-                                        All
-                                    </StandardButton>
-                                    <StandardButton
-                                        variant={filters.is_available === true ? "primary" : "secondary"}
-                                        size="sm"
-                                        onClick={() => handleFilterChange('is_available', true)}
-                                    >
-                                        Available
-                                    </StandardButton>
-                                    <StandardButton
-                                        variant={filters.is_available === false ? "primary" : "secondary"}
-                                        size="sm"
-                                        onClick={() => handleFilterChange('is_available', false)}
-                                    >
-                                        Unavailable
-                                    </StandardButton>
-                                </div>
-
-                                {/* Sort Controls */}
-                                <div className="flex items-center gap-3">
-                                    <span className="text-sm font-medium text-gray-700">Sort by:</span>
-                                    <select
-                                        value={filters.sort_by || 'name'}
-                                        onChange={(e) => handleFilterChange('sort_by', e.target.value)}
-                                        className={`px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 outline-none`}
-                                    >
-                                        <option value="name">Name</option>
-                                        <option value="capacity">Capacity</option>
-                                        <option value="created_at">Date</option>
-                                    </select>
-                                    <StandardButton
-                                        onClick={() => handleFilterChange('sort_order', filters.sort_order === 'asc' ? 'desc' : 'asc')}
-                                        variant="secondary"
-                                        size="sm"
-                                    >
-                                        {filters.sort_order === 'asc' ? '↑ Asc' : '↓ Desc'}
-                                    </StandardButton>
-                                </div>
-                            </div>
-
-                            {/* Results count */}
-                            <div className="text-sm text-gray-500">
-                                Showing {rooms.length} room{rooms.length !== 1 ? 's' : ''}
+                            <div className="flex gap-1">
+                                <StandardButton
+                                    variant="secondary"
+                                    size="sm"
+                                    icon={Filter}
+                                    onClick={() => setShowFilters(!showFilters)}
+                                >
+                                    Filters
+                                </StandardButton>
+                                <StandardButton
+                                    variant="secondary"
+                                    size="sm"
+                                    icon={RefreshCcw}
+                                    onClick={() => fetchRooms()}
+                                >
+                                    {''}
+                                </StandardButton>
                             </div>
                         </div>
+
+                        {/* Advanced Filters */}
+                        {showFilters && (
+                            <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-800 mb-1">Status</label>
+                                        <select
+                                            value={filters.is_available === undefined ? 'all' : filters.is_available ? 'available' : 'unavailable'}
+                                            onChange={(e) => {
+                                                const value = e.target.value;
+                                                handleFilterChange('is_available', value === 'all' ? undefined : value === 'available');
+                                            }}
+                                            className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
+                                        >
+                                            <option value="all">All Statuses</option>
+                                            <option value="available">Available</option>
+                                            <option value="unavailable">Unavailable</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-800 mb-1">Sort By</label>
+                                        <select
+                                            value={filters.sort_by || 'name'}
+                                            onChange={(e) => handleFilterChange('sort_by', e.target.value)}
+                                            className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
+                                        >
+                                            <option value="name">Name</option>
+                                            <option value="capacity">Capacity</option>
+                                            <option value="created_at">Date Created</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-800 mb-1">Sort Order</label>
+                                        <select
+                                            value={filters.sort_order || 'asc'}
+                                            onChange={(e) => handleFilterChange('sort_order', e.target.value)}
+                                            className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
+                                        >
+                                            <option value="asc">Ascending</option>
+                                            <option value="desc">Descending</option>
+                                        </select>
+                                    </div>
+                                    {/* Location Filter for Company Admin */}
+                                    {isCompanyAdmin && locations.length > 0 && (
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-800 mb-1">Location</label>
+                                            <LocationSelector
+                                                locations={locations.map(loc => ({
+                                                    id: loc.id.toString(),
+                                                    name: loc.name,
+                                                    address: loc.address || '',
+                                                    city: loc.city || '',
+                                                    state: loc.state || ''
+                                                }))}
+                                                selectedLocation={selectedLocationId?.toString() || ''}
+                                                onLocationChange={(locationId) => {
+                                                    setSelectedLocationId(locationId ? Number(locationId) : null);
+                                                    setCurrentPage(1);
+                                                }}
+                                                themeColor={themeColor}
+                                                fullColor={fullColor}
+                                                variant="compact"
+                                                showAllOption={true}
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="mt-3 flex justify-end">
+                                    <StandardButton
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={clearFilters}
+                                    >
+                                        Clear Filters
+                                    </StandardButton>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Results count */}
+                        <div className="text-sm text-gray-500 mt-3">
+                            Showing {rooms.length} room{rooms.length !== 1 ? 's' : ''}
+                        </div>
+                    </div>
                 )}
 
                 {/* Rooms Grid */}

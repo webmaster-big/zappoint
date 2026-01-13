@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   Users,
   Search,
+  Filter,
   Mail,
   Phone,
   Calendar,
@@ -36,6 +37,7 @@ const CustomerListing: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [totalCustomers, setTotalCustomers] = useState(0);
   const currentUser = getStoredUser();
+  const [showFilters, setShowFilters] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exportFilters, setExportFilters] = useState({
@@ -371,69 +373,110 @@ const CustomerListing: React.FC = () => {
 
       {/* Filters and Search */}
       <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-6">
-        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between mb-4">
+        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
           <div className="relative flex-1 max-w-lg">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search className="h-4 w-4 text-gray-400" />
+              <Search className="h-4 w-4 text-gray-600" />
             </div>
             <input
               type="text"
               placeholder="Search customers..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className={`pl-9 pr-3 py-2 border border-gray-200 rounded-lg w-full focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
+              className={`pl-9 pr-3 py-1.5 border border-gray-200 rounded-lg w-full text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
             />
           </div>
-          <div className="flex gap-2">
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className={`px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 min-w-[150px]`}
-            >
-              <option value="all">All Statuses</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-              <option value="new">New</option>
-            </select>
-            <select
-              value={itemsPerPage}
-              onChange={(e) => handleItemsPerPageChange(Number(e.target.value))}
-              className={`px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 min-w-[130px]`}
-            >
-              <option value="5">5 per page</option>
-              <option value="10">10 per page</option>
-              <option value="20">20 per page</option>
-              <option value="50">50 per page</option>
-            </select>
-            <select
-              value={`${sortBy}-${sortOrder}`}
-              onChange={(e) => {
-                const [column, order] = e.target.value.split('-');
-                setSortBy(column);
-                setSortOrder(order as 'asc' | 'desc');
-              }}
-              className={`px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 min-w-[180px]`}
-            >
-              <option value="name-asc">Name (A-Z)</option>
-              <option value="name-desc">Name (Z-A)</option>
-              <option value="joinDate-desc">Newest First</option>
-              <option value="joinDate-asc">Oldest First</option>
-              <option value="totalSpent-desc">Highest Spent</option>
-              <option value="totalSpent-asc">Lowest Spent</option>
-              <option value="bookings-desc">Most Bookings</option>
-              <option value="bookings-asc">Fewest Bookings</option>
-            </select>
+          <div className="flex gap-1">
             <StandardButton
               variant="secondary"
-              size="md"
+              size="sm"
+              onClick={() => setShowFilters(!showFilters)}
+              icon={Filter}
+            >
+              Filters
+            </StandardButton>
+            <StandardButton
+              variant="secondary"
+              size="sm"
               onClick={() => fetchCustomers(true)}
               icon={RefreshCcw}
-            />
+            >
+              {''}
+            </StandardButton>
           </div>
         </div>
         
+        {/* Advanced Filters */}
+        {showFilters && (
+          <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-800 mb-1">Status</label>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
+                >
+                  <option value="all">All Statuses</option>
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                  <option value="new">New</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-800 mb-1">Items Per Page</label>
+                <select
+                  value={itemsPerPage}
+                  onChange={(e) => handleItemsPerPageChange(Number(e.target.value))}
+                  className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
+                >
+                  <option value="5">5 per page</option>
+                  <option value="10">10 per page</option>
+                  <option value="20">20 per page</option>
+                  <option value="50">50 per page</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-800 mb-1">Sort By</label>
+                <select
+                  value={`${sortBy}-${sortOrder}`}
+                  onChange={(e) => {
+                    const [column, order] = e.target.value.split('-');
+                    setSortBy(column);
+                    setSortOrder(order as 'asc' | 'desc');
+                  }}
+                  className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
+                >
+                  <option value="name-asc">Name (A-Z)</option>
+                  <option value="name-desc">Name (Z-A)</option>
+                  <option value="joinDate-desc">Newest First</option>
+                  <option value="joinDate-asc">Oldest First</option>
+                  <option value="totalSpent-desc">Highest Spent</option>
+                  <option value="totalSpent-asc">Lowest Spent</option>
+                  <option value="bookings-desc">Most Bookings</option>
+                  <option value="bookings-asc">Fewest Bookings</option>
+                </select>
+              </div>
+            </div>
+            <div className="mt-3 flex justify-end">
+              <StandardButton
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setStatusFilter('all');
+                  setSearchTerm('');
+                  setSortBy('name');
+                  setSortOrder('asc');
+                }}
+              >
+                Clear Filters
+              </StandardButton>
+            </div>
+          </div>
+        )}
+        
         {/* Results count */}
-        <div className="text-sm text-gray-500">
+        <div className="text-sm text-gray-500 mt-3">
           Showing {totalCustomers > 0 ? startIndex + 1 : 0}-{Math.min(startIndex + itemsPerPage, totalCustomers)} of {totalCustomers} customer{totalCustomers !== 1 ? 's' : ''}
         </div>
       </div>

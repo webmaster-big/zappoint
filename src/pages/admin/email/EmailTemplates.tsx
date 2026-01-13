@@ -318,95 +318,125 @@ const EmailTemplates: React.FC = () => {
       </div>
 
       {/* Filters Section */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 mb-6">
-        <div className="p-4">
-          <div className="flex flex-col md:flex-row gap-4">
-            {/* Search */}
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search templates by name or subject..."
-                value={filters.search}
-                onChange={(e) => {
-                  setFilters(prev => ({ ...prev, search: e.target.value }));
-                  setCurrentPage(1);
-                }}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-              {filters.search && (
-                <button
-                  onClick={() => setFilters(prev => ({ ...prev, search: '' }))}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              )}
+      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-6">
+        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+          <div className="relative flex-1 max-w-lg">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Search className="h-4 w-4 text-gray-600" />
             </div>
-
-            {/* Location Filter (Company Admin only) */}
-            {isCompanyAdmin && locations.length > 0 && (
-              <select
-                value={selectedLocation}
-                onChange={(e) => {
-                  setSelectedLocation(e.target.value);
-                  setCurrentPage(1);
-                }}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="">All Locations</option>
-                {locations.map((loc) => (
-                  <option key={loc.id} value={loc.id.toString()}>
-                    {loc.name}
-                  </option>
-                ))}
-              </select>
-            )}
-
-            {/* Status Filter */}
-            <select
-              value={filters.status}
+            <input
+              type="text"
+              placeholder="Search templates by name or subject..."
+              value={filters.search}
               onChange={(e) => {
-                setFilters(prev => ({ ...prev, status: e.target.value as EmailTemplateStatus | 'all' }));
+                setFilters(prev => ({ ...prev, search: e.target.value }));
                 setCurrentPage(1);
               }}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="all">All Statuses</option>
-              <option value="draft">Draft</option>
-              <option value="active">Active</option>
-              <option value="archived">Archived</option>
-            </select>
-
-            {/* Category Filter */}
-            <select
-              value={filters.category}
-              onChange={(e) => {
-                setFilters(prev => ({ ...prev, category: e.target.value }));
-                setCurrentPage(1);
-              }}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            >
-              {categories.map((cat) => (
-                <option key={cat.value} value={cat.value}>
-                  {cat.label}
-                </option>
-              ))}
-            </select>
-
-            {/* Filter Toggle */}
-            <button
+              className={`pl-9 pr-3 py-1.5 border border-gray-200 rounded-lg w-full text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
+            />
+          </div>
+          <div className="flex gap-1">
+            <StandardButton
               onClick={() => setShowFilters(!showFilters)}
-              className={`p-2 rounded-lg border ${showFilters ? 'bg-blue-50 border-blue-300 text-blue-600' : 'border-gray-300 text-gray-600 hover:bg-gray-50'}`}
+              variant="secondary"
+              size="sm"
+              icon={Filter}
             >
-              <Filter className="w-5 h-5" />
-            </button>
+              Filters
+            </StandardButton>
+            <StandardButton
+              onClick={fetchTemplates}
+              variant="secondary"
+              size="sm"
+              icon={RefreshCcw}
+            >
+              {''}
+            </StandardButton>
           </div>
         </div>
+        
+        {/* Advanced Filters */}
+        {showFilters && (
+          <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+            <div className={`grid grid-cols-1 ${isCompanyAdmin && locations.length > 0 ? 'md:grid-cols-3' : 'md:grid-cols-2'} gap-3`}>
+              {/* Location Filter (Company Admin only) */}
+              {isCompanyAdmin && locations.length > 0 && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-800 mb-1">Location</label>
+                  <select
+                    value={selectedLocation}
+                    onChange={(e) => {
+                      setSelectedLocation(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                    className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
+                  >
+                    <option value="">All Locations</option>
+                    {locations.map((loc) => (
+                      <option key={loc.id} value={loc.id.toString()}>
+                        {loc.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Status Filter */}
+              <div>
+                <label className="block text-xs font-medium text-gray-800 mb-1">Status</label>
+                <select
+                  value={filters.status}
+                  onChange={(e) => {
+                    setFilters(prev => ({ ...prev, status: e.target.value as EmailTemplateStatus | 'all' }));
+                    setCurrentPage(1);
+                  }}
+                  className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
+                >
+                  <option value="all">All Statuses</option>
+                  <option value="draft">Draft</option>
+                  <option value="active">Active</option>
+                  <option value="archived">Archived</option>
+                </select>
+              </div>
+
+              {/* Category Filter */}
+              <div>
+                <label className="block text-xs font-medium text-gray-800 mb-1">Category</label>
+                <select
+                  value={filters.category}
+                  onChange={(e) => {
+                    setFilters(prev => ({ ...prev, category: e.target.value }));
+                    setCurrentPage(1);
+                  }}
+                  className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
+                >
+                  {categories.map((cat) => (
+                    <option key={cat.value} value={cat.value}>
+                      {cat.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="mt-3 flex justify-end">
+              <StandardButton
+                onClick={() => {
+                  setFilters({ status: 'all', category: 'all', search: '' });
+                  setSelectedLocation('');
+                  setCurrentPage(1);
+                }}
+                variant="ghost"
+                size="sm"
+              >
+                Clear Filters
+              </StandardButton>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Templates Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-visible">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         {loading ? (
           <div className="p-8 text-center">
             <div className={`animate-spin w-8 h-8 border-4 border-${themeColor}-200 border-t-${fullColor} rounded-full mx-auto mb-4`}></div>
@@ -435,14 +465,14 @@ const EmailTemplates: React.FC = () => {
           <>
             {/* Desktop Table */}
             <div className="hidden md:block overflow-x-auto">
-              <table className="w-full text-sm text-left">
-                <thead className="text-xs text-gray-500 uppercase bg-gray-50 border-b">
+              <table className="w-full">
+                <thead className="bg-gray-50 border-b border-gray-100">
                   <tr>
-                    <th scope="col" className="px-6 py-4 font-medium">Template</th>
-                    <th scope="col" className="px-6 py-4 font-medium">Category</th>
-                    <th scope="col" className="px-6 py-4 font-medium">Status</th>
-                    <th scope="col" className="px-6 py-4 font-medium">Created</th>
-                    <th scope="col" className="px-6 py-4 font-medium text-right">Actions</th>
+                    <th className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Template</th>
+                    <th className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Category</th>
+                    <th className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
+                    <th className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Created</th>
+                    <th className="px-4 py-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -450,27 +480,27 @@ const EmailTemplates: React.FC = () => {
                     const StatusIcon = statusConfig[template.status]?.icon || Clock;
                     return (
                       <tr key={template.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-6 py-4">
+                        <td className="px-4 py-4">
                           <div>
-                            <p className="font-medium text-gray-900">{template.name}</p>
+                            <p className="font-medium text-gray-900 text-sm">{template.name}</p>
                             <p className="text-xs text-gray-500 truncate max-w-md mt-0.5">{template.subject}</p>
                           </div>
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-4 py-4">
                           <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-${themeColor}-50 text-${themeColor}-700 border border-${themeColor}-200 capitalize`}>
                             {template.category || 'Uncategorized'}
                           </span>
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-4 py-4">
                           <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${statusConfig[template.status]?.color || 'bg-gray-100 text-gray-700'}`}>
                             <StatusIcon className="w-3.5 h-3.5" />
                             {statusConfig[template.status]?.label || template.status}
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-gray-500">
+                        <td className="px-4 py-4 text-sm text-gray-500">
                           {formatDate(template.created_at)}
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-4 py-4">
                           <div className="flex items-center justify-end gap-1">
                             <button
                               onClick={() => setPreviewTemplate(template)}

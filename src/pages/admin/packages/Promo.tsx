@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Plus, X, Edit2, Trash2, Eye, EyeOff, Copy } from "lucide-react";
+import { Plus, X, Edit2, Trash2, Eye, EyeOff, Copy, Search, Filter, RefreshCcw } from "lucide-react";
 import StandardButton from '../../../components/ui/StandardButton';
 import type { PromoStatus, PromoType, PromoItem } from '../../../types/Promo.types';
 import { useThemeColor } from '../../../hooks/useThemeColor';
@@ -12,6 +12,8 @@ const Promo: React.FC = () => {
   const [promos, setPromos] = useState<PromoItem[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [searchTerm, setSearchTerm] = useState<string>("");
+  const [showFilters, setShowFilters] = useState(false);
   const [loading, setLoading] = useState(false);
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const [editForm, setEditForm] = useState<null | Partial<PromoItem>>(null);
@@ -252,9 +254,30 @@ const Promo: React.FC = () => {
   };
 
   const filteredPromos = promos.filter(promo => {
-    if (filterStatus === "all") return !promo.deleted;
-    return promo.status === filterStatus && !promo.deleted;
+    if (promo.deleted) return false;
+    
+    // Search filter
+    if (searchTerm) {
+      const search = searchTerm.toLowerCase();
+      if (!promo.code.toLowerCase().includes(search) && 
+          !promo.description?.toLowerCase().includes(search)) {
+        return false;
+      }
+    }
+    
+    // Status filter
+    if (filterStatus !== "all" && promo.status !== filterStatus) {
+      return false;
+    }
+    
+    return true;
   });
+
+  // Clear filters function
+  const clearFilters = () => {
+    setFilterStatus("all");
+    setSearchTerm("");
+  };
 
   return (
     <div className="px-6 py-8">
@@ -277,54 +300,78 @@ const Promo: React.FC = () => {
       {/* Main Content */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
 
-        {/* Filter Section */}
-        <div className="mb-6 space-y-4">
-            <div className="flex flex-wrap gap-2">
-              <StandardButton 
-                variant={filterStatus === "all" ? "primary" : "secondary"}
-                size="sm"
-                className="rounded-full"
-                onClick={() => setFilterStatus("all")}
-              >
-                All
-              </StandardButton>
-              <StandardButton 
-                variant={filterStatus === "active" ? "primary" : "secondary"}
-                size="sm"
-                className="rounded-full"
-                onClick={() => setFilterStatus("active")}
-              >
-                Active
-              </StandardButton>
-              <StandardButton 
-                variant={filterStatus === "inactive" ? "primary" : "secondary"}
-                size="sm"
-                className="rounded-full"
-                onClick={() => setFilterStatus("inactive")}
-              >
-                Inactive
-              </StandardButton>
-              <StandardButton 
-                variant={filterStatus === "expired" ? "primary" : "secondary"}
-                size="sm"
-                className="rounded-full"
-                onClick={() => setFilterStatus("expired")}
-              >
-                Expired
-              </StandardButton>
-              <StandardButton 
-                variant={filterStatus === "exhausted" ? "primary" : "secondary"}
-                size="sm"
-                className="rounded-full"
-                onClick={() => setFilterStatus("exhausted")}
-              >
-                Exhausted
-              </StandardButton>
+        {/* Search and Filter Section */}
+        <div className="mb-6">
+          {/* Search Row */}
+          <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+            <div className="relative flex-1 max-w-lg">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Search className="h-4 w-4 text-gray-600" />
+              </div>
+              <input
+                type="text"
+                placeholder="Search promo codes..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className={`pl-9 pr-3 py-1.5 border border-gray-200 rounded-lg w-full text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
+              />
             </div>
-            <div className="text-sm text-gray-500">
-              Showing {filteredPromos.length} promo code{filteredPromos.length !== 1 ? 's' : ''}
+            <div className="flex gap-1">
+              <StandardButton
+                variant="secondary"
+                size="sm"
+                icon={Filter}
+                onClick={() => setShowFilters(!showFilters)}
+              >
+                Filters
+              </StandardButton>
+              <StandardButton
+                variant="secondary"
+                size="sm"
+                icon={RefreshCcw}
+                onClick={() => loadPromos()}
+              >
+                {''}
+              </StandardButton>
             </div>
           </div>
+
+          {/* Advanced Filters */}
+          {showFilters && (
+            <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-800 mb-1">Status</label>
+                  <select
+                    value={filterStatus}
+                    onChange={(e) => setFilterStatus(e.target.value)}
+                    className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
+                  >
+                    <option value="all">All Statuses</option>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                    <option value="expired">Expired</option>
+                    <option value="exhausted">Exhausted</option>
+                  </select>
+                </div>
+              </div>
+              <div className="mt-3 flex justify-end">
+                <StandardButton
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearFilters}
+                >
+                  Clear Filters
+                </StandardButton>
+              </div>
+            </div>
+          )}
+
+          {/* Results count */}
+          <div className="text-sm text-gray-500 mt-3">
+            Showing {filteredPromos.length} promo code{filteredPromos.length !== 1 ? 's' : ''}
+          </div>
+        </div>
 
         {/* Promos Grid */}
         {loading ? (
