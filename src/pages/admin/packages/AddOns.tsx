@@ -768,36 +768,55 @@ const ManageAddons = () => {
                   )}
                 </div>
                 <div className="p-4">
-                  <h3 className="font-semibold text-base text-gray-900 mb-1 truncate">{addon.name}</h3>
+                  <div className="flex items-start justify-between gap-2 mb-1">
+                    <h3 className="font-semibold text-base text-gray-900 truncate flex-1">{addon.name}</h3>
+                    {addon.is_force_add_on && (
+                      <span className={`px-1.5 py-0.5 text-[10px] font-medium bg-amber-100 text-amber-700 rounded shrink-0`}>
+                        Forced
+                      </span>
+                    )}
+                  </div>
                   {/* Location */}
                   {addon.location && (
-                    <div className="text-xs text-gray-500 mb-3">
+                    <div className="text-xs text-gray-500 mb-2">
                       {addon.location.name}
                     </div>
                   )}
-                  <div className="mt-3 pt-3 border-t border-gray-100">
-                    <div className="flex justify-between items-center mb-3">
+                  {/* Quick Stats */}
+                  <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500 mb-2">
+                    {addon.min_quantity && addon.min_quantity > 1 && (
+                      <span>Min: {addon.min_quantity}</span>
+                    )}
+                    {addon.max_quantity && (
+                      <span>Max: {addon.max_quantity}</span>
+                    )}
+                    {addon.is_force_add_on && addon.price_each_packages && addon.price_each_packages.length > 0 && (
+                      <span>{addon.price_each_packages.length} pkg{addon.price_each_packages.length !== 1 ? 's' : ''}</span>
+                    )}
+                  </div>
+                  <div className="pt-2 border-t border-gray-100">
+                    <div className="flex justify-between items-center">
                       <span className="text-lg font-bold text-gray-900">
-                        ${Number(addon.price).toFixed(2)}
+                        {addon.price !== null && addon.price !== undefined ? `$${Number(addon.price).toFixed(2)}` : <span className="text-sm text-gray-400">Per pkg</span>}
                       </span>
-                    </div>
-                    <div className="flex gap-1">
-                      <StandardButton
-                        onClick={() => handleEdit(addon)}
-                        variant="ghost"
-                        size="sm"
-                        className="p-1.5"
-                        icon={Edit}
-                        title="Edit add-on"
-                      />
-                      <StandardButton
-                        onClick={() => handleDelete(addon.id)}
-                        variant="danger"
-                        size="sm"
-                        className="p-1.5"
-                        icon={Trash2}
-                        title="Delete add-on"
-                      />
+                      <div className="flex gap-1">
+                        <StandardButton
+                          onClick={() => handleEdit(addon)}
+                          variant="ghost"
+                          size="sm"
+                          className="p-1.5"
+                          icon={Edit}
+                          title="Edit add-on"
+                        />
+                        <StandardButton
+                          onClick={() => handleDelete(addon.id)}
+                          variant="danger"
+                          size="sm"
+                          className="p-1.5"
+                          icon={Trash2}
+                          title="Delete add-on"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
