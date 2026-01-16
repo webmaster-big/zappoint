@@ -541,20 +541,30 @@ const ViewBooking: React.FC = () => {
                   <div>
                     <h3 className="font-medium text-gray-900 mb-2">Attractions ({booking.attractions.length})</h3>
                     <ul className="space-y-2">
-                      {booking.attractions.map((attraction: any, index: number) => (
-                        <li key={index} className="flex items-start justify-between text-gray-700">
-                          <div className="flex items-start">
-                            <span className="w-2 h-2 bg-gray-400 rounded-full mr-2 mt-2"></span>
-                            <div>
-                              <p className="font-medium">{attraction.name}</p>
-                              {attraction.pivot?.quantity > 1 && (
-                                <p className="text-sm text-gray-500">Quantity: {attraction.pivot.quantity}</p>
-                              )}
+                      {booking.attractions.map((attraction: any, index: number) => {
+                        const unitPrice = attraction.pivot?.price !== undefined ? Number(attraction.pivot.price) : Number(attraction.price);
+                        const quantity = attraction.pivot?.quantity || 1;
+                        const totalPrice = unitPrice * quantity;
+                        
+                        return (
+                          <li key={index} className="flex items-start justify-between text-gray-700">
+                            <div className="flex items-start">
+                              <span className="w-2 h-2 bg-gray-400 rounded-full mr-2 mt-2"></span>
+                              <div>
+                                <p className="font-medium">{attraction.name}</p>
+                                <p className="text-sm text-gray-500">
+                                  {quantity > 1 ? (
+                                    <>{quantity} × ${unitPrice.toFixed(2)}</>
+                                  ) : (
+                                    <>Quantity: {quantity}</>
+                                  )}
+                                </p>
+                              </div>
                             </div>
-                          </div>
-                          <span className="font-medium">${Number(attraction.price).toFixed(2)}</span>
-                        </li>
-                      ))}
+                            <span className="font-medium">${totalPrice.toFixed(2)}</span>
+                          </li>
+                        );
+                      })}
                     </ul>
                   </div>
                 )}
@@ -563,20 +573,51 @@ const ViewBooking: React.FC = () => {
                   <div>
                     <h3 className="font-medium text-gray-900 mb-2">Add-Ons ({(booking as any).add_ons.length})</h3>
                     <ul className="space-y-2">
-                      {(booking as any).add_ons.map((addon: any, index: number) => (
-                        <li key={index} className="flex items-start justify-between text-gray-700">
-                          <div className="flex items-start">
-                            <span className="w-2 h-2 bg-gray-400 rounded-full mr-2 mt-2"></span>
-                            <div>
-                              <p className="font-medium">{addon.name}</p>
-                              {addon.pivot?.quantity > 1 && (
-                                <p className="text-sm text-gray-500">Quantity: {addon.pivot.quantity}</p>
-                              )}
+                      {(booking as any).add_ons.map((addon: any, index: number) => {
+                        let unitPrice = 0;
+                        
+                        // For force add-ons, check price_each_packages for the package-specific price
+                        if (addon.is_force_add_on && addon.price_each_packages && Array.isArray(addon.price_each_packages) && booking.package_id) {
+                          const packagePrice = addon.price_each_packages.find((p: any) => p.package_id === booking.package_id);
+                          if (packagePrice) {
+                            unitPrice = Number(packagePrice.price);
+                          }
+                        }
+                        
+                        // Fallback to pivot price or addon price
+                        if (unitPrice === 0) {
+                          unitPrice = addon.pivot?.price !== undefined ? Number(addon.pivot.price) : (addon.price !== null ? Number(addon.price) : 0);
+                        }
+                        
+                        const quantity = addon.pivot?.quantity || 1;
+                        const totalPrice = unitPrice * quantity;
+                        
+                        return (
+                          <li key={index} className="flex items-start justify-between text-gray-700">
+                            <div className="flex items-start">
+                              <span className="w-2 h-2 bg-gray-400 rounded-full mr-2 mt-2"></span>
+                              <div>
+                                <p className="font-medium">
+                                  {addon.name}
+                                  {addon.is_force_add_on && (
+                                    <span className="ml-2 px-1.5 py-0.5 text-[10px] font-medium bg-amber-100 text-amber-700 rounded">
+                                      Forced
+                                    </span>
+                                  )}
+                                </p>
+                                <p className="text-sm text-gray-500">
+                                  {quantity > 1 ? (
+                                    <>{quantity} × ${unitPrice.toFixed(2)}</>
+                                  ) : (
+                                    <>Quantity: {quantity}</>
+                                  )}
+                                </p>
+                              </div>
                             </div>
-                          </div>
-                          <span className="font-medium">${Number(addon.price).toFixed(2)}</span>
-                        </li>
-                      ))}
+                            <span className="font-medium">${totalPrice.toFixed(2)}</span>
+                          </li>
+                        );
+                      })}
                     </ul>
                   </div>
                 )}
