@@ -319,10 +319,12 @@ const OnsiteBooking: React.FC = () => {
             addOns: pkg.add_ons?.map((a: any) => ({
               id: a.id,
               name: a.name,
-              price: Number(a.price),
+              price: a.price != null ? Number(a.price) : null,
               image: Array.isArray(a.image) ? a.image[0] : a.image,
               min_quantity: a.min_quantity,
-              max_quantity: a.max_quantity
+              max_quantity: a.max_quantity,
+              is_force_add_on: a.is_force_add_on || false,
+              price_each_packages: a.price_each_packages || null
             })) || [],
             rooms: pkg.rooms?.map((r: any) => ({
               id: r.id,
@@ -422,10 +424,12 @@ const OnsiteBooking: React.FC = () => {
             addOns: pkg.add_ons?.map((a: any) => ({
               id: a.id,
               name: a.name,
-              price: Number(a.price),
+              price: a.price != null ? Number(a.price) : null,
               image: Array.isArray(a.image) ? a.image[0] : a.image,
               min_quantity: a.min_quantity,
-              max_quantity: a.max_quantity
+              max_quantity: a.max_quantity,
+              is_force_add_on: a.is_force_add_on || false,
+              price_each_packages: a.price_each_packages || null
             })) || [],
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             rooms: pkg.rooms?.map((r: any) => ({
@@ -772,6 +776,40 @@ const OnsiteBooking: React.FC = () => {
     };
   }, [bookingData.date, selectedPackage]);
 
+  // Helper function to get the correct add-on price based on package
+  const getAddOnPrice = (addOn: { 
+    price: number | null; 
+    is_force_add_on?: boolean; 
+    price_each_packages?: Array<{ package_id: number; price: number; minimum_quantity: number }> | null 
+  }, packageId: number): number => {
+    // Check for package-specific pricing
+    if (addOn.price_each_packages && addOn.price_each_packages.length > 0) {
+      const packagePrice = addOn.price_each_packages.find(p => p.package_id === packageId);
+      if (packagePrice) {
+        return packagePrice.price;
+      }
+    }
+    // Fall back to default price
+    return addOn.price || 0;
+  };
+
+  // Helper function to get the minimum quantity for an add-on based on package
+  const getAddOnMinQuantity = (addOn: { 
+    min_quantity?: number; 
+    is_force_add_on?: boolean; 
+    price_each_packages?: Array<{ package_id: number; price: number; minimum_quantity: number }> | null 
+  }, packageId: number): number => {
+    // Check for package-specific minimum quantity
+    if (addOn.price_each_packages && addOn.price_each_packages.length > 0) {
+      const packagePrice = addOn.price_each_packages.find(p => p.package_id === packageId);
+      if (packagePrice) {
+        return packagePrice.minimum_quantity;
+      }
+    }
+    // Fall back to default min_quantity
+    return addOn.min_quantity || 1;
+  };
+
   const handlePackageSelect = (pkg: OnsiteBookingPackage) => {
     console.log('📦 Package selected:', {
       id: pkg.id,
@@ -785,11 +823,32 @@ const OnsiteBooking: React.FC = () => {
     const initialParticipants = pkg.minParticipants || 1;
     console.log('👥 Setting initial participants to:', initialParticipants);
     
+    // Find force add-ons that apply to this package and auto-add them
+    const forceAddOns = pkg.addOns
+      .filter(addOn => {
+        if (!addOn.is_force_add_on) return false;
+        // Check if this add-on has package-specific pricing for this package
+        if (addOn.price_each_packages && addOn.price_each_packages.length > 0) {
+          return addOn.price_each_packages.some(p => p.package_id === pkg.id);
+        }
+        return false;
+      })
+      .map(addOn => {
+        const minQty = getAddOnMinQuantity(addOn, pkg.id);
+        console.log('🔗 Auto-adding force add-on:', { name: addOn.name, id: addOn.id, minQty });
+        return {
+          id: addOn.id,
+          name: addOn.name,
+          quantity: minQty,
+          isForced: true // Mark as forced so UI can indicate it
+        };
+      });
+    
     setBookingData(prev => ({ 
       ...prev, 
       packageId: pkg.id,
       selectedAttractions: [],
-      selectedAddOns: [],
+      selectedAddOns: forceAddOns,
       participants: initialParticipants,
       date: '', // Reset date when package changes
       time: '', // Reset time when package changes
@@ -843,8 +902,14 @@ const OnsiteBooking: React.FC = () => {
 
   const handleAddOnToggle = (addOnName: string) => {
     setBookingData(prev => {
-      const existingIndex = prev.selectedAddOns.findIndex(a => a.name === addOnName);
-      if (existingIndex >= 0) {
+      const existingAddOn = prev.selectedAddOns.find(a => a.name === addOnName);
+      
+      if (existingAddOn) {
+        // Check if it's a forced add-on - prevent removal
+        if (existingAddOn.isForced) {
+          console.log('⚠️ Cannot remove force add-on:', addOnName);
+          return prev; // Don't allow removal of forced add-ons
+        }
         // Remove add-on
         return {
           ...prev,
@@ -853,7 +918,7 @@ const OnsiteBooking: React.FC = () => {
       } else {
         // Find the add-on to get its ID and min_quantity
         const addOn = selectedPackage?.addOns.find(a => a.name === addOnName);
-        const minQty = addOn?.min_quantity ?? 1;
+        const minQty = selectedPackage ? getAddOnMinQuantity(addOn!, selectedPackage.id) : (addOn?.min_quantity ?? 1);
         
         console.log('🔍 Adding add-on:', { 
           addOnName, 
@@ -869,7 +934,8 @@ const OnsiteBooking: React.FC = () => {
           selectedAddOns: [...prev.selectedAddOns, { 
             id: addOn?.id, 
             name: addOnName, 
-            quantity: minQty 
+            quantity: minQty,
+            isForced: false
           }]
         };
       }
@@ -878,7 +944,7 @@ const OnsiteBooking: React.FC = () => {
 
   const handleAddOnQuantityChange = (addOnName: string, quantity: number) => {
     const addOn = selectedPackage?.addOns.find(a => a.name === addOnName);
-    const minQty = addOn?.min_quantity ?? 1;
+    const minQty = selectedPackage ? getAddOnMinQuantity(addOn!, selectedPackage.id) : (addOn?.min_quantity ?? 1);
     const maxQty = addOn?.max_quantity ?? 99;
     
     // Enforce min and max limits
@@ -1037,8 +1103,10 @@ const OnsiteBooking: React.FC = () => {
     // Add-ons
     bookingData.selectedAddOns.forEach(({ name, quantity }) => {
       const addOn = selectedPackage?.addOns.find(a => a.name === name);
-      if (addOn) {
-        total += addOn.price * quantity;
+      if (addOn && selectedPackage) {
+        // Use package-specific price if available
+        const addOnPrice = getAddOnPrice(addOn, selectedPackage.id);
+        total += addOnPrice * quantity;
       }
     });
     
@@ -1218,8 +1286,8 @@ const OnsiteBooking: React.FC = () => {
             return null;
           }
           
-          // price_at_booking is unit price, backend calculates total with quantity
-          const unitPrice = Number(addOn.price);
+          // Use package-specific pricing if available
+          const unitPrice = getAddOnPrice(addOn, selectedPackage.id);
           console.log(`✅ Add-on found: ${name}, price: ${unitPrice}, id: ${addonId}`);
           
           return {
@@ -1526,8 +1594,9 @@ const OnsiteBooking: React.FC = () => {
               <div className="space-y-2">
                 {bookingData.selectedAddOns.map(({ name, quantity }) => {
                   const addOn = selectedPackage?.addOns.find(a => a.name === name);
-                  if (!addOn) return null;
-                  const price = addOn.price * quantity;
+                  if (!addOn || !selectedPackage) return null;
+                  const addOnPrice = getAddOnPrice(addOn, selectedPackage.id);
+                  const price = addOnPrice * quantity;
                   return (
                     <div key={name} className="flex gap-2 items-start">
                       {addOn.image && (
@@ -1539,7 +1608,7 @@ const OnsiteBooking: React.FC = () => {
                       )}
                       <div className="flex-1 min-w-0">
                         <p className="text-sm text-gray-900 font-medium truncate">{name}</p>
-                        <p className="text-xs text-gray-500">Qty: {quantity} × ${addOn.price.toFixed(2)}</p>
+                        <p className="text-xs text-gray-500">Qty: {quantity} × ${addOnPrice.toFixed(2)}</p>
                       </div>
                       <span className="font-medium text-sm text-gray-900 ml-2">${price.toFixed(2)}</span>
                     </div>
@@ -1641,14 +1710,15 @@ const OnsiteBooking: React.FC = () => {
                     <p className="text-xs font-semibold text-gray-600 uppercase mb-1">Add-ons</p>
                     {bookingData.selectedAddOns.map(({ name, quantity }) => {
                       const addOn = selectedPackage?.addOns.find(a => a.name === name);
-                      if (!addOn) return null;
+                      if (!addOn || !selectedPackage) return null;
+                      const addOnPrice = getAddOnPrice(addOn, selectedPackage.id);
                       return (
                         <div key={name} className="flex justify-between text-xs mb-1">
                           <div>
                             <span className="text-gray-700">{name}</span>
-                            <span className="text-gray-400 block">{quantity}× ${addOn.price.toFixed(2)}</span>
+                            <span className="text-gray-400 block">{quantity}× ${addOnPrice.toFixed(2)}</span>
                           </div>
-                          <span className="font-medium text-gray-800">+${(addOn.price * quantity).toFixed(2)}</span>
+                          <span className="font-medium text-gray-800">+${(addOnPrice * quantity).toFixed(2)}</span>
                         </div>
                       );
                     })}
@@ -2091,14 +2161,22 @@ const OnsiteBooking: React.FC = () => {
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Package Add-ons</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {selectedPackage.addOns.map(addOn => {
-              const isSelected = bookingData.selectedAddOns.some(a => a.name === addOn.name);
-              const selectedQty = bookingData.selectedAddOns.find(a => a.name === addOn.name)?.quantity || 0;
+              const selectedAddOn = bookingData.selectedAddOns.find(a => a.name === addOn.name);
+              const isSelected = !!selectedAddOn;
+              const isForced = selectedAddOn?.isForced || false;
+              const selectedQty = selectedAddOn?.quantity || 0;
+              // Get the correct price for this package
+              const displayPrice = getAddOnPrice(addOn, selectedPackage.id);
+              const minQty = getAddOnMinQuantity(addOn, selectedPackage.id);
+              
               return (
                 <div
                   key={addOn.name}
                   className={`border-2 rounded-lg p-4 flex gap-4 transition-all ${
                     isSelected 
-                      ? `border-${themeColor}-500 bg-${themeColor}-50 shadow-sm` 
+                      ? isForced 
+                        ? `border-amber-500 bg-amber-50 shadow-sm`
+                        : `border-${themeColor}-500 bg-${themeColor}-50 shadow-sm` 
                       : 'border-gray-200 hover:border-gray-300'
                   }`}
                 >
@@ -2113,20 +2191,36 @@ const OnsiteBooking: React.FC = () => {
                   <div className="flex-1 flex flex-col justify-between">
                     <div className="flex justify-between items-start">
                       <div className="flex-1">
-                        <h4 className="font-semibold text-gray-900">{addOn.name}</h4>
-                        <p className={`text-lg font-bold text-${fullColor} mt-1`}>${addOn.price}</p>
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-semibold text-gray-900">{addOn.name}</h4>
+                          {isForced && (
+                            <span className="text-xs px-2 py-0.5 bg-amber-200 text-amber-800 rounded-full font-medium">
+                              Required
+                            </span>
+                          )}
+                        </div>
+                        <p className={`text-lg font-bold text-${fullColor} mt-1`}>${displayPrice.toFixed(2)}</p>
+                        {isForced && (
+                          <p className="text-xs text-amber-700 mt-1">Min. {minQty} required for this package</p>
+                        )}
                       </div>
-                      <StandardButton
-                        type="button"
-                        variant={isSelected ? 'danger' : 'primary'}
-                        size="sm"
-                        onClick={() => handleAddOnToggle(addOn.name)}
-                      >
-                        {isSelected ? 'Remove' : 'Add'}
-                      </StandardButton>
+                      {isForced ? (
+                        <span className="text-xs text-amber-700 font-medium px-2 py-1 bg-amber-100 rounded">
+                          Included
+                        </span>
+                      ) : (
+                        <StandardButton
+                          type="button"
+                          variant={isSelected ? 'danger' : 'primary'}
+                          size="sm"
+                          onClick={() => handleAddOnToggle(addOn.name)}
+                        >
+                          {isSelected ? 'Remove' : 'Add'}
+                        </StandardButton>
+                      )}
                     </div>
                     {isSelected && (
-                      <div className={`mt-3 pt-3 border-t border-${themeColor}-200 flex items-center justify-between`}>
+                      <div className={`mt-3 pt-3 border-t ${isForced ? 'border-amber-200' : `border-${themeColor}-200`} flex items-center justify-between`}>
                         <span className="text-sm font-medium text-gray-700">Quantity:</span>
                         <div className="flex items-center gap-2">
                           <StandardButton
@@ -2135,15 +2229,16 @@ const OnsiteBooking: React.FC = () => {
                             size="sm"
                             icon={Minus}
                             onClick={() => handleAddOnQuantityChange(addOn.name, selectedQty - 1)}
+                            disabled={isForced && selectedQty <= minQty}
                           >
                             {''}
                           </StandardButton>
                           <input
                             type="number"
-                            min="1"
+                            min={minQty}
                             value={selectedQty}
                             onChange={(e) => {
-                              const newQty = parseInt(e.target.value) || 1;
+                              const newQty = parseInt(e.target.value) || minQty;
                               handleAddOnQuantityChange(addOn.name, newQty);
                             }}
                             className="w-16 text-center font-bold text-lg text-gray-900 border border-gray-300 rounded px-2 py-1"
@@ -2506,7 +2601,9 @@ const OnsiteBooking: React.FC = () => {
               <div className="space-y-2">
                 {bookingData.selectedAddOns.map(({ name, quantity }) => {
                   const addOn = selectedPackage?.addOns.find(a => a.name === name);
-                  const price = addOn ? addOn.price * quantity : 0;
+                  if (!addOn || !selectedPackage) return null;
+                  const addOnPrice = getAddOnPrice(addOn, selectedPackage.id);
+                  const price = addOnPrice * quantity;
                   return (
                     <div key={name} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
                       <div className="flex items-center gap-3 flex-1">
@@ -2515,7 +2612,7 @@ const OnsiteBooking: React.FC = () => {
                         )}
                         <div>
                           <p className="font-medium text-gray-900 text-sm">{name}</p>
-                          <p className="text-xs text-gray-600">Quantity: {quantity} × ${addOn?.price}</p>
+                          <p className="text-xs text-gray-600">Quantity: {quantity} × ${addOnPrice.toFixed(2)}</p>
                         </div>
                       </div>
                       <span className="font-semibold text-gray-900">${price.toFixed(2)}</span>
@@ -2901,14 +2998,15 @@ const OnsiteBooking: React.FC = () => {
               <p className="text-xs font-semibold text-gray-600 uppercase mb-2">Add-ons</p>
               {bookingData.selectedAddOns.map(({ name, quantity }) => {
                 const addOn = selectedPackage?.addOns.find(a => a.name === name);
-                if (!addOn) return null;
+                if (!addOn || !selectedPackage) return null;
+                const addOnPrice = getAddOnPrice(addOn, selectedPackage.id);
                 return (
                   <div key={name} className="flex justify-between text-sm mb-1">
                     <div>
                       <span className="text-gray-700">{name}</span>
-                      <span className="text-xs text-gray-500 ml-1">({quantity} × ${addOn.price.toFixed(2)})</span>
+                      <span className="text-xs text-gray-500 ml-1">({quantity} × ${addOnPrice.toFixed(2)})</span>
                     </div>
-                    <span className="font-medium">${(addOn.price * quantity).toFixed(2)}</span>
+                    <span className="font-medium">${(addOnPrice * quantity).toFixed(2)}</span>
                   </div>
                 );
               })}

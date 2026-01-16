@@ -7,13 +7,21 @@ export interface OnsiteBookingRoom {
   price?: number; 
 }
 
+export interface PackageSpecificPrice {
+  package_id: number;
+  price: number;
+  minimum_quantity: number;
+}
+
 export interface OnsiteBookingAddOn {
   id?: number;
   name: string;
-  price: number;
+  price: number | null;
   image?: string;
   min_quantity?: number;
   max_quantity?: number;
+  is_force_add_on?: boolean;
+  price_each_packages?: PackageSpecificPrice[] | null;
 }
 
 export interface OnsiteBookingAttraction {
@@ -100,7 +108,7 @@ export interface OnsiteBookingPromo {
 export interface OnsiteBookingData {
   packageId: number | null;
   selectedAttractions: { id: string; quantity: number }[];
-  selectedAddOns: { id?: number; name: string; quantity: number }[];
+  selectedAddOns: { id?: number; name: string; quantity: number; isForced?: boolean }[];
   date: string;
   time: string;
   participants: number;

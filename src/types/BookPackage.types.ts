@@ -16,16 +16,24 @@ export interface BookPackageAttraction {
   };
 }
 
+export interface PackageSpecificPrice {
+  package_id: number;
+  price: number;
+  minimum_quantity: number;
+}
+
 export interface BookPackageAddOn {
   id: number;
   location_id: number;
   name: string;
-  price: string;
+  price: string | null;
   description?: string;
   image?: string;
   is_active: boolean;
   min_quantity?: number;
   max_quantity?: number;
+  is_force_add_on?: boolean;
+  price_each_packages?: PackageSpecificPrice[] | null;
   pivot?: {
     package_id: number;
     add_on_id: number;

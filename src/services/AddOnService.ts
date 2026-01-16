@@ -24,11 +24,17 @@ api.interceptors.request.use(
 );
 
 // Types
+export interface PackageSpecificPrice {
+  package_id: number;
+  price: number;
+  minimum_quantity: number;
+}
+
 export interface AddOn {
   id: number;
   location_id?: number;
   name: string;
-  price: number;
+  price: number | null;
   description?: string;
   image?: string;
   is_active: boolean;
@@ -37,6 +43,8 @@ export interface AddOn {
   location?: string;
   min_quantity?: number;
   max_quantity?: number;
+  is_force_add_on?: boolean;
+  price_each_packages?: PackageSpecificPrice[] | null;
 }
 
 export interface AddOnFilters {
@@ -53,12 +61,14 @@ export interface AddOnFilters {
 export interface CreateAddOnData {
   location_id?: number;
   name: string;
-  price: number;
+  price?: number | null;
   description?: string;
   image?: string;
   is_active?: boolean;
   min_quantity?: number;
   max_quantity?: number;
+  is_force_add_on?: boolean;
+  price_each_packages?: PackageSpecificPrice[] | null;
 }
 
 export type UpdateAddOnData = Partial<CreateAddOnData>;

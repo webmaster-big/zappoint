@@ -152,6 +152,27 @@ const BookPackage: React.FC = () => {
         if (response.data.min_participants) {
           setParticipants(response.data.min_participants);
         }
+        
+        // Auto-add force add-ons that apply to this package
+        const forceAddOns: { [id: number]: number } = {};
+        response.data.add_ons?.forEach((addOn: any) => {
+          if (addOn.is_force_add_on && addOn.price_each_packages?.length > 0) {
+            const packageSpecificPrice = addOn.price_each_packages.find(
+              (p: any) => p.package_id === response.data.id
+            );
+            if (packageSpecificPrice) {
+              forceAddOns[addOn.id] = packageSpecificPrice.minimum_quantity || 1;
+              console.log('🔗 Auto-adding force add-on:', { 
+                name: addOn.name, 
+                id: addOn.id, 
+                minQty: packageSpecificPrice.minimum_quantity 
+              });
+            }
+          }
+        });
+        if (Object.keys(forceAddOns).length > 0) {
+          setSelectedAddOns(forceAddOns);
+        }
       } catch (err) {
         console.error('Error fetching package:', err);
         setError('Failed to load package details');
@@ -577,11 +598,19 @@ const BookPackage: React.FC = () => {
   // Handle add-on/attraction quantity change with min/max validation
   const handleAddOnQty = (id: number, qty: number) => {
     const addOn = pkg?.add_ons.find(a => a.id === id);
-    const minQty = addOn?.min_quantity ?? 0;
+    if (!addOn || !pkg) return;
+    
+    const isForcedAddOn = isForceAddOn(addOn, pkg.id);
+    const minQty = isForcedAddOn ? getAddOnMinQuantity(addOn, pkg.id) : (addOn?.min_quantity ?? 0);
     const maxQty = addOn?.max_quantity ?? 99;
     
     // Enforce max limit
     if (qty > maxQty) qty = maxQty;
+    
+    // For force add-ons, don't allow going below minimum
+    if (isForcedAddOn && qty < minQty) {
+      qty = minQty;
+    }
     
     // If going from 0 to positive and min_quantity is set, use min_quantity
     const currentQty = selectedAddOns[id] || 0;
@@ -589,7 +618,9 @@ const BookPackage: React.FC = () => {
       qty = minQty;
     }
     
-    setSelectedAddOns((prev) => ({ ...prev, [id]: Math.max(0, qty) }));
+    // For forced add-ons, use minimum; for others, allow 0
+    const finalQty = isForcedAddOn ? Math.max(minQty, qty) : Math.max(0, qty);
+    setSelectedAddOns((prev) => ({ ...prev, [id]: finalQty }));
   };
   
   const handleAttractionQty = (id: number, qty: number) => {
@@ -659,6 +690,53 @@ const BookPackage: React.FC = () => {
     setCardCVV("");
     setPaymentError("");
   };
+
+  // Helper function to get the correct add-on price based on package
+  const getAddOnPrice = (addOn: { 
+    price: string | null; 
+    is_force_add_on?: boolean; 
+    price_each_packages?: Array<{ package_id: number; price: number; minimum_quantity: number }> | null 
+  }, packageId: number): number => {
+    // Check for package-specific pricing
+    if (addOn.price_each_packages && addOn.price_each_packages.length > 0) {
+      const packagePrice = addOn.price_each_packages.find(p => p.package_id === packageId);
+      if (packagePrice) {
+        return packagePrice.price;
+      }
+    }
+    // Fall back to default price
+    return Number(addOn.price) || 0;
+  };
+
+  // Helper function to get the minimum quantity for an add-on based on package
+  const getAddOnMinQuantity = (addOn: { 
+    min_quantity?: number; 
+    is_force_add_on?: boolean; 
+    price_each_packages?: Array<{ package_id: number; price: number; minimum_quantity: number }> | null 
+  }, packageId: number): number => {
+    // Check for package-specific minimum quantity
+    if (addOn.price_each_packages && addOn.price_each_packages.length > 0) {
+      const packagePrice = addOn.price_each_packages.find(p => p.package_id === packageId);
+      if (packagePrice) {
+        return packagePrice.minimum_quantity;
+      }
+    }
+    // Fall back to default min_quantity
+    return addOn.min_quantity || 1;
+  };
+
+  // Check if an add-on is a force add-on for this package
+  const isForceAddOn = (addOn: { 
+    is_force_add_on?: boolean; 
+    price_each_packages?: Array<{ package_id: number; price: number; minimum_quantity: number }> | null 
+  }, packageId: number): boolean => {
+    if (!addOn.is_force_add_on) return false;
+    // Check if this add-on has package-specific pricing for this package
+    if (addOn.price_each_packages && addOn.price_each_packages.length > 0) {
+      return addOn.price_each_packages.some(p => p.package_id === packageId);
+    }
+    return false;
+  };
   
   // Handle card number input with formatting
   const handleCardNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -689,7 +767,9 @@ const BookPackage: React.FC = () => {
   const addOnsTotal = Object.entries(selectedAddOns).reduce((sum, [idStr, qty]) => {
     const id = Number(idStr);
     const found = pkg && pkg.add_ons.find((a) => a.id === id);
-    const price = found ? Number(found.price) : 0;
+    if (!found || !pkg) return sum;
+    // Use package-specific price if available
+    const price = getAddOnPrice(found, pkg.id);
     return sum + price * qty;
   }, 0);
   const attractionsTotal = Object.entries(selectedAttractions).reduce((sum, [idStr, qty]) => {
@@ -860,8 +940,8 @@ const BookPackage: React.FC = () => {
             console.warn(`⚠️ Add-on not found: ${id}, available:`, pkg.add_ons.map(a => a.id));
             return null;
           }
-          // price_at_booking should be unit price, backend calculates total
-          const unitPrice = Number(addon.price);
+          // Use package-specific price if available
+          const unitPrice = getAddOnPrice(addon, pkg.id);
           console.log(`✅ Add-on found: ${addon.name}, price: ${unitPrice}`);
           return {
             addon_id: Number(id),
@@ -1548,12 +1628,16 @@ const BookPackage: React.FC = () => {
                     <label className="block font-medium mb-3 text-gray-800 text-xs md:text-sm uppercase tracking-wide">Add-ons</label>
                     <div className="space-y-4">
                       {pkg.add_ons.map((addOn) => {
-                        const minQty = addOn.min_quantity ?? 0;
+                        const isForcedAddOn = isForceAddOn(addOn, pkg.id);
+                        const minQty = isForcedAddOn ? getAddOnMinQuantity(addOn, pkg.id) : (addOn.min_quantity ?? 0);
                         const maxQty = addOn.max_quantity ?? 99;
                         const currentQty = selectedAddOns[addOn.id] || 0;
+                        const displayPrice = getAddOnPrice(addOn, pkg.id);
                         
                         return (
-                        <div key={addOn.id} className="flex items-center justify-between p-2 md:p-3 bg-gray-50 rounded-lg gap-2 md:gap-4">
+                        <div key={addOn.id} className={`flex items-center justify-between p-2 md:p-3 rounded-lg gap-2 md:gap-4 ${
+                          isForcedAddOn ? 'bg-amber-50 border border-amber-200' : 'bg-gray-50'
+                        }`}>
                           {/* Add-on Image */}
                           <div className="w-12 h-12 md:w-16 md:h-16 flex-shrink-0 flex items-center justify-center bg-gray-100 rounded-md border border-gray-200 overflow-hidden">
                             {addOn.image ? (
@@ -1563,9 +1647,16 @@ const BookPackage: React.FC = () => {
                             )}
                           </div>
                           <div className="flex-1 flex flex-col justify-between min-w-0">
-                            <span className="font-medium text-gray-800 text-xs md:text-sm block truncate">{addOn.name}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium text-gray-800 text-xs md:text-sm block truncate">{addOn.name}</span>
+                              {isForcedAddOn && (
+                                <span className="text-xs px-1.5 py-0.5 bg-amber-200 text-amber-800 rounded font-medium whitespace-nowrap">
+                                  Required
+                                </span>
+                              )}
+                            </div>
                             <span className="block text-xs text-gray-500 mt-0.5">
-                              ${Number(addOn.price).toFixed(2)} each
+                              ${displayPrice.toFixed(2)} each
                             </span>
                             {/* Show quantity limits */}
                             {(minQty > 1 || maxQty < 99) && (
@@ -1575,23 +1666,29 @@ const BookPackage: React.FC = () => {
                                 {maxQty < 99 && `Max: ${maxQty}`}
                               </span>
                             )}
+                            {isForcedAddOn && (
+                              <span className="block text-xs text-amber-700 mt-0.5">
+                                Automatically included with this package
+                              </span>
+                            )}
                           </div>
                           <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
                             <button 
                               className="w-7 h-7 md:w-8 md:h-8 rounded-md bg-white border border-gray-300 text-gray-800 flex items-center justify-center text-sm font-semibold shadow-sm disabled:opacity-50"
                               onClick={() => handleAddOnQty(addOn.id, currentQty - 1)}
-                              disabled={currentQty <= 0}
+                              disabled={isForcedAddOn ? currentQty <= minQty : currentQty <= 0}
                             >
                               -
                             </button>
                             <input 
                               type="number" 
-                              min={0}
+                              min={isForcedAddOn ? minQty : 0}
                               max={maxQty}
                               value={currentQty} 
                               onChange={e => {
                                 let newQty = Number(e.target.value);
                                 if (newQty > maxQty) newQty = maxQty;
+                                if (isForcedAddOn && newQty < minQty) newQty = minQty;
                                 handleAddOnQty(addOn.id, newQty);
                               }} 
                               className="w-10 md:w-12 text-center rounded-md border border-gray-300 px-1 py-1 text-xs md:text-sm" 
