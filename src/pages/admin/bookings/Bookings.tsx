@@ -20,7 +20,8 @@ import {
   X,
   Edit3,
   Clock,
-  Home
+  Home,
+  FileDown
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import StandardButton from '../../../components/ui/StandardButton';
@@ -137,6 +138,24 @@ const Bookings: React.FC = () => {
   const [timeValue, setTimeValue] = useState<string>('');
   const [savingDate, setSavingDate] = useState(false);
   const [savingTime, setSavingTime] = useState(false);
+
+  // Booking Details Report modal state
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportFilters, setReportFilters] = useState({
+    packageIds: 'all' as string | number[],
+    periodType: 'today' as 'today' | 'weekly' | 'monthly' | 'custom',
+    weekOfMonth: 1,
+    month: new Date().getMonth() + 1,
+    year: new Date().getFullYear(),
+    startDate: '',
+    endDate: '',
+    viewMode: 'individual' as 'list' | 'individual',
+    status: [] as string[],
+    includeCancelled: false
+  });
+  const [generatingReport, setGeneratingReport] = useState(false);
+  const [reportPackages, setReportPackages] = useState<PackageType[]>([]);
+  const [loadingReportPackages, setLoadingReportPackages] = useState(false);
 
   // Editable fields configuration
   const editableFields = [
@@ -1040,6 +1059,217 @@ const Bookings: React.FC = () => {
     }
   };
 
+  // Report modal functions
+  const handleOpenReportModal = async () => {
+    setShowReportModal(true);
+    setLoadingReportPackages(true);
+    
+    try {
+      // Load packages for selection
+      const cachedPackages = await packageCacheService.getCachedPackages();
+      
+      if (cachedPackages && cachedPackages.length > 0) {
+        // Filter by selected location if applicable
+        const filteredPackages = selectedLocation 
+          ? cachedPackages.filter((pkg: PackageType) => pkg.location_id === selectedLocation && pkg.is_active)
+          : cachedPackages.filter((pkg: PackageType) => pkg.is_active);
+        setReportPackages(filteredPackages);
+      } else {
+        // Fetch from API
+        const params: any = { is_active: true };
+        if (selectedLocation) params.location_id = selectedLocation;
+        
+        const response = await packageService.getPackages(params);
+        if (response.success && response.data) {
+          setReportPackages(response.data.packages || []);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading packages for report:', error);
+    } finally {
+      setLoadingReportPackages(false);
+    }
+  };
+
+  const handleCloseReportModal = () => {
+    setShowReportModal(false);
+    setReportFilters({
+      packageIds: 'all',
+      periodType: 'today',
+      weekOfMonth: 1,
+      month: new Date().getMonth() + 1,
+      year: new Date().getFullYear(),
+      startDate: '',
+      endDate: '',
+      viewMode: 'individual',
+      status: [],
+      includeCancelled: false
+    });
+  };
+
+  const handleGenerateReport = async () => {
+    try {
+      setGeneratingReport(true);
+      
+      const user = getStoredUser();
+      const params = new URLSearchParams();
+      
+      // Package IDs
+      if (Array.isArray(reportFilters.packageIds)) {
+        params.append('package_ids', reportFilters.packageIds.join(','));
+      } else {
+        params.append('package_ids', reportFilters.packageIds);
+      }
+      
+      // Period type
+      params.append('period_type', reportFilters.periodType);
+      
+      // Conditional parameters based on period type
+      if (reportFilters.periodType === 'weekly') {
+        params.append('week_of_month', reportFilters.weekOfMonth.toString());
+        params.append('month', reportFilters.month.toString());
+        params.append('year', reportFilters.year.toString());
+      } else if (reportFilters.periodType === 'monthly') {
+        params.append('month', reportFilters.month.toString());
+        params.append('year', reportFilters.year.toString());
+      } else if (reportFilters.periodType === 'custom') {
+        if (!reportFilters.startDate || !reportFilters.endDate) {
+          alert('Please select both start and end dates for custom date range.');
+          setGeneratingReport(false);
+          return;
+        }
+        params.append('start_date', reportFilters.startDate);
+        params.append('end_date', reportFilters.endDate);
+      }
+      
+      // View mode
+      params.append('view_mode', reportFilters.viewMode);
+      
+      // Optional filters
+      if (selectedLocation) {
+        params.append('location_id', selectedLocation.toString());
+      }
+      
+      if (reportFilters.status.length > 0) {
+        params.append('status', reportFilters.status.join(','));
+      }
+      
+      if (reportFilters.includeCancelled) {
+        params.append('include_cancelled', 'true');
+      }
+      
+      if (user?.id) {
+        params.append('user_id', user.id.toString());
+      }
+      
+      // Build the URL and open in new tab to download
+      const reportUrl = `${API_BASE_URL}/bookings/details-report?${params.toString()}`;
+      
+      // Use fetch to handle potential errors
+      const response = await fetch(reportUrl, {
+        headers: {
+          'Authorization': `Bearer ${user?.token}`,
+          'Accept': 'application/pdf'
+        }
+      });
+      
+      if (!response.ok) {
+        if (response.status === 404) {
+          const errorData = await response.json();
+          alert(errorData.message || 'No bookings found for the specified criteria.');
+        } else if (response.status === 422) {
+          const errorData = await response.json();
+          alert('Validation error: ' + (errorData.message || 'Please check your filters.'));
+        } else {
+          alert('Failed to generate report. Please try again.');
+        }
+        return;
+      }
+      
+      // Download the PDF
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      
+      // Extract filename from Content-Disposition header or generate one
+      const contentDisposition = response.headers.get('Content-Disposition');
+      let filename = 'booking-details-report.pdf';
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+        if (filenameMatch) {
+          filename = filenameMatch[1].replace(/['"]/g, '');
+        }
+      }
+      
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      
+      handleCloseReportModal();
+    } catch (error) {
+      console.error('Error generating report:', error);
+      alert('Failed to generate report. Please try again.');
+    } finally {
+      setGeneratingReport(false);
+    }
+  };
+
+  const getMonthName = (month: number): string => {
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 
+                    'July', 'August', 'September', 'October', 'November', 'December'];
+    return months[month - 1] || '';
+  };
+
+  const toggleReportPackage = (packageId: number) => {
+    if (reportFilters.packageIds === 'all') {
+      // When "All" is selected, clicking a package deselects it (selects all others)
+      const allOtherIds = reportPackages.filter(pkg => pkg.id !== packageId).map(pkg => pkg.id);
+      setReportFilters(prev => ({ 
+        ...prev, 
+        packageIds: allOtherIds.length === 0 ? 'all' : allOtherIds 
+      }));
+    } else if (Array.isArray(reportFilters.packageIds)) {
+      if (reportFilters.packageIds.includes(packageId)) {
+        // Remove package
+        const newIds = reportFilters.packageIds.filter(id => id !== packageId);
+        setReportFilters(prev => ({ 
+          ...prev, 
+          packageIds: newIds.length === 0 ? 'all' : newIds 
+        }));
+      } else {
+        // Add package - check if adding this makes it all packages
+        const newIds = [...reportFilters.packageIds, packageId];
+        const allSelected = reportPackages.every(pkg => newIds.includes(pkg.id));
+        setReportFilters(prev => ({ 
+          ...prev, 
+          packageIds: allSelected ? 'all' : newIds 
+        }));
+      }
+    }
+  };
+
+  const toggleReportStatus = (status: string) => {
+    setReportFilters(prev => ({
+      ...prev,
+      status: prev.status.includes(status)
+        ? prev.status.filter(s => s !== status)
+        : [...prev.status, status]
+    }));
+  };
+
+  const toggleAllPackages = () => {
+    if (reportFilters.packageIds === 'all') {
+      // Uncheck all - set to empty array
+      setReportFilters(prev => ({ ...prev, packageIds: [] }));
+    } else {
+      // Check all
+      setReportFilters(prev => ({ ...prev, packageIds: 'all' }));
+    }
+  };
+
   // Inline editing functions
   const startEditing = (bookingId: string, field: string, currentValue: string | number) => {
     setEditingCell({ bookingId, field });
@@ -1726,6 +1956,14 @@ const Bookings: React.FC = () => {
               onClick={() => setShowExportModal(true)}
             >
               Export Bookings
+            </StandardButton>
+            <StandardButton
+              variant="primary"
+              size="md"
+              icon={FileDown}
+              onClick={handleOpenReportModal}
+            >
+              Generate Report
             </StandardButton>
           </div>
         </div>
@@ -2920,6 +3158,293 @@ const Bookings: React.FC = () => {
                   loading={savingTime}
                 >
                   {savingTime ? 'Saving...' : 'Save Time'}
+                </StandardButton>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Booking Details Report Modal */}
+        {showReportModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-backdrop-fade" onClick={handleCloseReportModal}>
+            <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+              <div className={`p-6 border-b border-gray-100 bg-${themeColor}-50`}>
+                <h2 className="text-2xl font-bold text-gray-900">Generate Booking Report</h2>
+                <p className="text-sm text-gray-600 mt-1">
+                  Generate a detailed PDF report of bookings
+                </p>
+              </div>
+
+              <div className="p-6 space-y-6">
+                {/* Package Selection */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Select Packages
+                  </label>
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={reportFilters.packageIds === 'all' || (Array.isArray(reportFilters.packageIds) && reportFilters.packageIds.length === reportPackages.length && reportPackages.length > 0)}
+                        onChange={toggleAllPackages}
+                        className={`rounded border-gray-300 text-${fullColor} focus:ring-${themeColor}-500`}
+                      />
+                      <span className="text-sm font-medium text-gray-700">All Packages</span>
+                    </label>
+                    
+                    {loadingReportPackages ? (
+                      <div className="flex items-center gap-2 text-sm text-gray-500 py-2">
+                        <div className={`animate-spin rounded-full h-4 w-4 border-b-2 border-${fullColor}`}></div>
+                        Loading packages...
+                      </div>
+                    ) : (
+                      <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-2 space-y-1">
+                        {reportPackages.map(pkg => (
+                          <label key={pkg.id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
+                            <input
+                              type="checkbox"
+                              checked={
+                                reportFilters.packageIds === 'all' || 
+                                (Array.isArray(reportFilters.packageIds) && reportFilters.packageIds.includes(pkg.id))
+                              }
+                              onChange={() => toggleReportPackage(pkg.id)}
+                              className={`rounded border-gray-300 text-${fullColor} focus:ring-${themeColor}-500`}
+                            />
+                            <span className="text-sm text-gray-700">
+                              {pkg.name}
+                            </span>
+                          </label>
+                        ))}
+                        {reportPackages.length === 0 && (
+                          <p className="text-sm text-gray-500 py-2 text-center">No packages available</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Period Type Selection */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Time Period
+                  </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {(['today', 'weekly', 'monthly', 'custom'] as const).map(period => (
+                      <button
+                        key={period}
+                        type="button"
+                        onClick={() => setReportFilters(prev => ({ ...prev, periodType: period }))}
+                        className={`px-3 py-2 text-sm font-medium rounded-lg border transition-colors ${
+                          reportFilters.periodType === period
+                            ? `bg-${themeColor}-100 border-${fullColor} text-${fullColor}`
+                            : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                        }`}
+                      >
+                        {period.charAt(0).toUpperCase() + period.slice(1)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Conditional Inputs based on Period Type */}
+                {reportFilters.periodType === 'weekly' && (
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Week</label>
+                      <select
+                        value={reportFilters.weekOfMonth}
+                        onChange={(e) => setReportFilters(prev => ({ ...prev, weekOfMonth: parseInt(e.target.value) }))}
+                        className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent text-sm`}
+                      >
+                        <option value={1}>Week 1 (1-7)</option>
+                        <option value={2}>Week 2 (8-14)</option>
+                        <option value={3}>Week 3 (15-21)</option>
+                        <option value={4}>Week 4 (22-28)</option>
+                        <option value={5}>Week 5 (29+)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Month</label>
+                      <select
+                        value={reportFilters.month}
+                        onChange={(e) => setReportFilters(prev => ({ ...prev, month: parseInt(e.target.value) }))}
+                        className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent text-sm`}
+                      >
+                        {[1,2,3,4,5,6,7,8,9,10,11,12].map(m => (
+                          <option key={m} value={m}>{getMonthName(m)}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Year</label>
+                      <select
+                        value={reportFilters.year}
+                        onChange={(e) => setReportFilters(prev => ({ ...prev, year: parseInt(e.target.value) }))}
+                        className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent text-sm`}
+                      >
+                        {[2024, 2025, 2026, 2027, 2028].map(y => (
+                          <option key={y} value={y}>{y}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                )}
+
+                {reportFilters.periodType === 'monthly' && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Month</label>
+                      <select
+                        value={reportFilters.month}
+                        onChange={(e) => setReportFilters(prev => ({ ...prev, month: parseInt(e.target.value) }))}
+                        className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent text-sm`}
+                      >
+                        {[1,2,3,4,5,6,7,8,9,10,11,12].map(m => (
+                          <option key={m} value={m}>{getMonthName(m)}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Year</label>
+                      <select
+                        value={reportFilters.year}
+                        onChange={(e) => setReportFilters(prev => ({ ...prev, year: parseInt(e.target.value) }))}
+                        className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent text-sm`}
+                      >
+                        {[2024, 2025, 2026, 2027, 2028].map(y => (
+                          <option key={y} value={y}>{y}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                )}
+
+                {reportFilters.periodType === 'custom' && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+                      <input
+                        type="date"
+                        value={reportFilters.startDate}
+                        onChange={(e) => setReportFilters(prev => ({ ...prev, startDate: e.target.value }))}
+                        className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent text-sm`}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+                      <input
+                        type="date"
+                        value={reportFilters.endDate}
+                        onChange={(e) => setReportFilters(prev => ({ ...prev, endDate: e.target.value }))}
+                        min={reportFilters.startDate}
+                        className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent text-sm`}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* View Mode Selection */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Report View
+                  </label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setReportFilters(prev => ({ ...prev, viewMode: 'individual' }))}
+                      className={`p-4 rounded-lg border-2 transition-all ${
+                        reportFilters.viewMode === 'individual'
+                          ? `border-${fullColor} bg-${themeColor}-50`
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <FileText className={`w-8 h-8 mx-auto mb-2 ${reportFilters.viewMode === 'individual' ? `text-${fullColor}` : 'text-gray-400'}`} />
+                      <p className={`text-sm font-medium ${reportFilters.viewMode === 'individual' ? `text-${fullColor}` : 'text-gray-700'}`}>
+                        Individual View
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        One booking per page with full details
+                      </p>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setReportFilters(prev => ({ ...prev, viewMode: 'list' }))}
+                      className={`p-4 rounded-lg border-2 transition-all ${
+                        reportFilters.viewMode === 'list'
+                          ? `border-${fullColor} bg-${themeColor}-50`
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <Calendar className={`w-8 h-8 mx-auto mb-2 ${reportFilters.viewMode === 'list' ? `text-${fullColor}` : 'text-gray-400'}`} />
+                      <p className={`text-sm font-medium ${reportFilters.viewMode === 'list' ? `text-${fullColor}` : 'text-gray-700'}`}>
+                        List View
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Multiple bookings per page (summary)
+                      </p>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Status Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Filter by Status (optional)
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {['pending', 'confirmed', 'checked-in', 'completed'].map(status => (
+                      <button
+                        key={status}
+                        type="button"
+                        onClick={() => toggleReportStatus(status)}
+                        className={`px-3 py-1.5 text-xs font-medium rounded-full border transition-colors ${
+                          reportFilters.status.includes(status)
+                            ? `bg-${themeColor}-100 border-${fullColor} text-${fullColor}`
+                            : 'bg-gray-100 border-gray-300 text-gray-600 hover:bg-gray-200'
+                        }`}
+                      >
+                        {status.charAt(0).toUpperCase() + status.slice(1).replace('-', ' ')}
+                      </button>
+                    ))}
+                  </div>
+                  {reportFilters.status.length === 0 && (
+                    <p className="text-xs text-gray-500 mt-1">No status filter = All statuses included</p>
+                  )}
+                </div>
+
+                {/* Include Cancelled */}
+                <div>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={reportFilters.includeCancelled}
+                      onChange={(e) => setReportFilters(prev => ({ ...prev, includeCancelled: e.target.checked }))}
+                      className={`rounded border-gray-300 text-${fullColor} focus:ring-${themeColor}-500`}
+                    />
+                    <span className="text-sm text-gray-700">Include cancelled bookings</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="p-6 border-t border-gray-100 flex gap-3 justify-end bg-gray-50">
+                <StandardButton
+                  variant="secondary"
+                  size="md"
+                  onClick={handleCloseReportModal}
+                  disabled={generatingReport}
+                >
+                  Cancel
+                </StandardButton>
+                <StandardButton
+                  variant="primary"
+                  size="md"
+                  icon={FileDown}
+                  onClick={handleGenerateReport}
+                  disabled={generatingReport}
+                  loading={generatingReport}
+                >
+                  {generatingReport ? 'Generating...' : 'Generate PDF Report'}
                 </StandardButton>
               </div>
             </div>
