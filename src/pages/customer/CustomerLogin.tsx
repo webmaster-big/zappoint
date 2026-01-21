@@ -3,7 +3,6 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
 import type { LoginFormData } from '../../types/customer';
 import customerService from '../../services/CustomerService';
-import LoadingSpinner from '../../components/ui/LoadingSpinner';
 
 const CustomerLogin = () => {
   const navigate = useNavigate();
