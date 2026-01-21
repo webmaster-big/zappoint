@@ -460,6 +460,15 @@ export const tokenizeCard = (
       return;
     }
 
+    // DEBUG: Log credentials being used (remove in production)
+    console.log('🔑 === ACCEPT.JS TOKENIZATION DEBUG ===');
+    console.log('API Login ID:', apiLoginID);
+    console.log('API Login ID Length:', apiLoginID?.length);
+    console.log('Client Key:', clientKey ? `${clientKey.substring(0, 20)}...` : 'NOT PROVIDED');
+    console.log('Client Key Length:', clientKey?.length || 0);
+    console.log('Using clientKey for auth:', clientKey ? 'YES' : 'NO (using apiLoginID as fallback)');
+    console.log('=====================================');
+
     const secureData: AcceptJSSecureData = {
       authData: {
         clientKey: clientKey || apiLoginID,
@@ -468,13 +477,33 @@ export const tokenizeCard = (
       cardData: cardData,
     };
 
+    console.log('📤 Sending to Accept.js:', {
+      authData: {
+        apiLoginID: secureData.authData.apiLoginID,
+        clientKey: secureData.authData.clientKey ? `${secureData.authData.clientKey.substring(0, 20)}...` : 'MISSING',
+      },
+      cardData: {
+        cardNumber: `****${cardData.cardNumber.slice(-4)}`,
+        month: cardData.month,
+        year: cardData.year,
+        cardCode: '***'
+      }
+    });
+
     window.Accept.dispatchData(secureData, (response: AcceptJSResponse) => {
+      console.log('📥 Accept.js Response:', {
+        resultCode: response.messages.resultCode,
+        messages: response.messages.message
+      });
+      
       if (response.messages.resultCode === 'Error') {
         const errorMessage = response.messages.message
-          .map((msg) => msg.text)
+          .map((msg) => `${msg.code}: ${msg.text}`)
           .join(', ');
+        console.error('❌ Accept.js Error:', errorMessage);
         reject(new Error(errorMessage));
       } else {
+        console.log('✅ Token received successfully');
         resolve(response.opaqueData);
       }
     });
