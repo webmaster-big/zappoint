@@ -116,21 +116,6 @@ export const debugAuthorizeNetCredentials = async (locationId: number): Promise<
   return response.data;
 };
 
-// Make debug function available globally for browser console access
-if (typeof window !== 'undefined') {
-  (window as any).debugAuthorizeNet = async (locationId: number = 1) => {
-    try {
-      const result = await debugAuthorizeNetCredentials(locationId);
-      console.table(result);
-      return result;
-    } catch (error: any) {
-      console.error('Debug failed:', error.response?.data || error.message);
-      return null;
-    }
-  };
-  console.log('💡 TIP: Run debugAuthorizeNet(locationId) in console to check credentials');
-}
-
 /**
  * User Account Management Service
  */
