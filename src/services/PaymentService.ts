@@ -388,6 +388,9 @@ export const exportBulkInvoices = async (
  * Accept.js Helper Functions
  */
 
+// Track which Accept.js environment is currently loaded
+let loadedAcceptJSEnvironment: 'sandbox' | 'production' | null = null;
+
 /**
  * Load Accept.js library dynamically
  * 
@@ -396,11 +399,21 @@ export const exportBulkInvoices = async (
  */
 export const loadAcceptJS = (environment: 'sandbox' | 'production' = 'sandbox'): Promise<void> => {
   return new Promise((resolve, reject) => {
-    // Check if already loaded
-    if (window.Accept) {
+    // Check if already loaded with the correct environment
+    if (window.Accept && loadedAcceptJSEnvironment === environment) {
+      console.log(`✅ Accept.js already loaded for ${environment}`);
       resolve();
       return;
     }
+    
+    // If loaded with different environment, warn but proceed (can't reload different version)
+    if (window.Accept && loadedAcceptJSEnvironment !== environment) {
+      console.warn(`⚠️ Accept.js already loaded for ${loadedAcceptJSEnvironment}, but ${environment} was requested. Using existing.`);
+      resolve();
+      return;
+    }
+
+    console.log(`📦 Loading Accept.js for ${environment} environment...`);
 
     // Create script element
     const script = document.createElement('script');
@@ -417,7 +430,8 @@ export const loadAcceptJS = (environment: 'sandbox' | 'production' = 'sandbox'):
     script.async = true;
 
     script.onload = () => {
-      console.log('✅ Accept.js loaded successfully');
+      loadedAcceptJSEnvironment = environment;
+      console.log(`✅ Accept.js loaded successfully for ${environment}`);
       resolve();
     };
 

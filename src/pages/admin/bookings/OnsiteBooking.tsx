@@ -119,6 +119,7 @@ const OnsiteBooking: React.FC = () => {
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [paymentError, setPaymentError] = useState('');
   const [authorizeApiLoginId, setAuthorizeApiLoginId] = useState('');
+  const [_authorizeClientKey, setAuthorizeClientKey] = useState('');
   const [authorizeEnvironment, setAuthorizeEnvironment] = useState<'sandbox' | 'production'>('sandbox');
   const [showNoAuthAccountModal, setShowNoAuthAccountModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -510,7 +511,13 @@ const OnsiteBooking: React.FC = () => {
         const settings = await getAuthorizeNetPublicKey(locationId);
         if (settings && settings.api_login_id) {
           setAuthorizeApiLoginId(settings.api_login_id);
-          setAuthorizeEnvironment(settings.environment);
+          setAuthorizeClientKey(settings.client_key || settings.api_login_id);
+          const env = (settings.environment || 'sandbox') as 'sandbox' | 'production';
+          setAuthorizeEnvironment(env);
+          
+          // Load Accept.js with the correct environment from API response
+          await loadAcceptJS(env);
+          console.log('✅ Accept.js loaded successfully for environment:', env);
         } else {
           setShowNoAuthAccountModal(true);
         }
@@ -1368,8 +1375,10 @@ const OnsiteBooking: React.FC = () => {
           setIsProcessingPayment(true);
           setPaymentError('');
           
-          // Load Accept.js library
-          await loadAcceptJS(authorizeEnvironment);
+          // Ensure Accept.js library is loaded (should already be loaded from settings)
+          if (!window.Accept) {
+            await loadAcceptJS(authorizeEnvironment);
+          }
           
           // Process payment
         // Customer billing data for Authorize.Net

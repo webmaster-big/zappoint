@@ -294,14 +294,14 @@ const BookPackage: React.FC = () => {
             usingClientKey: !!clientKey,
             environment: environment
           });
+          
+          // Load Accept.js with the correct environment from API response
+          await loadAcceptJS(environment as 'sandbox' | 'production');
+          console.log('✅ Accept.js loaded successfully for environment:', environment);
         } else {
           console.warn('⚠️ No Authorize.Net credentials found for location:', locationId);
           console.warn('Full response:', response);
         }
-        
-        // Load Accept.js library
-        await loadAcceptJS(authorizeEnvironment);
-        console.log('✅ Accept.js loaded successfully');
       } catch (error: any) {
         console.error('❌ Failed to initialize Authorize.Net');
         console.error('Error details:', {
@@ -314,7 +314,7 @@ const BookPackage: React.FC = () => {
     };
     
     initializeAuthorizeNet();
-  }, [authorizeEnvironment]);
+  }, [pkg?.location_id]);
 
   // Fetch day offs for the package's location
   useEffect(() => {

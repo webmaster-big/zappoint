@@ -284,13 +284,14 @@ const PurchaseAttraction = () => {
             usingClientKey: !!clientKey,
             environment: environment
           });
+          
+          // Load Accept.js with the correct environment from API response
+          await loadAcceptJS(environment as 'sandbox' | 'production');
+          console.log('✅ Accept.js loaded successfully for environment:', environment);
         } else {
           console.warn('⚠️ No Authorize.Net credentials found for location:', locationId);
           console.warn('Response:', response);
         }
-        
-        await loadAcceptJS(authorizeEnvironment);
-        console.log('✅ Accept.js loaded successfully');
       } catch (error: any) {
         console.error('❌ Failed to initialize Authorize.Net');
         console.error('Error details:', {
@@ -302,7 +303,7 @@ const PurchaseAttraction = () => {
       }
     };
     initializeAuthorizeNet();
-  }, [attraction, authorizeEnvironment]);
+  }, [attraction]);
 
   // Debounced customer search by email
   useEffect(() => {

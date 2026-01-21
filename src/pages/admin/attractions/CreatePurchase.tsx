@@ -75,7 +75,8 @@ const CreatePurchase = () => {
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [paymentError, setPaymentError] = useState('');
   const [authorizeApiLoginId, setAuthorizeApiLoginId] = useState('');
-  const [authorizeEnvironment] = useState<'sandbox' | 'production'>('sandbox');
+  const [_authorizeClientKey, setAuthorizeClientKey] = useState('');
+  const [_authorizeEnvironment, setAuthorizeEnvironment] = useState<'sandbox' | 'production'>('sandbox');
   const [showNoAuthAccountModal, setShowNoAuthAccountModal] = useState(false);
   const [showEmptyModal, setShowEmptyModal] = useState(false);
   const [sendEmail, setSendEmail] = useState(true);
@@ -273,12 +274,16 @@ const CreatePurchase = () => {
         const response = await getAuthorizeNetPublicKey(locationId);
         if (response && response.api_login_id) {
           setAuthorizeApiLoginId(response.api_login_id);
+          setAuthorizeClientKey(response.client_key || response.api_login_id);
+          setAuthorizeEnvironment((response.environment || 'sandbox') as 'sandbox' | 'production');
           setShowNoAuthAccountModal(false);
+          
+          // Load Accept.js with the correct environment from API response
+          await loadAcceptJS((response.environment || 'sandbox') as 'sandbox' | 'production');
+          console.log('✅ Accept.js loaded successfully for environment:', response.environment);
         } else {
           setShowNoAuthAccountModal(true);
         }
-        await loadAcceptJS(authorizeEnvironment);
-        console.log('✅ Accept.js loaded successfully');
       } catch (error: any) {
         console.error('❌ Failed to initialize Authorize.Net:', error);
         if (error.response?.data?.message?.includes('No active Authorize.Net account')) {
@@ -287,7 +292,7 @@ const CreatePurchase = () => {
       }
     };
     initializeAuthorizeNet();
-  }, [authorizeEnvironment, selectedAttraction, paymentMethod, useAuthorizeNet]);
+  }, [selectedAttraction, paymentMethod, useAuthorizeNet]);
 
   const handleCustomerInfoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
