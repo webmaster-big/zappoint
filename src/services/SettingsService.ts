@@ -102,6 +102,36 @@ export const getAuthorizeNetPublicKey = async (locationId: number): Promise<Sett
 };
 
 /**
+ * DEBUG: Get Authorize.Net credentials debug info for a location
+ * REMOVE IN PRODUCTION - Only for troubleshooting authentication issues
+ * @param locationId - The location ID to check
+ * @returns Debug info about the stored credentials
+ */
+export const debugAuthorizeNetCredentials = async (locationId: number): Promise<any> => {
+  const response = await api.get<any>(`/authorize-net/debug/${locationId}`);
+  console.log('🔍 === AUTHORIZE.NET DEBUG INFO ===');
+  console.log('Location ID:', locationId);
+  console.log('Response:', response.data);
+  console.log('===================================');
+  return response.data;
+};
+
+// Make debug function available globally for browser console access
+if (typeof window !== 'undefined') {
+  (window as any).debugAuthorizeNet = async (locationId: number = 1) => {
+    try {
+      const result = await debugAuthorizeNetCredentials(locationId);
+      console.table(result);
+      return result;
+    } catch (error: any) {
+      console.error('Debug failed:', error.response?.data || error.message);
+      return null;
+    }
+  };
+  console.log('💡 TIP: Run debugAuthorizeNet(locationId) in console to check credentials');
+}
+
+/**
  * User Account Management Service
  */
 
