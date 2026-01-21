@@ -880,7 +880,7 @@ const BookPackage: React.FC = () => {
       const paymentData = {
         location_id: pkg.location_id || 1,
         amount: amountToPay,
-        order_id: `PKG-${pkg.id}-${Date.now()}`,
+        order_id: `P${pkg.id}-${Date.now().toString().slice(-8)}`, // Max 20 chars for Authorize.Net
         description: `Package Booking: ${pkg.name}`,
         customer_id: customerId || undefined,
       };

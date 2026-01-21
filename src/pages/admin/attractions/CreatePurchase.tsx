@@ -385,7 +385,7 @@ const CreatePurchase = () => {
         const paymentData = {
           location_id: selectedAttraction.locationId || 1,
           amount: totalAmount,
-          order_id: `ATTR-${selectedAttraction.id}-${Date.now()}`,
+          order_id: `A${selectedAttraction.id}-${Date.now().toString().slice(-8)}`, // Max 20 chars for Authorize.Net
           description: `Attraction Purchase: ${selectedAttraction.name}`,
         };
         
