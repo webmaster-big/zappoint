@@ -108,7 +108,7 @@ export interface OnsiteBookingPromo {
 export interface OnsiteBookingData {
   packageId: number | null;
   selectedAttractions: { id: string; quantity: number }[];
-  selectedAddOns: { id?: number; name: string; quantity: number; isForced?: boolean }[];
+  selectedAddOns: { id?: number; name: string; quantity: number }[];
   date: string;
   time: string;
   participants: number;

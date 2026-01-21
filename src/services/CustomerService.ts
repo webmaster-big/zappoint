@@ -244,7 +244,12 @@ class CustomerService {
     phone: string;
     password: string;
     password_confirmation: string;
-    date_of_birth?: string;
+    // Nullable billing fields (max 2 chars for state/country codes)
+    address?: string;
+    city?: string;
+    state?: string; // 2-letter state code (e.g., 'CA', 'NY')
+    zip?: string;
+    country?: string; // 2-letter country code (e.g., 'US', 'CA')
   }): Promise<ApiResponse<Customer>> {
     const response = await api.post('/customers', data);
     return response.data;

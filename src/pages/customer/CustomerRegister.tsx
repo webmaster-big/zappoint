@@ -4,31 +4,104 @@ import { Eye, EyeOff } from 'lucide-react';
 import type { RegisterFormData } from '../../types/customer';
 import customerService from '../../services/CustomerService';
 
-const countries = [
-  'United States', 'Canada', 'United Kingdom', 'Afghanistan', 'Albania', 'Algeria', 'Andorra', 'Angola',
-  'Argentina', 'Armenia', 'Australia', 'Austria', 'Azerbaijan', 'Bahamas', 'Bahrain', 'Bangladesh',
-  'Barbados', 'Belarus', 'Belgium', 'Belize', 'Benin', 'Bhutan', 'Bolivia', 'Bosnia and Herzegovina',
-  'Botswana', 'Brazil', 'Brunei', 'Bulgaria', 'Burkina Faso', 'Burundi', 'Cambodia', 'Cameroon',
-  'Cape Verde', 'Central African Republic', 'Chad', 'Chile', 'China', 'Colombia', 'Comoros',
-  'Congo', 'Costa Rica', 'Croatia', 'Cuba', 'Cyprus', 'Czech Republic', 'Denmark', 'Djibouti',
-  'Dominica', 'Dominican Republic', 'East Timor', 'Ecuador', 'Egypt', 'El Salvador', 'Equatorial Guinea',
-  'Eritrea', 'Estonia', 'Ethiopia', 'Fiji', 'Finland', 'France', 'Gabon', 'Gambia', 'Georgia',
-  'Germany', 'Ghana', 'Greece', 'Grenada', 'Guatemala', 'Guinea', 'Guinea-Bissau', 'Guyana', 'Haiti',
-  'Honduras', 'Hungary', 'Iceland', 'India', 'Indonesia', 'Iran', 'Iraq', 'Ireland', 'Israel', 'Italy',
-  'Jamaica', 'Japan', 'Jordan', 'Kazakhstan', 'Kenya', 'Kiribati', 'North Korea', 'South Korea', 'Kuwait',
-  'Kyrgyzstan', 'Laos', 'Latvia', 'Lebanon', 'Lesotho', 'Liberia', 'Libya', 'Liechtenstein', 'Lithuania',
-  'Luxembourg', 'Macedonia', 'Madagascar', 'Malawi', 'Malaysia', 'Maldives', 'Mali', 'Malta', 'Marshall Islands',
-  'Mauritania', 'Mauritius', 'Mexico', 'Micronesia', 'Moldova', 'Monaco', 'Mongolia', 'Montenegro', 'Morocco',
-  'Mozambique', 'Myanmar', 'Namibia', 'Nauru', 'Nepal', 'Netherlands', 'New Zealand', 'Nicaragua', 'Niger',
-  'Nigeria', 'Norway', 'Oman', 'Pakistan', 'Palau', 'Panama', 'Papua New Guinea', 'Paraguay', 'Peru',
-  'Philippines', 'Poland', 'Portugal', 'Qatar', 'Romania', 'Russia', 'Rwanda', 'Saint Kitts and Nevis',
-  'Saint Lucia', 'Saint Vincent and the Grenadines', 'Samoa', 'San Marino', 'Sao Tome and Principe',
-  'Saudi Arabia', 'Senegal', 'Serbia', 'Seychelles', 'Sierra Leone', 'Singapore', 'Slovakia', 'Slovenia',
-  'Solomon Islands', 'Somalia', 'South Africa', 'South Sudan', 'Spain', 'Sri Lanka', 'Sudan', 'Suriname',
-  'Swaziland', 'Sweden', 'Switzerland', 'Syria', 'Taiwan', 'Tajikistan', 'Tanzania', 'Thailand', 'Togo',
-  'Tonga', 'Trinidad and Tobago', 'Tunisia', 'Turkey', 'Turkmenistan', 'Tuvalu', 'Uganda', 'Ukraine',
-  'United Arab Emirates', 'Uruguay', 'Uzbekistan', 'Vanuatu', 'Vatican City', 'Venezuela', 'Vietnam',
-  'Yemen', 'Zambia', 'Zimbabwe'
+// Country codes (ISO 3166-1 alpha-2) with display names
+const countries: { code: string; name: string }[] = [
+  { code: 'US', name: 'United States' },
+  { code: 'CA', name: 'Canada' },
+  { code: 'GB', name: 'United Kingdom' },
+  { code: 'AU', name: 'Australia' },
+  { code: 'DE', name: 'Germany' },
+  { code: 'FR', name: 'France' },
+  { code: 'IT', name: 'Italy' },
+  { code: 'ES', name: 'Spain' },
+  { code: 'MX', name: 'Mexico' },
+  { code: 'BR', name: 'Brazil' },
+  { code: 'JP', name: 'Japan' },
+  { code: 'CN', name: 'China' },
+  { code: 'IN', name: 'India' },
+  { code: 'KR', name: 'South Korea' },
+  { code: 'NL', name: 'Netherlands' },
+  { code: 'BE', name: 'Belgium' },
+  { code: 'CH', name: 'Switzerland' },
+  { code: 'AT', name: 'Austria' },
+  { code: 'SE', name: 'Sweden' },
+  { code: 'NO', name: 'Norway' },
+  { code: 'DK', name: 'Denmark' },
+  { code: 'FI', name: 'Finland' },
+  { code: 'IE', name: 'Ireland' },
+  { code: 'PT', name: 'Portugal' },
+  { code: 'PL', name: 'Poland' },
+  { code: 'NZ', name: 'New Zealand' },
+  { code: 'SG', name: 'Singapore' },
+  { code: 'HK', name: 'Hong Kong' },
+  { code: 'PH', name: 'Philippines' },
+  { code: 'TH', name: 'Thailand' },
+  { code: 'MY', name: 'Malaysia' },
+  { code: 'ID', name: 'Indonesia' },
+  { code: 'VN', name: 'Vietnam' },
+  { code: 'AE', name: 'United Arab Emirates' },
+  { code: 'SA', name: 'Saudi Arabia' },
+  { code: 'IL', name: 'Israel' },
+  { code: 'ZA', name: 'South Africa' },
+  { code: 'AR', name: 'Argentina' },
+  { code: 'CL', name: 'Chile' },
+  { code: 'CO', name: 'Colombia' },
+  { code: 'PE', name: 'Peru' },
+];
+
+// US State codes for convenience
+const usStates: { code: string; name: string }[] = [
+  { code: 'AL', name: 'Alabama' },
+  { code: 'AK', name: 'Alaska' },
+  { code: 'AZ', name: 'Arizona' },
+  { code: 'AR', name: 'Arkansas' },
+  { code: 'CA', name: 'California' },
+  { code: 'CO', name: 'Colorado' },
+  { code: 'CT', name: 'Connecticut' },
+  { code: 'DE', name: 'Delaware' },
+  { code: 'FL', name: 'Florida' },
+  { code: 'GA', name: 'Georgia' },
+  { code: 'HI', name: 'Hawaii' },
+  { code: 'ID', name: 'Idaho' },
+  { code: 'IL', name: 'Illinois' },
+  { code: 'IN', name: 'Indiana' },
+  { code: 'IA', name: 'Iowa' },
+  { code: 'KS', name: 'Kansas' },
+  { code: 'KY', name: 'Kentucky' },
+  { code: 'LA', name: 'Louisiana' },
+  { code: 'ME', name: 'Maine' },
+  { code: 'MD', name: 'Maryland' },
+  { code: 'MA', name: 'Massachusetts' },
+  { code: 'MI', name: 'Michigan' },
+  { code: 'MN', name: 'Minnesota' },
+  { code: 'MS', name: 'Mississippi' },
+  { code: 'MO', name: 'Missouri' },
+  { code: 'MT', name: 'Montana' },
+  { code: 'NE', name: 'Nebraska' },
+  { code: 'NV', name: 'Nevada' },
+  { code: 'NH', name: 'New Hampshire' },
+  { code: 'NJ', name: 'New Jersey' },
+  { code: 'NM', name: 'New Mexico' },
+  { code: 'NY', name: 'New York' },
+  { code: 'NC', name: 'North Carolina' },
+  { code: 'ND', name: 'North Dakota' },
+  { code: 'OH', name: 'Ohio' },
+  { code: 'OK', name: 'Oklahoma' },
+  { code: 'OR', name: 'Oregon' },
+  { code: 'PA', name: 'Pennsylvania' },
+  { code: 'RI', name: 'Rhode Island' },
+  { code: 'SC', name: 'South Carolina' },
+  { code: 'SD', name: 'South Dakota' },
+  { code: 'TN', name: 'Tennessee' },
+  { code: 'TX', name: 'Texas' },
+  { code: 'UT', name: 'Utah' },
+  { code: 'VT', name: 'Vermont' },
+  { code: 'VA', name: 'Virginia' },
+  { code: 'WA', name: 'Washington' },
+  { code: 'WV', name: 'West Virginia' },
+  { code: 'WI', name: 'Wisconsin' },
+  { code: 'WY', name: 'Wyoming' },
+  { code: 'DC', name: 'District of Columbia' },
 ];
 
 const CustomerRegister = () => {
@@ -40,13 +113,13 @@ const CustomerRegister = () => {
     phone: '',
     password: '',
     confirmPassword: '',
-    // Billing Information
+    // Billing Information (optional)
     address: '',
     address2: '',
     city: '',
-    state: '',
+    state: '', // 2-letter state code (e.g., 'CA', 'NY')
     zip: '',
-    country: 'United States',
+    country: '', // 2-letter country code (e.g., 'US', 'CA')
     agreeToTerms: false
   });
   const [showPassword, setShowPassword] = useState(false);
@@ -56,9 +129,6 @@ const CustomerRegister = () => {
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const [activeTab, setActiveTab] = useState<'account' | 'billing'>('account');
-  const [countrySearch, setCountrySearch] = useState('');
-  const [showCountrySuggestions, setShowCountrySuggestions] = useState(false);
-  const [countryDebounceTimer, setCountryDebounceTimer] = useState<NodeJS.Timeout | null>(null);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -70,9 +140,19 @@ const CustomerRegister = () => {
   };
 
   const validateForm = (): boolean => {
-    // Validate required fields only (address2 and company are optional)
-    if (!formData.firstName || !formData.lastName || !formData.email || !formData.phone || !formData.password || !formData.confirmPassword || !formData.address || !formData.city || !formData.state || !formData.zip || !formData.country) {
+    // Validate required fields only (billing fields are optional/nullable in backend)
+    if (!formData.firstName || !formData.lastName || !formData.email || !formData.phone || !formData.password || !formData.confirmPassword) {
       setError('Please fill in all required fields');
+      return false;
+    }
+    // Validate state code format if provided (max 2 characters)
+    if (formData.state && formData.state.length > 2) {
+      setError('State must be a 2-letter code (e.g., CA, NY)');
+      return false;
+    }
+    // Validate country code format if provided (max 2 characters)
+    if (formData.country && formData.country.length > 2) {
+      setError('Country must be a 2-letter code (e.g., US, CA)');
       return false;
     }
     if (formData.password !== formData.confirmPassword) {
@@ -110,18 +190,15 @@ const CustomerRegister = () => {
     );
   };
 
-  // Check if billing tab is complete
+  // Check if billing tab is complete (billing fields are optional)
   const isBillingTabComplete = (): boolean => {
-    return !!(
-      formData.address &&
-      formData.city &&
-      formData.state &&
-      formData.zip &&
-      formData.country
-    );
+    // Billing is optional, but if state or country is provided, validate format
+    if (formData.state && formData.state.length > 2) return false;
+    if (formData.country && formData.country.length > 2) return false;
+    return true; // Billing fields are optional
   };
 
-  // Check if form is ready to submit
+  // Check if form is ready to submit (billing is optional)
   const isFormValid = (): boolean => {
     return isAccountTabComplete() && isBillingTabComplete() && formData.agreeToTerms;
   };
@@ -135,7 +212,7 @@ const CustomerRegister = () => {
       return;
     }
     try {
-      // Call the API to register the customer
+      // Call the API to register the customer with optional billing fields
       const response = await customerService.register({
         first_name: formData.firstName,
         last_name: formData.lastName,
@@ -143,8 +220,12 @@ const CustomerRegister = () => {
         phone: formData.phone,
         password: formData.password,
         password_confirmation: formData.confirmPassword,
-        // Note: Billing information is stored locally and will be used during checkout
-        // Backend migration for billing fields may be needed
+        // Optional billing fields (nullable in backend)
+        ...(formData.address && { address: formData.address }),
+        ...(formData.city && { city: formData.city }),
+        ...(formData.state && { state: formData.state }), // 2-letter state code
+        ...(formData.zip && { zip: formData.zip }),
+        ...(formData.country && { country: formData.country }), // 2-letter country code
       });
 
       if (response.success && response.data) {
@@ -434,17 +515,18 @@ const CustomerRegister = () => {
             {activeTab === 'billing' && (
               <div className="space-y-5">
             <div className="space-y-4">
+                <p className="text-xs text-zinc-500 mb-2">Billing information is optional and can be added later.</p>
                 <div>
-                  <label className="block text-sm font-medium text-zinc-800 mb-1">Street Address</label>
+                  <label className="block text-sm font-medium text-zinc-800 mb-1">Street Address <span className="text-zinc-400 font-normal">(Optional)</span></label>
                   <input
                     type="text"
                     name="address"
                     autoComplete="address-line1"
-                    required
                     value={formData.address}
                     onChange={handleChange}
                     className="w-full border border-zinc-200 px-3 py-2 text-zinc-900 bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-800 focus:border-blue-800 transition text-base rounded-none"
                     placeholder="123 Main Street"
+                    maxLength={255}
                   />
                 </div>
 
@@ -463,127 +545,67 @@ const CustomerRegister = () => {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-zinc-800 mb-1">City</label>
+                    <label className="block text-sm font-medium text-zinc-800 mb-1">City <span className="text-zinc-400 font-normal">(Optional)</span></label>
                     <input
                       type="text"
                       name="city"
                       autoComplete="address-level2"
-                      required
                       value={formData.city}
                       onChange={handleChange}
                       className="w-full border border-zinc-200 px-3 py-2 text-zinc-900 bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-800 focus:border-blue-800 transition text-base rounded-none"
                       placeholder="City"
+                      maxLength={100}
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-zinc-800 mb-1">State / Province</label>
-                    <input
-                      type="text"
+                    <label className="block text-sm font-medium text-zinc-800 mb-1">State <span className="text-zinc-400 font-normal">(Optional, 2-letter code)</span></label>
+                    <select
                       name="state"
                       autoComplete="address-level1"
-                      required
                       value={formData.state}
-                      onChange={handleChange}
+                      onChange={(e) => setFormData(prev => ({ ...prev, state: e.target.value }))}
                       className="w-full border border-zinc-200 px-3 py-2 text-zinc-900 bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-800 focus:border-blue-800 transition text-base rounded-none"
-                      placeholder="State / Province"
-                    />
+                    >
+                      <option value="">Select state...</option>
+                      {usStates.map(state => (
+                        <option key={state.code} value={state.code}>
+                          {state.code} - {state.name}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-zinc-800 mb-1">ZIP / Postal Code</label>
+                    <label className="block text-sm font-medium text-zinc-800 mb-1">ZIP / Postal Code <span className="text-zinc-400 font-normal">(Optional)</span></label>
                     <input
                       type="text"
                       name="zip"
                       autoComplete="postal-code"
-                      required
                       value={formData.zip}
                       onChange={handleChange}
                       className="w-full border border-zinc-200 px-3 py-2 text-zinc-900 bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-800 focus:border-blue-800 transition text-base rounded-none"
                       placeholder="12345"
+                      maxLength={10}
                     />
                   </div>
-                  <div className="relative">
-                    <label className="block text-sm font-medium text-zinc-800 mb-1">Country</label>
-                    <input
-                      type="text"
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-800 mb-1">Country <span className="text-zinc-400 font-normal">(Optional, 2-letter code)</span></label>
+                    <select
                       name="country"
-                      value={countrySearch || formData.country}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        setCountrySearch(value);
-                        
-                        // Clear existing timer
-                        if (countryDebounceTimer) {
-                          clearTimeout(countryDebounceTimer);
-                        }
-                        
-                        // Set new timer to show suggestions after 300ms
-                        const timer = setTimeout(() => {
-                          setShowCountrySuggestions(true);
-                        }, 300);
-                        setCountryDebounceTimer(timer);
-                      }}
-                      onFocus={() => {
-                        // Clear the input to allow typing when focused
-                        if (formData.country && !countrySearch) {
-                          setCountrySearch('');
-                        }
-                        // Show suggestions after debounce
-                        if (countryDebounceTimer) {
-                          clearTimeout(countryDebounceTimer);
-                        }
-                        const timer = setTimeout(() => {
-                          setShowCountrySuggestions(true);
-                        }, 300);
-                        setCountryDebounceTimer(timer);
-                      }}
-                      onBlur={() => {
-                        setTimeout(() => {
-                          setShowCountrySuggestions(false);
-                          // If nothing typed, keep the selected country
-                          if (!countrySearch && formData.country) {
-                            setCountrySearch('');
-                          }
-                        }, 200);
-                      }}
-                      placeholder="Start typing country name..."
+                      autoComplete="country"
+                      value={formData.country}
+                      onChange={(e) => setFormData(prev => ({ ...prev, country: e.target.value }))}
                       className="w-full border border-zinc-200 px-3 py-2 text-zinc-900 bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-800 focus:border-blue-800 transition text-base rounded-none"
-                      required
-                      autoComplete="off"
-                    />
-                    {/* Country Suggestions Dropdown */}
-                    {showCountrySuggestions && (countrySearch || formData.country) && (
-                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                        {countries
-                          .filter(country => 
-                            country.toLowerCase().includes((countrySearch || formData.country || '').toLowerCase())
-                          )
-                          .slice(0, 10)
-                          .map(country => (
-                            <button
-                              key={country}
-                              type="button"
-                              className="w-full text-left px-4 py-2 hover:bg-blue-50 transition-colors text-sm"
-                              onClick={() => {
-                                setFormData({ ...formData, country });
-                                setCountrySearch('');
-                                setShowCountrySuggestions(false);
-                              }}
-                            >
-                              {country}
-                            </button>
-                          ))}
-                        {countries.filter(country => 
-                          country.toLowerCase().includes((countrySearch || formData.country || '').toLowerCase())
-                        ).length === 0 && (
-                          <div className="px-4 py-2 text-sm text-gray-500">
-                            No countries found
-                          </div>
-                        )}
-                      </div>
-                    )}
+                    >
+                      <option value="">Select country...</option>
+                      {countries.map(country => (
+                        <option key={country.code} value={country.code}>
+                          {country.code} - {country.name}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
               </div>
