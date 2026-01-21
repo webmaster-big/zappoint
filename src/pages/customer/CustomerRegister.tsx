@@ -222,6 +222,7 @@ const CustomerRegister = () => {
         password_confirmation: formData.confirmPassword,
         // Optional billing fields (nullable in backend)
         ...(formData.address && { address: formData.address }),
+        ...(formData.address2 && { address2: formData.address2 }),
         ...(formData.city && { city: formData.city }),
         ...(formData.state && { state: formData.state }), // 2-letter state code
         ...(formData.zip && { zip: formData.zip }),

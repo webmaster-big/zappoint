@@ -246,6 +246,7 @@ class CustomerService {
     password_confirmation: string;
     // Nullable billing fields (max 2 chars for state/country codes)
     address?: string;
+    address2?: string;
     city?: string;
     state?: string; // 2-letter state code (e.g., 'CA', 'NY')
     zip?: string;
