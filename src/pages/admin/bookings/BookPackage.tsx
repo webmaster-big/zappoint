@@ -31,31 +31,49 @@ const parseLocalDate = (isoDateString: string): Date => {
   return new Date(year, month - 1, day);
 };
 
-const countries = [
-  'United States', 'Canada', 'United Kingdom', 'Afghanistan', 'Albania', 'Algeria', 'Andorra', 'Angola',
-  'Argentina', 'Armenia', 'Australia', 'Austria', 'Azerbaijan', 'Bahamas', 'Bahrain', 'Bangladesh',
-  'Barbados', 'Belarus', 'Belgium', 'Belize', 'Benin', 'Bhutan', 'Bolivia', 'Bosnia and Herzegovina',
-  'Botswana', 'Brazil', 'Brunei', 'Bulgaria', 'Burkina Faso', 'Burundi', 'Cambodia', 'Cameroon',
-  'Cape Verde', 'Central African Republic', 'Chad', 'Chile', 'China', 'Colombia', 'Comoros',
-  'Congo', 'Costa Rica', 'Croatia', 'Cuba', 'Cyprus', 'Czech Republic', 'Denmark', 'Djibouti',
-  'Dominica', 'Dominican Republic', 'East Timor', 'Ecuador', 'Egypt', 'El Salvador', 'Equatorial Guinea',
-  'Eritrea', 'Estonia', 'Ethiopia', 'Fiji', 'Finland', 'France', 'Gabon', 'Gambia', 'Georgia',
-  'Germany', 'Ghana', 'Greece', 'Grenada', 'Guatemala', 'Guinea', 'Guinea-Bissau', 'Guyana', 'Haiti',
-  'Honduras', 'Hungary', 'Iceland', 'India', 'Indonesia', 'Iran', 'Iraq', 'Ireland', 'Israel', 'Italy',
-  'Jamaica', 'Japan', 'Jordan', 'Kazakhstan', 'Kenya', 'Kiribati', 'North Korea', 'South Korea', 'Kuwait',
-  'Kyrgyzstan', 'Laos', 'Latvia', 'Lebanon', 'Lesotho', 'Liberia', 'Libya', 'Liechtenstein', 'Lithuania',
-  'Luxembourg', 'Macedonia', 'Madagascar', 'Malawi', 'Malaysia', 'Maldives', 'Mali', 'Malta', 'Marshall Islands',
-  'Mauritania', 'Mauritius', 'Mexico', 'Micronesia', 'Moldova', 'Monaco', 'Mongolia', 'Montenegro', 'Morocco',
-  'Mozambique', 'Myanmar', 'Namibia', 'Nauru', 'Nepal', 'Netherlands', 'New Zealand', 'Nicaragua', 'Niger',
-  'Nigeria', 'Norway', 'Oman', 'Pakistan', 'Palau', 'Panama', 'Papua New Guinea', 'Paraguay', 'Peru',
-  'Philippines', 'Poland', 'Portugal', 'Qatar', 'Romania', 'Russia', 'Rwanda', 'Saint Kitts and Nevis',
-  'Saint Lucia', 'Saint Vincent and the Grenadines', 'Samoa', 'San Marino', 'Sao Tome and Principe',
-  'Saudi Arabia', 'Senegal', 'Serbia', 'Seychelles', 'Sierra Leone', 'Singapore', 'Slovakia', 'Slovenia',
-  'Solomon Islands', 'Somalia', 'South Africa', 'South Sudan', 'Spain', 'Sri Lanka', 'Sudan', 'Suriname',
-  'Swaziland', 'Sweden', 'Switzerland', 'Syria', 'Taiwan', 'Tajikistan', 'Tanzania', 'Thailand', 'Togo',
-  'Tonga', 'Trinidad and Tobago', 'Tunisia', 'Turkey', 'Turkmenistan', 'Tuvalu', 'Uganda', 'Ukraine',
-  'United Arab Emirates', 'Uruguay', 'Uzbekistan', 'Vanuatu', 'Vatican City', 'Venezuela', 'Vietnam',
-  'Yemen', 'Zambia', 'Zimbabwe'
+// Country codes (ISO 3166-1 alpha-2) with display names
+const countries: { code: string; name: string }[] = [
+  { code: 'US', name: 'United States' },
+  { code: 'CA', name: 'Canada' },
+  { code: 'GB', name: 'United Kingdom' },
+  { code: 'AU', name: 'Australia' },
+  { code: 'DE', name: 'Germany' },
+  { code: 'FR', name: 'France' },
+  { code: 'IT', name: 'Italy' },
+  { code: 'ES', name: 'Spain' },
+  { code: 'MX', name: 'Mexico' },
+  { code: 'BR', name: 'Brazil' },
+  { code: 'JP', name: 'Japan' },
+  { code: 'CN', name: 'China' },
+  { code: 'IN', name: 'India' },
+  { code: 'KR', name: 'South Korea' },
+  { code: 'NL', name: 'Netherlands' },
+  { code: 'BE', name: 'Belgium' },
+  { code: 'CH', name: 'Switzerland' },
+  { code: 'AT', name: 'Austria' },
+  { code: 'SE', name: 'Sweden' },
+  { code: 'NO', name: 'Norway' },
+  { code: 'DK', name: 'Denmark' },
+  { code: 'FI', name: 'Finland' },
+  { code: 'IE', name: 'Ireland' },
+  { code: 'PT', name: 'Portugal' },
+  { code: 'PL', name: 'Poland' },
+  { code: 'NZ', name: 'New Zealand' },
+  { code: 'SG', name: 'Singapore' },
+  { code: 'HK', name: 'Hong Kong' },
+  { code: 'PH', name: 'Philippines' },
+  { code: 'TH', name: 'Thailand' },
+  { code: 'MY', name: 'Malaysia' },
+  { code: 'ID', name: 'Indonesia' },
+  { code: 'VN', name: 'Vietnam' },
+  { code: 'AE', name: 'United Arab Emirates' },
+  { code: 'SA', name: 'Saudi Arabia' },
+  { code: 'IL', name: 'Israel' },
+  { code: 'ZA', name: 'South Africa' },
+  { code: 'AR', name: 'Argentina' },
+  { code: 'CL', name: 'Chile' },
+  { code: 'CO', name: 'Colombia' },
+  { code: 'PE', name: 'Peru' },
 ];
 
 const BookPackage: React.FC = () => {
@@ -78,13 +96,13 @@ const BookPackage: React.FC = () => {
     email: "",
     phone: "",
     notes: "",
-    // Billing Information
+    // Billing Information (optional)
     address: "",
     address2: "",
     city: "",
-    state: "",
+    state: "", // 2-letter state code
     zip: "",
-    country: "United States",
+    country: "", // 2-letter country code
     // Guest of Honor
     guestOfHonorName: "",
     guestOfHonorAge: "",
@@ -191,66 +209,55 @@ const BookPackage: React.FC = () => {
         const customerData = localStorage.getItem('zapzone_customer');
         if (customerData) {
           const customer: any = JSON.parse(customerData);
+          
+          // Immediately autofill from localStorage (instant feedback)
+          setForm(prev => ({
+            ...prev,
+            firstName: customer.firstName || customer.first_name || prev.firstName,
+            lastName: customer.lastName || customer.last_name || prev.lastName,
+            email: customer.email || prev.email,
+            phone: customer.phone || prev.phone,
+            address: customer.address || prev.address,
+            address2: customer.address2 || prev.address2,
+            city: customer.city || prev.city,
+            state: customer.state || prev.state,
+            zip: customer.zip || prev.zip,
+            country: customer.country || prev.country || 'US'
+          }));
+          
           if (customer.id) {
-            // Fetch fresh customer data from API
-            const response = await customerService.getCustomerById(customer.id);
-            if (response.success && response.data) {
-              const data: any = response.data;
-              setCustomerId(customer.id); // Store customer ID
-              setForm(prev => ({
-                ...prev,
-                firstName: data.first_name || customer.firstName || '',
-                lastName: data.last_name || customer.lastName || '',
-                email: data.email || customer.email || '',
-                phone: data.phone || customer.phone || '',
-                address: data.address || customer.address || '',
-                address2: data.address2 || customer.address2 || '',
-                city: data.city || customer.city || '',
-                state: data.state || customer.state || '',
-                zip: data.zip || customer.zip || '',
-                country: data.country || customer.country || 'United States'
-              }));
-              console.log('✅ Customer billing information auto-filled from localStorage');
+            setCustomerId(customer.id);
+            console.log('✅ Customer info auto-filled from localStorage');
+            
+            // Optionally refresh from API for latest data
+            try {
+              const response = await customerService.getCustomerById(customer.id);
+              if (response.success && response.data) {
+                const data: any = response.data;
+                setForm(prev => ({
+                  ...prev,
+                  firstName: data.first_name || prev.firstName,
+                  lastName: data.last_name || prev.lastName,
+                  email: data.email || prev.email,
+                  phone: data.phone || prev.phone,
+                  address: data.address || prev.address,
+                  address2: data.address2 || prev.address2,
+                  city: data.city || prev.city,
+                  state: data.state || prev.state,
+                  zip: data.zip || prev.zip,
+                  country: data.country || prev.country
+                }));
+                console.log('✅ Customer info refreshed from API');
+              }
+            } catch (apiError) {
+              console.log('⚠️ API refresh skipped, using localStorage data');
             }
           } else {
-            // If no ID but customer data exists in localStorage, use it directly
-            setForm(prev => ({
-              ...prev,
-              firstName: customer.firstName || '',
-              lastName: customer.lastName || '',
-              email: customer.email || '',
-              phone: customer.phone || '',
-              address: customer.address || '',
-              address2: customer.address2 || '',
-              city: customer.city || '',
-              state: customer.state || '',
-              zip: customer.zip || '',
-              country: customer.country || 'United States'
-            }));
-            console.log('✅ Customer information auto-filled from localStorage (no API call)');
+            console.log('✅ Customer info auto-filled from localStorage (guest)');
           }
         }
       } catch (error) {
-        console.error('Error fetching customer data:', error);
-        // Fallback to localStorage data if API fails
-        const customerData = localStorage.getItem('zapzone_customer');
-        if (customerData) {
-          const customer: any = JSON.parse(customerData);
-          setForm(prev => ({
-            ...prev,
-            firstName: customer.firstName || '',
-            lastName: customer.lastName || '',
-            email: customer.email || '',
-            phone: customer.phone || '',
-            address: customer.address || '',
-            address2: customer.address2 || '',
-            city: customer.city || '',
-            state: customer.state || '',
-            zip: customer.zip || '',
-            country: customer.country || 'United States'
-          }));
-          console.log('✅ Customer information auto-filled from localStorage (fallback)');
-        }
+        console.error('Error loading customer data:', error);
       }
     };
     
@@ -673,7 +680,7 @@ const BookPackage: React.FC = () => {
       city: "",
       state: "",
       zip: "",
-      country: "United States",
+      country: "",
       guestOfHonorName: "",
       guestOfHonorAge: "",
       guestOfHonorGender: ""
@@ -1953,16 +1960,17 @@ const BookPackage: React.FC = () => {
                           setCountrySearch(value);
                           setShowCountrySuggestions(true);
                           
-                          // If exact match, auto-select it
-                          const exactMatch = countries.find(c => c.toLowerCase() === value.toLowerCase());
+                          // If exact match by name, auto-select it
+                          const exactMatch = countries.find(c => c.name.toLowerCase() === value.toLowerCase());
                           if (exactMatch) {
-                            setForm(f => ({ ...f, country: exactMatch }));
+                            setForm(f => ({ ...f, country: exactMatch.code }));
                           }
                         }}
                         onFocus={() => {
                           // If input is empty but country is selected, show the country name
                           if (!countrySearch && form.country) {
-                            setCountrySearch(form.country);
+                            const selectedCountry = countries.find(c => c.code === form.country);
+                            if (selectedCountry) setCountrySearch(selectedCountry.name);
                           }
                           setShowCountrySuggestions(true);
                         }}
@@ -1970,12 +1978,13 @@ const BookPackage: React.FC = () => {
                           setTimeout(() => {
                             setShowCountrySuggestions(false);
                             // If the typed value doesn't match any country, reset to selected country
-                            const matchedCountry = countries.find(c => c.toLowerCase() === countrySearch.toLowerCase());
+                            const matchedCountry = countries.find(c => c.name.toLowerCase() === countrySearch.toLowerCase());
                             if (matchedCountry) {
-                              setForm(f => ({ ...f, country: matchedCountry }));
-                              setCountrySearch(matchedCountry);
+                              setForm(f => ({ ...f, country: matchedCountry.code }));
+                              setCountrySearch(matchedCountry.name);
                             } else if (form.country) {
-                              setCountrySearch(form.country);
+                              const selectedCountry = countries.find(c => c.code === form.country);
+                              if (selectedCountry) setCountrySearch(selectedCountry.name);
                             }
                           }, 200);
                         }}
@@ -1988,28 +1997,28 @@ const BookPackage: React.FC = () => {
                         <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                           {countries
                             .filter(country => 
-                              country.toLowerCase().includes(countrySearch.toLowerCase())
+                              country.name.toLowerCase().includes(countrySearch.toLowerCase())
                             )
                             .slice(0, 10)
                             .map(country => (
                               <button
-                                key={country}
+                                key={country.code}
                                 type="button"
                                 className={`w-full text-left px-4 py-2 hover:bg-blue-50 transition-colors text-sm ${
-                                  country === form.country ? 'bg-blue-50 font-medium' : ''
+                                  country.code === form.country ? 'bg-blue-50 font-medium' : ''
                                 }`}
                                 onMouseDown={(e) => {
                                   e.preventDefault(); // Prevent blur from firing first
-                                  setForm(f => ({ ...f, country }));
-                                  setCountrySearch(country);
+                                  setForm(f => ({ ...f, country: country.code }));
+                                  setCountrySearch(country.name);
                                   setShowCountrySuggestions(false);
                                 }}
                               >
-                                {country}
+                                {country.name}
                               </button>
                             ))}
                           {countries.filter(country => 
-                            country.toLowerCase().includes(countrySearch.toLowerCase())
+                            country.name.toLowerCase().includes(countrySearch.toLowerCase())
                           ).length === 0 && (
                             <div className="px-4 py-2 text-sm text-gray-500">
                               No countries found

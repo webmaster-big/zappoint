@@ -92,7 +92,7 @@ const CustomerLogin = () => {
           city: response.user.city || '',
           state: response.user.state || '',
           zip: response.user.zip || '',
-          country: response.user.country || 'United States',
+          country: response.user.country || 'US', // 2-letter country code
           token: response.token,
           role: response.role,
         };
