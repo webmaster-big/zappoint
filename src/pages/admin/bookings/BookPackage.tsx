@@ -76,6 +76,61 @@ const countries: { code: string; name: string }[] = [
   { code: 'PE', name: 'Peru' },
 ];
 
+// Helper function to parse payment errors into user-friendly messages
+const getPaymentErrorMessage = (error: any): string => {
+  const errorMessage = error?.message?.toLowerCase() || '';
+  const responseMessage = error?.response?.data?.message?.toLowerCase() || '';
+  const combinedMessage = `${errorMessage} ${responseMessage}`;
+  
+  // Card declined errors
+  if (combinedMessage.includes('declined') || combinedMessage.includes('decline')) {
+    return 'Your card was declined. Please check your card details or try a different payment method.';
+  }
+  
+  // Insufficient funds
+  if (combinedMessage.includes('insufficient') || combinedMessage.includes('nsf')) {
+    return 'Insufficient funds. Please try a different card or payment method.';
+  }
+  
+  // Invalid card number
+  if (combinedMessage.includes('invalid card') || combinedMessage.includes('card number')) {
+    return 'Invalid card number. Please check and re-enter your card details.';
+  }
+  
+  // Expired card
+  if (combinedMessage.includes('expired') || combinedMessage.includes('expiration')) {
+    return 'Your card has expired. Please use a different card.';
+  }
+  
+  // CVV/Security code errors
+  if (combinedMessage.includes('cvv') || combinedMessage.includes('security code') || combinedMessage.includes('cvc')) {
+    return 'Invalid security code (CVV). Please check the 3 or 4 digit code on your card.';
+  }
+  
+  // Authentication errors
+  if (combinedMessage.includes('authentication') || combinedMessage.includes('3d secure')) {
+    return 'Card authentication failed. Please try again or use a different card.';
+  }
+  
+  // Network/connection errors
+  if (combinedMessage.includes('network') || combinedMessage.includes('connection') || combinedMessage.includes('timeout')) {
+    return 'Connection error. Please check your internet and try again.';
+  }
+  
+  // Fraud detection
+  if (combinedMessage.includes('fraud') || combinedMessage.includes('suspicious')) {
+    return 'Transaction blocked for security reasons. Please contact your bank or try a different card.';
+  }
+  
+  // Rate limiting
+  if (combinedMessage.includes('too many') || combinedMessage.includes('rate limit')) {
+    return 'Too many attempts. Please wait a moment and try again.';
+  }
+  
+  // Default fallback
+  return error?.message || 'Payment could not be processed. Please check your card details and try again.';
+};
+
 const BookPackage: React.FC = () => {
   const { slug } = useParams<{ location: string; slug: string }>();
   const packageId = slug ? extractIdFromSlug(slug) : null;
@@ -121,7 +176,7 @@ const BookPackage: React.FC = () => {
   const [paymentError, setPaymentError] = useState("");
   const [authorizeApiLoginId, setAuthorizeApiLoginId] = useState("");
   const [authorizeClientKey, setAuthorizeClientKey] = useState("");
-  const [authorizeEnvironment, setAuthorizeEnvironment] = useState<'sandbox' | 'production'>('sandbox');
+  const [_authorizeEnvironment, setAuthorizeEnvironment] = useState<'sandbox' | 'production'>('sandbox');
   
   // Date and time selection
   const [selectedDate, setSelectedDate] = useState<string>("");
@@ -161,9 +216,6 @@ const BookPackage: React.FC = () => {
       try {
         setLoadingPackage(true);
         const response = await bookingService.getPackageById(Number(packageId));
-        console.log('📦 Package data received:', response.data);
-        console.log('📷 Package image:', response.data.image);
-        console.log('🎨 Add-ons:', response.data.add_ons);
         setPkg(response.data);
         
         // Set default participants to min_participants
@@ -180,20 +232,14 @@ const BookPackage: React.FC = () => {
             );
             if (packageSpecificPrice) {
               forceAddOns[addOn.id] = packageSpecificPrice.minimum_quantity || 1;
-              console.log('🔗 Auto-adding force add-on:', { 
-                name: addOn.name, 
-                id: addOn.id, 
-                minQty: packageSpecificPrice.minimum_quantity 
-              });
             }
           }
         });
         if (Object.keys(forceAddOns).length > 0) {
           setSelectedAddOns(forceAddOns);
         }
-      } catch (err) {
-        console.error('Error fetching package:', err);
-        setError('Failed to load package details');
+      } catch {
+        setError('Failed to load package details. Please refresh the page.');
       } finally {
         setLoadingPackage(false);
       }
@@ -227,7 +273,6 @@ const BookPackage: React.FC = () => {
           
           if (customer.id) {
             setCustomerId(customer.id);
-            console.log('✅ Customer info auto-filled from localStorage');
             
             // Optionally refresh from API for latest data
             try {
@@ -247,17 +292,14 @@ const BookPackage: React.FC = () => {
                   zip: data.zip || prev.zip,
                   country: data.country || prev.country
                 }));
-                console.log('✅ Customer info refreshed from API');
               }
-            } catch (apiError) {
-              console.log('⚠️ API refresh skipped, using localStorage data');
+            } catch {
+              // API refresh skipped, using localStorage data
             }
-          } else {
-            console.log('✅ Customer info auto-filled from localStorage (guest)');
           }
         }
-      } catch (error) {
-        console.error('Error loading customer data:', error);
+      } catch {
+        // Error loading customer data - silent fail
       }
     };
     
@@ -269,47 +311,25 @@ const BookPackage: React.FC = () => {
     const initializeAuthorizeNet = async () => {
       try {
         const locationId = pkg?.location_id || 1;
-        console.log('🔧 Initializing Authorize.Net for location:', locationId);
         
         // Fetch public key from backend
         const response = await getAuthorizeNetPublicKey(locationId);
-        console.log('📡 Authorize.Net API Response:', response);
         
         // API returns data directly: { api_login_id, client_key, environment }
         const apiLoginId = response.api_login_id;
         const clientKey = response.client_key;
         const environment = response.environment || 'sandbox';
         
-        console.log('📡 Authorize.Net parsed data:', {
-          apiLoginId: apiLoginId ? '✅ Present' : '❌ Missing',
-          clientKey: clientKey ? '✅ Present' : '⚠️ Missing (will use API Login ID)',
-          environment: environment
-        });
-        
         if (apiLoginId) {
           setAuthorizeApiLoginId(apiLoginId);
           setAuthorizeClientKey(clientKey || apiLoginId); // Fallback to apiLoginId if no clientKey
           setAuthorizeEnvironment(environment as 'sandbox' | 'production');
-          console.log('✅ Authorize.Net credentials set:', {
-            usingClientKey: !!clientKey,
-            environment: environment
-          });
           
           // Load Accept.js with the correct environment from API response
           await loadAcceptJS(environment as 'sandbox' | 'production');
-          console.log('✅ Accept.js loaded successfully for environment:', environment);
-        } else {
-          console.warn('⚠️ No Authorize.Net credentials found for location:', locationId);
-          console.warn('Full response:', response);
         }
-      } catch (error: any) {
-        console.error('❌ Failed to initialize Authorize.Net');
-        console.error('Error details:', {
-          message: error.message,
-          response: error.response?.data,
-          status: error.response?.status,
-          fullError: error
-        });
+      } catch {
+        // Payment system initialization failed - will show error when user tries to pay
       }
     };
     
@@ -375,10 +395,9 @@ const BookPackage: React.FC = () => {
           
           setDayOffs(fullDayOffDates);
           setDayOffsWithTime(partialOrSpecificDayOffs);
-          console.log('📅 Day offs loaded:', fullDayOffDates.length, 'full location-wide days,', partialOrSpecificDayOffs.length, 'partial/resource-specific days');
         }
-      } catch (error) {
-        console.error('Error fetching day offs:', error);
+      } catch {
+        // Error fetching day offs - calendar will work without day off restrictions
       }
     };
     
@@ -578,20 +597,18 @@ const BookPackage: React.FC = () => {
         const data = JSON.parse(event.data);
         setAvailableTimeSlots(data.available_slots);
         setLoadingTimeSlots(false);
-        // console.log('Received SSE data:', data);
         
         // Mark first update as complete (no auto-selection)
         if (isFirstUpdate) {
           isFirstUpdate = false;
         }
       } catch (err) {
-        console.error('Error parsing SSE data:', err);
+        // SSE parsing error - handled silently in production
       }
     };
     
     // Handle errors
-    eventSource.onerror = (err) => {
-      console.error('SSE connection error:', err);
+    eventSource.onerror = () => {
       setLoadingTimeSlots(false);
       eventSource.close();
     };
@@ -861,8 +878,6 @@ const BookPackage: React.FC = () => {
       }
       
       // Step 1: Process payment first
-      console.log('💳 Processing payment...');
-      
       const cardData = {
         cardNumber: cardNumber.replace(/\s/g, ''),
         month: cardMonth,
@@ -892,12 +907,6 @@ const BookPackage: React.FC = () => {
         customer_id: customerId || undefined,
       };
       
-      console.log('🔑 Using Authorize.Net credentials:', {
-        apiLoginId: authorizeApiLoginId ? '✅ Set' : '❌ Missing',
-        clientKey: authorizeClientKey ? '✅ Set' : '❌ Missing',
-        environment: authorizeEnvironment
-      });
-      
       const paymentResponse = await processCardPayment(
         cardData,
         paymentData,
@@ -910,27 +919,16 @@ const BookPackage: React.FC = () => {
         throw new Error(paymentResponse.message || 'Payment failed');
       }
       
-      console.log('✅ Payment successful:', paymentResponse.transaction_id);
-      
       // Step 2: Create booking with payment info
-      console.log('📦 Building additional attractions/addons...', {
-        selectedAttractions,
-        selectedAddOns,
-        pkgAttractions: pkg.attractions,
-        pkgAddOns: pkg.add_ons
-      });
-      
       const additionalAttractions = Object.entries(selectedAttractions)
         .filter(([, qty]) => qty > 0)
         .map(([id, qty]) => {
           const attraction = pkg.attractions.find(a => a.id === Number(id));
           if (!attraction) {
-            console.warn(`⚠️ Attraction not found: ${id}, available:`, pkg.attractions.map(a => a.id));
             return null;
           }
           // price_at_booking should be unit price, backend calculates total
           const unitPrice = Number(attraction.price);
-          console.log(`✅ Attraction found: ${attraction.name}, price: ${unitPrice}`);
           return {
             attraction_id: Number(id),
             quantity: qty,
@@ -944,12 +942,10 @@ const BookPackage: React.FC = () => {
         .map(([id, qty]) => {
           const addon = pkg.add_ons.find(a => a.id === Number(id));
           if (!addon) {
-            console.warn(`⚠️ Add-on not found: ${id}, available:`, pkg.add_ons.map(a => a.id));
             return null;
           }
           // Use package-specific price if available
           const unitPrice = getAddOnPrice(addon, pkg.id);
-          console.log(`✅ Add-on found: ${addon.name}, price: ${unitPrice}`);
           return {
             addon_id: Number(id),
             quantity: qty,
@@ -988,63 +984,11 @@ const BookPackage: React.FC = () => {
         guest_of_honor_gender: pkg.has_guest_of_honor && form.guestOfHonorGender ? form.guestOfHonorGender as 'male' | 'female' | 'other' : undefined,
       };
       
-      console.log('📦 === BOOKING DATA BEING SENT TO BACKEND ===');
-      console.log('Full Booking Object:', JSON.stringify(bookingData, null, 2));
-      console.log('Guest Information:', {
-        name: bookingData.guest_name,
-        email: bookingData.guest_email,
-        phone: bookingData.guest_phone,
-        customer_id: bookingData.customer_id
-      });
-      console.log('Billing Information:', {
-        address: form.address,
-        address2: form.address2,
-        city: form.city,
-        state: form.state,
-        zip: form.zip,
-        country: form.country
-      });
-      console.log('\n🔍 === CRITICAL BOOKING FIELDS VALIDATION ===');
-      console.log('✅ room_id:', bookingData.room_id ? `${bookingData.room_id} (from selected time slot)` : '❌ MISSING - This will cause booking to fail!');
-      console.log('✅ booking_time:', bookingData.booking_time || '❌ MISSING');
-      console.log('✅ booking_date:', bookingData.booking_date || '❌ MISSING');
-      console.log('📍 Selected time slot details:', availableTimeSlots.find(slot => slot.start_time === selectedTime));
-      console.log('Booking Details:', {
-        location_id: bookingData.location_id,
-        package_id: bookingData.package_id,
-        room_id: bookingData.room_id,
-        type: bookingData.type,
-        date: bookingData.booking_date,
-        time: bookingData.booking_time,
-        participants: bookingData.participants,
-        duration: `${bookingData.duration} ${bookingData.duration_unit}`
-      });
-      console.log('=========================================\n');
-      console.log('Payment Information:', {
-        total_amount: bookingData.total_amount,
-        amount_paid: bookingData.amount_paid,
-        payment_method: bookingData.payment_method,
-        payment_status: bookingData.payment_status,
-        transaction_id: bookingData.transaction_id
-      });
-      console.log('Add-ons & Attractions:', {
-        attractions: bookingData.additional_attractions,
-        addons: bookingData.additional_addons
-      });
-      console.log('Discounts:', {
-        promo_code: bookingData.promo_code,
-        gift_card_code: bookingData.gift_card_code
-      });
-      console.log('Additional Notes:', bookingData.notes);
-      console.log('==============================================');
-      
       const response = await bookingService.createBooking(bookingData);
       
       if (response.success && response.data) {
         const bookingId = response.data.id;
         const referenceNumber = response.data.reference_number;
-        
-        console.log('✅ Booking created:', { bookingId, referenceNumber });
         
         // Update payment record with payable_id and payable_type
         if (paymentResponse.payment?.id) {
@@ -1053,9 +997,8 @@ const BookPackage: React.FC = () => {
               payable_id: bookingId,
               payable_type: PAYMENT_TYPE.BOOKING
             });
-            console.log('✅ Payment record updated with payable_id:', bookingId);
           } catch (paymentUpdateError) {
-            console.error('⚠️ Failed to update payment with payable_id:', paymentUpdateError);
+            // Payment update error - handled silently in production
           }
         }
         
@@ -1071,9 +1014,8 @@ const BookPackage: React.FC = () => {
         
         try {
           await bookingService.storeQrCode(bookingId, qrCodeBase64);
-          console.log('✅ QR code stored');
         } catch (qrError) {
-          console.error('⚠️ Failed to store QR code:', qrError);
+          // QR code storage error - handled silently in production
         }
         
         // Show confirmation modal
@@ -1085,8 +1027,8 @@ const BookPackage: React.FC = () => {
         setShowConfirmation(true);
       }
     } catch (err: any) {
-      console.error('❌ Payment/Booking error:', err);
-      setPaymentError(err.message || 'Payment processing failed. Please try again.');
+      const userFriendlyMessage = getPaymentErrorMessage(err);
+      setPaymentError(userFriendlyMessage);
     } finally {
       setIsProcessingPayment(false);
     }
@@ -1499,12 +1441,6 @@ const BookPackage: React.FC = () => {
                                     setSelectedTime(slot.start_time);
                                     if (slot.room_id) {
                                       setSelectedRoomId(slot.room_id);
-                                      console.log('🏠 Room auto-assigned from time slot:', {
-                                        time: slot.start_time,
-                                        room_id: slot.room_id,
-                                        room_name: slot.room_name,
-                                        available_rooms_count: slot.available_rooms_count
-                                      });
                                     }
                                   }}
                                   className="accent-blue-800"

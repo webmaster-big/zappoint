@@ -27,6 +27,61 @@ import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
 import { extractIdFromSlug } from '../../../utils/slug';
 import StandardButton from '../../../components/ui/StandardButton';
 
+// Helper function to parse payment errors into user-friendly messages
+const getPaymentErrorMessage = (error: any): string => {
+  const errorMessage = error?.message?.toLowerCase() || '';
+  const responseMessage = error?.response?.data?.message?.toLowerCase() || '';
+  const combinedMessage = `${errorMessage} ${responseMessage}`;
+  
+  // Card declined errors
+  if (combinedMessage.includes('declined') || combinedMessage.includes('decline')) {
+    return 'Your card was declined. Please check your card details or try a different payment method.';
+  }
+  
+  // Insufficient funds
+  if (combinedMessage.includes('insufficient') || combinedMessage.includes('nsf')) {
+    return 'Insufficient funds. Please try a different card or payment method.';
+  }
+  
+  // Invalid card number
+  if (combinedMessage.includes('invalid card') || combinedMessage.includes('card number')) {
+    return 'Invalid card number. Please check and re-enter your card details.';
+  }
+  
+  // Expired card
+  if (combinedMessage.includes('expired') || combinedMessage.includes('expiration')) {
+    return 'Your card has expired. Please use a different card.';
+  }
+  
+  // CVV/Security code errors
+  if (combinedMessage.includes('cvv') || combinedMessage.includes('security code') || combinedMessage.includes('cvc')) {
+    return 'Invalid security code (CVV). Please check the 3 or 4 digit code on your card.';
+  }
+  
+  // Authentication errors
+  if (combinedMessage.includes('authentication') || combinedMessage.includes('3d secure')) {
+    return 'Card authentication failed. Please try again or use a different card.';
+  }
+  
+  // Network/connection errors
+  if (combinedMessage.includes('network') || combinedMessage.includes('connection') || combinedMessage.includes('timeout')) {
+    return 'Connection error. Please check your internet and try again.';
+  }
+  
+  // Fraud detection
+  if (combinedMessage.includes('fraud') || combinedMessage.includes('suspicious')) {
+    return 'Transaction blocked for security reasons. Please contact your bank or try a different card.';
+  }
+  
+  // Rate limiting
+  if (combinedMessage.includes('too many') || combinedMessage.includes('rate limit')) {
+    return 'Too many attempts. Please wait a moment and try again.';
+  }
+  
+  // Default fallback
+  return error?.message || 'Payment could not be processed. Please check your card details and try again.';
+};
+
 // Country codes (ISO 3166-1 alpha-2) with display names
 const countries: { code: string; name: string }[] = [
   { code: 'US', name: 'United States' },
@@ -77,20 +132,6 @@ const PurchaseAttraction = () => {
   const attractionId = slug ? extractIdFromSlug(slug) : null;
   const navigate = useNavigate();
 
-  // Get auth token from localStorage
-  const getAuthToken = () => {
-    const userData = localStorage.getItem('zapzone_user');
-    if (userData) {
-      try {
-        const user = JSON.parse(userData);
-        return user.token;
-      } catch (error) {
-        console.error('Error parsing user data:', error);
-        return null;
-      }
-    }
-    return null;
-  };
   const [attraction, setAttraction] = useState<PurchaseAttractionAttraction | null>(null);
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
@@ -124,7 +165,7 @@ const PurchaseAttraction = () => {
   const [customAmount, setCustomAmount] = useState<number>(0);
   const [authorizeApiLoginId, setAuthorizeApiLoginId] = useState('');
   const [authorizeClientKey, setAuthorizeClientKey] = useState('');
-  const [authorizeEnvironment, setAuthorizeEnvironment] = useState<'sandbox' | 'production'>('sandbox');
+  const [_authorizeEnvironment, setAuthorizeEnvironment] = useState<'sandbox' | 'production'>('sandbox');
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [qrCodeImage, setQrCodeImage] = useState<string | null>(null);
   const [showQRModal, setShowQRModal] = useState(false);
@@ -171,7 +212,6 @@ const PurchaseAttraction = () => {
           
           if (customer.id) {
             setSelectedCustomerId(customer.id);
-            console.log('✅ Customer info auto-filled from localStorage');
             
             // Optionally refresh from API for latest data
             try {
@@ -191,17 +231,14 @@ const PurchaseAttraction = () => {
                   zip: data.zip || prev.zip,
                   country: data.country || prev.country
                 }));
-                console.log('✅ Customer info refreshed from API');
               }
-            } catch (apiError) {
-              console.log('⚠️ API refresh skipped, using localStorage data');
+            } catch {
+              // API refresh skipped, using localStorage data
             }
-          } else {
-            console.log('✅ Customer info auto-filled from localStorage (guest)');
           }
         }
-      } catch (error) {
-        console.error('Error loading customer data:', error);
+      } catch {
+        // Error loading customer data - silent fail
       }
     };
     
@@ -218,9 +255,6 @@ const PurchaseAttraction = () => {
 
       try {
         setLoading(true);
-        const authToken = getAuthToken();
-        console.log('🔐 Loading attraction - Auth Token:', authToken ? 'Present' : 'Missing');
-        
         // If location parameter exists, use it (future enhancement for location-based filtering)
         // For now, we fetch by ID directly
         const response = await attractionService.getAttraction(Number(attractionId));
@@ -244,11 +278,9 @@ const PurchaseAttraction = () => {
           createdAt: attr.created_at,
           availability: typeof attr.availability === 'object' ? attr.availability as Record<string, boolean> : {},
         };
-        console.log('Loaded attraction:', convertedAttraction);
         setAttraction(convertedAttraction);
-      } catch (error) {
-        console.error('Error loading attraction:', error);
-        setToast({ message: 'Failed to load attraction', type: 'error' });
+      } catch {
+        setToast({ message: 'Failed to load attraction. Please refresh the page.', type: 'error' });
       } finally {
         setLoading(false);
       }
@@ -264,46 +296,24 @@ const PurchaseAttraction = () => {
       
       try {
         const locationId = attraction.locationId || 1;
-        console.log('🔧 Initializing Authorize.Net for location:', locationId);
         
         const response = await getAuthorizeNetPublicKey(locationId);
-        console.log('📡 Authorize.Net API Response:', response);
         
         // API returns data directly: { api_login_id, client_key, environment }
         const apiLoginId = response.api_login_id;
         const clientKey = response.client_key;
         const environment = response.environment || 'sandbox';
         
-        console.log('📡 Authorize.Net parsed data:', {
-          apiLoginId: apiLoginId ? '✅ Present' : '❌ Missing',
-          clientKey: clientKey ? '✅ Present' : '⚠️ Missing (will use API Login ID)',
-          environment: environment
-        });
-        
         if (apiLoginId) {
           setAuthorizeApiLoginId(apiLoginId);
           setAuthorizeClientKey(clientKey || apiLoginId); // Fallback to apiLoginId if no clientKey
           setAuthorizeEnvironment(environment as 'sandbox' | 'production');
-          console.log('✅ Authorize.Net credentials set:', {
-            usingClientKey: !!clientKey,
-            environment: environment
-          });
           
           // Load Accept.js with the correct environment from API response
           await loadAcceptJS(environment as 'sandbox' | 'production');
-          console.log('✅ Accept.js loaded successfully for environment:', environment);
-        } else {
-          console.warn('⚠️ No Authorize.Net credentials found for location:', locationId);
-          console.warn('Response:', response);
         }
-      } catch (error: any) {
-        console.error('❌ Failed to initialize Authorize.Net');
-        console.error('Error details:', {
-          message: error.message,
-          response: error.response?.data,
-          status: error.response?.status,
-          fullError: error
-        });
+      } catch {
+        // Payment system initialization failed - will show error when user tries to pay
       }
     };
     initializeAuthorizeNet();
@@ -340,8 +350,7 @@ const PurchaseAttraction = () => {
         } else {
           setSelectedCustomerId(null);
         }
-      } catch (error) {
-        console.error('Error searching customer:', error);
+      } catch {
         setFoundCustomers([]);
         setShowCustomerDropdown(false);
         setSelectedCustomerId(null);
@@ -418,15 +427,11 @@ const PurchaseAttraction = () => {
       setSubmitting(true);
       setIsProcessingPayment(true);
       setPaymentError('');
-      const authToken = getAuthToken();
-      console.log('🔐 Creating purchase - Auth Token:', authToken ? 'Present' : 'Missing');
 
       const totalAmount = calculateTotal();
       let transactionId: string | undefined;
 
       // Process card payment
-      console.log('💳 Processing payment...');
-      
       const cardData = {
         cardNumber: cardNumber.replace(/\s/g, ''),
         month: cardMonth,
@@ -458,12 +463,6 @@ const PurchaseAttraction = () => {
         description: `Attraction Purchase: ${attraction.name}${paymentType === 'custom' ? ' (Partial Payment)' : ''}`,
       };
       
-      console.log('🔑 Using Authorize.Net credentials:', {
-        apiLoginId: authorizeApiLoginId ? '✅ Set' : '❌ Missing',
-        clientKey: authorizeClientKey ? '✅ Set' : '❌ Missing',
-        environment: authorizeEnvironment
-      });
-      
       const paymentResponse = await processCardPayment(
         cardData,
         paymentData,
@@ -477,7 +476,6 @@ const PurchaseAttraction = () => {
       }
       
       transactionId = paymentResponse.transaction_id;
-      console.log('✅ Payment successful:', transactionId);
 
       // Create purchase data matching backend Payment model
       const purchaseData = {
@@ -500,40 +498,6 @@ const PurchaseAttraction = () => {
         // transaction_id is auto-generated by backend
       };
 
-      console.log('🎫 === PURCHASE DATA BEING SENT TO BACKEND ===');
-      console.log('Full Purchase Object:', JSON.stringify(purchaseData, null, 2));
-      console.log('Guest Information:', {
-        name: purchaseData.guest_name,
-        email: purchaseData.guest_email,
-        phone: purchaseData.guest_phone,
-        customer_id: purchaseData.customer_id
-      });
-      console.log('Billing Information:', {
-        address: customerInfo.address,
-        address2: customerInfo.address2,
-        city: customerInfo.city,
-        state: customerInfo.state,
-        zip: customerInfo.zip,
-        country: customerInfo.country
-      });
-      console.log('Purchase Details:', {
-        attraction_id: purchaseData.attraction_id,
-        attraction_name: attraction.name,
-        location_id: purchaseData.location_id,
-        quantity: purchaseData.quantity,
-        purchase_date: purchaseData.purchase_date
-      });
-      console.log('Payment Information:', {
-        amount: purchaseData.amount,
-        currency: purchaseData.currency,
-        method: purchaseData.payment_method,
-        status: purchaseData.status,
-        payment_id: purchaseData.payment_id,
-        transaction_id: transactionId
-      });
-      console.log('Additional Notes:', purchaseData.notes);
-      console.log('==============================================');
-
       // Create purchase via API
       const response = await attractionPurchaseService.createPurchase(purchaseData);
       const createdPurchase = response.data;
@@ -546,8 +510,7 @@ const PurchaseAttraction = () => {
       try {
         await attractionPurchaseService.sendReceipt(createdPurchase.id, qrData);
         setToast({ message: 'Purchase completed! Receipt sent to your email.', type: 'success' });
-      } catch (emailError) {
-        console.error('Error sending email:', emailError);
+      } catch {
         setToast({ message: 'Purchase completed! (Email failed to send)', type: 'info' });
       }
 
@@ -556,9 +519,9 @@ const PurchaseAttraction = () => {
       setShowQRModal(true);
 
     } catch (error: any) {
-      console.error('❌ Payment/Purchase error:', error);
-      setPaymentError(error.message || 'Payment processing failed. Please try again.');
-      setToast({ message: error.message || 'Failed to complete purchase. Please try again.', type: 'error' });
+      const userFriendlyMessage = getPaymentErrorMessage(error);
+      setPaymentError(userFriendlyMessage);
+      setToast({ message: userFriendlyMessage, type: 'error' });
     } finally {
       setSubmitting(false);
       setIsProcessingPayment(false);
