@@ -160,9 +160,6 @@ const PurchaseAttraction = () => {
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [paymentError, setPaymentError] = useState('');
   
-  // Payment type selection
-  const [paymentType, setPaymentType] = useState<'full' | 'custom'>('full');
-  const [customAmount, setCustomAmount] = useState<number>(0);
   const [authorizeApiLoginId, setAuthorizeApiLoginId] = useState('');
   const [authorizeClientKey, setAuthorizeClientKey] = useState('');
   const [_authorizeEnvironment, setAuthorizeEnvironment] = useState<'sandbox' | 'production'>('sandbox');
@@ -453,14 +450,11 @@ const PurchaseAttraction = () => {
         country: customerInfo.country,
       };
       
-      // Calculate amount to charge based on payment type
-      const chargeAmount = paymentType === 'full' ? totalAmount : customAmount;
-      
       const paymentData = {
         location_id: attraction.locationId || 1, // Use attraction's location_id or default to 1
-        amount: chargeAmount, // Charge based on payment type selection
+        amount: totalAmount, // Full payment amount
         order_id: `A${attraction.id}-${Date.now().toString().slice(-8)}`, // Max 20 chars for Authorize.Net
-        description: `Attraction Purchase: ${attraction.name}${paymentType === 'custom' ? ' (Partial Payment)' : ''}`,
+        description: `Attraction Purchase: ${attraction.name}`,
       };
       
       const paymentResponse = await processCardPayment(
@@ -486,7 +480,7 @@ const PurchaseAttraction = () => {
         guest_phone: customerInfo.phone || undefined,
         quantity: quantity,
         amount: totalAmount,
-        amount_paid: chargeAmount, // Based on payment type selection (full, partial, or custom)
+        amount_paid: totalAmount, // Full payment
         currency: 'USD',
         method: 'card',
         payment_method: 'card' as 'card' | 'cash',
@@ -993,76 +987,6 @@ const PurchaseAttraction = () => {
                     </div>
                   </div>
 
-                  {/* Payment Type Selection */}
-                  <div className="space-y-3">
-                    <label className="block font-medium text-gray-800 text-xs md:text-sm">Payment Amount</label>
-                    <div className="grid grid-cols-2 gap-2 md:gap-3">
-                      <button
-                        type="button"
-                        onClick={() => setPaymentType('full')}
-                        className={`p-3 rounded-lg border-2 text-center transition-all ${
-                          paymentType === 'full'
-                            ? 'border-blue-600 bg-blue-50 text-blue-800'
-                            : 'border-gray-200 hover:border-gray-300 text-gray-600'
-                        }`}
-                      >
-                        <div className="text-xs md:text-sm font-semibold">Full Payment</div>
-                        <div className="text-xs text-gray-500 mt-0.5">${calculateTotal().toFixed(2)}</div>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setPaymentType('custom')}
-                        className={`p-3 rounded-lg border-2 text-center transition-all ${
-                          paymentType === 'custom'
-                            ? 'border-blue-600 bg-blue-50 text-blue-800'
-                            : 'border-gray-200 hover:border-gray-300 text-gray-600'
-                        }`}
-                      >
-                        <div className="text-xs md:text-sm font-semibold">Custom Amount</div>
-                        <div className="text-xs text-gray-500 mt-0.5">Enter amount</div>
-                      </button>
-                    </div>
-                    
-                    {/* Custom Amount Input */}
-                    {paymentType === 'custom' && (
-                      <div className="mt-3">
-                        <label className="block font-medium mb-2 text-gray-800 text-xs md:text-sm">Amount to Pay</label>
-                        <div className="relative">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
-                          <input
-                            type="number"
-                            value={customAmount}
-                            onChange={(e) => {
-                              const value = parseFloat(e.target.value) || 0;
-                              setCustomAmount(Math.min(value, calculateTotal()));
-                            }}
-                            min="0"
-                            max={calculateTotal()}
-                            step="0.01"
-                            className="w-full rounded-lg border border-gray-300 pl-7 pr-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
-                            placeholder="0.00"
-                          />
-                        </div>
-                        <p className="text-xs text-gray-500 mt-1">Max: ${calculateTotal().toFixed(2)}</p>
-                      </div>
-                    )}
-                    
-                    {/* Amount Being Charged Notice */}
-                    <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-green-800 font-medium">Amount to be charged:</span>
-                        <span className="text-lg font-bold text-green-700">
-                          ${paymentType === 'full' ? calculateTotal().toFixed(2) : customAmount.toFixed(2)}
-                        </span>
-                      </div>
-                      {paymentType === 'custom' && customAmount < calculateTotal() && (
-                        <p className="text-xs text-green-600 mt-1">
-                          Remaining balance: ${(calculateTotal() - customAmount).toFixed(2)}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
                   {/* Card Form */}
                   <div className="space-y-4">
                     {/* Card Number */}
@@ -1203,8 +1127,8 @@ const PurchaseAttraction = () => {
                             </>
                           ) : (
                             <>
-                              <span className="hidden sm:inline">Pay ${paymentType === 'full' ? calculateTotal().toFixed(2) : customAmount.toFixed(2)}</span>
-                              <span className="sm:hidden">${paymentType === 'full' ? calculateTotal().toFixed(2) : customAmount.toFixed(2)}</span>
+                              <span className="hidden sm:inline">Pay ${calculateTotal().toFixed(2)}</span>
+                              <span className="sm:hidden">${calculateTotal().toFixed(2)}</span>
                             </>
                           )}
                         </>
