@@ -401,19 +401,15 @@ export const loadAcceptJS = (environment: 'sandbox' | 'production' = 'sandbox'):
   return new Promise((resolve, reject) => {
     // Check if already loaded with the correct environment
     if (window.Accept && loadedAcceptJSEnvironment === environment) {
-      console.log(`✅ Accept.js already loaded for ${environment}`);
       resolve();
       return;
     }
     
-    // If loaded with different environment, warn but proceed (can't reload different version)
+    // If loaded with different environment, proceed with existing
     if (window.Accept && loadedAcceptJSEnvironment !== environment) {
-      console.warn(`⚠️ Accept.js already loaded for ${loadedAcceptJSEnvironment}, but ${environment} was requested. Using existing.`);
       resolve();
       return;
     }
-
-    console.log(`📦 Loading Accept.js for ${environment} environment...`);
 
     // Create script element
     const script = document.createElement('script');
@@ -431,12 +427,10 @@ export const loadAcceptJS = (environment: 'sandbox' | 'production' = 'sandbox'):
 
     script.onload = () => {
       loadedAcceptJSEnvironment = environment;
-      console.log(`✅ Accept.js loaded successfully for ${environment}`);
       resolve();
     };
 
     script.onerror = () => {
-      console.error('❌ Failed to load Accept.js');
       reject(new Error('Failed to load Accept.js library'));
     };
 
@@ -474,15 +468,6 @@ export const tokenizeCard = (
       return;
     }
 
-    // DEBUG: Log credentials being used (remove in production)
-    console.log('🔑 === ACCEPT.JS TOKENIZATION DEBUG ===');
-    console.log('API Login ID:', apiLoginID);
-    console.log('API Login ID Length:', apiLoginID?.length);
-    console.log('Client Key:', clientKey ? `${clientKey.substring(0, 20)}...` : 'NOT PROVIDED');
-    console.log('Client Key Length:', clientKey?.length || 0);
-    console.log('Using clientKey for auth:', clientKey ? 'YES' : 'NO (using apiLoginID as fallback)');
-    console.log('=====================================');
-
     const secureData: AcceptJSSecureData = {
       authData: {
         clientKey: clientKey || apiLoginID,
@@ -491,33 +476,13 @@ export const tokenizeCard = (
       cardData: cardData,
     };
 
-    console.log('📤 Sending to Accept.js:', {
-      authData: {
-        apiLoginID: secureData.authData.apiLoginID,
-        clientKey: secureData.authData.clientKey ? `${secureData.authData.clientKey.substring(0, 20)}...` : 'MISSING',
-      },
-      cardData: {
-        cardNumber: `****${cardData.cardNumber.slice(-4)}`,
-        month: cardData.month,
-        year: cardData.year,
-        cardCode: '***'
-      }
-    });
-
     window.Accept.dispatchData(secureData, (response: AcceptJSResponse) => {
-      console.log('📥 Accept.js Response:', {
-        resultCode: response.messages.resultCode,
-        messages: response.messages.message
-      });
-      
       if (response.messages.resultCode === 'Error') {
         const errorMessage = response.messages.message
           .map((msg) => `${msg.code}: ${msg.text}`)
           .join(', ');
-        console.error('❌ Accept.js Error:', errorMessage);
         reject(new Error(errorMessage));
       } else {
-        console.log('✅ Token received successfully');
         resolve(response.opaqueData);
       }
     });
@@ -558,11 +523,9 @@ export const processCardPayment = async (
 ): Promise<PaymentChargeResponse> => {
   try {
     // Step 1: Tokenize card data
-    console.log('🔐 Tokenizing card data...');
     const opaqueData = await tokenizeCard(cardData, apiLoginID, clientKey);
     
     // Step 2: Charge payment with token
-    console.log('💳 Processing payment...');
     const chargeRequest: PaymentChargeRequest = {
       ...paymentData,
       opaqueData,
@@ -570,11 +533,9 @@ export const processCardPayment = async (
     };
     
     const response = await chargePayment(chargeRequest);
-    console.log('✅ Payment processed successfully');
     
     return response;
   } catch (error: unknown) {
-    console.error('❌ Payment processing failed:', error);
     throw error;
   }
 };
