@@ -387,6 +387,8 @@ const CreatePurchase = () => {
       }
 
       // Create purchase data matching backend Payment model
+      // For cash payments, use amountPaid if explicitly set, otherwise default to full payment
+      const cashAmountPaid = amountPaid > 0 ? amountPaid : totalAmount;
       const purchaseData = {
         attraction_id: Number(selectedAttraction.id),
         customer_id: selectedCustomerId || undefined,
@@ -395,7 +397,7 @@ const CreatePurchase = () => {
         guest_phone: customerInfo.phone || undefined,
         quantity: quantity,
         amount: totalAmount,
-        amount_paid: paymentMethod === 'paylater' ? 0 : (paymentMethod === 'card' ? totalAmount : amountPaid),
+        amount_paid: paymentMethod === 'paylater' ? 0 : (paymentMethod === 'card' ? totalAmount : cashAmountPaid),
         currency: 'USD',
         method: paymentMethod as 'card' | 'cash' | 'paylater',
         payment_method: paymentMethod as 'card' | 'cash' | 'paylater',
@@ -421,7 +423,7 @@ const CreatePurchase = () => {
       }
 
       // Create payment record if amount_paid > 0
-      const actualAmountPaid = paymentMethod === 'paylater' ? 0 : (paymentMethod === 'card' ? totalAmount : amountPaid);
+      const actualAmountPaid = paymentMethod === 'paylater' ? 0 : (paymentMethod === 'card' ? totalAmount : cashAmountPaid);
       if (actualAmountPaid > 0) {
         try {
           const paymentData = {
