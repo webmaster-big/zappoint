@@ -124,8 +124,8 @@ const DayOffs: React.FC = () => {
                             setSelectedLocationId(locationsArray[0].id);
                         }
                     }
-                } catch (error) {
-                    console.error('Error fetching locations:', error);
+                } catch {
+                    // Error fetching locations - handled silently
                 }
             }
         };
@@ -161,8 +161,7 @@ const DayOffs: React.FC = () => {
                 const pagination = response.data.pagination;
                 setTotalPages(pagination?.last_page || 1);
             }
-        } catch (error) {
-            console.error('Error fetching Day Offs:', error);
+        } catch {
             showToast('Error loading Day Offs', 'error');
         } finally {
             setLoading(false);
@@ -187,7 +186,6 @@ const DayOffs: React.FC = () => {
             if (resourcesCache && 
                 resourcesCache.locationId === locationId && 
                 Date.now() - resourcesCache.timestamp < CACHE_TTL) {
-                console.log('📦 Using cached packages/spaces for location', locationId);
                 setAvailablePackages(resourcesCache.packages);
                 setAvailableRooms(resourcesCache.rooms);
                 return;
@@ -213,10 +211,8 @@ const DayOffs: React.FC = () => {
                     rooms,
                     timestamp: Date.now()
                 });
-                
-                console.log('📥 Fetched and cached packages/spaces for location', locationId);
-            } catch (error) {
-                console.error('Error fetching packages/spaces:', error);
+            } catch {
+                // Error fetching packages/spaces - handled silently
             } finally {
                 setLoadingResources(false);
             }
@@ -307,7 +303,6 @@ const DayOffs: React.FC = () => {
             resetForm();
             fetchDayOffs();
         } catch (error: unknown) {
-            console.error('Error creating Day Off:', error);
             const message = error instanceof Error ? error.message : 'Error creating Day Off';
             showToast(message, 'error');
         }
@@ -349,6 +344,7 @@ const DayOffs: React.FC = () => {
             
             // Build update data with properly sanitized time values
             const updateData = {
+                location_id: selectedDayOff.location_id, // Include location_id from the original day off
                 date: formData.date,
                 reason: formData.reason || undefined,
                 is_recurring: formData.is_recurring,
@@ -358,8 +354,6 @@ const DayOffs: React.FC = () => {
                 room_ids
             };
             
-            console.log('📤 Updating day off with data:', updateData, '| Form time values:', { time_start: formData.time_start, time_end: formData.time_end });
-            
             await dayOffService.updateDayOff(selectedDayOff.id, updateData);
             
             showToast('Day Off updated successfully!', 'success');
@@ -367,7 +361,6 @@ const DayOffs: React.FC = () => {
             resetForm();
             fetchDayOffs();
         } catch (error: unknown) {
-            console.error('Error updating Day Off:', error);
             const message = error instanceof Error ? error.message : 'Error updating Day Off';
             showToast(message, 'error');
         }
@@ -383,8 +376,7 @@ const DayOffs: React.FC = () => {
             await dayOffService.deleteDayOff(dayOffId);
             showToast('Day Off deleted successfully!', 'success');
             fetchDayOffs();
-        } catch (error) {
-            console.error('Error deleting Day Off:', error);
+        } catch {
             showToast('Error deleting Day Off', 'error');
         }
     };
@@ -424,8 +416,7 @@ const DayOffs: React.FC = () => {
                     : d
             ));
             showToast('Updated successfully!', 'success');
-        } catch (error) {
-            console.error('Error updating day off:', error);
+        } catch {
             showToast('Error updating day off', 'error');
         } finally {
             setSavingCell(null);
@@ -556,8 +547,7 @@ const DayOffs: React.FC = () => {
             setSelectedDayOffIds(new Set());
             setSelectionMode(false);
             fetchDayOffs();
-        } catch (error) {
-            console.error('Error deleting Day Offs:', error);
+        } catch {
             showToast('Error deleting Day Offs', 'error');
         }
     };
@@ -576,14 +566,6 @@ const DayOffs: React.FC = () => {
         
         const timeStart = normalizeTime(dayOff.time_start);
         const timeEnd = normalizeTime(dayOff.time_end);
-        
-        console.log('📝 Loading day off for edit:', { 
-            id: dayOff.id, 
-            original_time_start: dayOff.time_start, 
-            original_time_end: dayOff.time_end,
-            normalized_time_start: timeStart,
-            normalized_time_end: timeEnd
-        });
         
         setFormData({
             date: dayOff.date.split('T')[0], // Extract date part
@@ -673,7 +655,6 @@ const DayOffs: React.FC = () => {
         // Accept both HH:mm and HH:mm:ss formats, normalize to HH:mm
         const timeRegex = /^([0-1][0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$/;
         if (!timeRegex.test(trimmed)) {
-            console.warn('⚠️ Invalid time format:', trimmed);
             return null; // Return null for invalid formats
         }
         
@@ -820,8 +801,7 @@ const DayOffs: React.FC = () => {
                     room_ids
                 });
                 successCount++;
-            } catch (error) {
-                console.error(`Failed to create day off for ${dateStr}:`, error);
+            } catch {
                 failCount++;
             }
         }
