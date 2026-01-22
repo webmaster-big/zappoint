@@ -120,7 +120,7 @@ const PurchaseAttraction = () => {
   const [paymentError, setPaymentError] = useState('');
   
   // Payment type selection
-  const [paymentType, setPaymentType] = useState<'full' | 'partial' | 'custom'>('full');
+  const [paymentType, setPaymentType] = useState<'full' | 'custom'>('full');
   const [customAmount, setCustomAmount] = useState<number>(0);
   const [authorizeApiLoginId, setAuthorizeApiLoginId] = useState('');
   const [authorizeClientKey, setAuthorizeClientKey] = useState('');
@@ -449,17 +449,13 @@ const PurchaseAttraction = () => {
       };
       
       // Calculate amount to charge based on payment type
-      const chargeAmount = paymentType === 'full' 
-        ? totalAmount 
-        : paymentType === 'partial' 
-          ? Math.round(totalAmount * 0.5 * 100) / 100 
-          : customAmount;
+      const chargeAmount = paymentType === 'full' ? totalAmount : customAmount;
       
       const paymentData = {
         location_id: attraction.locationId || 1, // Use attraction's location_id or default to 1
         amount: chargeAmount, // Charge based on payment type selection
         order_id: `A${attraction.id}-${Date.now().toString().slice(-8)}`, // Max 20 chars for Authorize.Net
-        description: `Attraction Purchase: ${attraction.name}${paymentType !== 'full' ? ` (${paymentType === 'partial' ? '50% Deposit' : 'Partial Payment'})` : ''}`,
+        description: `Attraction Purchase: ${attraction.name}${paymentType === 'custom' ? ' (Partial Payment)' : ''}`,
       };
       
       console.log('🔑 Using Authorize.Net credentials:', {
@@ -1037,7 +1033,7 @@ const PurchaseAttraction = () => {
                   {/* Payment Type Selection */}
                   <div className="space-y-3">
                     <label className="block font-medium text-gray-800 text-xs md:text-sm">Payment Amount</label>
-                    <div className="grid grid-cols-3 gap-2 md:gap-3">
+                    <div className="grid grid-cols-2 gap-2 md:gap-3">
                       <button
                         type="button"
                         onClick={() => setPaymentType('full')}
@@ -1052,21 +1048,6 @@ const PurchaseAttraction = () => {
                       </button>
                       <button
                         type="button"
-                        onClick={() => {
-                          setPaymentType('partial');
-                          setCustomAmount(Math.round(calculateTotal() * 0.5 * 100) / 100);
-                        }}
-                        className={`p-3 rounded-lg border-2 text-center transition-all ${
-                          paymentType === 'partial'
-                            ? 'border-blue-600 bg-blue-50 text-blue-800'
-                            : 'border-gray-200 hover:border-gray-300 text-gray-600'
-                        }`}
-                      >
-                        <div className="text-xs md:text-sm font-semibold">50% Deposit</div>
-                        <div className="text-xs text-gray-500 mt-0.5">${(calculateTotal() * 0.5).toFixed(2)}</div>
-                      </button>
-                      <button
-                        type="button"
                         onClick={() => setPaymentType('custom')}
                         className={`p-3 rounded-lg border-2 text-center transition-all ${
                           paymentType === 'custom'
@@ -1074,7 +1055,7 @@ const PurchaseAttraction = () => {
                             : 'border-gray-200 hover:border-gray-300 text-gray-600'
                         }`}
                       >
-                        <div className="text-xs md:text-sm font-semibold">Custom</div>
+                        <div className="text-xs md:text-sm font-semibold">Custom Amount</div>
                         <div className="text-xs text-gray-500 mt-0.5">Enter amount</div>
                       </button>
                     </div>
@@ -1108,16 +1089,12 @@ const PurchaseAttraction = () => {
                       <div className="flex justify-between items-center">
                         <span className="text-sm text-green-800 font-medium">Amount to be charged:</span>
                         <span className="text-lg font-bold text-green-700">
-                          ${paymentType === 'full' 
-                            ? calculateTotal().toFixed(2) 
-                            : paymentType === 'partial' 
-                              ? (calculateTotal() * 0.5).toFixed(2) 
-                              : customAmount.toFixed(2)}
+                          ${paymentType === 'full' ? calculateTotal().toFixed(2) : customAmount.toFixed(2)}
                         </span>
                       </div>
-                      {paymentType !== 'full' && (
+                      {paymentType === 'custom' && customAmount < calculateTotal() && (
                         <p className="text-xs text-green-600 mt-1">
-                          Remaining balance: ${(calculateTotal() - (paymentType === 'partial' ? calculateTotal() * 0.5 : customAmount)).toFixed(2)}
+                          Remaining balance: ${(calculateTotal() - customAmount).toFixed(2)}
                         </p>
                       )}
                     </div>
@@ -1263,8 +1240,8 @@ const PurchaseAttraction = () => {
                             </>
                           ) : (
                             <>
-                              <span className="hidden sm:inline">Pay ${paymentType === 'full' ? calculateTotal().toFixed(2) : paymentType === 'partial' ? (calculateTotal() * 0.5).toFixed(2) : customAmount.toFixed(2)}</span>
-                              <span className="sm:hidden">${paymentType === 'full' ? calculateTotal().toFixed(2) : paymentType === 'partial' ? (calculateTotal() * 0.5).toFixed(2) : customAmount.toFixed(2)}</span>
+                              <span className="hidden sm:inline">Pay ${paymentType === 'full' ? calculateTotal().toFixed(2) : customAmount.toFixed(2)}</span>
+                              <span className="sm:hidden">${paymentType === 'full' ? calculateTotal().toFixed(2) : customAmount.toFixed(2)}</span>
                             </>
                           )}
                         </>
