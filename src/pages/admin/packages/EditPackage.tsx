@@ -703,17 +703,21 @@ const EditPackage: React.FC = () => {
                 }
             }
             
-            // Update in cache
-            if (response.success && response.data) {
-                await packageCacheService.updatePackageInCache(response.data);
+            // Update in cache - wrap in try-catch to prevent white screen
+            try {
+                if (response?.success && response?.data) {
+                    await packageCacheService.updatePackageInCache(response.data);
+                }
+            } catch (cacheError) {
+                console.error('Error updating cache:', cacheError);
+                // Don't fail the whole operation if cache update fails
             }
             
             showToast("Package updated successfully!", "success");
+            setSubmitting(false);
             
             // Navigate back after a short delay
-            setTimeout(() => {
-                navigate("/packages");
-            }, 1000);
+            navigate("/packages");
         } catch (error: unknown) {
             console.error("Error updating package:", error);
             
@@ -725,7 +729,6 @@ const EditPackage: React.FC = () => {
             }
             
             showToast(errorMessage, "error");
-        } finally {
             setSubmitting(false);
         }
     };
