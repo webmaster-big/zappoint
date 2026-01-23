@@ -35,6 +35,7 @@ const ManageAddons = () => {
     price_each_packages: [] as PackageSpecificPrice[]
   });
   const [loading, setLoading] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
   const [packages, setPackages] = useState<Package[]>([]);
   const [loadingPackages, setLoadingPackages] = useState(false);
 
@@ -288,7 +289,7 @@ const ManageAddons = () => {
     }
 
     try {
-      setLoading(true);
+      setActionLoading(true);
       const price = formData.price ? parseFloat(formData.price) : null;
 
       if (editingAddon) {
@@ -337,7 +338,11 @@ const ManageAddons = () => {
           ));
           
           // Update in cache
-          await addOnCacheService.updateAddOnInCache(result.data);
+          try {
+            await addOnCacheService.updateAddOnInCache(result.data);
+          } catch (cacheError) {
+            console.error('Error updating cache:', cacheError);
+          }
         }
         
         showToast('Add-on updated successfully!', 'success');
@@ -350,7 +355,7 @@ const ManageAddons = () => {
           // For company_admin, use modal location or require selection
           if (!modalLocationId) {
             showToast('Please select a location first', 'error');
-            setLoading(false);
+            setActionLoading(false);
             return;
           }
           locationId = modalLocationId;
@@ -400,7 +405,11 @@ const ManageAddons = () => {
           setAddons(prev => [...prev, newAddon]);
           
           // Add to cache
-          await addOnCacheService.addAddOnToCache(result.data);
+          try {
+            await addOnCacheService.addAddOnToCache(result.data);
+          } catch (cacheError) {
+            console.error('Error adding to cache:', cacheError);
+          }
         }
         
         showToast('Add-on created successfully!', 'success');
@@ -416,12 +425,16 @@ const ManageAddons = () => {
       const errorMessage = error?.response?.data?.message || error?.response?.data?.error || 'Error saving add-on';
       showToast(errorMessage, 'error');
     } finally {
-      setLoading(false);
+      setActionLoading(false);
     }
   };
 
   const handleEdit = (addon: AddOnsAddon) => {
     setEditingAddon(addon);
+    // Set modal location ID for company admin
+    if (isCompanyAdmin && addon.location?.id) {
+      setModalLocationId(addon.location.id);
+    }
     // Remove ASSET_URL prefix if present for proper display in modal
     const imageUrl = addon.image?.startsWith(ASSET_URL) 
       ? addon.image 
@@ -441,21 +454,25 @@ const ManageAddons = () => {
   const handleDelete = async (id: string) => {
     if (window.confirm('Are you sure you want to delete this add-on?')) {
       try {
-        setLoading(true);
+        setActionLoading(true);
         await addOnService.deleteAddOn(parseInt(id));
         
         // Remove addon from state without full reload
         setAddons(prev => prev.filter(addon => addon.id !== id));
         
         // Remove from cache
-        await addOnCacheService.removeAddOnFromCache(parseInt(id));
+        try {
+          await addOnCacheService.removeAddOnFromCache(parseInt(id));
+        } catch (cacheError) {
+          console.error('Error removing from cache:', cacheError);
+        }
         
         showToast('Add-on deleted successfully!', 'success');
       } catch (error) {
         console.error('Error deleting add-on:', error);
         showToast('Error deleting add-on', 'error');
       } finally {
-        setLoading(false);
+        setActionLoading(false);
       }
     }
   };
@@ -471,6 +488,7 @@ const ManageAddons = () => {
       price_each_packages: []
     });
     setEditingAddon(null);
+    setModalLocationId(null);
   };
 
   const handleModalClose = () => {
@@ -1218,13 +1236,13 @@ const ManageAddons = () => {
                   </StandardButton>
                   <StandardButton
                     type="submit"
-                    disabled={loading}
+                    disabled={actionLoading}
                     variant="primary"
                     size="md"
-                    loading={loading}
+                    loading={actionLoading}
                     fullWidth
                   >
-                    {loading ? 'Saving...' : (editingAddon ? 'Update Add-on' : 'Create Add-on')}
+                    {actionLoading ? 'Saving...' : (editingAddon ? 'Update Add-on' : 'Create Add-on')}
                   </StandardButton>
                 </div>
               </form>
