@@ -1339,8 +1339,19 @@ const OnsiteBooking: React.FC = () => {
       if (bookingData.paymentMethod === 'paylater') {
         amountPaid = 0;
       } else if (bookingData.paymentMethod === 'in-store') {
-        // Use the in-store amount paid that was entered
-        amountPaid = bookingData.inStoreAmountPaid || 0;
+        // If in-store amount was explicitly entered, use that
+        // Otherwise fall back to payment type selection
+        if (bookingData.inStoreAmountPaid > 0) {
+          amountPaid = bookingData.inStoreAmountPaid;
+        } else if (bookingData.paymentType === 'custom' && bookingData.customPaymentAmount > 0) {
+          amountPaid = Math.min(bookingData.customPaymentAmount, totalAmount);
+        } else if (bookingData.paymentType === 'partial' && partialAmount > 0) {
+          amountPaid = partialAmount;
+        } else if (bookingData.paymentType === 'full') {
+          amountPaid = totalAmount;
+        } else {
+          amountPaid = 0; // No amount specified
+        }
       } else if (bookingData.paymentType === 'custom' && bookingData.customPaymentAmount > 0) {
         amountPaid = Math.min(bookingData.customPaymentAmount, totalAmount);
       } else if (bookingData.paymentType === 'partial' && partialAmount > 0) {
@@ -2192,6 +2203,7 @@ const OnsiteBooking: React.FC = () => {
                           const newQty = parseInt(e.target.value) || 1;
                           handleAttractionQuantityChange(String(attraction.id), newQty);
                         }}
+                        onWheel={(e) => e.currentTarget.blur()}
                         className="w-16 text-center font-bold text-lg text-gray-900 border border-gray-300 rounded px-2 py-1"
                       />
                       <StandardButton
@@ -2309,6 +2321,7 @@ const OnsiteBooking: React.FC = () => {
                               const newQty = parseInt(e.target.value) || minQty;
                               handleAddOnQuantityChange(addOn.name, newQty);
                             }}
+                            onWheel={(e) => e.currentTarget.blur()}
                             className="w-16 text-center font-bold text-lg text-gray-900 border border-gray-300 rounded px-2 py-1"
                           />
                           <StandardButton
@@ -2514,6 +2527,7 @@ const OnsiteBooking: React.FC = () => {
                   name="guestOfHonorAge"
                   value={bookingData.guestOfHonorAge}
                   onChange={handleInputChange}
+                  onWheel={(e) => e.currentTarget.blur()}
                   min="0"
                   className={`w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:ring-2 focus:ring-${themeColor}-400 focus:border-${themeColor}-500 transition-colors`}
                   placeholder="Age"
@@ -2801,6 +2815,7 @@ const OnsiteBooking: React.FC = () => {
                     inStoreAmountPaid: Math.min(Math.max(0, value), maxAmount)
                   }));
                 }}
+                onWheel={(e) => e.currentTarget.blur()}
                 placeholder="0.00"
                 className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
               />
@@ -3018,6 +3033,7 @@ const OnsiteBooking: React.FC = () => {
                       customPaymentAmount: Math.min(Math.max(0, value), maxAmount) 
                     }));
                   }}
+                  onWheel={(e) => e.currentTarget.blur()}
                   placeholder="0.00"
                   className="w-full pl-8 pr-4 py-2.5 border border-green-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-sm"
                 />
@@ -3128,6 +3144,11 @@ const OnsiteBooking: React.FC = () => {
           <div className="flex justify-between font-semibold text-md mt-2 pt-2 border-t border-dashed border-gray-300 text-orange-700">
             <span>Amount Due Now</span>
             <span>$0.00</span>
+          </div>
+        ) : bookingData.paymentMethod === 'in-store' && bookingData.inStoreAmountPaid > 0 ? (
+          <div className="flex justify-between font-semibold text-md mt-2 pt-2 border-t border-dashed border-gray-300 text-green-700">
+            <span>In-Store Amount Paid</span>
+            <span>${Math.min(bookingData.inStoreAmountPaid, calculateTotal()).toFixed(2)}</span>
           </div>
         ) : bookingData.paymentType === 'partial' && calculatePartialAmount() > 0 ? (
           <div className="flex justify-between font-semibold text-md mt-2 pt-2 border-t border-dashed border-gray-300 text-blue-700">
