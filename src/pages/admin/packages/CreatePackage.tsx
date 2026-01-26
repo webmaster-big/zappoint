@@ -772,7 +772,7 @@ const CreatePackage: React.FC = () => {
                                     className={`block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-${themeColor}-50 file:text-${fullColor} hover:file:bg-${themeColor}-100`}
                                 />
                                 <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
-                                    <p className="text-xs text-blue-800 font-medium">📐 Recommended: 16:9 aspect ratio (1280×720 or 1920×1080 pixels)</p>
+                                    <p className="text-xs text-blue-800 font-medium">Recommended: 16:9 aspect ratio (1280×720 or 1920×1080 pixels)</p>
                                     <p className="text-xs text-blue-600 mt-1">Images will be cropped to fit the display area. Center your subject for best results.</p>
                                 </div>
                                 <p className="text-xs text-gray-500 mt-1">Max file size: 20MB. Use optimized images for faster loading.</p>
