@@ -105,6 +105,7 @@ export interface BookPackagePackage {
   partial_payment_percentage?: number | null;
   partial_payment_fixed?: number | null;
   has_guest_of_honor?: boolean;
+  customer_notes?: string;  // Package-specific notes displayed to customers
   location?: {
     id: number;
     company_id: number;

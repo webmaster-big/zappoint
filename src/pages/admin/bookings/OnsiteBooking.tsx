@@ -34,6 +34,7 @@ import { formatDurationDisplay } from '../../../utils/timeFormat';
 import { loadAcceptJS, processCardPayment, validateCardNumber, formatCardNumber, getCardType, createPayment } from '../../../services/PaymentService';
 import { PAYMENT_TYPE } from '../../../types/Payment.types';
 import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
+import { globalNoteService, type GlobalNote } from '../../../services/GlobalNoteService';
 
 // Helper function to parse ISO date string (YYYY-MM-DD) in local timezone
 // Avoids UTC offset issues that cause date to show as previous day
@@ -107,6 +108,7 @@ const OnsiteBooking: React.FC = () => {
   const [loadingTimeSlots, setLoadingTimeSlots] = useState(false);
   const [loadingPackages, setLoadingPackages] = useState(true);
   const [loadingCustomer, setLoadingCustomer] = useState(false);
+  const [globalNotes, setGlobalNotes] = useState<GlobalNote[]>([]);
   const [step, setStep] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
   
@@ -365,7 +367,8 @@ const OnsiteBooking: React.FC = () => {
             pricePerAdditional: Number(pkg.price_per_additional || 0),
             partialPaymentPercentage: pkg.partial_payment_percentage || 0,
             partialPaymentFixed: pkg.partial_payment_fixed || 0,
-            has_guest_of_honor: pkg.has_guest_of_honor || false
+            has_guest_of_honor: pkg.has_guest_of_honor || false,
+            customerNotes: pkg.customer_notes || ''
           }));
           
           setPackages(transformedPackages);
@@ -474,7 +477,8 @@ const OnsiteBooking: React.FC = () => {
             pricePerAdditional: Number(pkg.price_per_additional || 0),
             partialPaymentPercentage: pkg.partial_payment_percentage || 0,
             partialPaymentFixed: pkg.partial_payment_fixed || 0,
-            has_guest_of_honor: pkg.has_guest_of_honor || false
+            has_guest_of_honor: pkg.has_guest_of_honor || false,
+            customerNotes: pkg.customer_notes || ''
             };
           });
           
@@ -819,7 +823,7 @@ const OnsiteBooking: React.FC = () => {
     return addOn.min_quantity || 1;
   };
 
-  const handlePackageSelect = (pkg: OnsiteBookingPackage) => {
+  const handlePackageSelect = async (pkg: OnsiteBookingPackage) => {
     console.log('📦 Package selected:', {
       id: pkg.id,
       name: pkg.name,
@@ -828,6 +832,15 @@ const OnsiteBooking: React.FC = () => {
     });
     
     setSelectedPackage(pkg);
+    
+    // Fetch global notes for this package
+    try {
+      const notesResponse = await globalNoteService.getNotesForPackage(pkg.id);
+      setGlobalNotes(notesResponse.data || []);
+    } catch {
+      console.error('Failed to load global notes');
+      setGlobalNotes([]);
+    }
     
     const initialParticipants = pkg.minParticipants || 1;
     console.log('👥 Setting initial participants to:', initialParticipants);
@@ -1760,6 +1773,25 @@ const OnsiteBooking: React.FC = () => {
                 <div className="flex justify-between items-center pt-2 mt-2 bg-green-50 rounded-lg p-2">
                   <span className="text-sm font-semibold text-green-700">Custom Amount Due Now</span>
                   <span className="text-lg font-bold text-green-800">${Math.min(bookingData.customPaymentAmount, total).toFixed(2)}</span>
+                </div>
+              )}
+              
+              {/* Package Notes */}
+              {selectedPackage?.customerNotes && (
+                <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                  <p className="text-xs text-amber-800 whitespace-pre-wrap">{selectedPackage.customerNotes}</p>
+                </div>
+              )}
+              
+              {/* Global Notes */}
+              {globalNotes.length > 0 && (
+                <div className="mt-3 space-y-2">
+                  {globalNotes.map((note) => (
+                    <div key={note.id} className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      {note.title && <p className="text-xs font-semibold text-blue-900 mb-1">{note.title}</p>}
+                      <p className="text-xs text-blue-800 whitespace-pre-wrap">{note.content}</p>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>

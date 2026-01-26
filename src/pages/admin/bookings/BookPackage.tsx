@@ -23,6 +23,10 @@ import DatePicker from '../../../components/ui/DatePicker';
 import { extractIdFromSlug } from '../../../utils/slug';
 import { formatDurationDisplay } from '../../../utils/timeFormat';
 import StandardButton from '../../../components/ui/StandardButton';
+import { globalNoteService, type GlobalNote } from '../../../services/GlobalNoteService';
+
+// Processing fee rate (4.87%)
+const PROCESSING_FEE_RATE = 0.0487;
 
 // Helper function to parse ISO date string (YYYY-MM-DD) in local timezone
 // Avoids UTC offset issues that cause date to show as previous day
@@ -137,6 +141,7 @@ const BookPackage: React.FC = () => {
   const [pkg, setPkg] = useState<BookPackagePackage | null>(null);
   const [loadingPackage, setLoadingPackage] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [globalNotes, setGlobalNotes] = useState<GlobalNote[]>([]);
   
   const [selectedAddOns, setSelectedAddOns] = useState<{ [id: number]: number }>({});
   const [selectedAttractions, setSelectedAttractions] = useState<{ [id: number]: number }>({});
@@ -227,6 +232,14 @@ const BookPackage: React.FC = () => {
         setLoadingPackage(true);
         const response = await bookingService.getPackageById(Number(packageId));
         setPkg(response.data);
+        
+        // Fetch global notes for this package
+        try {
+          const notesResponse = await globalNoteService.getNotesForPackage(response.data.id);
+          setGlobalNotes(notesResponse.data || []);
+        } catch {
+          console.error('Failed to load global notes');
+        }
         
         // Set default participants to min_participants
         if (response.data.min_participants) {
@@ -819,9 +832,11 @@ const BookPackage: React.FC = () => {
   const promoDiscount = appliedPromo ? Number(appliedPromo.discount_value || 0) : 0;
   const giftCardDiscount = appliedGiftCard ? Number(appliedGiftCard.discount_value || 0) : 0;
   
-  // Calculate subtotal and total
+  // Calculate subtotal and total with processing fee
   const subtotal = basePrice + addOnsTotal + attractionsTotal;
-  const total = Math.max(0, subtotal - promoDiscount - giftCardDiscount);
+  const discountedSubtotal = Math.max(0, subtotal - promoDiscount - giftCardDiscount);
+  const processingFee = Math.round(discountedSubtotal * PROCESSING_FEE_RATE * 100) / 100;
+  const total = discountedSubtotal + processingFee;
 
   // Calculate partial payment amount based on package settings
   const calculatePartialAmount = () => {
@@ -2434,10 +2449,41 @@ const BookPackage: React.FC = () => {
                 </div>
               )}
               
+              {/* Subtotal before processing fee */}
+              <div className="flex justify-between text-xs text-gray-600 py-1">
+                <span>Subtotal</span>
+                <span>${discountedSubtotal.toFixed(2)}</span>
+              </div>
+              
+              {/* Processing Fee */}
+              <div className="flex justify-between text-xs text-gray-600 py-1">
+                <span>Processing Fee (4.87%)</span>
+                <span>+${processingFee.toFixed(2)}</span>
+              </div>
+              
               <div className="flex justify-between pt-3 border-t font-semibold text-base">
                 <span>Total</span>
                 <span className="text-blue-800">${total.toFixed(2)}</span>
               </div>
+              
+              {/* Package Notes */}
+              {pkg.customer_notes && (
+                <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                  <p className="text-xs text-amber-800 whitespace-pre-wrap">{pkg.customer_notes}</p>
+                </div>
+              )}
+              
+              {/* Global Notes */}
+              {globalNotes.length > 0 && (
+                <div className="mt-3 space-y-2">
+                  {globalNotes.map((note) => (
+                    <div key={note.id} className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      {note.title && <p className="text-xs font-semibold text-blue-900 mb-1">{note.title}</p>}
+                      <p className="text-xs text-blue-800 whitespace-pre-wrap">{note.content}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
             
             <div className="mt-6 text-xs text-gray-500 text-center border-t pt-4">

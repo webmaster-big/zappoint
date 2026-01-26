@@ -27,6 +27,9 @@ import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
 import { extractIdFromSlug } from '../../../utils/slug';
 import StandardButton from '../../../components/ui/StandardButton';
 
+// Processing fee rate (4.87%)
+const PROCESSING_FEE_RATE = 0.0487;
+
 // Helper function to parse payment errors into user-friendly messages
 const getPaymentErrorMessage = (error: any): string => {
   const errorMessage = error?.message?.toLowerCase() || '';
@@ -393,14 +396,20 @@ const PurchaseAttraction = () => {
     }
   };
 
-  const calculateTotal = () => {
+  // Calculate subtotal (before processing fee)
+  const calculateSubtotal = () => {
     if (!attraction) return 0;
-    
-    let total = parseFloat(attraction.price.toString());
-    
-      total = total * quantity;
-    
-    return total;
+    return parseFloat(attraction.price.toString()) * quantity;
+  };
+
+  // Calculate processing fee
+  const calculateProcessingFee = () => {
+    return Math.round(calculateSubtotal() * PROCESSING_FEE_RATE * 100) / 100;
+  };
+
+  // Calculate total (with processing fee)
+  const calculateTotal = () => {
+    return calculateSubtotal() + calculateProcessingFee();
   };
 
   const handlePurchase = async () => {
@@ -667,7 +676,22 @@ const PurchaseAttraction = () => {
                         −
                       </button>
                       <div className="text-center">
-                        <div className="text-4xl md:text-5xl font-bold text-blue-800 mb-1">{quantity}</div>
+                        <input
+                          type="number"
+                          value={quantity}
+                          onChange={(e) => {
+                            const value = parseInt(e.target.value) || 1;
+                            setQuantity(Math.max(1, value));
+                          }}
+                          onBlur={(e) => {
+                            if (!e.target.value || parseInt(e.target.value) < 1) {
+                              setQuantity(1);
+                            }
+                          }}
+                          onWheel={(e) => (e.target as HTMLInputElement).blur()}
+                          min="1"
+                          className="w-20 md:w-24 text-4xl md:text-5xl font-bold text-blue-800 text-center bg-transparent border-2 border-transparent hover:border-blue-300 focus:border-blue-500 focus:outline-none rounded-lg transition-colors mb-1"
+                        />
                         <div className="text-xs md:text-sm text-gray-600">{quantity === 1 ? 'ticket' : 'tickets'}</div>
                       </div>
                       <button
@@ -1395,12 +1419,15 @@ const PurchaseAttraction = () => {
                         <span className="font-medium text-sm md:text-base">{quantity}</span>
                       </div>
                       
-                      {attraction.pricingType === 'per_person' && (
-                        <div className="flex justify-between items-center">
-                          <span className="text-xs md:text-sm text-gray-600">Subtotal</span>
-                          <span className="font-medium text-sm md:text-base">${(attraction.price * quantity).toFixed(2)}</span>
-                        </div>
-                      )}
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs md:text-sm text-gray-600">Subtotal</span>
+                        <span className="font-medium text-sm md:text-base">${calculateSubtotal().toFixed(2)}</span>
+                      </div>
+                      
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs md:text-sm text-gray-600">Processing Fee (4.87%)</span>
+                        <span className="font-medium text-sm md:text-base">+${calculateProcessingFee().toFixed(2)}</span>
+                      </div>
                     </>
                   )}
                   </div>

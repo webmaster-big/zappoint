@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import Toast from "../../../components/ui/Toast";
 import StandardButton from "../../../components/ui/StandardButton";
-import { Info, Plus, Calendar, Clock, Gift, Tag, Home, ArrowLeft, Save, Trash2, X, GripVertical } from "lucide-react";
+import { Info, Plus, Calendar, Clock, Gift, Tag, Home, ArrowLeft, Save, Trash2, X, GripVertical, FileText } from "lucide-react";
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { 
     attractionService, 
@@ -95,6 +95,7 @@ const EditPackage: React.FC = () => {
         partialPaymentPercentage: "0", // Percentage for partial payments
         partialPaymentFixed: "0", // Fixed amount for partial payments
         hasGuestOfHonor: false,
+        customerNotes: "", // Notes displayed to customers during booking
     });
 
     // Image preview state
@@ -324,6 +325,7 @@ const EditPackage: React.FC = () => {
                     partialPaymentPercentage: String(pkg.partial_payment_percentage || "0"),
                     partialPaymentFixed: String(pkg.partial_payment_fixed || "0"),
                     hasGuestOfHonor: pkg.has_guest_of_honor || false,
+                    customerNotes: pkg.customer_notes || "",
                 });
 
                 if (pkg.image) {
@@ -733,6 +735,7 @@ const EditPackage: React.FC = () => {
                 partial_payment_percentage: form.partialPaymentPercentage ? parseInt(form.partialPaymentPercentage) : undefined,
                 partial_payment_fixed: form.partialPaymentFixed ? parseInt(form.partialPaymentFixed) : undefined,
                 has_guest_of_honor: form.hasGuestOfHonor,
+                customer_notes: form.customerNotes.trim() || undefined,
                 image: form.image || undefined,
                 attraction_ids,
                 addon_ids,
@@ -1843,6 +1846,22 @@ const EditPackage: React.FC = () => {
                                 <span className="text-base text-neutral-800">Enable guest of honor fields for this package</span>
                             </label>
                             <p className="text-xs text-gray-500 mt-2">When enabled, customers can specify the name, age, and gender of the guest of honor during booking.</p>
+                        </div>
+
+                        {/* Customer Notes */}
+                        <div>
+                            <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2">
+                                <FileText className={`w-5 h-5 text-${themeColor}-600`} /> Customer Notes
+                            </h3>
+                            <textarea
+                                name="customerNotes"
+                                value={form.customerNotes}
+                                onChange={handleChange}
+                                rows={3}
+                                placeholder="e.g., A 4.87% processing fee applies to all card transactions. Please arrive 15 minutes early."
+                                className={`w-full border border-neutral-300 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
+                            />
+                            <p className="text-xs text-gray-500 mt-2">These notes will be displayed to customers during booking and included in their confirmation email.</p>
                         </div>
                         
                         <div className="flex gap-2 mt-6">

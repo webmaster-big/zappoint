@@ -78,6 +78,7 @@ export interface OnsiteBookingPackage {
   has_guest_of_honor?: boolean;
   rooms?: (string | OnsiteBookingRoom)[];
   image?: string;
+  customerNotes?: string;
 }
 
 export interface OnsiteBookingGiftCard {

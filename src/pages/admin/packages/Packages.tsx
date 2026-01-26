@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Users, Tag, Search, Download, Upload, X, CheckSquare, Square, Pencil, Trash2, MapPin, Eye, Power, Plus } from "lucide-react";
+import { Users, Tag, Search, Download, Upload, X, CheckSquare, Square, Pencil, Trash2, MapPin, Eye, Power, Plus, FileText } from "lucide-react";
 import StandardButton from '../../../components/ui/StandardButton';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { packageService, type Package } from '../../../services';
@@ -424,6 +424,15 @@ const Packages: React.FC = () => {
           <p className="text-gray-600 mt-1">Manage and view all your packages</p>
         </div>
         <div className="flex items-center gap-2">
+          <Link to="/packages/global-notes">
+            <StandardButton
+              variant="secondary"
+              size="md"
+              icon={FileText}
+            >
+              Notes
+            </StandardButton>
+          </Link>
           <StandardButton
             variant="secondary"
             size="md"

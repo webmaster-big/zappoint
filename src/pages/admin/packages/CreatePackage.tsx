@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import Toast from "../../../components/ui/Toast";
 import StandardButton from "../../../components/ui/StandardButton";
 import LocationSelector from '../../../components/admin/LocationSelector';
-import { Info, Plus, RefreshCcw, Calendar, Clock, Gift, Tag, Home, Trash2, X, GripVertical } from "lucide-react";
+import { Info, Plus, RefreshCcw, Calendar, Clock, Gift, Tag, Home, Trash2, X, GripVertical, FileText } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { 
@@ -236,6 +236,7 @@ const CreatePackage: React.FC = () => {
         partialPaymentPercentage: "0", // Percentage for partial payments
         partialPaymentFixed: "0", // Fixed amount for partial payments
         hasGuestOfHonor: false,
+        customerNotes: "", // Notes displayed to customers during booking
         
         // NEW: Replace old availability fields with schedules array
         availability_schedules: [] as AvailabilitySchedule[],
@@ -591,6 +592,7 @@ const CreatePackage: React.FC = () => {
                 partial_payment_percentage: form.partialPaymentPercentage ? parseInt(form.partialPaymentPercentage) : undefined,
                 partial_payment_fixed: form.partialPaymentFixed ? parseInt(form.partialPaymentFixed) : undefined,
                 has_guest_of_honor: form.hasGuestOfHonor,
+                customer_notes: form.customerNotes.trim() || undefined,
                 
                 // NEW: Send availability schedules
                 availability_schedules: form.availability_schedules,
@@ -670,6 +672,7 @@ const CreatePackage: React.FC = () => {
                 partialPaymentPercentage: "0",
                 partialPaymentFixed: "0",
                 hasGuestOfHonor: false,
+                customerNotes: "",
                 availability_schedules: [],
             });
             setImagePreview("");
@@ -1769,6 +1772,22 @@ const CreatePackage: React.FC = () => {
                                 <p className="text-xs text-gray-500 mt-2">When enabled, customers can specify the name, age, and gender of the guest of honor during booking.</p>
                             </div>
 
+                            {/* Customer Notes */}
+                            <div>
+                                <h3 className="text-xl font-bold mb-4 text-neutral-900 flex items-center gap-2">
+                                    <FileText className="w-5 h-5 text-primary" /> Customer Notes
+                                </h3>
+                                <textarea
+                                    name="customerNotes"
+                                    value={form.customerNotes}
+                                    onChange={handleChange}
+                                    rows={3}
+                                    placeholder="e.g., A 4.87% processing fee applies to all card transactions. Please arrive 15 minutes early."
+                                    className={`w-full border border-neutral-300 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
+                                />
+                                <p className="text-xs text-gray-500 mt-2">These notes will be displayed to customers during booking and included in their confirmation email.</p>
+                            </div>
+
                             
                             <div className="flex gap-2 mt-6">
                                 <StandardButton
@@ -1810,6 +1829,7 @@ const CreatePackage: React.FC = () => {
                                         partialPaymentPercentage: "0",
                                         partialPaymentFixed: "0",
                                         hasGuestOfHonor: false,
+                                        customerNotes: "",
                                         availability_schedules: [],
                                     })}
                                 >

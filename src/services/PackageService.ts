@@ -49,6 +49,7 @@ export interface Package {
   partial_payment_percentage?: number;
   partial_payment_fixed?: number;
   has_guest_of_honor?: boolean;
+  customer_notes?: string;
   created_at: string;
   updated_at: string;
   deleted_at?: string | null;

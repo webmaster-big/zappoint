@@ -63,6 +63,7 @@ import AttractionDetails from "./pages/admin/attractions/AttractionDetails";
 import PurchaseDetails from "./pages/admin/attractions/PurchaseDetails";
 import PackageDetails from "./pages/admin/packages/PackageDetails";
 import TrashedPackages from "./pages/admin/packages/TrashedPackages";
+import GlobalNotes from "./pages/admin/packages/GlobalNotes";
 import SpaceSchedule from "./pages/admin/bookings/SpaceSchedule";
 import EmailTemplates from "./pages/admin/email/EmailTemplates";
 import CreateEmailTemplate from "./pages/admin/email/CreateEmailTemplate";
@@ -121,6 +122,7 @@ function App() {
           <Route path="/packages/custom" element={<CustomPackages />} />
           <Route path="/packages/details/:slug" element={<PackageDetails />} />
           <Route path="/packages/trashed" element={<TrashedPackages />} />
+          <Route path="/packages/global-notes" element={<GlobalNotes />} />
           <Route path="/packages/promos" element={<Promo />} />
           <Route path="/packages/rooms" element={<Rooms />} />
           <Route path="/packages/add-ons" element={<ManageAddOns />} />

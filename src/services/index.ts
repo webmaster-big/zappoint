@@ -34,6 +34,9 @@ export type { Room, RoomFilters, CreateRoomData, UpdateRoomData } from './RoomSe
 export { dayOffService } from './DayOffService';
 export type { DayOff, DayOffFilters, CreateDayOffData, UpdateDayOffData, CheckDateData } from './DayOffService';
 
+export { globalNoteService } from './GlobalNoteService';
+export type { GlobalNote, CreateGlobalNoteData, UpdateGlobalNoteData, GlobalNoteFilters } from './GlobalNoteService';
+
 export { giftCardService } from './GiftCardService';
 export type { GiftCard, GiftCardFilters, CreateGiftCardData, UpdateGiftCardData } from './GiftCardService';
 
