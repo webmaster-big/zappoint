@@ -746,19 +746,23 @@ const EditAttraction = () => {
                     onChange={handleImageUpload}
                     className={`block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-${themeColor}-50 file:text-${fullColor} hover:file:bg-${themeColor}-100`}
                   />
-                  <p className="text-xs text-gray-500 mt-1">Accepts images below 20MB. We recommend using low file sizes with good quality to avoid loading issues.</p>
+                  <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                    <p className="text-xs text-blue-800 font-medium">📐 Recommended: 16:9 aspect ratio (1280×720 or 1920×1080 pixels)</p>
+                    <p className="text-xs text-blue-600 mt-1">Images will be cropped to fit the display area. Center your subject for best results.</p>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">Max file size: 20MB. Use optimized images for faster loading.</p>
                 </div>
 
                 {imagePreviews.length > 0 && (
                   <div>
-                    <label className="block font-semibold mb-2 text-base text-neutral-800">Image Previews</label>
+                    <label className="block font-semibold mb-2 text-base text-neutral-800">Image Previews (as customers will see)</label>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                       {imagePreviews.map((preview, index) => (
-                        <div key={index} className="relative group rounded-lg overflow-hidden">
+                        <div key={index} className="relative group rounded-lg overflow-hidden bg-gray-100 aspect-video">
                           <img
                             src={preview}
                             alt={`Preview ${index + 1}`}
-                            className="h-32 w-full object-cover"
+                            className="absolute inset-0 w-full h-full object-cover"
                           />
                           <button
                             type="button"

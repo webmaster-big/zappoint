@@ -763,7 +763,6 @@ const CreatePackage: React.FC = () => {
                             )}
                             
                             {/* Image Upload */}
-                            {/* Image Upload */}
                             <div>
                                 <label className="block font-semibold mb-2 text-base text-neutral-800">Package Image</label>
                                 <input
@@ -772,10 +771,17 @@ const CreatePackage: React.FC = () => {
                                     onChange={handleImageChange}
                                     className={`block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-${themeColor}-50 file:text-${fullColor} hover:file:bg-${themeColor}-100`}
                                 />
-                                <p className="text-xs text-gray-500 mt-1">Accepts images below 20MB. We recommend using low file sizes with good quality to avoid loading issues.</p>
+                                <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                                    <p className="text-xs text-blue-800 font-medium">📐 Recommended: 16:9 aspect ratio (1280×720 or 1920×1080 pixels)</p>
+                                    <p className="text-xs text-blue-600 mt-1">Images will be cropped to fit the display area. Center your subject for best results.</p>
+                                </div>
+                                <p className="text-xs text-gray-500 mt-1">Max file size: 20MB. Use optimized images for faster loading.</p>
                                 {imagePreview && (
                                     <div className="mt-4">
-                                        <img src={imagePreview} alt="Preview" className="w-full max-h-56 object-contain rounded-md border border-gray-200" />
+                                        <p className="text-xs text-gray-600 mb-2 font-medium">Preview (as customers will see it):</p>
+                                        <div className="relative w-full aspect-video rounded-md border border-gray-200 overflow-hidden bg-gray-100">
+                                            <img src={imagePreview} alt="Preview" className="absolute inset-0 w-full h-full object-cover" />
+                                        </div>
                                     </div>
                                 )}
                             </div>

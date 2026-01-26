@@ -531,12 +531,12 @@ const EntertainmentLandingPage = () => {
                   >
                     <div className="flex flex-col md:flex-row">
                       {/* Image Section */}
-                      <div className="h-48 md:h-auto md:w-2/5 bg-gray-200 relative">
+                      <div className="aspect-video md:aspect-auto md:h-auto md:w-2/5 bg-gray-200 relative">
                         {pkg.image ? (
                           <img 
                             src={getImageUrl(pkg.image)} 
                             alt={pkg.name}
-                            className="w-full h-full object-cover"
+                            className="absolute inset-0 w-full h-full object-cover"
                           />
                         ) : (
                           <div className="w-full h-full bg-gray-900 flex items-center justify-center text-white text-lg font-bold">
@@ -622,12 +622,12 @@ const EntertainmentLandingPage = () => {
                     onClick={() => handlePackageClick(pkg)}
                     className="bg-white border border-gray-200 hover:shadow-lg transition-all duration-300 cursor-pointer overflow-hidden transform hover:scale-105"
                   >
-                    <div className="h-48 bg-gray-200 relative">
+                    <div className="aspect-video bg-gray-200 relative">
                       {pkg.image ? (
                         <img 
                           src={getImageUrl(pkg.image)} 
                           alt={pkg.name}
-                          className="w-full h-full object-cover"
+                          className="absolute inset-0 w-full h-full object-cover"
                         />
                       ) : (
                         <div className="w-full h-full bg-gradient-to-br from-blue-800 to-violet-500 flex items-center justify-center text-white text-lg font-semibold">
@@ -715,12 +715,12 @@ const EntertainmentLandingPage = () => {
                     onClick={() => handleAttractionClick(attraction)}
                     className="bg-white border border-gray-200 hover:shadow-lg transition-all duration-300 cursor-pointer overflow-hidden transform hover:scale-105"
                   >
-                    <div className="h-48 bg-gray-200 relative">
+                    <div className="aspect-video bg-gray-200 relative">
                       {attraction.image ? (
                         <img 
                           src={getImageUrl(attraction.image)} 
                           alt={attraction.name}
-                          className="w-full h-full object-cover"
+                          className="absolute inset-0 w-full h-full object-cover"
                         />
                       ) : (
                         <div className="w-full h-full bg-gradient-to-br from-violet-500 to-blue-800 flex items-center justify-center text-white text-lg font-semibold">
