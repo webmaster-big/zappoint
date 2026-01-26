@@ -3,6 +3,7 @@ import { Plus, Search, Edit, Trash2, Utensils, Download, Upload, X, CheckSquare,
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import StandardButton from '../../../components/ui/StandardButton';
 import { addOnService, locationService, packageService } from '../../../services';
+import type { CreateAddOnData, UpdateAddOnData } from '../../../services/AddOnService';
 import { addOnCacheService } from '../../../services/AddOnCacheService';
 import { packageCacheService } from '../../../services/PackageCacheService';
 import LocationSelector from '../../../components/admin/LocationSelector';
@@ -29,6 +30,7 @@ const ManageAddons = () => {
     name: '',
     price: '',
     image: '',
+    description: '',
     min_quantity: '1',
     max_quantity: '',
     is_force_add_on: false,
@@ -133,7 +135,20 @@ const ManageAddons = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedLocationId]);
 
-  // Filter addons based on search
+  // Filter addons based on search - separate effects to avoid resetting page on addon updates
+  useEffect(() => {
+    if (searchTerm) {
+      const filtered = addons.filter(addon =>
+        addon.name.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+      setFilteredAddons(filtered);
+    } else {
+      setFilteredAddons(addons);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [addons]);
+  
+  // Only reset page when search term changes
   useEffect(() => {
     if (searchTerm) {
       const filtered = addons.filter(addon =>
@@ -144,14 +159,15 @@ const ManageAddons = () => {
       setFilteredAddons(addons);
     }
     setCurrentPage(1);
-  }, [searchTerm, addons]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchTerm]);
 
   const loadAddons = async () => {
     try {
       setLoading(true);
       
       // Build filter params
-      const params: any = {
+      const params: { user_id?: number; location_id?: number } = {
         user_id: getStoredUser()?.id,
       };
       
@@ -184,6 +200,7 @@ const ManageAddons = () => {
               name: addon.name,
               price: addon.price,
               image: imageFull,
+              description: addon.description,
               location: addon.location && typeof addon.location === 'object' ? addon.location : null,
               min_quantity: addon.min_quantity,
               max_quantity: addon.max_quantity,
@@ -221,6 +238,7 @@ const ManageAddons = () => {
             name: addon.name,
             price: addon.price,
             image: imageFull,
+            description: addon.description,
             location: addon.location && typeof addon.location === 'object' ? addon.location : null,
             min_quantity: addon.min_quantity,
             max_quantity: addon.max_quantity,
@@ -294,13 +312,13 @@ const ManageAddons = () => {
 
       if (editingAddon) {
         // Update existing add-on
-        const updatePayload: any = {
+        const updatePayload: UpdateAddOnData = {
           name: formData.name,
           price: price,
-          description: '',
+          description: formData.description || '',
           is_active: true,
           min_quantity: formData.min_quantity ? parseInt(formData.min_quantity) : 1,
-          max_quantity: formData.max_quantity ? parseInt(formData.max_quantity) : null,
+          max_quantity: formData.max_quantity ? parseInt(formData.max_quantity) : undefined,
           is_force_add_on: formData.is_force_add_on,
           price_each_packages: formData.is_force_add_on ? formData.price_each_packages : null,
         };
@@ -328,6 +346,7 @@ const ManageAddons = () => {
                   name: result.data.name,
                   price: result.data.price,
                   image: result.data.image ? (result.data.image.startsWith('http') ? result.data.image : `${ASSET_URL}${result.data.image}`) : addon.image,
+                  description: result.data.description,
                   location: result.data.location && typeof result.data.location === 'object' ? result.data.location : addon.location,
                   min_quantity: result.data.min_quantity,
                   max_quantity: result.data.max_quantity,
@@ -364,14 +383,14 @@ const ManageAddons = () => {
           locationId = currentUser?.location_id || 1;
         }
 
-        const createPayload: any = {
+        const createPayload: CreateAddOnData = {
           location_id: locationId,
           name: formData.name,
           price: price,
-          description: '',
+          description: formData.description || '',
           is_active: true,
           min_quantity: formData.min_quantity ? parseInt(formData.min_quantity) : 1,
-          max_quantity: formData.max_quantity ? parseInt(formData.max_quantity) : null,
+          max_quantity: formData.max_quantity ? parseInt(formData.max_quantity) : undefined,
           is_force_add_on: formData.is_force_add_on,
           price_each_packages: formData.is_force_add_on ? formData.price_each_packages : null,
         };
@@ -396,6 +415,7 @@ const ManageAddons = () => {
             name: result.data.name,
             price: result.data.price,
             image: result.data.image ? (result.data.image.startsWith('http') ? result.data.image : `${ASSET_URL}${result.data.image}`) : '',
+            description: result.data.description,
             location: result.data.location && typeof result.data.location === 'object' ? result.data.location : null,
             min_quantity: result.data.min_quantity,
             max_quantity: result.data.max_quantity,
@@ -417,12 +437,13 @@ const ManageAddons = () => {
 
       resetForm();
       setShowModal(false);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error saving add-on:', error);
-      console.error('Error response data:', error?.response?.data);
-      console.error('Error response status:', error?.response?.status);
-      console.error('Full error:', JSON.stringify(error?.response, null, 2));
-      const errorMessage = error?.response?.data?.message || error?.response?.data?.error || 'Error saving add-on';
+      const axiosError = error as { response?: { data?: { message?: string; error?: string }; status?: number } };
+      console.error('Error response data:', axiosError?.response?.data);
+      console.error('Error response status:', axiosError?.response?.status);
+      console.error('Full error:', JSON.stringify(axiosError?.response, null, 2));
+      const errorMessage = axiosError?.response?.data?.message || axiosError?.response?.data?.error || 'Error saving add-on';
       showToast(errorMessage, 'error');
     } finally {
       setActionLoading(false);
@@ -443,6 +464,7 @@ const ManageAddons = () => {
       name: addon.name,
       price: addon.price?.toString() || '',
       image: imageUrl,
+      description: addon.description || '',
       min_quantity: addon.min_quantity?.toString() || '1',
       max_quantity: addon.max_quantity?.toString() || '',
       is_force_add_on: addon.is_force_add_on || false,
@@ -482,6 +504,7 @@ const ManageAddons = () => {
       name: '',
       price: '',
       image: '',
+      description: '',
       min_quantity: '1',
       max_quantity: '',
       is_force_add_on: false,
@@ -1060,6 +1083,24 @@ const ManageAddons = () => {
                           placeholder="No limit"
                         />
                       </div>
+                    </div>
+
+                    {/* Description */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Description
+                      </label>
+                      <textarea
+                        name="description"
+                        value={formData.description}
+                        onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                        rows={3}
+                        className={`w-full border border-gray-200 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 outline-none resize-none`}
+                        placeholder="Add ingredients, special notes, dietary info, etc."
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        This description will be shown to customers when they click "Details"
+                      </p>
                     </div>
                   </div>
                 </div>

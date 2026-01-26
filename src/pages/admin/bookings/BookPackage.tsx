@@ -198,6 +198,16 @@ const BookPackage: React.FC = () => {
   const [countrySearch, setCountrySearch] = useState('');
   const [showCountrySuggestions, setShowCountrySuggestions] = useState(false);
   const [customerId, setCustomerId] = useState<number | null>(null);
+  
+  // Add-on details modal state
+  const [showAddOnDetailsModal, setShowAddOnDetailsModal] = useState(false);
+  const [selectedAddOnForDetails, setSelectedAddOnForDetails] = useState<{
+    id: number;
+    name: string;
+    image?: string;
+    description?: string;
+    price: number;
+  } | null>(null);
   const [showAccountModal, setShowAccountModal] = useState(false);
 
   // Show account modal for non-logged-in users
@@ -854,12 +864,6 @@ const BookPackage: React.FC = () => {
       return;
     }
     
-    // Validate custom payment amount if selected
-    if (paymentType === 'custom' && (!customPaymentAmount || customPaymentAmount <= 0)) {
-      setPaymentError('Please enter a valid custom payment amount');
-      return;
-    }
-    
     if (!authorizeApiLoginId) {
       setPaymentError('Payment system not initialized. Please refresh the page.');
       return;
@@ -869,13 +873,8 @@ const BookPackage: React.FC = () => {
     setPaymentError('');
     
     try {
-      // Calculate payment amount
-      let amountToPay = total;
-      if (paymentType === 'custom' && customPaymentAmount > 0) {
-        amountToPay = Math.min(customPaymentAmount, total);
-      } else if (paymentType === 'partial') {
-        amountToPay = partialAmount;
-      }
+      // Calculate payment amount - customers pay deposit if available, otherwise full
+      const amountToPay = partialAmount > 0 ? partialAmount : total;
       
       // Step 1: Process payment first
       const cardData = {
@@ -971,7 +970,7 @@ const BookPackage: React.FC = () => {
         total_amount: total,
         amount_paid: amountToPay,
         payment_method: 'card' as const,
-        payment_status: (paymentType === 'full' || (paymentType === 'custom' && customPaymentAmount >= total) ? 'paid' : 'partial') as 'paid' | 'partial',
+        payment_status: (partialAmount > 0 ? 'partial' : 'paid') as 'paid' | 'partial',
         status: 'confirmed' as const,
         additional_attractions: additionalAttractions.length > 0 ? additionalAttractions : undefined,
         additional_addons: additionalAddons.length > 0 ? additionalAddons : undefined,
@@ -1034,6 +1033,62 @@ const BookPackage: React.FC = () => {
     }
   };
 
+  // Add-on Details Modal Component
+  const AddOnDetailsModal = () => {
+    if (!showAddOnDetailsModal || !selectedAddOnForDetails) return null;
+    
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-backdrop-fade" onClick={() => setShowAddOnDetailsModal(false)}>
+        <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+          {/* Close button */}
+          <div className="sticky top-0 bg-white p-4 border-b border-gray-100 flex justify-between items-center">
+            <h3 className="text-lg font-semibold text-gray-800">{selectedAddOnForDetails.name}</h3>
+            <button
+              onClick={() => setShowAddOnDetailsModal(false)}
+              className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+            >
+              <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+            </button>
+          </div>
+          
+          <div className="p-6">
+            {/* Large Image */}
+            <div className="mb-6 flex justify-center">
+              {selectedAddOnForDetails.image ? (
+                <img 
+                  src={getImageUrl(selectedAddOnForDetails.image)} 
+                  alt={selectedAddOnForDetails.name}
+                  className="max-w-full max-h-64 object-contain rounded-lg border border-gray-200"
+                />
+              ) : (
+                <div className="w-full h-48 bg-gray-100 rounded-lg flex items-center justify-center">
+                  <span className="text-gray-400">No image available</span>
+                </div>
+              )}
+            </div>
+            
+            {/* Price */}
+            <div className="mb-4 flex items-center justify-between">
+              <span className="text-gray-600 text-sm">Price:</span>
+              <span className="text-lg font-semibold text-blue-800">${selectedAddOnForDetails.price.toFixed(2)}</span>
+            </div>
+            
+            {/* Description */}
+            <div className="border-t border-gray-100 pt-4">
+              <h4 className="text-sm font-medium text-gray-700 mb-2">Description</h4>
+              {selectedAddOnForDetails.description ? (
+                <p className="text-sm text-gray-600 whitespace-pre-wrap">{selectedAddOnForDetails.description}</p>
+              ) : (
+                <p className="text-sm text-gray-400 italic">No description available</p>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
   
   // Confirmation Modal Component
   const ConfirmationModal = () => {
@@ -1278,6 +1333,7 @@ const BookPackage: React.FC = () => {
   return (
     <>
       <ConfirmationModal />
+      <AddOnDetailsModal />
       
       {/* Account Modal */}
       {showAccountModal && (
@@ -1590,13 +1646,30 @@ const BookPackage: React.FC = () => {
                             )}
                           </div>
                           <div className="flex-1 flex flex-col justify-between min-w-0">
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                               <span className="font-medium text-gray-800 text-xs md:text-sm block truncate">{addOn.name}</span>
                               {isForcedAddOn && (
                                 <span className="text-xs px-1.5 py-0.5 bg-amber-200 text-amber-800 rounded font-medium whitespace-nowrap">
                                   Required
                                 </span>
                               )}
+                              {/* Details Button */}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedAddOnForDetails({
+                                    id: addOn.id,
+                                    name: addOn.name,
+                                    image: addOn.image,
+                                    description: (addOn as any).description,
+                                    price: displayPrice
+                                  });
+                                  setShowAddOnDetailsModal(true);
+                                }}
+                                className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors font-medium"
+                              >
+                                Details
+                              </button>
                             </div>
                             <span className="block text-xs text-gray-500 mt-0.5">
                               ${displayPrice.toFixed(2)} each
@@ -2118,94 +2191,47 @@ const BookPackage: React.FC = () => {
                   </div>
                 </div>
                 
-                {/* Payment Type Selection */}
+                {/* Payment Type Selection - Customer only sees required deposit */}
                 <div className="mt-4 md:mt-6 mb-4 border border-gray-200 rounded-xl p-4 md:p-5">
-                  <label className="block font-medium mb-3 text-gray-800 text-xs md:text-sm">Select Payment Type</label>
-                  <div className="space-y-3">
-                    <label className="flex items-start gap-3 cursor-pointer p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition">
-                      <input
-                        type="radio"
-                        name="paymentType"
-                        value="full"
-                        checked={paymentType === 'full'}
-                        onChange={() => setPaymentType('full')}
-                        className="mt-1 accent-blue-800"
-                      />
-                      <div className="flex-1">
-                        <div className="font-medium text-sm text-gray-900">Full Payment</div>
-                        <div className="text-xs text-gray-600 mt-1">Pay the complete amount now (${total.toFixed(2)})</div>
-                      </div>
-                    </label>
-                    {partialAmount > 0 && (
-                      <label className="flex items-start gap-3 cursor-pointer p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition">
-                        <input
-                          type="radio"
-                          name="paymentType"
-                          value="partial"
-                          checked={paymentType === 'partial'}
-                          onChange={() => setPaymentType('partial')}
-                          className="mt-1 accent-blue-800"
-                        />
-                        <div className="flex-1">
-                          <div className="font-medium text-sm text-gray-900">
-                            Partial Payment {pkg.partial_payment_percentage ? `(${pkg.partial_payment_percentage}%)` : ''}
-                          </div>
-                          <div className="text-xs text-gray-600 mt-1">
-                            Pay <span className="font-semibold text-blue-800">${partialAmount.toFixed(2)}</span> now. 
-                            Remaining <span className="font-semibold">${(total - partialAmount).toFixed(2)}</span> will be paid on-site.
-                          </div>
+                  <label className="block font-medium mb-3 text-gray-800 text-xs md:text-sm">Payment</label>
+                  {partialAmount > 0 ? (
+                    <div className="space-y-3">
+                      <div className="p-4 rounded-lg border border-blue-200 bg-blue-50">
+                        <div className="flex items-center gap-2 mb-2">
+                          <svg className="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd"></path>
+                          </svg>
+                          <span className="font-semibold text-sm text-blue-900">Required Deposit</span>
+      
                         </div>
-                      </label>
-                    )}
-                    
-                    {/* Custom Payment Amount Option */}
-                    <label className="flex items-start gap-3 cursor-pointer p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition">
-                      <input
-                        type="radio"
-                        name="paymentType"
-                        value="custom"
-                        checked={paymentType === 'custom'}
-                        onChange={() => setPaymentType('custom')}
-                        className="mt-1 accent-green-600"
-                      />
-                      <div className="flex-1">
-                        <div className="font-medium text-sm text-gray-900">Custom Amount</div>
-                        <div className="text-xs text-gray-600 mt-1">
-                          Enter a specific deposit amount
+                        <div className="text-sm text-blue-800">
+                          <p className="mb-2">
+                            Pay <span className="font-bold text-lg">${partialAmount.toFixed(2)}</span> now to secure your booking.
+                          </p>
+                          <p className="text-xs text-blue-700">
+                            The remaining <span className="font-semibold">${(total - partialAmount).toFixed(2)}</span> will be due on the day of your visit.
+                          </p>
                         </div>
                       </div>
-                    </label>
-                    
-                    {/* Custom Amount Input - Show when custom is selected */}
-                    {paymentType === 'custom' && (
-                      <div className="ml-8 mt-2 p-3 bg-green-50 rounded-lg border border-green-200">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Enter Custom Amount</label>
-                        <div className="relative">
-                          <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 font-medium">$</span>
-                          <input
-                            type="number"
-                            min="0.01"
-                            max={total}
-                            step="0.01"
-                            value={customPaymentAmount || ''}
-                            onChange={(e) => {
-                              const value = parseFloat(e.target.value) || 0;
-                              setCustomPaymentAmount(Math.min(Math.max(0, value), total));
-                            }}
-                            placeholder="0.00"
-                            className="w-full pl-8 pr-4 py-2.5 border border-green-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-sm"
-                          />
+                      <input type="hidden" value="partial" />
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="p-4 rounded-lg border border-gray-200 bg-gray-50">
+                        <div className="flex items-center gap-2 mb-2">
+                          <svg className="w-5 h-5 text-gray-600" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4zm6 4a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd"></path>
+                          </svg>
+                          <span className="font-semibold text-sm text-gray-900">Full Payment Required</span>
                         </div>
-                        <div className="flex justify-between mt-2 text-xs text-gray-600">
-                          <span>Remaining: ${Math.max(0, total - (customPaymentAmount || 0)).toFixed(2)}</span>
-                          <span>Total: ${total.toFixed(2)}</span>
+                        <div className="text-sm text-gray-700">
+                          <p>
+                            Pay <span className="font-bold text-lg">${total.toFixed(2)}</span> to complete your booking.
+                          </p>
                         </div>
-                        {customPaymentAmount > 0 && customPaymentAmount >= total && (
-                          <p className="mt-2 text-xs text-green-600 font-medium">✓ This covers the full amount</p>
-                        )}
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
                 
                 <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center pt-6 gap-3">
@@ -2226,7 +2252,7 @@ const BookPackage: React.FC = () => {
                     variant="primary"
                     size="md"
                     onClick={handlePayNow}
-                    disabled={isProcessingPayment || !cardNumber || !cardMonth || !cardYear || !cardCVV || !validateCardNumber(cardNumber) || (paymentType === 'custom' && (!customPaymentAmount || customPaymentAmount <= 0))}
+                    disabled={isProcessingPayment || !cardNumber || !cardMonth || !cardYear || !cardCVV || !validateCardNumber(cardNumber)}
                     className="flex items-center justify-center flex-1 sm:flex-initial"
                   >
                     {isProcessingPayment ? (
@@ -2239,7 +2265,7 @@ const BookPackage: React.FC = () => {
                         <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
                         </svg>
-                        Pay ${paymentType === 'full' ? total.toFixed(2) : paymentType === 'custom' ? Math.min(customPaymentAmount || 0, total).toFixed(2) : partialAmount.toFixed(2)}
+                        Pay ${partialAmount > 0 ? partialAmount.toFixed(2) : total.toFixed(2)}
                       </>
                     )}
                   </StandardButton>

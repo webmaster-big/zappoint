@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import {
   Home,
   Calendar,
@@ -268,7 +268,16 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
   const { theme, toggleTheme } = useTheme();
   const { themeColor, fullColor } = useThemeColor();
   const location = useLocation();
-  const [openDropdowns, setOpenDropdowns] = useState<Record<string, boolean>>({});
+  
+  // Initialize openDropdowns from localStorage to persist state across navigation
+  const [openDropdowns, setOpenDropdowns] = useState<Record<string, boolean>>(() => {
+    try {
+      const saved = localStorage.getItem('zapzone_sidebar_dropdowns');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
   const profileDropdownRef = useRef<HTMLDivElement>(null);
   const [searchValue, setSearchValue] = useState('');
@@ -276,9 +285,40 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
   const [searchSuggestions, setSearchSuggestions] = useState<{ label: string; href: string; description?: string; fragmentId?: string }[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
+  const navRef = useRef<HTMLElement>(null);
   
   // Sidebar layout preference
   const [sidebarLayout, setSidebarLayout] = useState<'dropdown' | 'grouped'>('dropdown');
+  
+  // Persist openDropdowns to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('zapzone_sidebar_dropdowns', JSON.stringify(openDropdowns));
+  }, [openDropdowns]);
+  
+  // Use useLayoutEffect to restore scroll position BEFORE browser paints (prevents blinking)
+  useLayoutEffect(() => {
+    const savedScrollPosition = sessionStorage.getItem('zapzone_sidebar_scroll');
+    if (navRef.current && savedScrollPosition) {
+      const scrollPos = parseInt(savedScrollPosition, 10);
+      if (scrollPos > 0) {
+        // Immediately set scroll position before paint
+        navRef.current.scrollTop = scrollPos;
+      }
+    }
+  }, [location.pathname]);
+  
+  // Save scroll position continuously as user scrolls
+  useEffect(() => {
+    const navElement = navRef.current;
+    if (!navElement) return;
+    
+    const handleScroll = () => {
+      sessionStorage.setItem('zapzone_sidebar_scroll', String(navElement.scrollTop));
+    };
+    
+    navElement.addEventListener('scroll', handleScroll, { passive: true });
+    return () => navElement.removeEventListener('scroll', handleScroll);
+  }, []);
 
   // Load company logo on mount and listen for updates
   useEffect(() => {
@@ -727,10 +767,20 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
   // Handle search selection
 
   const toggleDropdown = (label: string) => {
+    // Preserve scroll position before state change
+    const scrollTop = navRef.current?.scrollTop || 0;
+    
     setOpenDropdowns(prev => ({
       ...prev,
       [label]: !prev[label]
     }));
+    
+    // Restore scroll position after render
+    requestAnimationFrame(() => {
+      if (navRef.current) {
+        navRef.current.scrollTop = scrollTop;
+      }
+    });
   };
 
   const NavItemComponent: React.FC<{ item: NavItem; depth?: number }> = ({ item, depth = 0 }) => {
@@ -792,6 +842,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
     
     // Only close sidebar on navigation for mobile screens
     const handleNavClick = () => {
+      // Scroll position is saved continuously via scroll event listener
       if (window.innerWidth < 1024) {
         setIsOpen(false);
       }
@@ -1169,7 +1220,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
             )}
           </div>
           {/* Navigation */}
-          <nav className="flex-1 px-4 py-4 space-y-2 hidden-scrollbar" style={{ overflowY: 'auto', overflowX: 'visible' }}>
+          <nav ref={navRef} className="flex-1 px-4 py-4 space-y-2 hidden-scrollbar" style={{ overflowY: 'auto', overflowX: 'visible', overflowAnchor: 'none' }}>
             {navigation.map((item, idx) => (
               <NavItemComponent key={idx} item={item} />
             ))}
