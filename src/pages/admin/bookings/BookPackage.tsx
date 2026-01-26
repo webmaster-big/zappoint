@@ -2452,19 +2452,16 @@ const BookPackage: React.FC = () => {
               
               {/* Package Notes */}
               {pkg.customer_notes && (
-                <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                  <p className="text-xs text-amber-800 whitespace-pre-wrap">{pkg.customer_notes}</p>
-                </div>
+                <p className="mt-3 text-xs text-gray-500 whitespace-pre-wrap">{pkg.customer_notes}</p>
               )}
               
               {/* Global Notes */}
               {globalNotes.length > 0 && (
-                <div className="mt-3 space-y-2">
+                <div className="mt-2 space-y-1">
                   {globalNotes.map((note) => (
-                    <div key={note.id} className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                      {note.title && <p className="text-xs font-semibold text-blue-900 mb-1">{note.title}</p>}
-                      <p className="text-xs text-blue-800 whitespace-pre-wrap">{note.content}</p>
-                    </div>
+                    <p key={note.id} className="text-xs text-gray-500 whitespace-pre-wrap">
+                      {note.title ? `${note.title}: ` : ''}{note.content}
+                    </p>
                   ))}
                 </div>
               )}

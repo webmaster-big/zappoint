@@ -7,10 +7,8 @@ import {
   Pencil, 
   Trash2, 
   Power, 
-  GripVertical,
   Save,
-  X,
-  Package
+  X
 } from 'lucide-react';
 import StandardButton from '../../../components/ui/StandardButton';
 import { useThemeColor } from '../../../hooks/useThemeColor';
@@ -212,19 +210,10 @@ const GlobalNotes: React.FC = () => {
       </div>
 
       {/* Info Box */}
-      <div className={`mb-6 p-4 bg-${themeColor}-50 border border-${themeColor}-200 rounded-lg`}>
-        <div className="flex items-start gap-3">
-          <FileText className={`h-5 w-5 text-${fullColor} mt-0.5`} />
-          <div className="text-sm">
-            <p className={`font-medium text-${themeColor}-900`}>How Global Notes Work</p>
-            <ul className={`mt-1 text-${themeColor}-700 list-disc list-inside space-y-1`}>
-              <li><strong>Global notes</strong> (no packages selected) appear on ALL package bookings</li>
-              <li><strong>Package-specific notes</strong> only appear on selected packages</li>
-              <li>Notes are displayed to customers during booking and included in confirmation emails</li>
-              <li>Example use: "A 4.87% processing fee applies to all transactions"</li>
-            </ul>
-          </div>
-        </div>
+      <div className="mb-6 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+        <p className="text-xs text-gray-600">
+          <strong>Note:</strong> Global notes (no packages selected) appear on all bookings. Package-specific notes only appear on selected packages.
+        </p>
       </div>
 
       {/* Notes List */}
@@ -254,44 +243,39 @@ const GlobalNotes: React.FC = () => {
               .map((note) => (
                 <div 
                   key={note.id} 
-                  className={`p-4 hover:bg-gray-50 transition-colors ${!note.is_active ? 'opacity-60' : ''}`}
+                  className={`p-3 hover:bg-gray-50 transition-colors ${!note.is_active ? 'opacity-50' : ''}`}
                 >
-                  <div className="flex items-start gap-4">
-                    <div className="flex-shrink-0 pt-1">
-                      <GripVertical className="h-5 w-5 text-gray-400" />
-                    </div>
-                    
+                  <div className="flex items-start gap-3">
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
+                      <div className="flex items-center gap-2 mb-0.5">
                         {note.title && (
-                          <h3 className="font-semibold text-gray-900">{note.title}</h3>
+                          <span className="font-medium text-sm text-gray-900">{note.title}</span>
                         )}
-                        <span className={`px-2 py-0.5 text-xs rounded-full ${
+                        <span className={`px-1.5 py-0.5 text-[10px] rounded ${
                           note.is_active 
-                            ? 'bg-green-100 text-green-800' 
-                            : 'bg-gray-100 text-gray-600'
+                            ? 'bg-green-100 text-green-700' 
+                            : 'bg-gray-100 text-gray-500'
                         }`}>
                           {note.is_active ? 'Active' : 'Inactive'}
                         </span>
                         {(!note.package_ids || note.package_ids.length === 0) && (
-                          <span className={`px-2 py-0.5 text-xs rounded-full bg-${themeColor}-100 text-${themeColor}-800`}>
+                          <span className="px-1.5 py-0.5 text-[10px] rounded bg-blue-100 text-blue-700">
                             Global
                           </span>
                         )}
                       </div>
                       
-                      <p className="text-gray-700 text-sm whitespace-pre-wrap">{note.content}</p>
+                      <p className="text-sm text-gray-600 line-clamp-2">{note.content}</p>
                       
-                      <div className="mt-2 flex items-center gap-2 text-xs text-gray-500">
-                        <Package className="h-3 w-3" />
-                        <span>{getPackageNames(note.package_ids)}</span>
-                      </div>
+                      <p className="mt-1 text-[11px] text-gray-400">
+                        {getPackageNames(note.package_ids)}
+                      </p>
                     </div>
                     
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-0.5">
                       <button
                         onClick={() => handleToggleStatus(note.id)}
-                        className={`p-2 rounded-lg hover:bg-gray-100 transition-colors ${
+                        className={`p-1.5 rounded hover:bg-gray-100 transition-colors ${
                           note.is_active ? 'text-green-600' : 'text-gray-400'
                         }`}
                         title={note.is_active ? 'Deactivate' : 'Activate'}
@@ -300,14 +284,14 @@ const GlobalNotes: React.FC = () => {
                       </button>
                       <button
                         onClick={() => handleOpenForm(note)}
-                        className="p-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-600"
+                        className="p-1.5 rounded hover:bg-gray-100 transition-colors text-gray-500"
                         title="Edit"
                       >
                         <Pencil className="h-4 w-4" />
                       </button>
                       <button
                         onClick={() => handleDelete(note.id)}
-                        className="p-2 rounded-lg hover:bg-red-50 transition-colors text-red-600"
+                        className="p-1.5 rounded hover:bg-red-50 transition-colors text-red-500"
                         title="Delete"
                       >
                         <Trash2 className="h-4 w-4" />
