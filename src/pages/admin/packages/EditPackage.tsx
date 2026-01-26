@@ -240,6 +240,10 @@ const EditPackage: React.FC = () => {
                 const giftCardCodes = pkg.gift_cards?.map((g: any) => typeof g === 'string' ? g : (g.code || '')) || [];
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const addOnNames = pkg.add_ons?.map((a: any) => typeof a === 'string' ? a : (a.name || '')) || [];
+                // Use add_ons_order if available for preserved drag-and-drop order, otherwise fall back to add_ons
+                const orderedAddOnNames = (pkg.add_ons_order && pkg.add_ons_order.length > 0) 
+                    ? pkg.add_ons_order.filter((name: string) => addOnNames.includes(name))
+                    : addOnNames;
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const roomNames = pkg.rooms?.map((r: any) => typeof r === 'string' ? r : (r.name || '')) || [];
                 
@@ -248,6 +252,7 @@ const EditPackage: React.FC = () => {
                     promoCodes,
                     giftCardCodes,
                     addOnNames,
+                    orderedAddOnNames,
                     roomNames
                 });
 
@@ -301,7 +306,7 @@ const EditPackage: React.FC = () => {
                     durationMinutes: durationMinutes,
                     promos: promoCodes,
                     giftCards: giftCardCodes,
-                    addOns: addOnNames,
+                    addOns: orderedAddOnNames,
                     availabilityType: pkg.availability_type || "daily",
                     availableDays: availableDays,
                     availableWeekDays: availableWeekDays,
