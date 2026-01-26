@@ -79,6 +79,19 @@ export interface OnsiteBookingPackage {
   rooms?: (string | OnsiteBookingRoom)[];
   image?: string;
   customerNotes?: string;
+  booking_window_days?: number | null;  // Package-specific max days in advance for booking (1-365)
+  location?: {
+    id: number;
+    company_id: number;
+    name: string;
+    address: string;
+    city: string;
+    state: string;
+    zip_code: string;
+    phone: string;
+    email: string;
+    booking_window_days?: number | null;  // Max days in advance customers can book (1-365)
+  };
 }
 
 export interface OnsiteBookingGiftCard {

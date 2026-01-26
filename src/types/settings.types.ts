@@ -5,6 +5,7 @@ export interface SettingsLocation {
   name: string;
   city: string;
   state: string;
+  booking_window_days?: number | null;  // Max days in advance customers can book (1-365)
 }
 
 export interface SettingsAuthorizeNetAccount {

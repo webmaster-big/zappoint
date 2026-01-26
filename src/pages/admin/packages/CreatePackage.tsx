@@ -240,6 +240,7 @@ const CreatePackage: React.FC = () => {
         invitation_download_link: "", // Link to downloadable invitation template
         invitation_file: "", // Base64 encoded invitation file
         invitationType: "link" as "link" | "file", // Tab selection for invitation
+        bookingWindowDays: "", // Max days in advance for booking (1-365)
         
         // NEW: Replace old availability fields with schedules array
         availability_schedules: [] as AvailabilitySchedule[],
@@ -610,6 +611,7 @@ const CreatePackage: React.FC = () => {
                 customer_notes: form.customerNotes.trim() || undefined,
                 invitation_download_link: form.invitationType === 'link' ? (form.invitation_download_link.trim() || undefined) : undefined,
                 invitation_file: form.invitationType === 'file' ? (form.invitation_file || undefined) : undefined,
+                booking_window_days: form.bookingWindowDays ? parseInt(form.bookingWindowDays) : undefined,
                 
                 // NEW: Send availability schedules
                 availability_schedules: form.availability_schedules,
@@ -693,6 +695,7 @@ const CreatePackage: React.FC = () => {
                 invitation_download_link: "",
                 invitation_file: "",
                 invitationType: "link",
+                bookingWindowDays: "",
                 availability_schedules: [],
             });
             setImagePreview("");
@@ -1808,6 +1811,75 @@ const CreatePackage: React.FC = () => {
                                 <p className="text-xs text-gray-500 mt-2">These notes will be displayed to customers during booking and included in their confirmation email.</p>
                             </div>
 
+                            {/* Booking Window */}
+                            <div>
+                                <label className="block font-semibold mb-3 text-base text-neutral-800">Booking Window</label>
+                                <p className="text-sm text-gray-500 mb-3">How far in advance customers can book this package</p>
+                                
+                                {/* Quick presets row */}
+                                <div className="flex flex-wrap gap-1.5 mb-3">
+                                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(month => {
+                                        const days = month * 30;
+                                        const isSelected = form.bookingWindowDays === String(days);
+                                        return (
+                                            <button
+                                                key={month}
+                                                type="button"
+                                                onClick={() => setForm(prev => ({ ...prev, bookingWindowDays: String(days) }))}
+                                                className={`w-10 h-8 text-xs font-medium rounded-md border transition-all ${
+                                                    isSelected
+                                                        ? `bg-${fullColor} text-white border-${fullColor} shadow-sm`
+                                                        : `bg-white text-gray-600 border-gray-200 hover:border-${themeColor}-300 hover:text-${fullColor}`
+                                                }`}
+                                            >
+                                                {month}mo
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                                
+                                {/* Custom and No Limit options */}
+                                <div className="flex items-center gap-3">
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            type="number"
+                                            value={form.bookingWindowDays}
+                                            onChange={(e) => setForm(prev => ({ ...prev, bookingWindowDays: e.target.value }))}
+                                            onWheel={(e) => (e.target as HTMLInputElement).blur()}
+                                            className={`w-20 h-8 px-2 text-sm border rounded-md transition-all ${
+                                                form.bookingWindowDays && ![30,60,90,120,150,180,210,240,270,300,330,360].includes(parseInt(form.bookingWindowDays))
+                                                    ? `border-${fullColor} ring-1 ring-${fullColor}`
+                                                    : 'border-gray-200'
+                                            } focus:ring-1 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
+                                            placeholder="Days"
+                                            min="1"
+                                            max="365"
+                                        />
+                                        <span className="text-sm text-gray-500">days</span>
+                                    </div>
+                                    
+                                    <div className="text-gray-300">|</div>
+                                    
+                                    <button
+                                        type="button"
+                                        onClick={() => setForm(prev => ({ ...prev, bookingWindowDays: '' }))}
+                                        className={`h-8 px-3 text-sm font-medium rounded-md border transition-all ${
+                                            form.bookingWindowDays === ''
+                                                ? 'bg-gray-700 text-white border-gray-700'
+                                                : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'
+                                        }`}
+                                    >
+                                        No Limit
+                                    </button>
+                                </div>
+                                
+                                {form.bookingWindowDays && (
+                                    <p className="text-xs text-${themeColor}-600 mt-2">
+                                        Customers can book up to {form.bookingWindowDays} days ({Math.round(parseInt(form.bookingWindowDays) / 30 * 10) / 10} months) in advance
+                                    </p>
+                                )}
+                            </div>
+
                             {/* Invitation */}
                             <div>
                                 <label className="block font-semibold mb-3 text-base text-neutral-800">Invitation Template</label>
@@ -1916,6 +1988,7 @@ const CreatePackage: React.FC = () => {
                                         invitation_download_link: "",
                                         invitation_file: "",
                                         invitationType: "link",
+                                        bookingWindowDays: "",
                                         availability_schedules: [],
                                     })}
                                 >

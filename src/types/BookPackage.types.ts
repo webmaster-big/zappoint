@@ -107,6 +107,8 @@ export interface BookPackagePackage {
   has_guest_of_honor?: boolean;
   customer_notes?: string;  // Package-specific notes displayed to customers
   invitation_download_link?: string;  // URL for downloadable invitation template
+  invitation_file?: string;  // Base64 encoded invitation file
+  booking_window_days?: number | null;  // Package-specific max days in advance for booking (1-365)
   location?: {
     id: number;
     company_id: number;
@@ -117,6 +119,7 @@ export interface BookPackagePackage {
     zip_code: string;
     phone: string;
     email: string;
+    booking_window_days?: number | null;  // Max days in advance customers can book (1-365)
   };
   attractions: BookPackageAttraction[];
   add_ons: BookPackageAddOn[];

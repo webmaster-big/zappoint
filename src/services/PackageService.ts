@@ -50,6 +50,8 @@ export interface Package {
   partial_payment_fixed?: number;
   has_guest_of_honor?: boolean;
   customer_notes?: string;
+  invitation_download_link?: string;
+  invitation_file?: string;
   created_at: string;
   updated_at: string;
   deleted_at?: string | null;
@@ -139,6 +141,9 @@ export interface CreatePackageData {
   partial_payment_percentage?: number;
   partial_payment_fixed?: number;
   has_guest_of_honor?: boolean;
+  customer_notes?: string;
+  invitation_download_link?: string;
+  invitation_file?: string;
   attraction_ids?: (number | undefined)[];
   room_ids?: (number | undefined)[];
   addon_ids?: (number | undefined)[];

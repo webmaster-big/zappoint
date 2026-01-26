@@ -525,8 +525,15 @@ const BookPackage: React.FC = () => {
     const today = new Date();
     const dates: Date[] = [];
     
-    // Generate available dates for the next 90 days
-    for (let i = 0; i < 90; i++) {
+    // Determine booking window: package-specific > location-specific > no limit (365 days)
+    // If null/undefined, use 365 days as the maximum (no limit)
+    const packageWindow = pkg.booking_window_days;
+    const locationWindow = pkg.location?.booking_window_days;
+    const bookingWindowDays = packageWindow ?? locationWindow ?? 365;
+    const maxDays = Math.min(Math.max(1, bookingWindowDays), 365); // Clamp between 1 and 365
+    
+    // Generate available dates for the booking window
+    for (let i = 0; i < maxDays; i++) {
       const date = new Date();
       date.setDate(today.getDate() + i);
       
@@ -1294,7 +1301,7 @@ const BookPackage: React.FC = () => {
             </div>
             
             {/* Invitation Download */}
-            {pkg?.invitation_download_link && (
+            {(pkg?.invitation_download_link || pkg?.invitation_file) && (
               <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 sm:p-4 mb-4 sm:mb-6">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center">
@@ -1304,7 +1311,8 @@ const BookPackage: React.FC = () => {
                     <span className="text-sm text-purple-800 font-medium">Download Invitation Template</span>
                   </div>
                   <a
-                    href={pkg.invitation_download_link}
+                    href={pkg.invitation_file || pkg.invitation_download_link}
+                    download={pkg.invitation_file ? "invitation-template" : undefined}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 transition-colors"

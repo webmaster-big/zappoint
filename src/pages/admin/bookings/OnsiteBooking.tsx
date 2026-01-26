@@ -568,8 +568,15 @@ const OnsiteBooking: React.FC = () => {
     const today = new Date();
     const dates: Date[] = [];
     
-    // Generate available dates for the next 90 days
-    for (let i = 0; i < 90; i++) {
+    // Determine booking window: package-specific > location-specific > no limit (365 days)
+    // If null/undefined, use 365 days as the maximum (no limit)
+    const packageWindow = selectedPackage.booking_window_days;
+    const locationWindow = selectedPackage.location?.booking_window_days;
+    const bookingWindowDays = packageWindow ?? locationWindow ?? 365;
+    const maxDays = Math.min(Math.max(1, bookingWindowDays), 365); // Clamp between 1 and 365
+    
+    // Generate available dates for the booking window
+    for (let i = 0; i < maxDays; i++) {
       const date = new Date();
       date.setDate(today.getDate() + i);
       
