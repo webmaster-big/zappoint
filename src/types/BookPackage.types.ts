@@ -106,6 +106,7 @@ export interface BookPackagePackage {
   partial_payment_fixed?: number | null;
   has_guest_of_honor?: boolean;
   customer_notes?: string;  // Package-specific notes displayed to customers
+  invitation_download_link?: string;  // URL for downloadable invitation template
   location?: {
     id: number;
     company_id: number;

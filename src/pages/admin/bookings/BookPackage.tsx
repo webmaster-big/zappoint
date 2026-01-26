@@ -1106,8 +1106,8 @@ const BookPackage: React.FC = () => {
     if (!showConfirmation || !confirmationData) return null;
     
     return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto animate-backdrop-fade" onClick={() => setShowConfirmation(false)}>
-        <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full my-8 max-h-[calc(100vh-4rem)] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto animate-backdrop-fade">
+        <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full my-8 max-h-[calc(100vh-4rem)] overflow-y-auto">
           <div className="p-4 sm:p-8">
             {/* Success Header */}
             <div className="text-center mb-4 sm:mb-6">
@@ -1292,6 +1292,28 @@ const BookPackage: React.FC = () => {
                 </div>
               </div>
             </div>
+            
+            {/* Invitation Download */}
+            {pkg?.invitation_download_link && (
+              <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 sm:p-4 mb-4 sm:mb-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <svg className="w-5 h-5 text-purple-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                    <span className="text-sm text-purple-800 font-medium">Download Invitation Template</span>
+                  </div>
+                  <a
+                    href={pkg.invitation_download_link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 transition-colors"
+                  >
+                    Download
+                  </a>
+                </div>
+              </div>
+            )}
             
             {/* Action Button */}
             <div className="flex justify-center">

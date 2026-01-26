@@ -1442,8 +1442,8 @@ const PurchaseAttraction = () => {
 
       {/* QR Code Modal */}
       {showQRModal && qrCodeImage && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-backdrop-fade" onClick={() => setShowQRModal(false)}>
-          <div className="bg-white rounded-xl max-w-2xl w-full p-4 sm:p-6 max-h-[calc(100vh-2rem)] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-backdrop-fade">
+          <div className="bg-white rounded-xl max-w-2xl w-full p-4 sm:p-6 max-h-[calc(100vh-2rem)] overflow-y-auto">
             <div className="text-center mb-4">
               <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-3" />
               <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">Purchase Complete!</h3>
