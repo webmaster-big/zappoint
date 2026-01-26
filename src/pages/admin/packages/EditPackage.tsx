@@ -758,7 +758,7 @@ const EditPackage: React.FC = () => {
                 customer_notes: form.customerNotes.trim() || undefined,
                 invitation_download_link: form.invitationType === 'link' ? (form.invitation_download_link.trim() || undefined) : undefined,
                 invitation_file: form.invitationType === 'file' ? (form.invitation_file || undefined) : undefined,
-                booking_window_days: form.bookingWindowDays ? parseInt(form.bookingWindowDays) : undefined,
+                booking_window_days: form.bookingWindowDays ? parseInt(form.bookingWindowDays) : null,
                 image: form.image || undefined,
                 attraction_ids,
                 addon_ids,

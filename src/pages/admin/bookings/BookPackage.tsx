@@ -525,12 +525,13 @@ const BookPackage: React.FC = () => {
     const today = new Date();
     const dates: Date[] = [];
     
-    // Determine booking window: package-specific > location-specific > no limit (365 days)
-    // If null/undefined, use 365 days as the maximum (no limit)
+    // Determine booking window: package-specific > location-specific > unlimited
+    // If both are null/undefined, allow unlimited date selection (730 days = 2 years)
     const packageWindow = pkg.booking_window_days;
     const locationWindow = pkg.location?.booking_window_days;
-    const bookingWindowDays = packageWindow ?? locationWindow ?? 365;
-    const maxDays = Math.min(Math.max(1, bookingWindowDays), 365); // Clamp between 1 and 365
+    const bookingWindowDays = packageWindow ?? locationWindow ?? null;
+    // If null, allow unlimited (730 days); otherwise use the configured value
+    const maxDays = bookingWindowDays === null ? 730 : Math.max(1, bookingWindowDays);
     
     // Generate available dates for the booking window
     for (let i = 0; i < maxDays; i++) {
