@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import Toast from "../../../components/ui/Toast";
 import StandardButton from "../../../components/ui/StandardButton";
-import { Info, Plus, Calendar, Clock, Gift, Tag, Home, ArrowLeft, Save, Trash2, X } from "lucide-react";
+import { Info, Plus, Calendar, Clock, Gift, Tag, Home, ArrowLeft, Save, Trash2, X, GripVertical } from "lucide-react";
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { 
     attractionService, 
@@ -404,6 +404,58 @@ const EditPackage: React.FC = () => {
         }));
     };
 
+    // Drag and drop state for features
+    const [draggedFeatureIndex, setDraggedFeatureIndex] = useState<number | null>(null);
+    
+    // Drag and drop handlers for features
+    const handleFeatureDragStart = (index: number) => {
+        setDraggedFeatureIndex(index);
+    };
+    
+    const handleFeatureDragOver = (e: React.DragEvent, index: number) => {
+        e.preventDefault();
+        if (draggedFeatureIndex === null || draggedFeatureIndex === index) return;
+        
+        setForm((prev) => {
+            const newFeatures = [...prev.features];
+            const draggedItem = newFeatures[draggedFeatureIndex];
+            newFeatures.splice(draggedFeatureIndex, 1);
+            newFeatures.splice(index, 0, draggedItem);
+            setDraggedFeatureIndex(index);
+            return { ...prev, features: newFeatures };
+        });
+    };
+    
+    const handleFeatureDragEnd = () => {
+        setDraggedFeatureIndex(null);
+    };
+
+    // Drag and drop state for add-ons
+    const [draggedAddOnIndex, setDraggedAddOnIndex] = useState<number | null>(null);
+    
+    // Drag and drop handlers for add-ons
+    const handleAddOnDragStart = (index: number) => {
+        setDraggedAddOnIndex(index);
+    };
+    
+    const handleAddOnDragOver = (e: React.DragEvent, index: number) => {
+        e.preventDefault();
+        if (draggedAddOnIndex === null || draggedAddOnIndex === index) return;
+        
+        setForm((prev) => {
+            const newAddOns = [...prev.addOns];
+            const draggedItem = newAddOns[draggedAddOnIndex];
+            newAddOns.splice(draggedAddOnIndex, 1);
+            newAddOns.splice(index, 0, draggedItem);
+            setDraggedAddOnIndex(index);
+            return { ...prev, addOns: newAddOns };
+        });
+    };
+    
+    const handleAddOnDragEnd = () => {
+        setDraggedAddOnIndex(null);
+    };
+
     // Multi-select for promos and gift cards
     const handleMultiSelectCheckbox = (name: 'promos' | 'giftCards', value: string) => {
         setForm((prev) => {
@@ -686,6 +738,15 @@ const EditPackage: React.FC = () => {
 
             console.log("Updating package with data:", updateData);
 
+            // Delete existing add-ons first to preserve the new order from drag-and-drop
+            try {
+                await packageService.deletePackageAddOns(parseInt(id));
+                console.log("Deleted existing add-ons for package", id);
+            } catch (deleteError) {
+                console.error('Error deleting existing add-ons:', deleteError);
+                // Continue with update even if delete fails - the update will handle it
+            }
+
             const response = await packageService.updatePackage(parseInt(id), updateData);
             console.log("Update response:", response);
             
@@ -961,6 +1022,7 @@ const EditPackage: React.FC = () => {
                                             name="minParticipants"
                                             value={form.minParticipants}
                                             onChange={handleChange}
+                                            onWheel={(e) => (e.target as HTMLInputElement).blur()}
                                             className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400`}
                                             min="1"
                                             placeholder="Enter min participants"
@@ -974,6 +1036,7 @@ const EditPackage: React.FC = () => {
                                             name="maxParticipants"
                                             value={form.maxParticipants}
                                             onChange={handleChange}
+                                            onWheel={(e) => (e.target as HTMLInputElement).blur()}
                                             className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400`}
                                             min="0"
                                             placeholder="Enter max participants"
@@ -990,6 +1053,7 @@ const EditPackage: React.FC = () => {
                                             name="pricePerAdditional"
                                             value={form.pricePerAdditional}
                                             onChange={handleChange}
+                                            onWheel={(e) => (e.target as HTMLInputElement).blur()}
                                             className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400`}
                                             min="0"
                                             step="0.01"
@@ -1020,6 +1084,7 @@ const EditPackage: React.FC = () => {
                                                         name="durationHours"
                                                         value={form.durationHours}
                                                         onChange={handleChange}
+                                                        onWheel={(e) => (e.target as HTMLInputElement).blur()}
                                                         className={`w-full rounded-md border border-gray-200 px-3 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400`}
                                                         min="0"
                                                         placeholder="0"
@@ -1032,6 +1097,7 @@ const EditPackage: React.FC = () => {
                                                         name="durationMinutes"
                                                         value={form.durationMinutes}
                                                         onChange={handleChange}
+                                                        onWheel={(e) => (e.target as HTMLInputElement).blur()}
                                                         className={`w-full rounded-md border border-gray-200 px-3 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400`}
                                                         min="0"
                                                         max="59"
@@ -1045,6 +1111,7 @@ const EditPackage: React.FC = () => {
                                                 name="duration"
                                                 value={form.duration}
                                                 onChange={handleChange}
+                                                onWheel={(e) => (e.target as HTMLInputElement).blur()}
                                                 className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400`}
                                                 min="1"
                                                 placeholder="Enter duration"
@@ -1054,10 +1121,20 @@ const EditPackage: React.FC = () => {
                                 </div>
 
                                 <div>
-                                    <label className="block font-semibold mb-2 text-base text-neutral-800">Features</label>
+                                    <label className="block font-semibold mb-2 text-base text-neutral-800">Features <span className="text-xs font-normal text-gray-500">(drag to reorder)</span></label>
                                     <div className="space-y-2">
                                         {form.features.map((feature, index) => (
-                                            <div key={index} className="flex gap-2">
+                                            <div 
+                                                key={index} 
+                                                className={`flex gap-2 ${draggedFeatureIndex === index ? 'opacity-50' : ''}`}
+                                                draggable
+                                                onDragStart={() => handleFeatureDragStart(index)}
+                                                onDragOver={(e) => handleFeatureDragOver(e, index)}
+                                                onDragEnd={handleFeatureDragEnd}
+                                            >
+                                                <div className="flex items-center cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600">
+                                                    <GripVertical className="w-5 h-5" />
+                                                </div>
                                                 <input
                                                     type="text"
                                                     value={feature}
@@ -1261,6 +1338,7 @@ const EditPackage: React.FC = () => {
                                                                 type="number"
                                                                 value={schedule.time_slot_interval}
                                                                 onChange={(e) => updateSchedule(index, { time_slot_interval: parseInt(e.target.value) || 30 })}
+                                                                onWheel={(e) => (e.target as HTMLInputElement).blur()}
                                                                 min="15"
                                                                 step="15"
                                                                 className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm"
@@ -1522,6 +1600,7 @@ const EditPackage: React.FC = () => {
                                     className="rounded-md border border-gray-200 px-2 py-1 w-16 bg-white text-sm transition-all placeholder:text-gray-400"
                                     id="addon-price"
                                     min="0"
+                                    onWheel={(e) => (e.target as HTMLInputElement).blur()}
                                 />
                                 <StandardButton
                                     variant="secondary"
@@ -1538,6 +1617,44 @@ const EditPackage: React.FC = () => {
                                     Add
                                 </StandardButton>
                             </div>
+                            
+                            {/* Selected Add-ons - Draggable Order */}
+                            {form.addOns.length > 0 && (
+                                <div className="mt-4">
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Selected Add-ons Order <span className="text-xs font-normal text-gray-500">(drag to reorder)</span>
+                                    </label>
+                                    <div className="space-y-2 bg-gray-50 rounded-lg p-3">
+                                        {form.addOns.map((addonName, index) => {
+                                            const addon = addOns.find(a => a.name === addonName);
+                                            return (
+                                                <div
+                                                    key={addonName}
+                                                    className={`flex items-center gap-2 bg-white rounded-md p-2 border border-gray-200 ${draggedAddOnIndex === index ? 'opacity-50' : ''}`}
+                                                    draggable
+                                                    onDragStart={() => handleAddOnDragStart(index)}
+                                                    onDragOver={(e) => handleAddOnDragOver(e, index)}
+                                                    onDragEnd={handleAddOnDragEnd}
+                                                >
+                                                    <div className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600">
+                                                        <GripVertical className="w-4 h-4" />
+                                                    </div>
+                                                    <span className="text-sm font-medium text-gray-600 w-6">{index + 1}.</span>
+                                                    <span className="flex-1 text-sm text-neutral-800">{addonName}</span>
+                                                    {addon && <span className="text-xs text-gray-500">${addon.price}</span>}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleMultiSelect("addOns", addonName)}
+                                                        className="text-gray-400 hover:text-red-500 transition-colors"
+                                                    >
+                                                        <X className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                         
                         {/* Promos Section */}
@@ -1655,6 +1772,7 @@ const EditPackage: React.FC = () => {
                                 name="price"
                                 value={form.price}
                                 onChange={handleChange}
+                                onWheel={(e) => (e.target as HTMLInputElement).blur()}
                                 className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400`}
                                 min="0"
                                 step="0.01"
@@ -1679,6 +1797,7 @@ const EditPackage: React.FC = () => {
                                         name="partialPaymentPercentage"
                                         value={form.partialPaymentPercentage}
                                         onChange={handleChange}
+                                        onWheel={(e) => (e.target as HTMLInputElement).blur()}
                                         className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400`}
                                         min="0"
                                         max="100"
@@ -1693,6 +1812,7 @@ const EditPackage: React.FC = () => {
                                         name="partialPaymentFixed"
                                         value={form.partialPaymentFixed}
                                         onChange={handleChange}
+                                        onWheel={(e) => (e.target as HTMLInputElement).blur()}
                                         className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400`}
                                         min="0"
                                         step="0.01"

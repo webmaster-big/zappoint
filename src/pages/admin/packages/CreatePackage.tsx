@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import Toast from "../../../components/ui/Toast";
 import StandardButton from "../../../components/ui/StandardButton";
 import LocationSelector from '../../../components/admin/LocationSelector';
-import { Info, Plus, RefreshCcw, Calendar, Clock, Gift, Tag, Home, Trash2, X } from "lucide-react";
+import { Info, Plus, RefreshCcw, Calendar, Clock, Gift, Tag, Home, Trash2, X, GripVertical } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { 
@@ -292,6 +292,58 @@ const CreatePackage: React.FC = () => {
             ...prev,
             features: prev.features.filter((_, i) => i !== index)
         }));
+    };
+
+    // Drag and drop state for features
+    const [draggedFeatureIndex, setDraggedFeatureIndex] = useState<number | null>(null);
+    
+    // Drag and drop handlers for features
+    const handleFeatureDragStart = (index: number) => {
+        setDraggedFeatureIndex(index);
+    };
+    
+    const handleFeatureDragOver = (e: React.DragEvent, index: number) => {
+        e.preventDefault();
+        if (draggedFeatureIndex === null || draggedFeatureIndex === index) return;
+        
+        setForm((prev) => {
+            const newFeatures = [...prev.features];
+            const draggedItem = newFeatures[draggedFeatureIndex];
+            newFeatures.splice(draggedFeatureIndex, 1);
+            newFeatures.splice(index, 0, draggedItem);
+            setDraggedFeatureIndex(index);
+            return { ...prev, features: newFeatures };
+        });
+    };
+    
+    const handleFeatureDragEnd = () => {
+        setDraggedFeatureIndex(null);
+    };
+
+    // Drag and drop state for add-ons
+    const [draggedAddOnIndex, setDraggedAddOnIndex] = useState<number | null>(null);
+    
+    // Drag and drop handlers for add-ons
+    const handleAddOnDragStart = (index: number) => {
+        setDraggedAddOnIndex(index);
+    };
+    
+    const handleAddOnDragOver = (e: React.DragEvent, index: number) => {
+        e.preventDefault();
+        if (draggedAddOnIndex === null || draggedAddOnIndex === index) return;
+        
+        setForm((prev) => {
+            const newAddOns = [...prev.addOns];
+            const draggedItem = newAddOns[draggedAddOnIndex];
+            newAddOns.splice(draggedAddOnIndex, 1);
+            newAddOns.splice(index, 0, draggedItem);
+            setDraggedAddOnIndex(index);
+            return { ...prev, addOns: newAddOns };
+        });
+    };
+    
+    const handleAddOnDragEnd = () => {
+        setDraggedAddOnIndex(null);
     };
 
     // Multi-select for promos and gift cards
@@ -770,6 +822,7 @@ const CreatePackage: React.FC = () => {
                                             name="durationHours"
                                             value={form.durationHours}
                                             onChange={handleChange}
+                                            onWheel={(e) => (e.target as HTMLInputElement).blur()}
                                             className={`w-full rounded-md border border-gray-200 px-3 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400`}
                                             min="0"
                                             placeholder="0"
@@ -782,6 +835,7 @@ const CreatePackage: React.FC = () => {
                                             name="durationMinutes"
                                             value={form.durationMinutes}
                                             onChange={handleChange}
+                                            onWheel={(e) => (e.target as HTMLInputElement).blur()}
                                             className={`w-full rounded-md border border-gray-200 px-3 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400`}
                                             min="0"
                                             max="59"
@@ -795,6 +849,7 @@ const CreatePackage: React.FC = () => {
                                     name="duration"
                                     value={form.duration}
                                     onChange={handleChange}
+                                    onWheel={(e) => (e.target as HTMLInputElement).blur()}
                                     className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400`}
                                     min="1"
                                     placeholder="Enter duration"
@@ -811,6 +866,7 @@ const CreatePackage: React.FC = () => {
                                                 name="minParticipants"
                                                 value={form.minParticipants}
                                                 onChange={handleChange}
+                                                onWheel={(e) => (e.target as HTMLInputElement).blur()}
                                                 className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400`}
                                                 min="1"
                                                 placeholder="Enter min participants"
@@ -824,6 +880,7 @@ const CreatePackage: React.FC = () => {
                                                 name="maxParticipants"
                                                 value={form.maxParticipants}
                                                 onChange={handleChange}
+                                                onWheel={(e) => (e.target as HTMLInputElement).blur()}
                                                 className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400`}
                                                 min="1"
                                                 placeholder="Enter max participants"
@@ -840,6 +897,7 @@ const CreatePackage: React.FC = () => {
                                 name="pricePerAdditional"
                                 value={form.pricePerAdditional}
                                 onChange={handleChange}
+                                onWheel={(e) => (e.target as HTMLInputElement).blur()}
                                 className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400`}
                                 min="0"
                                 step="0.01"
@@ -942,10 +1000,20 @@ const CreatePackage: React.FC = () => {
 
                                     {/* Features input below category */}
                                     <div>
-                                        <label className="block font-semibold mb-2 text-base text-neutral-800">Features</label>
+                                        <label className="block font-semibold mb-2 text-base text-neutral-800">Features <span className="text-xs font-normal text-gray-500">(drag to reorder)</span></label>
                                         <div className="space-y-2">
                                             {form.features.map((feature, index) => (
-                                                <div key={index} className="flex gap-2">
+                                                <div 
+                                                    key={index} 
+                                                    className={`flex gap-2 items-center ${draggedFeatureIndex === index ? 'opacity-50' : ''}`}
+                                                    draggable
+                                                    onDragStart={() => handleFeatureDragStart(index)}
+                                                    onDragOver={(e) => handleFeatureDragOver(e, index)}
+                                                    onDragEnd={handleFeatureDragEnd}
+                                                >
+                                                    <div className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600">
+                                                        <GripVertical size={18} />
+                                                    </div>
                                                     <input
                                                         type="text"
                                                         value={feature}
@@ -1171,6 +1239,7 @@ const CreatePackage: React.FC = () => {
                                                                 type="number"
                                                                 value={schedule.time_slot_interval}
                                                                 onChange={(e) => updateSchedule(index, { time_slot_interval: parseInt(e.target.value) || 30 })}
+                                                                onWheel={(e) => (e.target as HTMLInputElement).blur()}
                                                                 min="15"
                                                                 step="15"
                                                                 className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm"
@@ -1401,12 +1470,49 @@ const CreatePackage: React.FC = () => {
                                         {form.addOns.length === addOns.length ? 'Deselect All' : 'Select All'}
                                     </StandardButton>
                                 </div>
+                                
+                                {/* Selected Add-ons - Draggable list */}
+                                {form.addOns.length > 0 && (
+                                    <div className="mb-4">
+                                        <label className="block text-sm font-medium text-gray-600 mb-2">Selected Add-ons <span className="text-xs font-normal text-gray-500">(drag to reorder)</span></label>
+                                        <div className="space-y-2">
+                                            {form.addOns.map((addOnName, index) => {
+                                                const addOn = addOns.find(a => a.name === addOnName);
+                                                return (
+                                                    <div 
+                                                        key={addOnName}
+                                                        className={`flex items-center gap-2 p-2 bg-green-50 border border-green-200 rounded-lg ${draggedAddOnIndex === index ? 'opacity-50' : ''}`}
+                                                        draggable
+                                                        onDragStart={() => handleAddOnDragStart(index)}
+                                                        onDragOver={(e) => handleAddOnDragOver(e, index)}
+                                                        onDragEnd={handleAddOnDragEnd}
+                                                    >
+                                                        <div className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600">
+                                                            <GripVertical size={18} />
+                                                        </div>
+                                                        <span className="flex-1 text-sm font-medium text-gray-800">{addOnName}</span>
+                                                        {addOn && <span className="text-xs text-green-600">${addOn.price}</span>}
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleMultiSelect("addOns", addOnName)}
+                                                            className="text-red-500 hover:text-red-700 p-1"
+                                                        >
+                                                            <X size={14} />
+                                                        </button>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
+                                
+                                {/* Available Add-ons to select */}
                                 <div className="flex flex-wrap gap-2 mb-2">
-                                    {addOns.map((add) => (
+                                    {addOns.filter(add => !form.addOns.includes(add.name)).map((add) => (
                                         <StandardButton
                                             type="button"
                                             key={add.name}
-                                            variant={form.addOns.includes(add.name) ? 'success' : 'secondary'}
+                                            variant="secondary"
                                             size="sm"
                                             onClick={() => handleMultiSelect("addOns", add.name)}
                                         >
@@ -1425,6 +1531,7 @@ const CreatePackage: React.FC = () => {
                                         className="rounded-md border border-gray-200 px-2 py-1 w-16 bg-white text-sm transition-all placeholder:text-gray-400"
                                         id="addon-price"
                                         min="0"
+                                        onWheel={(e) => (e.target as HTMLInputElement).blur()}
                                     />
                                     <StandardButton type="button" variant="ghost" size="sm" icon={Plus} title="Add add-on"
                                         onClick={async () => {
@@ -1588,6 +1695,7 @@ const CreatePackage: React.FC = () => {
                                     name="price"
                                     value={form.price}
                                     onChange={handleChange}
+                                    onWheel={(e) => (e.target as HTMLInputElement).blur()}
                                     className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400`}
                                     min="0"
                                     step="0.01"
@@ -1611,6 +1719,7 @@ const CreatePackage: React.FC = () => {
                                             name="partialPaymentPercentage"
                                             value={form.partialPaymentPercentage}
                                             onChange={handleChange}
+                                            onWheel={(e) => (e.target as HTMLInputElement).blur()}
                                             className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400`}
                                             min="0"
                                             max="100"
@@ -1625,6 +1734,7 @@ const CreatePackage: React.FC = () => {
                                             name="partialPaymentFixed"
                                             value={form.partialPaymentFixed}
                                             onChange={handleChange}
+                                            onWheel={(e) => (e.target as HTMLInputElement).blur()}
                                             className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400`}
                                             min="0"
                                             placeholder="e.g. 50 for $50"

@@ -736,6 +736,7 @@ const CreatePurchase = () => {
                         max={calculateSubtotal()}
                         value={discount}
                         onChange={(e) => setDiscount(Number(e.target.value))}
+                        onWheel={(e) => (e.target as HTMLInputElement).blur()}
                         className={`w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
                       />
                     </div>
@@ -751,6 +752,7 @@ const CreatePurchase = () => {
                         max={calculateTotal()}
                         value={paymentMethod === 'paylater' ? 0 : amountPaid}
                         onChange={(e) => setAmountPaid(Number(e.target.value))}
+                        onWheel={(e) => (e.target as HTMLInputElement).blur()}
                         disabled={paymentMethod === 'paylater'}
                         className={`w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 ${paymentMethod === 'paylater' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                         placeholder="0.00"

@@ -865,6 +865,7 @@ const ManualBooking: React.FC = () => {
                               }
                               setForm(prev => ({ ...prev, participants: value }));
                             }}
+                            onWheel={(e) => (e.target as HTMLInputElement).blur()}
                             min="1"
                             max={pkg?.max_participants}
                             required
@@ -1041,6 +1042,7 @@ const ManualBooking: React.FC = () => {
                                         setSelectedAddOns(prev => ({ ...prev, [addOn.id]: newQty }));
                                       }
                                     }}
+                                    onWheel={(e) => (e.target as HTMLInputElement).blur()}
                                     className="w-14 text-center font-bold text-sm text-gray-900 border border-gray-300 rounded px-1 py-1"
                                   />
                                   <StandardButton
@@ -1125,6 +1127,7 @@ const ManualBooking: React.FC = () => {
                                         setSelectedAttractions(prev => ({ ...prev, [attraction.id]: newQty }));
                                       }
                                     }}
+                                    onWheel={(e) => (e.target as HTMLInputElement).blur()}
                                     className="w-14 text-center font-bold text-sm text-gray-900 border border-gray-300 rounded px-1 py-1"
                                   />
                                   <StandardButton
@@ -1270,6 +1273,7 @@ const ManualBooking: React.FC = () => {
                         name="totalAmount"
                         value={form.totalAmount}
                         onChange={handleInputChange}
+                        onWheel={(e) => (e.target as HTMLInputElement).blur()}
                         step="0.01"
                         min="0"
                         placeholder={`${Number(calculatedTotal || 0).toFixed(2)}`}
@@ -1285,6 +1289,7 @@ const ManualBooking: React.FC = () => {
                         name="amountPaid"
                         value={form.amountPaid}
                         onChange={handleInputChange}
+                        onWheel={(e) => (e.target as HTMLInputElement).blur()}
                         step="0.01"
                         min="0"
                         placeholder="Auto-calculated"
@@ -1359,6 +1364,7 @@ const ManualBooking: React.FC = () => {
                             name="guestOfHonorAge"
                             value={form.guestOfHonorAge}
                             onChange={handleInputChange}
+                            onWheel={(e) => (e.target as HTMLInputElement).blur()}
                             min="0"
                             className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
                             placeholder="Age"

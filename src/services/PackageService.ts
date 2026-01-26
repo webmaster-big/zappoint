@@ -350,6 +350,14 @@ class PackageService {
     const response = await api.delete(`/packages/${packageId}/availability-schedules/${scheduleId}`);
     return response.data;
   }
+
+  /**
+   * Delete all add-ons for a package (used before re-adding in new order)
+   */
+  async deletePackageAddOns(packageId: number): Promise<ApiResponse<null>> {
+    const response = await api.delete(`/packages/addons/${packageId}`);
+    return response.data;
+  }
 }
 
 // Export a singleton instance
