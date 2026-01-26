@@ -118,6 +118,7 @@ export interface BookPackagePackage {
   };
   attractions: BookPackageAttraction[];
   add_ons: BookPackageAddOn[];
+  add_ons_order?: string[];  // Add-on names in display order
   rooms: BookPackageRoom[];
   promos: BookPackagePromoOrGiftCard[];
   gift_cards: BookPackagePromoOrGiftCard[];

@@ -327,6 +327,7 @@ const OnsiteBooking: React.FC = () => {
               is_force_add_on: a.is_force_add_on || false,
               price_each_packages: a.price_each_packages || null
             })) || [],
+            addOnsOrder: pkg.add_ons_order || [],
             rooms: pkg.rooms?.map((r: any) => ({
               id: r.id,
               name: r.name,
@@ -432,6 +433,7 @@ const OnsiteBooking: React.FC = () => {
               is_force_add_on: a.is_force_add_on || false,
               price_each_packages: a.price_each_packages || null
             })) || [],
+            addOnsOrder: pkg.add_ons_order || [],
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             rooms: pkg.rooms?.map((r: any) => ({
               id: r.id,
@@ -2169,7 +2171,17 @@ const OnsiteBooking: React.FC = () => {
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Package Add-ons</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {selectedPackage.addOns.map(addOn => {
+            {[...selectedPackage.addOns].sort((a, b) => {
+              // Sort by addOnsOrder if available, otherwise keep original order
+              if (!selectedPackage.addOnsOrder || selectedPackage.addOnsOrder.length === 0) return 0;
+              const indexA = selectedPackage.addOnsOrder.indexOf(a.name);
+              const indexB = selectedPackage.addOnsOrder.indexOf(b.name);
+              // Items not in order array go to the end
+              if (indexA === -1 && indexB === -1) return 0;
+              if (indexA === -1) return 1;
+              if (indexB === -1) return -1;
+              return indexA - indexB;
+            }).map(addOn => {
               const selectedAddOn = bookingData.selectedAddOns.find(a => a.name === addOn.name);
               const isSelected = !!selectedAddOn;
               const isForced = selectedAddOn?.isForced || false;

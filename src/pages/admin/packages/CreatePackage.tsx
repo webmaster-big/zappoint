@@ -606,6 +606,8 @@ const CreatePackage: React.FC = () => {
                     const found = addOns.find(a => a.name === name);
                     return found?.id;
                 }).filter(Boolean),
+                // Store add-ons order for display (uses add-on names)
+                add_ons_order: form.addOns,
                 promo_ids: form.promos.map(code => {
                     const found = promos.find(p => p.code === code);
                     return found?.id;

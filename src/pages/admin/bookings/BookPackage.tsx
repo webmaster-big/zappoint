@@ -1626,7 +1626,17 @@ const BookPackage: React.FC = () => {
                   <div className="border border-gray-200 rounded-xl p-4 md:p-5">
                     <label className="block font-medium mb-3 text-gray-800 text-xs md:text-sm uppercase tracking-wide">Add-ons</label>
                     <div className="space-y-4">
-                      {pkg.add_ons.map((addOn) => {
+                      {[...pkg.add_ons].sort((a, b) => {
+                        // Sort by add_ons_order if available, otherwise keep original order
+                        if (!pkg.add_ons_order || pkg.add_ons_order.length === 0) return 0;
+                        const indexA = pkg.add_ons_order.indexOf(a.name);
+                        const indexB = pkg.add_ons_order.indexOf(b.name);
+                        // Items not in order array go to the end
+                        if (indexA === -1 && indexB === -1) return 0;
+                        if (indexA === -1) return 1;
+                        if (indexB === -1) return -1;
+                        return indexA - indexB;
+                      }).map((addOn) => {
                         const isForcedAddOn = isForceAddOn(addOn, pkg.id);
                         const minQty = isForcedAddOn ? getAddOnMinQuantity(addOn, pkg.id) : (addOn.min_quantity ?? 0);
                         const maxQty = addOn.max_quantity ?? 99;

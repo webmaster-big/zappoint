@@ -66,6 +66,7 @@ export interface OnsiteBookingPackage {
   availability_schedules?: OnsiteBookingAvailabilitySchedule[];
   attractions: OnsiteBookingAttraction[];
   addOns: OnsiteBookingAddOn[];
+  addOnsOrder?: string[];  // Add-on names in display order
   giftCards: OnsiteBookingGiftCard[];
   promos: OnsiteBookingPromo[];
   duration: string;

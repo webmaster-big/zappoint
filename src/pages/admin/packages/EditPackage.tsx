@@ -734,18 +734,11 @@ const EditPackage: React.FC = () => {
                 room_ids,
                 promo_ids,
                 gift_card_ids,
+                // Store add-ons order for display (uses add-on names)
+                add_ons_order: form.addOns,
             };
 
             console.log("Updating package with data:", updateData);
-
-            // Delete existing add-ons first to preserve the new order from drag-and-drop
-            try {
-                await packageService.deletePackageAddOns(parseInt(id));
-                console.log("Deleted existing add-ons for package", id);
-            } catch (deleteError) {
-                console.error('Error deleting existing add-ons:', deleteError);
-                // Continue with update even if delete fails - the update will handle it
-            }
 
             const response = await packageService.updatePackage(parseInt(id), updateData);
             console.log("Update response:", response);
