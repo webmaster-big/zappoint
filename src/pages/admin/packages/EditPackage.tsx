@@ -96,6 +96,7 @@ const EditPackage: React.FC = () => {
         partialPaymentFixed: "0", // Fixed amount for partial payments
         hasGuestOfHonor: false,
         customerNotes: "", // Notes displayed to customers during booking
+        invitation_download_link: "", // Link to downloadable invitation template
     });
 
     // Image preview state
@@ -326,6 +327,7 @@ const EditPackage: React.FC = () => {
                     partialPaymentFixed: String(pkg.partial_payment_fixed || "0"),
                     hasGuestOfHonor: pkg.has_guest_of_honor || false,
                     customerNotes: pkg.customer_notes || "",
+                    invitation_download_link: pkg.invitation_download_link || "",
                 });
 
                 if (pkg.image) {
@@ -736,6 +738,7 @@ const EditPackage: React.FC = () => {
                 partial_payment_fixed: form.partialPaymentFixed ? parseInt(form.partialPaymentFixed) : undefined,
                 has_guest_of_honor: form.hasGuestOfHonor,
                 customer_notes: form.customerNotes.trim() || undefined,
+                invitation_download_link: form.invitation_download_link.trim() || undefined,
                 image: form.image || undefined,
                 attraction_ids,
                 addon_ids,
@@ -1862,6 +1865,20 @@ const EditPackage: React.FC = () => {
                                 className={`w-full border border-neutral-300 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
                             />
                             <p className="text-xs text-gray-500 mt-2">These notes will be displayed to customers during booking and included in their confirmation email.</p>
+                        </div>
+
+                        {/* Invitation Download Link */}
+                        <div>
+                            <label className="block font-semibold mb-2 text-base text-neutral-800">Invitation Download Link</label>
+                            <input
+                                type="url"
+                                name="invitation_download_link"
+                                value={form.invitation_download_link}
+                                onChange={handleChange}
+                                className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400`}
+                                placeholder="https://example.com/invitation-template.pdf"
+                            />
+                            <p className="text-xs text-gray-500 mt-2">Optional: Provide a link to a downloadable invitation template that customers can access after booking.</p>
                         </div>
                         
                         <div className="flex gap-2 mt-6">
