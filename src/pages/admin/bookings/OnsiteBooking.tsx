@@ -68,8 +68,9 @@ interface BookingData extends Omit<OnsiteBookingData, 'customer'> {
     email: string;
     phone: string;
   };
-  paymentMethod: 'card' | 'cash' | 'paylater';
+  paymentMethod: 'card' | 'in-store' | 'paylater';
   paymentType: 'full' | 'partial' | 'custom';
+  inStoreAmountPaid: number;
   customPaymentAmount: number;
   giftCardCode: string;
   promoCode: string;
@@ -142,9 +143,10 @@ const OnsiteBooking: React.FC = () => {
       phone: ''
     },
     room: '',
-    paymentMethod: 'cash',
-    paymentType: 'full',
+    paymentMethod: 'in-store',
+    paymentType: 'partial',
     customPaymentAmount: 0,
+    inStoreAmountPaid: 0,
     giftCardCode: '',
     promoCode: '',
     notes: '',
@@ -1183,9 +1185,10 @@ const OnsiteBooking: React.FC = () => {
         phone: ''
       },
       room: '',
-      paymentMethod: 'cash',
-      paymentType: 'full',
+      paymentMethod: 'in-store',
+      paymentType: 'partial',
       customPaymentAmount: 0,
+      inStoreAmountPaid: 0,
       giftCardCode: '',
       promoCode: '',
       notes: '',
@@ -1335,6 +1338,9 @@ const OnsiteBooking: React.FC = () => {
       
       if (bookingData.paymentMethod === 'paylater') {
         amountPaid = 0;
+      } else if (bookingData.paymentMethod === 'in-store') {
+        // Use the in-store amount paid that was entered
+        amountPaid = bookingData.inStoreAmountPaid || 0;
       } else if (bookingData.paymentType === 'custom' && bookingData.customPaymentAmount > 0) {
         amountPaid = Math.min(bookingData.customPaymentAmount, totalAmount);
       } else if (bookingData.paymentType === 'partial' && partialAmount > 0) {
@@ -1362,12 +1368,14 @@ const OnsiteBooking: React.FC = () => {
         duration_unit: finalDurationUnit,
         total_amount: totalAmount,
         amount_paid: amountPaid,
-        payment_method: bookingData.paymentMethod as 'cash' | 'card' | 'paylater',
+        payment_method: (bookingData.paymentMethod === 'in-store' ? 'in-store' : bookingData.paymentMethod) as 'card' | 'in-store' | 'paylater',
         payment_status: bookingData.paymentMethod === 'paylater' ? 'pending' as const : 
+          (bookingData.paymentMethod === 'in-store' && amountPaid < totalAmount) ? (amountPaid > 0 ? 'partial' as const : 'pending' as const) :
           ((bookingData.paymentType === 'partial' && partialAmount > 0) || 
            (bookingData.paymentType === 'custom' && bookingData.customPaymentAmount > 0 && bookingData.customPaymentAmount < totalAmount)) 
             ? 'partial' as const : 'paid' as const,
         status: bookingData.paymentMethod === 'paylater' || 
+          (bookingData.paymentMethod === 'in-store' && amountPaid < totalAmount) ||
           ((bookingData.paymentType === 'partial' && partialAmount > 0) ||
            (bookingData.paymentType === 'custom' && bookingData.customPaymentAmount > 0 && bookingData.customPaymentAmount < totalAmount)) 
             ? 'pending' as const : 'confirmed' as const,
@@ -1487,10 +1495,12 @@ const OnsiteBooking: React.FC = () => {
               customer_id: response.data.customer_id || null,
               amount: amountPaid,
               currency: 'USD',
-              method: bookingData.paymentMethod as 'card' | 'cash',
+              method: (bookingData.paymentMethod === 'in-store' ? 'cash' : bookingData.paymentMethod) as 'card' | 'cash',
               status: 'completed' as const,
               location_id: bookingData_request.location_id,
-              notes: `Payment for booking ${referenceNumber}`,
+              notes: bookingData.paymentMethod === 'in-store' 
+                ? `In-store payment for booking ${referenceNumber}` 
+                : `Payment for booking ${referenceNumber}`,
             };
             
             await createPayment(paymentData);
@@ -2719,11 +2729,11 @@ const OnsiteBooking: React.FC = () => {
             <div className="grid grid-cols-3 gap-2">
               <StandardButton
                 type="button"
-                variant={bookingData.paymentMethod === 'cash' ? 'primary' : 'secondary'}
-                onClick={() => setBookingData(prev => ({ ...prev, paymentMethod: 'cash' }))}
+                variant={bookingData.paymentMethod === 'in-store' ? 'primary' : 'secondary'}
+                onClick={() => setBookingData(prev => ({ ...prev, paymentMethod: 'in-store' }))}
               >
                 <DollarSign className="h-5 w-5 mx-auto mb-1" />
-                <span className="text-sm font-medium">Cash</span>
+                <span className="text-sm font-medium">In-Store</span>
               </StandardButton>
               
               <StandardButton
@@ -2759,6 +2769,43 @@ const OnsiteBooking: React.FC = () => {
               <p className="text-sm font-medium text-orange-800">Payment will be collected later</p>
               <p className="text-xs text-orange-700 mt-1">No payment is being processed now. Customer will pay at a later time.</p>
             </div>
+          </div>
+        </div>
+      )}
+      
+      {/* In-Store Payment - Prompt for amount paid */}
+      {bookingData.paymentMethod === 'in-store' && (
+        <div className="mb-4 p-4 bg-green-50 rounded-lg border border-green-200">
+          <div className="flex items-start gap-2 mb-3">
+            <DollarSign className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-medium text-green-800">In-Store Payment</p>
+              <p className="text-xs text-green-700 mt-1">Enter the amount paid in-store to track this payment.</p>
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">How much was paid in-store?</label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 font-medium">$</span>
+              <input
+                type="number"
+                min="0"
+                max={calculateTotal()}
+                step="0.01"
+                value={bookingData.inStoreAmountPaid || ''}
+                onChange={(e) => {
+                  const value = parseFloat(e.target.value) || 0;
+                  const maxAmount = calculateTotal();
+                  setBookingData(prev => ({ 
+                    ...prev, 
+                    inStoreAmountPaid: Math.min(Math.max(0, value), maxAmount)
+                  }));
+                }}
+                placeholder="0.00"
+                className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              />
+            </div>
+            <p className="text-xs text-gray-500 mt-2">Total: ${calculateTotal().toFixed(2)} | Remaining: ${(calculateTotal() - (bookingData.inStoreAmountPaid || 0)).toFixed(2)}</p>
           </div>
         </div>
       )}

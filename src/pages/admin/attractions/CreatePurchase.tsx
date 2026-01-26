@@ -39,7 +39,7 @@ const CreatePurchase = () => {
     email: '',
     phone: ''
   });
-  const [paymentMethod, setPaymentMethod] = useState('cash');
+  const [paymentMethod, setPaymentMethod] = useState('in-store');
   const [discount, setDiscount] = useState(0);
   const [notes, setNotes] = useState('');
   const [amountPaid, setAmountPaid] = useState<number>(0);
@@ -399,9 +399,9 @@ const CreatePurchase = () => {
         amount: totalAmount,
         amount_paid: paymentMethod === 'paylater' ? 0 : (paymentMethod === 'card' ? totalAmount : cashAmountPaid),
         currency: 'USD',
-        method: paymentMethod as 'card' | 'cash' | 'paylater',
-        payment_method: paymentMethod as 'card' | 'cash' | 'paylater',
-        status: (paymentMethod === 'paylater' || paymentMethod === 'cash' ? 'pending' : 'completed') as 'pending' | 'completed' | 'cancelled',
+        method: paymentMethod === 'in-store' ? 'cash' : paymentMethod as 'card' | 'paylater',
+        payment_method: paymentMethod as 'card' | 'in-store' | 'paylater',
+        status: (paymentMethod === 'paylater' || paymentMethod === 'in-store' ? 'pending' : 'completed') as 'pending' | 'completed' | 'cancelled',
         payment_id: transactionId, // Only present if Authorize.Net was used
         location_id: selectedAttraction.locationId || 1,
         purchase_date: new Date().toISOString().split('T')[0],
@@ -472,7 +472,7 @@ const CreatePurchase = () => {
       setDiscount(0);
       setNotes('');
       setAmountPaid(0);
-      setPaymentMethod('cash');
+      setPaymentMethod('in-store');
       setSelectedCustomerId(null);
       setCardNumber('');
       setCardMonth('');
@@ -777,15 +777,15 @@ const CreatePurchase = () => {
                     <h3 className="text-sm font-medium text-gray-700 mb-3">Payment Method</h3>
                     <div className="grid grid-cols-3 gap-2">
                       <StandardButton
-                        variant={paymentMethod === 'cash' ? 'primary' : 'secondary'}
+                        variant={paymentMethod === 'in-store' ? 'primary' : 'secondary'}
                         size="md"
                         onClick={() => {
-                          setPaymentMethod('cash');
-                          setAmountPaid(calculateTotal()); // Default to full payment for cash
+                          setPaymentMethod('in-store');
+                          setAmountPaid(calculateTotal()); // Default to full payment for in-store
                         }}
                         icon={DollarSign}
                       >
-                        Cash
+                        In-Store
                       </StandardButton>
                    
                       <StandardButton

@@ -479,7 +479,7 @@ const PurchaseAttraction = () => {
         amount_paid: totalAmount, // Full payment
         currency: 'USD',
         method: 'card',
-        payment_method: 'card' as 'card' | 'cash',
+        payment_method: 'card' as 'card' | 'in-store',
         status: 'completed' as 'pending' | 'completed' | 'cancelled',
         payment_id: transactionId,
         location_id: attraction.locationId || 1, // Use attraction's location_id from API

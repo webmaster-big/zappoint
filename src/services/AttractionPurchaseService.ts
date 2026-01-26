@@ -35,7 +35,7 @@ export interface AttractionPurchase {
   guest_phone?: string;
   quantity: number;
   total_amount: number;
-  payment_method: 'card' | 'cash' | 'paylater';
+  payment_method: 'card' | 'in-store' | 'paylater';
   status: 'pending' | 'completed' | 'cancelled';
   purchase_date: string;
   notes?: string;
@@ -63,7 +63,7 @@ export interface CreatePurchaseData {
   guest_email?: string;
   guest_phone?: string;
   quantity: number;
-  payment_method: 'card' | 'cash' | 'paylater';
+  payment_method: 'card' | 'in-store' | 'paylater';
   purchase_date: string;
   notes?: string;
   // Optional fields for payment tracking

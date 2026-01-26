@@ -66,7 +66,7 @@ const ManagePurchases = () => {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedPurchaseForPayment, setSelectedPurchaseForPayment] = useState<AttractionPurchasesPurchase | null>(null);
   const [paymentAmount, setPaymentAmount] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<'card' | 'cash'>('cash');
+  const [paymentMethod, setPaymentMethod] = useState<'card' | 'in-store'>('in-store');
   const [paymentNotes, setPaymentNotes] = useState('');
   const [processingPayment, setProcessingPayment] = useState(false);
 
@@ -386,7 +386,7 @@ const ManagePurchases = () => {
   const handleOpenPaymentModal = (purchase: AttractionPurchasesPurchase) => {
     setSelectedPurchaseForPayment(purchase);
     setPaymentAmount(purchase.totalAmount.toFixed(2));
-    setPaymentMethod('cash');
+    setPaymentMethod('in-store');
     setPaymentNotes('');
     setShowPaymentModal(true);
   };
@@ -395,7 +395,7 @@ const ManagePurchases = () => {
     setShowPaymentModal(false);
     setSelectedPurchaseForPayment(null);
     setPaymentAmount('');
-    setPaymentMethod('cash');
+    setPaymentMethod('in-store');
     setPaymentNotes('');
   };
 
@@ -441,9 +441,11 @@ const ManagePurchases = () => {
         location_id: locationId,
         amount: amount,
         currency: 'USD',
-        method: paymentMethod,
+        method: paymentMethod === 'in-store' ? 'cash' : paymentMethod,
         status: 'completed',
-        notes: paymentNotes || `Payment for attraction purchase #${selectedPurchaseForPayment.id}`,
+        notes: paymentNotes || (paymentMethod === 'in-store' 
+          ? `In-store payment for attraction purchase #${selectedPurchaseForPayment.id}`
+          : `Payment for attraction purchase #${selectedPurchaseForPayment.id}`),
       });
 
       if (!paymentResponse.success) {
@@ -909,10 +911,10 @@ const ManagePurchases = () => {
                 </label>
                 <select
                   value={paymentMethod}
-                  onChange={(e) => setPaymentMethod(e.target.value as 'card' | 'cash')}
+                  onChange={(e) => setPaymentMethod(e.target.value as 'card' | 'in-store')}
                   className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
                 >
-                  <option value="cash">Cash</option>
+                  <option value="in-store">In-Store</option>
                   <option value="card">Card</option>
                 </select>
               </div>

@@ -62,7 +62,7 @@ const ManualBooking: React.FC = () => {
     bookingDate: string;
     bookingTime: string;
     participants: number;
-    paymentMethod: 'cash' | 'card' | 'paylater';
+    paymentMethod: 'in-store' | 'card' | 'paylater';
     paymentStatus: 'paid' | 'partial' | 'pending';
     status: 'pending' | 'confirmed' | 'checked-in' | 'completed' | 'cancelled';
     notes: string;
@@ -80,7 +80,7 @@ const ManualBooking: React.FC = () => {
     bookingDate: '',
     bookingTime: '',
     participants: 1,
-    paymentMethod: 'cash',
+    paymentMethod: 'in-store',
     paymentStatus: 'paid',
     status: 'completed',
     notes: '',
@@ -493,7 +493,7 @@ const ManualBooking: React.FC = () => {
         duration_unit: finalDurationUnit,
         total_amount: finalTotalAmount,
         amount_paid: finalAmountPaid,
-        payment_method: form.paymentMethod as 'cash' | 'card' | 'paylater',
+        payment_method: (form.paymentMethod === 'in-store' ? 'in-store' : form.paymentMethod) as 'card' | 'in-store' | 'paylater',
         payment_status: form.paymentStatus as 'paid' | 'partial' | 'pending',
         status: form.status as 'pending' | 'confirmed' | 'checked-in' | 'completed' | 'cancelled',
         notes: form.notes || undefined,
@@ -1306,7 +1306,7 @@ const ManualBooking: React.FC = () => {
                         onChange={handleInputChange}
                         className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
                       >
-                        <option value="cash">Cash</option>
+                        <option value="in-store">In-Store</option>
                         <option value="card">Card</option>
                         <option value="paylater">Pay Later</option>
                       </select>

@@ -56,7 +56,7 @@ const CheckIn: React.FC = () => {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedBookingForPayment, setSelectedBookingForPayment] = useState<Booking | null>(null);
   const [paymentAmount, setPaymentAmount] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<'card' | 'cash'>('cash');
+  const [paymentMethod, setPaymentMethod] = useState<'card' | 'in-store'>('in-store');
   const [paymentNotes, setPaymentNotes] = useState('');
   const [processingPayment, setProcessingPayment] = useState(false);
   const scannerRef = useRef<Html5Qrcode | null>(null);
@@ -442,7 +442,7 @@ const CheckIn: React.FC = () => {
     setSelectedBookingForPayment(booking);
     const remainingAmount = Math.max(0, Number(booking.total_amount) - Number(booking.amount_paid || 0));
     setPaymentAmount((Math.floor(remainingAmount * 100) / 100).toFixed(2));
-    setPaymentMethod('cash');
+    setPaymentMethod('in-store');
     setPaymentNotes('');
     setShowPaymentModal(true);
     setShowVerificationModal(false); // Close verification modal
@@ -452,7 +452,7 @@ const CheckIn: React.FC = () => {
     setShowPaymentModal(false);
     setSelectedBookingForPayment(null);
     setPaymentAmount('');
-    setPaymentMethod('cash');
+    setPaymentMethod('in-store');
     setPaymentNotes('');
   };
 
@@ -498,9 +498,11 @@ const CheckIn: React.FC = () => {
         location_id: locationId,
         amount: amount,
         currency: 'USD',
-        method: paymentMethod,
+        method: paymentMethod === 'in-store' ? 'cash' : paymentMethod,
         status: 'completed',
-        notes: paymentNotes || `Payment for booking ${selectedBookingForPayment.reference_number}`,
+        notes: paymentNotes || (paymentMethod === 'in-store' 
+          ? `In-store payment for booking ${selectedBookingForPayment.reference_number}`
+          : `Payment for booking ${selectedBookingForPayment.reference_number}`),
       });
 
       if (!paymentResponse.success) {
@@ -1843,10 +1845,10 @@ const CheckIn: React.FC = () => {
                   </label>
                   <select
                     value={paymentMethod}
-                    onChange={(e) => setPaymentMethod(e.target.value as 'card' | 'cash')}
+                    onChange={(e) => setPaymentMethod(e.target.value as 'card' | 'in-store')}
                     className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
                   >
-                    <option value="cash">Cash</option>
+                    <option value="in-store">In-Store</option>
                     <option value="card">Card</option>
                   </select>
                 </div>

@@ -165,7 +165,7 @@ const BookPackage: React.FC = () => {
     guestOfHonorAge: "",
     guestOfHonorGender: ""
   });
-  const [paymentType, setPaymentType] = useState<'full' | 'partial' | 'custom'>('full');
+  const [paymentType, setPaymentType] = useState<'full' | 'partial' | 'custom'>('partial');
   const [customPaymentAmount, setCustomPaymentAmount] = useState<number>(0);
   const [currentStep, setCurrentStep] = useState(1);
   
@@ -730,7 +730,7 @@ const BookPackage: React.FC = () => {
       guestOfHonorAge: "",
       guestOfHonorGender: ""
     });
-    setPaymentType('full');
+    setPaymentType('partial');
     setCustomPaymentAmount(0);
     setCurrentStep(1);
     setSelectedTime("");
