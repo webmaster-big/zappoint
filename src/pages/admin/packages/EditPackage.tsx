@@ -97,6 +97,8 @@ const EditPackage: React.FC = () => {
         hasGuestOfHonor: false,
         customerNotes: "", // Notes displayed to customers during booking
         invitation_download_link: "", // Link to downloadable invitation template
+        invitation_file: "", // Base64 encoded invitation file
+        invitationType: "link" as "link" | "file", // Tab selection for invitation
     });
 
     // Image preview state
@@ -328,6 +330,8 @@ const EditPackage: React.FC = () => {
                     hasGuestOfHonor: pkg.has_guest_of_honor || false,
                     customerNotes: pkg.customer_notes || "",
                     invitation_download_link: pkg.invitation_download_link || "",
+                    invitation_file: pkg.invitation_file || "",
+                    invitationType: pkg.invitation_file ? "file" : "link",
                 });
 
                 if (pkg.image) {
@@ -371,6 +375,18 @@ const EditPackage: React.FC = () => {
             reader.onloadend = () => {
                 setForm(prev => ({ ...prev, image: reader.result as string }));
                 setImagePreview(reader.result as string);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    // Handle invitation file upload
+    const handleInvitationFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setForm(prev => ({ ...prev, invitation_file: reader.result as string }));
             };
             reader.readAsDataURL(file);
         }
@@ -738,7 +754,8 @@ const EditPackage: React.FC = () => {
                 partial_payment_fixed: form.partialPaymentFixed ? parseInt(form.partialPaymentFixed) : undefined,
                 has_guest_of_honor: form.hasGuestOfHonor,
                 customer_notes: form.customerNotes.trim() || undefined,
-                invitation_download_link: form.invitation_download_link.trim() || undefined,
+                invitation_download_link: form.invitationType === 'link' ? (form.invitation_download_link.trim() || undefined) : undefined,
+                invitation_file: form.invitationType === 'file' ? (form.invitation_file || undefined) : undefined,
                 image: form.image || undefined,
                 attraction_ids,
                 addon_ids,
@@ -1867,18 +1884,67 @@ const EditPackage: React.FC = () => {
                             <p className="text-xs text-gray-500 mt-2">These notes will be displayed to customers during booking and included in their confirmation email.</p>
                         </div>
 
-                        {/* Invitation Download Link */}
+                        {/* Invitation */}
                         <div>
-                            <label className="block font-semibold mb-2 text-base text-neutral-800">Invitation Download Link</label>
-                            <input
-                                type="url"
-                                name="invitation_download_link"
-                                value={form.invitation_download_link}
-                                onChange={handleChange}
-                                className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400`}
-                                placeholder="https://example.com/invitation-template.pdf"
-                            />
-                            <p className="text-xs text-gray-500 mt-2">Optional: Provide a link to a downloadable invitation template that customers can access after booking.</p>
+                            <label className="block font-semibold mb-3 text-base text-neutral-800">Invitation Template</label>
+                            
+                            {/* Tab Navigation */}
+                            <div className="flex border-b border-gray-200 mb-4">
+                                <button
+                                    type="button"
+                                    onClick={() => setForm(prev => ({ ...prev, invitationType: 'link' }))}
+                                    className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                                        form.invitationType === 'link'
+                                            ? `border-${fullColor} text-${fullColor}`
+                                            : 'border-transparent text-gray-500 hover:text-gray-700'
+                                    }`}
+                                >
+                                    Link
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setForm(prev => ({ ...prev, invitationType: 'file' }))}
+                                    className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                                        form.invitationType === 'file'
+                                            ? `border-${fullColor} text-${fullColor}`
+                                            : 'border-transparent text-gray-500 hover:text-gray-700'
+                                    }`}
+                                >
+                                    Upload File
+                                </button>
+                            </div>
+
+                            {/* Tab Content */}
+                            {form.invitationType === 'link' ? (
+                                <div>
+                                    <input
+                                        type="url"
+                                        name="invitation_download_link"
+                                        value={form.invitation_download_link}
+                                        onChange={handleChange}
+                                        className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all placeholder:text-gray-400`}
+                                        placeholder="https://example.com/invitation-template.pdf"
+                                    />
+                                    <p className="text-xs text-gray-500 mt-2">Provide a URL to a downloadable invitation template.</p>
+                                </div>
+                            ) : (
+                                <div>
+                                    <input
+                                        type="file"
+                                        accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
+                                        onChange={handleInvitationFileChange}
+                                        className={`block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-${themeColor}-50 file:text-${fullColor} hover:file:bg-${themeColor}-100`}
+                                    />
+                                    <p className="text-xs text-gray-500 mt-2">Upload an invitation template file (PDF, DOC, DOCX, or image).</p>
+                                    {form.invitation_file && (
+                                        <div className="mt-2 flex items-center gap-2 text-sm text-green-600">
+                                            <span>✓</span>
+                                            <span>File uploaded successfully</span>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                            <p className="text-xs text-gray-500 mt-3">Optional: Customers can access this invitation template after booking.</p>
                         </div>
                         
                         <div className="flex gap-2 mt-6">
