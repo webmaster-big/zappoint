@@ -25,9 +25,6 @@ import { formatDurationDisplay } from '../../../utils/timeFormat';
 import StandardButton from '../../../components/ui/StandardButton';
 import { globalNoteService, type GlobalNote } from '../../../services/GlobalNoteService';
 
-// Processing fee rate (4.87%)
-const PROCESSING_FEE_RATE = 0.0487;
-
 // Helper function to parse ISO date string (YYYY-MM-DD) in local timezone
 // Avoids UTC offset issues that cause date to show as previous day
 const parseLocalDate = (isoDateString: string): Date => {
@@ -832,11 +829,10 @@ const BookPackage: React.FC = () => {
   const promoDiscount = appliedPromo ? Number(appliedPromo.discount_value || 0) : 0;
   const giftCardDiscount = appliedGiftCard ? Number(appliedGiftCard.discount_value || 0) : 0;
   
-  // Calculate subtotal and total with processing fee
+  // Calculate subtotal and total
   const subtotal = basePrice + addOnsTotal + attractionsTotal;
   const discountedSubtotal = Math.max(0, subtotal - promoDiscount - giftCardDiscount);
-  const processingFee = Math.round(discountedSubtotal * PROCESSING_FEE_RATE * 100) / 100;
-  const total = discountedSubtotal + processingFee;
+  const total = discountedSubtotal;
 
   // Calculate partial payment amount based on package settings
   const calculatePartialAmount = () => {
@@ -2448,18 +2444,6 @@ const BookPackage: React.FC = () => {
                   <span>-${giftCardDiscount.toFixed(2)}</span>
                 </div>
               )}
-              
-              {/* Subtotal before processing fee */}
-              <div className="flex justify-between text-xs text-gray-600 py-1">
-                <span>Subtotal</span>
-                <span>${discountedSubtotal.toFixed(2)}</span>
-              </div>
-              
-              {/* Processing Fee */}
-              <div className="flex justify-between text-xs text-gray-600 py-1">
-                <span>Processing Fee (4.87%)</span>
-                <span>+${processingFee.toFixed(2)}</span>
-              </div>
               
               <div className="flex justify-between pt-3 border-t font-semibold text-base">
                 <span>Total</span>

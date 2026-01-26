@@ -27,9 +27,6 @@ import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
 import { extractIdFromSlug } from '../../../utils/slug';
 import StandardButton from '../../../components/ui/StandardButton';
 
-// Processing fee rate (4.87%)
-const PROCESSING_FEE_RATE = 0.0487;
-
 // Helper function to parse payment errors into user-friendly messages
 const getPaymentErrorMessage = (error: any): string => {
   const errorMessage = error?.message?.toLowerCase() || '';
@@ -396,20 +393,10 @@ const PurchaseAttraction = () => {
     }
   };
 
-  // Calculate subtotal (before processing fee)
-  const calculateSubtotal = () => {
+  // Calculate total
+  const calculateTotal = () => {
     if (!attraction) return 0;
     return parseFloat(attraction.price.toString()) * quantity;
-  };
-
-  // Calculate processing fee
-  const calculateProcessingFee = () => {
-    return Math.round(calculateSubtotal() * PROCESSING_FEE_RATE * 100) / 100;
-  };
-
-  // Calculate total (with processing fee)
-  const calculateTotal = () => {
-    return calculateSubtotal() + calculateProcessingFee();
   };
 
   const handlePurchase = async () => {
@@ -1417,16 +1404,6 @@ const PurchaseAttraction = () => {
                       <div className="flex justify-between items-center">
                         <span className="text-xs md:text-sm text-gray-600">Quantity</span>
                         <span className="font-medium text-sm md:text-base">{quantity}</span>
-                      </div>
-                      
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs md:text-sm text-gray-600">Subtotal</span>
-                        <span className="font-medium text-sm md:text-base">${calculateSubtotal().toFixed(2)}</span>
-                      </div>
-                      
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs md:text-sm text-gray-600">Processing Fee (4.87%)</span>
-                        <span className="font-medium text-sm md:text-base">+${calculateProcessingFee().toFixed(2)}</span>
                       </div>
                     </>
                   )}
