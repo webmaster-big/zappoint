@@ -313,6 +313,12 @@ const CreatePurchase = () => {
     const subtotal = calculateSubtotal();
     return Math.max(0, subtotal - discount);
   };
+  
+  // Calculate the 4.87% fee that's already included in prices (for display purposes)
+  const FEE_RATE = 0.0487;
+  const currentTotal = calculateTotal();
+  const priceBeforeFee = currentTotal / (1 + FEE_RATE);
+  const includedFee = currentTotal - priceBeforeFee;
 
   const handleAddToCart = (attraction: CreatePurchaseAttraction) => {
     setSelectedAttraction(attraction);
@@ -976,6 +982,17 @@ const CreatePurchase = () => {
                         <span>-${discount.toFixed(2)}</span>
                       </div>
                     )}
+                    
+                    {/* Fee breakdown */}
+                    <div className="flex justify-between mb-2 text-gray-500 text-sm">
+                      <span>Before Fee</span>
+                      <span>${priceBeforeFee.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between mb-2 text-gray-500 text-sm">
+                      <span>Processing Fee (4.87%)</span>
+                      <span>${includedFee.toFixed(2)}</span>
+                    </div>
+                    
                     <div className="flex justify-between font-bold text-lg mt-3 pt-3 border-t border-gray-200">
                       <span>Total</span>
                       <span className="transition-all duration-300">${calculateTotal().toFixed(2)}</span>

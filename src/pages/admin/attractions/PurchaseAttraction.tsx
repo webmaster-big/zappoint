@@ -398,6 +398,12 @@ const PurchaseAttraction = () => {
     if (!attraction) return 0;
     return parseFloat(attraction.price.toString()) * quantity;
   };
+  
+  // Calculate the 4.87% fee that's already included in prices (for display purposes)
+  const FEE_RATE = 0.0487;
+  const total = calculateTotal();
+  const priceBeforeFee = total / (1 + FEE_RATE);
+  const includedFee = total - priceBeforeFee;
 
   const handlePurchase = async () => {
     if (!attraction) return;
@@ -1409,9 +1415,19 @@ const PurchaseAttraction = () => {
                   )}
                   </div>
                   
+                  {/* Fee breakdown */}
+                  <div className="flex justify-between items-center mt-3 pt-3 border-t border-gray-200">
+                    <span className="text-xs md:text-sm text-gray-600">Subtotal (before fee)</span>
+                    <span className="font-medium text-sm md:text-base">${priceBeforeFee.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs md:text-sm text-gray-600">Processing Fee (4.87%)</span>
+                    <span className="font-medium text-sm md:text-base">${includedFee.toFixed(2)}</span>
+                  </div>
+                  
                   <div className="flex justify-between items-center mt-4 pt-4 border-t-2 border-gray-300">
                     <span className="font-bold text-gray-900 text-base md:text-lg">Total</span>
-                    <span className="text-xl md:text-2xl font-bold text-blue-800">${calculateTotal().toFixed(2)}</span>
+                    <span className="text-xl md:text-2xl font-bold text-blue-800">${total.toFixed(2)}</span>
                   </div>
                 </div>
                 

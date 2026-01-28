@@ -1545,6 +1545,11 @@ const OnsiteBooking: React.FC = () => {
     const total = calculateTotal();
     const partialAmount = calculatePartialAmount();
     
+    // Calculate the 4.87% fee that's already included in prices (for display purposes)
+    const FEE_RATE = 0.0487;
+    const priceBeforeFee = total / (1 + FEE_RATE);
+    const includedFee = total - priceBeforeFee;
+    
     return (
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 sticky top-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
@@ -1781,8 +1786,14 @@ const OnsiteBooking: React.FC = () => {
               
               {/* Subtotal */}
               <div className="flex justify-between items-center pt-3 mt-2 border-t border-gray-200 text-sm">
-                <span className="text-gray-600">Subtotal</span>
-                <span className="font-medium text-gray-800">${total.toFixed(2)}</span>
+                <span className="text-gray-600">Subtotal (before fee)</span>
+                <span className="font-medium text-gray-800">${priceBeforeFee.toFixed(2)}</span>
+              </div>
+              
+              {/* Processing Fee */}
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-gray-600">Processing Fee (4.87%)</span>
+                <span className="font-medium text-gray-800">${includedFee.toFixed(2)}</span>
               </div>
               
               {/* Total */}

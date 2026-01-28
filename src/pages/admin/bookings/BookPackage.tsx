@@ -841,6 +841,12 @@ const BookPackage: React.FC = () => {
   const subtotal = basePrice + addOnsTotal + attractionsTotal;
   const discountedSubtotal = Math.max(0, subtotal - promoDiscount - giftCardDiscount);
   const total = discountedSubtotal;
+  
+  // Calculate the 4.87% fee that's already included in prices (for display purposes)
+  // Fee is included in prices, so we extract it: priceBeforeFee = total / 1.0487
+  const FEE_RATE = 0.0487;
+  const priceBeforeFee = total / (1 + FEE_RATE);
+  const includedFee = total - priceBeforeFee;
 
   // Calculate partial payment amount based on package settings
   const calculatePartialAmount = () => {
@@ -2468,6 +2474,16 @@ const BookPackage: React.FC = () => {
                   <span>-${giftCardDiscount.toFixed(2)}</span>
                 </div>
               )}
+              
+              {/* Fee breakdown - showing the 4.87% fee included in prices */}
+              <div className="flex justify-between text-xs text-gray-500 pt-2">
+                <span>Subtotal (before fee)</span>
+                <span>${priceBeforeFee.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-xs text-gray-500">
+                <span>Processing Fee (4.87%)</span>
+                <span>${includedFee.toFixed(2)}</span>
+              </div>
               
               <div className="flex justify-between pt-3 border-t font-semibold text-base">
                 <span>Total</span>
