@@ -295,16 +295,50 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
     localStorage.setItem('zapzone_sidebar_dropdowns', JSON.stringify(openDropdowns));
   }, [openDropdowns]);
   
+  // Ref to track pending scroll restoration
+  const pendingScrollRef = useRef<number | null>(null);
+  
   // Use useLayoutEffect to restore scroll position BEFORE browser paints (prevents blinking)
   useLayoutEffect(() => {
+    const navElement = navRef.current;
+    if (!navElement) return;
+    
     const savedScrollPosition = sessionStorage.getItem('zapzone_sidebar_scroll');
-    if (navRef.current && savedScrollPosition) {
+    if (savedScrollPosition) {
       const scrollPos = parseInt(savedScrollPosition, 10);
       if (scrollPos > 0) {
         // Immediately set scroll position before paint
-        navRef.current.scrollTop = scrollPos;
+        navElement.scrollTop = scrollPos;
+        pendingScrollRef.current = scrollPos;
+        
+        // Double-check after a microtask in case React batched updates reset it
+        queueMicrotask(() => {
+          if (navElement && pendingScrollRef.current !== null) {
+            navElement.scrollTop = pendingScrollRef.current;
+          }
+        });
       }
     }
+  }, [location.pathname]);
+  
+  // Additional scroll restoration after render completes
+  useEffect(() => {
+    const navElement = navRef.current;
+    if (!navElement || pendingScrollRef.current === null) return;
+    
+    // Restore scroll after layout is complete
+    const scrollPos = pendingScrollRef.current;
+    navElement.scrollTop = scrollPos;
+    
+    // Use requestAnimationFrame as final fallback
+    const rafId = requestAnimationFrame(() => {
+      if (navElement) {
+        navElement.scrollTop = scrollPos;
+        pendingScrollRef.current = null;
+      }
+    });
+    
+    return () => cancelAnimationFrame(rafId);
   }, [location.pathname]);
   
   // Save scroll position continuously as user scrolls
@@ -313,12 +347,22 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
     if (!navElement) return;
     
     const handleScroll = () => {
-      sessionStorage.setItem('zapzone_sidebar_scroll', String(navElement.scrollTop));
+      const scrollTop = navElement.scrollTop;
+      sessionStorage.setItem('zapzone_sidebar_scroll', String(scrollTop));
     };
     
     navElement.addEventListener('scroll', handleScroll, { passive: true });
     return () => navElement.removeEventListener('scroll', handleScroll);
   }, []);
+  
+  // Helper function to save scroll position immediately
+  const saveScrollPosition = () => {
+    if (navRef.current) {
+      const scrollTop = navRef.current.scrollTop;
+      sessionStorage.setItem('zapzone_sidebar_scroll', String(scrollTop));
+      pendingScrollRef.current = scrollTop;
+    }
+  };
 
   // Load company logo on mount and listen for updates
   useEffect(() => {
@@ -767,20 +811,13 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
   // Handle search selection
 
   const toggleDropdown = (label: string) => {
-    // Preserve scroll position before state change
-    const scrollTop = navRef.current?.scrollTop || 0;
+    // Save scroll position before state change
+    saveScrollPosition();
     
     setOpenDropdowns(prev => ({
       ...prev,
       [label]: !prev[label]
     }));
-    
-    // Restore scroll position after render
-    requestAnimationFrame(() => {
-      if (navRef.current) {
-        navRef.current.scrollTop = scrollTop;
-      }
-    });
   };
 
   const NavItemComponent: React.FC<{ item: NavItem; depth?: number }> = ({ item, depth = 0 }) => {
@@ -842,7 +879,9 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
     
     // Only close sidebar on navigation for mobile screens
     const handleNavClick = () => {
-      // Scroll position is saved continuously via scroll event listener
+      // Save scroll position immediately before navigation
+      saveScrollPosition();
+      
       if (window.innerWidth < 1024) {
         setIsOpen(false);
       }
@@ -1220,9 +1259,19 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
             )}
           </div>
           {/* Navigation */}
-          <nav ref={navRef} className="flex-1 px-4 py-4 space-y-2 hidden-scrollbar" style={{ overflowY: 'auto', overflowX: 'visible', overflowAnchor: 'none' }}>
+          <nav 
+            ref={navRef} 
+            className="flex-1 px-4 py-4 space-y-2 hidden-scrollbar" 
+            style={{ 
+              overflowY: 'auto', 
+              overflowX: 'visible', 
+              overflowAnchor: 'none',
+              scrollBehavior: 'auto',
+              contain: 'layout style'
+            }}
+          >
             {navigation.map((item, idx) => (
-              <NavItemComponent key={idx} item={item} />
+              <NavItemComponent key={`${item.label}-${idx}`} item={item} />
             ))}
           </nav>
           {/* User profile & Notifications */}

@@ -1726,14 +1726,7 @@ const BookPackage: React.FC = () => {
                             <span className="block text-xs text-gray-500 mt-0.5">
                               ${displayPrice.toFixed(2)} each
                             </span>
-                            {/* Show quantity limits */}
-                            {(minQty > 1 || maxQty < 99) && (
-                              <span className="block text-xs text-gray-400 mt-0.5">
-                                {minQty > 1 && `Min: ${minQty}`}
-                                {minQty > 1 && maxQty < 99 && ' • '}
-                                {maxQty < 99 && `Max: ${maxQty}`}
-                              </span>
-                            )}
+            
                             {isForcedAddOn && (
                               <span className="block text-xs text-amber-700 mt-0.5">
                                 Automatically included with this package
