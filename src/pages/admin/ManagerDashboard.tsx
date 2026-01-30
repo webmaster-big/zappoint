@@ -342,12 +342,14 @@ const LocationManagerDashboard: React.FC = () => {
   // Navigate to previous/next month
   const goToPreviousMonth = () => {
     const newDate = new Date(currentMonth);
+    newDate.setDate(1); // Set to first day to avoid month overflow
     newDate.setMonth(newDate.getMonth() - 1);
     setCurrentMonth(newDate);
   };
 
   const goToNextMonth = () => {
     const newDate = new Date(currentMonth);
+    newDate.setDate(1); // Set to first day to avoid month overflow
     newDate.setMonth(newDate.getMonth() + 1);
     setCurrentMonth(newDate);
   };
