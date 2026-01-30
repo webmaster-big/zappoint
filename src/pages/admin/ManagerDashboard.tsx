@@ -435,7 +435,7 @@ const LocationManagerDashboard: React.FC = () => {
     const slots: { time: string; hour: number; minute: number }[] = [];
     const startHour = 8; // 8 AM
     const endHour = 22; // 10 PM
-    const interval = 30; // 30-minute intervals
+    const interval = 15; // 15-minute intervals to match SpaceSchedule
     
     for (let hour = startHour; hour <= endHour; hour++) {
       for (let minute = 0; minute < 60; minute += interval) {
@@ -511,7 +511,7 @@ const LocationManagerDashboard: React.FC = () => {
     });
   };
 
-  // Calculate row span for a booking
+  // Calculate row span for a booking (based on 15-minute intervals)
   const getBookingRowSpan = (booking: any) => {
     let durationMinutes = 60;
     if (booking.duration && booking.duration_unit) {
@@ -519,7 +519,7 @@ const LocationManagerDashboard: React.FC = () => {
       else if (booking.duration_unit === 'minutes') durationMinutes = booking.duration;
       else durationMinutes = Math.floor(booking.duration) * 60 + Math.round((booking.duration % 1) * 60);
     }
-    return Math.max(1, Math.ceil(durationMinutes / 30));
+    return Math.max(1, Math.ceil(durationMinutes / 15));
   };
 
   // Format time for display

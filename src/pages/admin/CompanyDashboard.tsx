@@ -230,17 +230,16 @@ const CompanyDashboard: React.FC = () => {
   // Sorted rooms for display
   const sortedRooms = [...rooms].sort(naturalSort);
 
-  // Generate time slots for the SpaceSchedule-style daily view (30-min intervals from 8 AM to 10 PM)
+  // Generate time slots for the SpaceSchedule-style daily view (15-min intervals from 8 AM to 10 PM)
   const generateTimeSlots = () => {
     const slots: { time: string; slot: string }[] = [];
     for (let hour = 8; hour <= 22; hour++) {
-      const slot00 = `${hour.toString().padStart(2, '0')}:00`;
-      const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
-      const ampm = hour >= 12 ? 'PM' : 'AM';
-      slots.push({ time: `${displayHour}:00 ${ampm}`, slot: slot00 });
-      if (hour < 22) {
-        const slot30 = `${hour.toString().padStart(2, '0')}:30`;
-        slots.push({ time: `${displayHour}:30 ${ampm}`, slot: slot30 });
+      for (let minute = 0; minute < 60; minute += 15) {
+        if (hour === 22 && minute > 0) break;
+        const slot = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+        const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
+        const ampm = hour >= 12 ? 'PM' : 'AM';
+        slots.push({ time: `${displayHour}:${minute.toString().padStart(2, '0')} ${ampm}`, slot });
       }
     }
     return slots;
@@ -308,7 +307,7 @@ const CompanyDashboard: React.FC = () => {
     });
   };
 
-  // Calculate row span based on booking duration
+  // Calculate row span based on booking duration (15-minute intervals)
   const getBookingRowSpan = (booking: any) => {
     let durationMinutes = 60;
     if (booking.duration && booking.duration_unit) {
@@ -316,7 +315,7 @@ const CompanyDashboard: React.FC = () => {
       else if (booking.duration_unit === 'minutes') durationMinutes = booking.duration;
       else durationMinutes = Math.floor(booking.duration) * 60 + Math.round((booking.duration % 1) * 60);
     }
-    return Math.max(1, Math.ceil(durationMinutes / 30));
+    return Math.max(1, Math.ceil(durationMinutes / 15));
   };
 
   // Format time to 12-hour format
