@@ -73,6 +73,7 @@ const CompanyDashboard: React.FC = () => {
 
   // Data states
   const [locations, setLocations] = useState<Location[]>([]);
+  const [allBookings, setAllBookings] = useState<any[]>([]); // All-time bookings (optionally filtered by location)
   const [weeklyBookings, setWeeklyBookings] = useState<any[]>([]);
   const [dailyBookings, setDailyBookings] = useState<any[]>([]);
   // All data (unfiltered) for location performance
@@ -177,52 +178,23 @@ const CompanyDashboard: React.FC = () => {
 
   const monthDays = getMonthDays(currentMonth);
 
-  // Fetch monthly calendar data (changes when month changes) - USE CACHE FIRST
+  // Monthly calendar data - derived from allBookings (no API call needed)
   useEffect(() => {
-    const fetchMonthlyData = async () => {
-      if (calendarView !== 'month') return;
-      
-      try {
-        const year = currentMonth.getFullYear();
-        const month = currentMonth.getMonth();
-        const monthStart = new Date(year, month, 1);
-        const monthEnd = new Date(year, month + 1, 0);
-        
-        const dateParams = {
-          date_from: monthStart.toISOString().split('T')[0],
-          date_to: monthEnd.toISOString().split('T')[0],
-        };
-        
-        // Try cache first for instant loading
-        let bookings = await bookingCacheService.getFilteredBookingsFromCache(dateParams);
-        
-        if (bookings && bookings.length > 0) {
-          // Filter by location if needed
-          if (selectedLocation !== 'all') {
-            bookings = bookings.filter(b => b.location_id === selectedLocation);
-          }
-          setMonthlyBookings(bookings);
-        } else {
-          // No cache, fetch from API
-          const bookingsResponse = await bookingService.getBookings({
-            location_id: selectedLocation === 'all' ? undefined : selectedLocation,
-            ...dateParams,
-            per_page: 500,
-          });
-          
-          bookings = bookingsResponse.data.bookings || [];
-          setMonthlyBookings(bookings);
-          // Cache for next time
-          await bookingCacheService.cacheBookings(bookings);
-        }
-        
-      } catch (error) {
-        console.error('Error fetching monthly data:', error);
-      }
-    };
+    if (calendarView !== 'month' || allBookings.length === 0) return;
     
-    fetchMonthlyData();
-  }, [currentMonth, calendarView, selectedLocation]);
+    const year = currentMonth.getFullYear();
+    const month = currentMonth.getMonth();
+    const monthStart = new Date(year, month, 1);
+    const monthEnd = new Date(year, month + 1, 0);
+    
+    const monthly = allBookings.filter(booking => {
+      const bookingDate = parseLocalDate(booking.booking_date);
+      return bookingDate >= monthStart && bookingDate <= monthEnd;
+    });
+    
+    setMonthlyBookings(monthly);
+    console.log('📅 [CompanyDashboard] Monthly bookings filtered:', monthly.length);
+  }, [allBookings, currentMonth, calendarView]);
 
   // Get bookings for a specific day
   const getBookingsForDay = (date: Date) => {
@@ -435,95 +407,67 @@ const CompanyDashboard: React.FC = () => {
     fetchNewBookings();
   }, []);
 
-  // Fetch daily calendar data
+  // Daily calendar data - derived from allBookings (no API call needed)
   useEffect(() => {
-    const fetchDailyData = async () => {
-      if (calendarView !== 'day') return;
-      
+    if (calendarView !== 'day' || allBookings.length === 0) return;
+    
+    const year = currentDay.getFullYear();
+    const month = String(currentDay.getMonth() + 1).padStart(2, '0');
+    const day = String(currentDay.getDate()).padStart(2, '0');
+    const dateStr = `${year}-${month}-${day}`;
+    
+    const daily = allBookings.filter(booking => {
+      const bookingDatePart = booking.booking_date.split('T')[0];
+      return bookingDatePart === dateStr;
+    });
+    
+    setDailyBookings(daily);
+    console.log('📅 [CompanyDashboard] Daily bookings filtered for', dateStr, ':', daily.length);
+  }, [allBookings, currentDay, calendarView]);
+
+  // Load ALL bookings (cache-first, then background sync)
+  // This is the primary data source for the table and calendar views
+  useEffect(() => {
+    const loadAllBookings = async () => {
       try {
-        // Format date as YYYY-MM-DD for booking_date filter
-        const year = currentDay.getFullYear();
-        const month = String(currentDay.getMonth() + 1).padStart(2, '0');
-        const day = String(currentDay.getDate()).padStart(2, '0');
-        const dateStr = `${year}-${month}-${day}`;
-        console.log('📅 [CompanyDashboard] Fetching daily bookings for:', dateStr);
+        console.log('📦 [CompanyDashboard] Loading all bookings...');
         
-        // Check if cache has any data first (like SpaceSchedule)
-        const hasCachedBookings = await bookingCacheService.hasCachedData();
+        // Step 1: Try cache first for instant loading
+        const cachedBookings = await bookingCacheService.getFilteredBookingsFromCache(
+          selectedLocation === 'all' ? {} : { location_id: selectedLocation as number }
+        );
         
-        if (hasCachedBookings) {
-          // Cache exists - use filtered results by date only
-          console.log('[CompanyDashboard] Cache exists, filtering for date:', dateStr);
-          const filterParams: any = { booking_date: dateStr };
-          // Only add location filter if a specific location is selected (not 'all')
-          if (selectedLocation !== 'all') {
-            filterParams.location_id = selectedLocation;
-          }
-          const cachedBookings = await bookingCacheService.getFilteredBookingsFromCache(filterParams);
-          console.log('[CompanyDashboard] Filtered bookings from cache:', cachedBookings?.length || 0);
-          setDailyBookings((cachedBookings || []) as any[]);
-        } else {
-          // No cache available, fetch from API
-          console.log('🔄 [CompanyDashboard] No cache, fetching from API...');
-          const bookingsResponse = await bookingService.getBookings({
-            booking_date: dateStr,
-            location_id: selectedLocation === 'all' ? undefined : selectedLocation,
-            per_page: 100,
-          });
-          const bookings = bookingsResponse.data.bookings || [];
-          console.log('✅ [CompanyDashboard] Fetched', bookings.length, 'bookings');
-          setDailyBookings(bookings);
-          // Cache the fetched bookings
-          if (bookings.length > 0) {
-            await bookingCacheService.cacheBookings(bookings);
-          }
+        if (cachedBookings && cachedBookings.length > 0) {
+          console.log('📦 [CompanyDashboard] Loaded', cachedBookings.length, 'bookings from cache');
+          setAllBookings(cachedBookings);
+          setLoading(false);
         }
         
-      } catch (error) {
-        console.error('Error fetching daily data:', error);
-      }
-    };
-    
-    fetchDailyData();
-  }, [currentDay, calendarView, selectedLocation]);
-
-  // Background sync: Fetch fresh bookings data on component mount
-  // This ensures the cache is always up-to-date when user visits the dashboard
-  useEffect(() => {
-    const syncBookingsInBackground = async () => {
-      try {
+        // Step 2: Fetch fresh data from API in background (ALL bookings, no date filter)
         console.log('🔄 [CompanyDashboard] Background sync: Fetching fresh bookings...');
-        
-        // Fetch all bookings from API (last 30 days + next 30 days for comprehensive cache)
-        const today = new Date();
-        const thirtyDaysAgo = new Date(today);
-        thirtyDaysAgo.setDate(today.getDate() - 30);
-        const thirtyDaysAhead = new Date(today);
-        thirtyDaysAhead.setDate(today.getDate() + 30);
-        
         const bookingsResponse = await bookingService.getBookings({
-          date_from: thirtyDaysAgo.toISOString().split('T')[0],
-          date_to: thirtyDaysAhead.toISOString().split('T')[0],
-          per_page: 500,
+          location_id: selectedLocation === 'all' ? undefined : selectedLocation as number,
+          per_page: 1000, // Get all bookings
         });
         
         const bookings = bookingsResponse.data.bookings || [];
-        console.log('✅ [CompanyDashboard] Background sync: Fetched', bookings.length, 'bookings');
+        console.log('✅ [CompanyDashboard] Fetched', bookings.length, 'bookings from API');
         
-        // Update cache with fresh data
+        // Update state and cache
+        setAllBookings(bookings);
         if (bookings.length > 0) {
           await bookingCacheService.cacheBookings(bookings);
-          console.log('✅ [CompanyDashboard] Background sync: Cache updated');
+          console.log('✅ [CompanyDashboard] Cache updated');
         }
       } catch (error) {
-        console.error('⚠️ [CompanyDashboard] Background sync failed:', error);
-        // Don't throw - this is a background operation
+        console.error('⚠️ [CompanyDashboard] Error loading bookings:', error);
+      } finally {
+        setLoading(false);
       }
     };
     
-    // Run sync in background (don't block UI)
-    syncBookingsInBackground();
-  }, []);
+    loadAllBookings();
+  }, [selectedLocation]);
 
   // Fetch metrics data when selectedLocation or timeframe changes
   // PERFORMANCE OPTIMIZATION: Cache-first loading with background refresh
@@ -646,44 +590,21 @@ const CompanyDashboard: React.FC = () => {
     fetchMetricsData();
   }, [selectedLocation, metricsTimeframe]);
 
-  // Fetch weekly calendar data when currentWeek changes
-  // Uses cache service for faster loading, syncs in background
+  // Weekly calendar data - derived from allBookings (no API call needed)
   useEffect(() => {
-    const fetchWeeklyData = async () => {
-      try {
-        const weekStart = weekDates[0];
-        const weekEnd = weekDates[6];
-        
-        // Build query params WITHOUT location filter
-        const bookingParams: any = {
-          date_from: weekStart.toISOString().split('T')[0],
-          date_to: weekEnd.toISOString().split('T')[0],
-        };
-        
-        // Try to get from cache first, then sync in background
-        const cachedBookings = await bookingCacheService.getFilteredBookingsFromCache(bookingParams);
-        
-        if (cachedBookings && cachedBookings.length > 0) {
-          setWeeklyBookings(cachedBookings);
-        } else {
-          // No cache, fetch from API
-          const bookingsResponse = await bookingService.getBookings({
-            ...bookingParams,
-            per_page: 500,
-          });
-          const bookings = bookingsResponse.data.bookings || [];
-          setWeeklyBookings(bookings);
-          // Cache the fetched bookings
-          await bookingCacheService.cacheBookings(bookings);
-        }
-        
-      } catch (error) {
-        console.error('Error fetching weekly data:', error);
-      }
-    };
+    if (allBookings.length === 0) return;
     
-    fetchWeeklyData();
-  }, [currentWeek]);
+    const weekStart = weekDates[0];
+    const weekEnd = weekDates[6];
+    
+    const weekly = allBookings.filter(booking => {
+      const bookingDate = parseLocalDate(booking.booking_date);
+      return bookingDate >= weekStart && bookingDate <= weekEnd;
+    });
+    
+    setWeeklyBookings(weekly);
+    console.log('📅 [CompanyDashboard] Weekly bookings filtered:', weekly.length);
+  }, [allBookings, currentWeek]);
 
   // Dynamic metrics cards
   const metricsCards = [
@@ -873,8 +794,8 @@ const CompanyDashboard: React.FC = () => {
     Pending: 'bg-amber-100 text-amber-800',
   };
 
-  // Filter bookings by status, location, and search for the table
-  const filteredBookings = bookingsThisWeek.filter(booking => {
+  // Filter ALL bookings by status, location, and search for the table (shows ALL bookings, not just this week)
+  const filteredBookings = allBookings.filter(booking => {
     const statusMatch = selectedStatus === 'all' || booking.status.toLowerCase() === selectedStatus.toLowerCase();
     const locationMatch = selectedLocation === 'all' || booking.location_id === selectedLocation;
     

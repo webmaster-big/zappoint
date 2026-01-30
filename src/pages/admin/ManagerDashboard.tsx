@@ -60,6 +60,7 @@ const LocationManagerDashboard: React.FC = () => {
   const [newBookings, setNewBookings] = useState<any[]>([]);
 
   // Data states
+  const [allBookings, setAllBookings] = useState<any[]>([]); // All-time bookings for this location
   const [weeklyBookings, setWeeklyBookings] = useState<any[]>([]);
   const [dailyBookings, setDailyBookings] = useState<any[]>([]);
   const [ticketPurchases, setTicketPurchases] = useState<any[]>([]);
@@ -103,45 +104,50 @@ const LocationManagerDashboard: React.FC = () => {
     }
   }, []);
 
-  // Background sync: Fetch fresh bookings data on component mount
-  // This ensures the cache is always up-to-date when user visits the dashboard
+  // Load ALL bookings for this location (cache-first, then background sync)
+  // This is the primary data source for the table and calendar views
   useEffect(() => {
     if (!locationId) return;
     
-    const syncBookingsInBackground = async () => {
+    const loadAllBookings = async () => {
       try {
+        console.log('📦 [ManagerDashboard] Loading all bookings for location:', locationId);
+        
+        // Step 1: Try cache first for instant loading
+        const cachedBookings = await bookingCacheService.getFilteredBookingsFromCache({
+          location_id: locationId,
+        });
+        
+        if (cachedBookings && cachedBookings.length > 0) {
+          console.log('📦 [ManagerDashboard] Loaded', cachedBookings.length, 'bookings from cache');
+          setAllBookings(cachedBookings);
+          setLoading(false);
+        }
+        
+        // Step 2: Fetch fresh data from API in background (ALL bookings for location, no date filter)
         console.log('🔄 [ManagerDashboard] Background sync: Fetching fresh bookings...');
-        
-        // Fetch all bookings from API (last 30 days + next 30 days for comprehensive cache)
-        const today = new Date();
-        const thirtyDaysAgo = new Date(today);
-        thirtyDaysAgo.setDate(today.getDate() - 30);
-        const thirtyDaysAhead = new Date(today);
-        thirtyDaysAhead.setDate(today.getDate() + 30);
-        
         const bookingsResponse = await bookingService.getBookings({
           location_id: locationId,
-          date_from: thirtyDaysAgo.toISOString().split('T')[0],
-          date_to: thirtyDaysAhead.toISOString().split('T')[0],
-          per_page: 500,
+          per_page: 1000, // Get all bookings
         });
         
         const bookings = bookingsResponse.data.bookings || [];
-        console.log('✅ [ManagerDashboard] Background sync: Fetched', bookings.length, 'bookings');
+        console.log('✅ [ManagerDashboard] Fetched', bookings.length, 'bookings from API');
         
-        // Update cache with fresh data
+        // Update state and cache
+        setAllBookings(bookings);
         if (bookings.length > 0) {
           await bookingCacheService.cacheBookings(bookings, { locationId });
-          console.log('✅ [ManagerDashboard] Background sync: Cache updated');
+          console.log('✅ [ManagerDashboard] Cache updated');
         }
       } catch (error) {
-        console.error('⚠️ [ManagerDashboard] Background sync failed:', error);
-        // Don't throw - this is a background operation
+        console.error('⚠️ [ManagerDashboard] Error loading bookings:', error);
+      } finally {
+        setLoading(false);
       }
     };
     
-    // Run sync in background (don't block UI)
-    syncBookingsInBackground();
+    loadAllBookings();
   }, [locationId]);
 
   // Fetch rooms/spaces for daily view - use cache for faster loading
@@ -298,95 +304,39 @@ const LocationManagerDashboard: React.FC = () => {
     fetchMetricsData();
   }, [locationId, metricsTimeframe]);
 
-  // Fetch weekly calendar data (changes when week changes)
-  // Uses cache service for faster loading, syncs in background
+  // Weekly calendar data - derived from allBookings (no API call needed)
   useEffect(() => {
-    const fetchWeeklyData = async () => {
-      if (!locationId) return;
-      
-      try {
-        const weekStart = weekDates[0];
-        const weekEnd = weekDates[6];
-        
-        const bookingParams = {
-          location_id: locationId,
-          date_from: weekStart.toISOString().split('T')[0],
-          date_to: weekEnd.toISOString().split('T')[0],
-        };
-        
-        // Try to get from cache first
-        const cachedBookings = await bookingCacheService.getFilteredBookingsFromCache(bookingParams);
-        
-        if (cachedBookings && cachedBookings.length > 0) {
-          setWeeklyBookings(cachedBookings);
-        } else {
-          // No cache, fetch from API
-          const bookingsResponse = await bookingService.getBookings({
-            ...bookingParams,
-            per_page: 100,
-          });
-          const bookings = bookingsResponse.data.bookings || [];
-          setWeeklyBookings(bookings);
-          // Cache the fetched bookings
-          await bookingCacheService.cacheBookings(bookings, { locationId });
-        }
-        
-      } catch (error) {
-        console.error('Error fetching weekly data:', error);
-      }
-    };
+    if (allBookings.length === 0) return;
     
-    fetchWeeklyData();
-  }, [locationId, currentWeek]);
+    const weekStart = weekDates[0];
+    const weekEnd = weekDates[6];
+    
+    const weekly = allBookings.filter(booking => {
+      const bookingDate = parseLocalDate(booking.booking_date);
+      return bookingDate >= weekStart && bookingDate <= weekEnd;
+    });
+    
+    setWeeklyBookings(weekly);
+    console.log('📅 [ManagerDashboard] Weekly bookings filtered:', weekly.length);
+  }, [allBookings, currentWeek]);
   
-  // Fetch daily calendar data
+  // Daily calendar data - derived from allBookings (no API call needed)
   useEffect(() => {
-    const fetchDailyData = async () => {
-      if (!locationId || calendarView !== 'day') return;
-      
-      try {
-        // Format date as YYYY-MM-DD for booking_date filter
-        const year = currentDay.getFullYear();
-        const month = String(currentDay.getMonth() + 1).padStart(2, '0');
-        const day = String(currentDay.getDate()).padStart(2, '0');
-        const dateStr = `${year}-${month}-${day}`;
-        console.log('📅 [ManagerDashboard] Fetching daily bookings for:', dateStr);
-        
-        // Check if cache has any data first (like SpaceSchedule)
-        const hasCachedBookings = await bookingCacheService.hasCachedData();
-        
-        if (hasCachedBookings) {
-          // Cache exists - use filtered results by date only
-          console.log('[ManagerDashboard] Cache exists, filtering for date:', dateStr);
-          const cachedBookings = await bookingCacheService.getFilteredBookingsFromCache({
-            booking_date: dateStr,
-          });
-          console.log('[ManagerDashboard] Filtered bookings from cache:', cachedBookings?.length || 0);
-          setDailyBookings((cachedBookings || []) as any[]);
-        } else {
-          // No cache available, fetch from API
-          console.log('🔄 [ManagerDashboard] No cache, fetching from API...');
-          const bookingsResponse = await bookingService.getBookings({
-            booking_date: dateStr,
-            user_id: getStoredUser()?.id,
-            per_page: 100,
-          });
-          const bookings = bookingsResponse.data.bookings || [];
-          console.log('✅ [ManagerDashboard] Fetched', bookings.length, 'bookings');
-          setDailyBookings(bookings);
-          // Cache the fetched bookings
-          if (bookings.length > 0) {
-            await bookingCacheService.cacheBookings(bookings);
-          }
-        }
-        
-      } catch (error) {
-        console.error('Error fetching daily data:', error);
-      }
-    };
+    if (calendarView !== 'day' || allBookings.length === 0) return;
     
-    fetchDailyData();
-  }, [locationId, currentDay, calendarView]);
+    const year = currentDay.getFullYear();
+    const month = String(currentDay.getMonth() + 1).padStart(2, '0');
+    const day = String(currentDay.getDate()).padStart(2, '0');
+    const dateStr = `${year}-${month}-${day}`;
+    
+    const daily = allBookings.filter(booking => {
+      const bookingDatePart = booking.booking_date.split('T')[0];
+      return bookingDatePart === dateStr;
+    });
+    
+    setDailyBookings(daily);
+    console.log('📅 [ManagerDashboard] Daily bookings filtered for', dateStr, ':', daily.length);
+  }, [allBookings, currentDay, calendarView]);
   
   // Navigate to previous/next day
   const goToPreviousDay = () => {
@@ -453,50 +403,23 @@ const LocationManagerDashboard: React.FC = () => {
 
   const monthDays = getMonthDays(currentMonth);
 
-  // Fetch monthly calendar data (changes when month changes) - USE CACHE FIRST
+  // Monthly calendar data - derived from allBookings (no API call needed)
   useEffect(() => {
-    const fetchMonthlyData = async () => {
-      if (!locationId || calendarView !== 'month') return;
-      
-      try {
-        const year = currentMonth.getFullYear();
-        const month = currentMonth.getMonth();
-        const monthStart = new Date(year, month, 1);
-        const monthEnd = new Date(year, month + 1, 0);
-        
-        const dateParams = {
-          date_from: monthStart.toISOString().split('T')[0],
-          date_to: monthEnd.toISOString().split('T')[0],
-        };
-        
-        // Try cache first for instant loading
-        let bookings = await bookingCacheService.getFilteredBookingsFromCache(dateParams);
-        
-        if (bookings && bookings.length > 0) {
-          // Filter by location
-          bookings = bookings.filter(b => b.location_id === locationId);
-          setMonthlyBookings(bookings);
-        } else {
-          // No cache, fetch from API
-          const bookingsResponse = await bookingService.getBookings({
-            location_id: locationId,
-            ...dateParams,
-            per_page: 500,
-          });
-          
-          bookings = bookingsResponse.data.bookings || [];
-          setMonthlyBookings(bookings);
-          // Cache for next time
-          await bookingCacheService.cacheBookings(bookings);
-        }
-        
-      } catch (error) {
-        console.error('Error fetching monthly data:', error);
-      }
-    };
+    if (calendarView !== 'month' || allBookings.length === 0) return;
     
-    fetchMonthlyData();
-  }, [locationId, currentMonth, calendarView]);
+    const year = currentMonth.getFullYear();
+    const month = currentMonth.getMonth();
+    const monthStart = new Date(year, month, 1);
+    const monthEnd = new Date(year, month + 1, 0);
+    
+    const monthly = allBookings.filter(booking => {
+      const bookingDate = parseLocalDate(booking.booking_date);
+      return bookingDate >= monthStart && bookingDate <= monthEnd;
+    });
+    
+    setMonthlyBookings(monthly);
+    console.log('📅 [ManagerDashboard] Monthly bookings filtered:', monthly.length);
+  }, [allBookings, currentMonth, calendarView]);
 
   // Get bookings for a specific day
   const getBookingsForDay = (date: Date) => {
@@ -731,10 +654,10 @@ const LocationManagerDashboard: React.FC = () => {
     return colors[payment] || 'bg-gray-100 text-gray-800';
   };
 
-  // Filter bookings by status for the table
+  // Filter all bookings by status for the table (shows ALL bookings for this location, not just this week)
   const filteredBookings = selectedStatus === 'all' 
-    ? bookingsThisWeek 
-    : bookingsThisWeek.filter(booking => booking.status === selectedStatus);
+    ? allBookings 
+    : allBookings.filter(booking => booking.status.toLowerCase() === selectedStatus.toLowerCase());
 
   return (
     <div className="min-h-screen p-4 md:p-8 space-y-8">
@@ -1386,7 +1309,7 @@ const LocationManagerDashboard: React.FC = () => {
       {/* Bookings Table */}
       <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
-          <h2 className="text-lg font-semibold text-gray-900">Weekly Bookings</h2>
+          <h2 className="text-lg font-semibold text-gray-900">All Bookings</h2>
           <div className="flex flex-wrap gap-2 mt-4 md:mt-0">
             <select 
               value={selectedStatus}
