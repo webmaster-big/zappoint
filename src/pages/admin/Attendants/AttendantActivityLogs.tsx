@@ -109,218 +109,383 @@ const AttendantActivityLogs = () => {
     return colors[userType] || `bg-${themeColor}-100 text-${fullColor}`;
   };
 
-  // Format detailed activity description with metadata
+  // Format detailed activity description with metadata based on action type
   const formatActivityDescription = (log: AttendantActivityLogsLog) => {
-    const action = log.action.replace('_', ' ');
-    const resourceType = log.resourceType;
-    const resourceName = log.resourceName || 'Unknown';
-    const resourceId = log.resourceId ? `#${log.resourceId}` : '';
-    const metadata = log.metadata || {};
-    
-    // Build a more detailed description based on action and resource type
-    let description = '';
+    const metadata = log.metadata || {} as Record<string, unknown>;
     const metadataDetails: string[] = [];
-    
-    // Parse useful metadata fields naturally
-    if (metadata.old_value !== undefined && metadata.new_value !== undefined) {
-      metadataDetails.push(`Changed from "${metadata.old_value}" to "${metadata.new_value}"`);
-    }
-    
-    if (metadata.changes) {
-      try {
-        const changes = typeof metadata.changes === 'string' ? JSON.parse(metadata.changes) : metadata.changes;
-        const changeList = Object.entries(changes).map(([key, value]: [string, unknown]) => {
-          const fieldName = key.replace(/_/g, ' ');
-          if (typeof value === 'object' && value !== null && 'old' in value && 'new' in value) {
-            const typedValue = value as { old: unknown; new: unknown };
-            return `${fieldName}: "${typedValue.old}" → "${typedValue.new}"`;
-          }
-          return `${fieldName}: ${value}`;
-        });
-        if (changeList.length > 0) {
-          metadataDetails.push(changeList.join(', '));
-        }
-      } catch {
-        // If parsing fails, skip
-      }
-    }
-    
-    if (metadata.quantity) {
-      metadataDetails.push(`Quantity: ${metadata.quantity}`);
-    }
-    
-    if (metadata.amount || metadata.price || metadata.total_price) {
-      const amount = metadata.amount || metadata.price || metadata.total_price;
-      metadataDetails.push(`Amount: $${parseFloat(String(amount)).toFixed(2)}`);
-    }
-    
-    if (metadata.participants || metadata.num_participants) {
-      const participants = metadata.participants || metadata.num_participants;
-      metadataDetails.push(`${participants} participants`);
-    }
-    
-    if (metadata.guest_name || metadata.customer_name) {
-      const name = metadata.guest_name || metadata.customer_name;
-      metadataDetails.push(`Guest: ${name}`);
-    }
-    
-    if (metadata.customer_email || metadata.email) {
-      const email = metadata.customer_email || metadata.email;
-      metadataDetails.push(`Email: ${email}`);
-    }
-    
-    if (metadata.booking_date || metadata.date) {
-      const date = metadata.booking_date || metadata.date;
-      metadataDetails.push(`Date: ${date}`);
-    }
-    
-    if (metadata.time || metadata.booking_time || metadata.time_slot) {
-      const time = metadata.time || metadata.booking_time || metadata.time_slot;
-      metadataDetails.push(`Time: ${time}`);
-    }
-    
-    if (metadata.status || metadata.booking_status) {
-      const status = metadata.status || metadata.booking_status;
-      metadataDetails.push(`Status: ${status}`);
-    }
-    
-    if (metadata.reference_number || metadata.reference || metadata.booking_reference) {
-      const ref = metadata.reference_number || metadata.reference || metadata.booking_reference;
-      metadataDetails.push(`Ref: ${ref}`);
-    }
-    
-    if (metadata.package_name) {
-      metadataDetails.push(`Package: ${metadata.package_name}`);
-    }
-    
-    if (metadata.attraction_name) {
-      metadataDetails.push(`Attraction: ${metadata.attraction_name}`);
-    }
-    
-    if (metadata.add_ons && Array.isArray(metadata.add_ons) && metadata.add_ons.length > 0) {
-      const addOnNames = metadata.add_ons.map((a: { name?: string }) => a.name || 'Unknown').join(', ');
-      metadataDetails.push(`Add-ons: ${addOnNames}`);
-    }
-    
-    if (metadata.payment_method) {
-      metadataDetails.push(`Payment: ${metadata.payment_method}`);
-    }
-    
-    if (metadata.location_name || metadata.location) {
-      const location = metadata.location_name || metadata.location;
-      metadataDetails.push(`Location: ${location}`);
-    }
-    
-    if (metadata.room_name || metadata.room) {
-      const room = metadata.room_name || metadata.room;
-      metadataDetails.push(`Room: ${room}`);
-    }
-    
-    if (metadata.duration || metadata.duration_minutes) {
-      const duration = metadata.duration || metadata.duration_minutes;
-      metadataDetails.push(`Duration: ${duration} min`);
-    }
-    
-    if (metadata.promo_code || metadata.discount_code) {
-      const code = metadata.promo_code || metadata.discount_code;
-      metadataDetails.push(`Promo: ${code}`);
-    }
-    
-    if (metadata.discount_amount) {
-      metadataDetails.push(`Discount: $${parseFloat(String(metadata.discount_amount)).toFixed(2)}`);
-    }
-    
-    if (metadata.notes || metadata.special_requests) {
-      const notes = metadata.notes || metadata.special_requests;
-      if (notes.length <= 50) {
-        metadataDetails.push(`Notes: ${notes}`);
-      }
-    }
-    
-    // Build description based on action
+    let description = '';
+
+    // Helper to safely get nested properties
+    const getMetaValue = (key: string): unknown => (metadata as Record<string, unknown>)[key];
+
+    // Format based on specific action types from the API
     switch (log.action) {
-      case 'created':
-        description = `Created ${resourceType} "${resourceName}" ${resourceId}`;
+      // Booking actions
+      case 'Booking Created': {
+        const refNum = getMetaValue('reference_number') as string;
+        const customerName = getMetaValue('customer_name') as string;
+        const bookingDetails = getMetaValue('booking_details') as { booking_date?: string; booking_time?: string; participants?: number; duration?: number } | undefined;
+        const pkg = getMetaValue('package') as { name?: string } | undefined;
+        const room = getMetaValue('room') as { name?: string } | undefined;
+        const financial = getMetaValue('financial') as { total_amount?: number; amount_paid?: number } | undefined;
+        
+        description = `Booking ${refNum || ''} created for ${customerName || 'customer'}`;
+        if (pkg?.name) metadataDetails.push(`Package: ${pkg.name}`);
+        if (room?.name) metadataDetails.push(`Room: ${room.name}`);
+        if (bookingDetails?.booking_date) metadataDetails.push(`Date: ${bookingDetails.booking_date}`);
+        if (bookingDetails?.booking_time) metadataDetails.push(`Time: ${bookingDetails.booking_time}`);
+        if (bookingDetails?.participants) metadataDetails.push(`${bookingDetails.participants} participants`);
+        if (financial?.total_amount) metadataDetails.push(`Total: $${financial.total_amount.toFixed(2)}`);
         break;
-      case 'updated':
-        description = `Updated ${resourceType} "${resourceName}" ${resourceId}`;
-        break;
-      case 'deleted':
-        description = `Deleted ${resourceType} "${resourceName}" ${resourceId}`;
-        break;
-      case 'viewed':
-        description = `Viewed ${resourceType} "${resourceName}" ${resourceId}`;
-        break;
-      case 'checked_in':
-        description = `Checked in customer for ${resourceType} "${resourceName}" ${resourceId}`;
-        break;
-      case 'checked_out':
-        description = `Checked out customer from ${resourceType} "${resourceName}" ${resourceId}`;
-        break;
-      case 'purchased':
-        description = `Processed purchase of ${resourceType} "${resourceName}" ${resourceId}`;
-        break;
-      case 'logged_in':
-        description = `Logged into the system`;
-        if (metadata.ip_address) {
-          metadataDetails.push(`from IP: ${metadata.ip_address}`);
-        }
-        if (metadata.user_agent || metadata.browser) {
-          const browser = metadata.browser || metadata.user_agent;
-          if (browser.length <= 30) {
-            metadataDetails.push(`Browser: ${browser}`);
-          }
-        }
-        break;
-      case 'logged_out':
-        description = `Logged out of the system`;
-        if (metadata.session_duration) {
-          metadataDetails.push(`Session: ${metadata.session_duration}`);
+      }
+      
+      case 'Booking Edited': {
+        const refNum = getMetaValue('reference_number') as string;
+        const customerName = getMetaValue('customer_name') as string;
+        const updatedFields = getMetaValue('updated_fields') as string[] | undefined;
+        const changes = getMetaValue('changes') as Record<string, { from: unknown; to: unknown }> | undefined;
+        
+        description = `Booking ${refNum || ''} edited for ${customerName || 'customer'}`;
+        if (updatedFields?.length) metadataDetails.push(`Changed: ${updatedFields.join(', ')}`);
+        if (changes) {
+          const changeList = Object.entries(changes).slice(0, 3).map(([key, val]) => 
+            `${key.replace(/_/g, ' ')}: "${val.from}" → "${val.to}"`
+          );
+          if (changeList.length > 0) metadataDetails.push(changeList.join(', '));
         }
         break;
-      case 'approved':
-        description = `Approved ${resourceType} "${resourceName}" ${resourceId}`;
+      }
+      
+      case 'Booking Status Changed': {
+        const refNum = getMetaValue('reference_number') as string;
+        const statusChange = getMetaValue('status_change') as { from?: string; to?: string } | undefined;
+        
+        description = `Booking ${refNum || ''} status changed`;
+        if (statusChange) metadataDetails.push(`${statusChange.from} → ${statusChange.to}`);
         break;
-      case 'rejected':
-        description = `Rejected ${resourceType} "${resourceName}" ${resourceId}`;
-        if (metadata.reason || metadata.rejection_reason) {
-          const reason = metadata.reason || metadata.rejection_reason;
-          metadataDetails.push(`Reason: ${reason}`);
+      }
+      
+      case 'Payment Status Changed': {
+        const refNum = getMetaValue('reference_number') as string;
+        const paymentStatusChange = getMetaValue('payment_status_change') as { from?: string; to?: string } | undefined;
+        
+        description = `Booking ${refNum || ''} payment status changed`;
+        if (paymentStatusChange) metadataDetails.push(`${paymentStatusChange.from} → ${paymentStatusChange.to}`);
+        break;
+      }
+      
+      case 'Booking Internal Notes Updated': {
+        const refNum = getMetaValue('reference_number') as string;
+        description = `Internal notes updated for booking ${refNum || ''}`;
+        break;
+      }
+      
+      case 'Booking Deleted': {
+        const refNum = getMetaValue('reference_number') as string;
+        description = `Booking ${refNum || ''} deleted`;
+        break;
+      }
+      
+      case 'Bulk Bookings Deleted': {
+        const count = getMetaValue('deleted_count') as number;
+        description = `${count || 0} bookings deleted in bulk operation`;
+        break;
+      }
+      
+      // Payment actions
+      case 'Payment Recorded': {
+        const txnId = getMetaValue('transaction_id') as string;
+        const paymentDetails = getMetaValue('payment_details') as { amount?: number; method?: string } | undefined;
+        const customer = getMetaValue('customer') as { name?: string } | undefined;
+        
+        description = `Payment recorded`;
+        if (paymentDetails?.amount) metadataDetails.push(`Amount: $${paymentDetails.amount.toFixed(2)}`);
+        if (paymentDetails?.method) metadataDetails.push(`Method: ${paymentDetails.method}`);
+        if (customer?.name) metadataDetails.push(`Customer: ${customer.name}`);
+        if (txnId) metadataDetails.push(`Transaction: ${txnId}`);
+        break;
+      }
+      
+      case 'Payment Refunded': {
+        const paymentDetails = getMetaValue('payment_details') as { amount?: number } | undefined;
+        const customer = getMetaValue('customer') as { name?: string } | undefined;
+        
+        description = `Payment refunded`;
+        if (paymentDetails?.amount) metadataDetails.push(`Amount: $${paymentDetails.amount.toFixed(2)}`);
+        if (customer?.name) metadataDetails.push(`Customer: ${customer.name}`);
+        break;
+      }
+      
+      // User actions
+      case 'User Login': {
+        const userDetails = getMetaValue('user_details') as { name?: string; role?: string } | undefined;
+        const loginInfo = getMetaValue('login_info') as { ip_address?: string } | undefined;
+        
+        description = `User ${userDetails?.name || ''} logged in`;
+        if (userDetails?.role) metadataDetails.push(`Role: ${userDetails.role}`);
+        if (loginInfo?.ip_address) metadataDetails.push(`IP: ${loginInfo.ip_address}`);
+        break;
+      }
+      
+      case 'User Logout': {
+        const userDetails = getMetaValue('user_details') as { name?: string } | undefined;
+        description = `User ${userDetails?.name || ''} logged out`;
+        break;
+      }
+      
+      case 'User Created': {
+        const userDetails = getMetaValue('user_details') as { name?: string; role?: string; email?: string } | undefined;
+        description = `New user ${userDetails?.name || ''} created`;
+        if (userDetails?.role) metadataDetails.push(`Role: ${userDetails.role}`);
+        if (userDetails?.email) metadataDetails.push(`Email: ${userDetails.email}`);
+        break;
+      }
+      
+      case 'User Updated': {
+        const userDetails = getMetaValue('user_details') as { name?: string } | undefined;
+        const updatedFields = getMetaValue('updated_fields') as string[] | undefined;
+        
+        description = `User ${userDetails?.name || ''} information updated`;
+        if (updatedFields?.length) metadataDetails.push(`Changed: ${updatedFields.join(', ')}`);
+        break;
+      }
+      
+      case 'User Deleted': {
+        const userDetails = getMetaValue('user_details') as { name?: string } | undefined;
+        description = `User ${userDetails?.name || ''} deleted`;
+        break;
+      }
+      
+      case 'Bulk Users Deleted': {
+        const count = getMetaValue('deleted_count') as number;
+        description = `${count || 0} users deleted in bulk operation`;
+        break;
+      }
+      
+      case 'Customer Logout': {
+        const customerDetails = getMetaValue('customer_details') as { name?: string } | undefined;
+        description = `Customer ${customerDetails?.name || ''} logged out`;
+        break;
+      }
+      
+      // Attraction purchase actions
+      case 'Attraction Purchase Created': {
+        const purchaseDetails = getMetaValue('purchase_details') as { attraction_name?: string; quantity?: number; total_amount?: number } | undefined;
+        const customerDetails = getMetaValue('customer_details') as { name?: string } | undefined;
+        
+        description = `Attraction purchase created`;
+        if (purchaseDetails?.attraction_name) metadataDetails.push(`Attraction: ${purchaseDetails.attraction_name}`);
+        if (purchaseDetails?.quantity) metadataDetails.push(`Qty: ${purchaseDetails.quantity}`);
+        if (purchaseDetails?.total_amount) metadataDetails.push(`Total: $${purchaseDetails.total_amount.toFixed(2)}`);
+        if (customerDetails?.name) metadataDetails.push(`Customer: ${customerDetails.name}`);
+        break;
+      }
+      
+      case 'Attraction Purchase Updated': {
+        const purchaseDetails = getMetaValue('purchase_details') as { attraction_name?: string } | undefined;
+        const updatedFields = getMetaValue('updated_fields') as string[] | undefined;
+        
+        description = `Attraction purchase updated`;
+        if (purchaseDetails?.attraction_name) metadataDetails.push(`Attraction: ${purchaseDetails.attraction_name}`);
+        if (updatedFields?.length) metadataDetails.push(`Changed: ${updatedFields.join(', ')}`);
+        break;
+      }
+      
+      case 'Attraction Purchase Deleted':
+      case 'Bulk Attraction Purchases Deleted': {
+        const count = getMetaValue('deleted_count') as number;
+        if (count) {
+          description = `${count} attraction purchases deleted`;
+        } else {
+          const purchaseDetails = getMetaValue('purchase_details') as { attraction_name?: string } | undefined;
+          description = `Attraction purchase deleted`;
+          if (purchaseDetails?.attraction_name) metadataDetails.push(`Attraction: ${purchaseDetails.attraction_name}`);
         }
         break;
-      case 'managed':
-        description = `Managed ${resourceType} "${resourceName}" ${resourceId}`;
+      }
+      
+      // Gift card actions
+      case 'Gift Card Updated': {
+        const gcDetails = getMetaValue('gift_card_details') as { code?: string; balance?: number } | undefined;
+        description = `Gift card ${gcDetails?.code || ''} updated`;
+        if (gcDetails?.balance) metadataDetails.push(`Balance: $${gcDetails.balance.toFixed(2)}`);
         break;
-      case 'reported':
-        description = `Generated report for ${resourceType} "${resourceName}" ${resourceId}`;
+      }
+      
+      case 'Gift Card Deleted': {
+        const gcDetails = getMetaValue('gift_card_details') as { code?: string } | undefined;
+        description = `Gift card ${gcDetails?.code || ''} deleted`;
         break;
-      case 'cancelled':
-        description = `Cancelled ${resourceType} "${resourceName}" ${resourceId}`;
-        if (metadata.cancellation_reason) {
-          metadataDetails.push(`Reason: ${metadata.cancellation_reason}`);
+      }
+      
+      case 'Gift Card Redeemed': {
+        const gcDetails = getMetaValue('gift_card_details') as { code?: string } | undefined;
+        const redemptionDetails = getMetaValue('redemption_details') as { amount_redeemed?: number; remaining_balance?: number } | undefined;
+        
+        description = `Gift card ${gcDetails?.code || ''} redeemed`;
+        if (redemptionDetails?.amount_redeemed) metadataDetails.push(`Amount: $${redemptionDetails.amount_redeemed.toFixed(2)}`);
+        if (redemptionDetails?.remaining_balance !== undefined) metadataDetails.push(`Remaining: $${redemptionDetails.remaining_balance.toFixed(2)}`);
+        break;
+      }
+      
+      // Customer actions
+      case 'Customer Updated': {
+        const customerDetails = getMetaValue('customer_details') as { name?: string } | undefined;
+        const updatedFields = getMetaValue('updated_fields') as string[] | undefined;
+        
+        description = `Customer ${customerDetails?.name || ''} updated`;
+        if (updatedFields?.length) metadataDetails.push(`Changed: ${updatedFields.join(', ')}`);
+        break;
+      }
+      
+      case 'Customer Deleted': {
+        const customerDetails = getMetaValue('customer_details') as { name?: string } | undefined;
+        description = `Customer ${customerDetails?.name || ''} deleted`;
+        break;
+      }
+      
+      // Room actions
+      case 'Room Deleted':
+      case 'Room Bulk Deleted':
+      case 'Rooms Bulk Delete': {
+        const count = getMetaValue('deleted_count') as number;
+        if (count) {
+          description = `${count} rooms deleted in bulk operation`;
+        } else {
+          const roomDetails = getMetaValue('room_details') as { name?: string } | undefined;
+          description = `Room "${roomDetails?.name || ''}" deleted`;
         }
         break;
-      case 'refunded':
-        description = `Processed refund for ${resourceType} "${resourceName}" ${resourceId}`;
-        if (metadata.refund_amount) {
-          metadataDetails.push(`Refund: $${parseFloat(String(metadata.refund_amount)).toFixed(2)}`);
+      }
+      
+      // Legacy/fallback action handling
+      default: {
+        const action = log.action.replace(/_/g, ' ');
+        const resourceType = log.resourceType;
+        const resourceName = log.resourceName || '';
+        const resourceId = log.resourceId ? `#${log.resourceId}` : '';
+        
+        // Build description for legacy format
+        switch (log.action) {
+          case 'created':
+            description = `Created ${resourceType} "${resourceName}" ${resourceId}`;
+            break;
+          case 'updated':
+            description = `Updated ${resourceType} "${resourceName}" ${resourceId}`;
+            break;
+          case 'deleted':
+            description = `Deleted ${resourceType} "${resourceName}" ${resourceId}`;
+            break;
+          case 'viewed':
+            description = `Viewed ${resourceType} "${resourceName}" ${resourceId}`;
+            break;
+          case 'checked_in':
+            description = `Checked in customer for ${resourceType} "${resourceName}" ${resourceId}`;
+            break;
+          case 'checked_out':
+            description = `Checked out customer from ${resourceType} "${resourceName}" ${resourceId}`;
+            break;
+          case 'purchased':
+            description = `Processed purchase of ${resourceType} "${resourceName}" ${resourceId}`;
+            break;
+          case 'logged_in':
+            description = `Logged into the system`;
+            if (getMetaValue('ip_address')) metadataDetails.push(`IP: ${getMetaValue('ip_address')}`);
+            if (getMetaValue('user_agent') || getMetaValue('browser')) {
+              const browser = (getMetaValue('browser') || getMetaValue('user_agent')) as string;
+              if (browser && browser.length <= 30) metadataDetails.push(`Browser: ${browser}`);
+            }
+            break;
+          case 'logged_out':
+            description = `Logged out of the system`;
+            if (getMetaValue('session_duration')) metadataDetails.push(`Session: ${getMetaValue('session_duration')}`);
+            break;
+          case 'approved':
+            description = `Approved ${resourceType} "${resourceName}" ${resourceId}`;
+            break;
+          case 'rejected':
+            description = `Rejected ${resourceType} "${resourceName}" ${resourceId}`;
+            if (getMetaValue('reason') || getMetaValue('rejection_reason')) {
+              metadataDetails.push(`Reason: ${getMetaValue('reason') || getMetaValue('rejection_reason')}`);
+            }
+            break;
+          case 'managed':
+            description = `Managed ${resourceType} "${resourceName}" ${resourceId}`;
+            break;
+          case 'reported':
+            description = `Generated report for ${resourceType} "${resourceName}" ${resourceId}`;
+            break;
+          case 'cancelled':
+            description = `Cancelled ${resourceType} "${resourceName}" ${resourceId}`;
+            if (getMetaValue('cancellation_reason')) metadataDetails.push(`Reason: ${getMetaValue('cancellation_reason')}`);
+            break;
+          case 'refunded':
+            description = `Processed refund for ${resourceType} "${resourceName}" ${resourceId}`;
+            if (getMetaValue('refund_amount')) metadataDetails.push(`Refund: $${parseFloat(String(getMetaValue('refund_amount'))).toFixed(2)}`);
+            break;
+          default:
+            description = `${action.charAt(0).toUpperCase() + action.slice(1)} ${resourceType} "${resourceName}" ${resourceId}`.trim();
         }
-        break;
-      default:
-        description = `${action.charAt(0).toUpperCase() + action.slice(1)} ${resourceType} "${resourceName}" ${resourceId}`;
+        
+        // Parse legacy metadata fields
+        if (getMetaValue('reference_number') || getMetaValue('reference') || getMetaValue('booking_reference')) {
+          metadataDetails.push(`Ref: ${getMetaValue('reference_number') || getMetaValue('reference') || getMetaValue('booking_reference')}`);
+        }
+        if (getMetaValue('guest_name') || getMetaValue('customer_name')) {
+          metadataDetails.push(`Customer: ${getMetaValue('guest_name') || getMetaValue('customer_name')}`);
+        }
+        if (getMetaValue('customer_email') || getMetaValue('email')) {
+          metadataDetails.push(`Email: ${getMetaValue('customer_email') || getMetaValue('email')}`);
+        }
+        if (getMetaValue('amount') || getMetaValue('price') || getMetaValue('total_price')) {
+          const amount = getMetaValue('amount') || getMetaValue('price') || getMetaValue('total_price');
+          metadataDetails.push(`Amount: $${parseFloat(String(amount)).toFixed(2)}`);
+        }
+        if (getMetaValue('quantity')) metadataDetails.push(`Qty: ${getMetaValue('quantity')}`);
+        if (getMetaValue('participants') || getMetaValue('num_participants')) {
+          metadataDetails.push(`${getMetaValue('participants') || getMetaValue('num_participants')} participants`);
+        }
+        if (getMetaValue('booking_date') || getMetaValue('date')) {
+          metadataDetails.push(`Date: ${getMetaValue('booking_date') || getMetaValue('date')}`);
+        }
+        if (getMetaValue('time') || getMetaValue('booking_time') || getMetaValue('time_slot')) {
+          metadataDetails.push(`Time: ${getMetaValue('time') || getMetaValue('booking_time') || getMetaValue('time_slot')}`);
+        }
+        if (getMetaValue('status') || getMetaValue('booking_status')) {
+          metadataDetails.push(`Status: ${getMetaValue('status') || getMetaValue('booking_status')}`);
+        }
+        if (getMetaValue('package_name')) metadataDetails.push(`Package: ${getMetaValue('package_name')}`);
+        if (getMetaValue('attraction_name')) metadataDetails.push(`Attraction: ${getMetaValue('attraction_name')}`);
+        if (getMetaValue('payment_method')) metadataDetails.push(`Payment: ${getMetaValue('payment_method')}`);
+        if (getMetaValue('location_name') || getMetaValue('location')) {
+          metadataDetails.push(`Location: ${getMetaValue('location_name') || getMetaValue('location')}`);
+        }
+        if (getMetaValue('room_name') || getMetaValue('room')) {
+          metadataDetails.push(`Room: ${getMetaValue('room_name') || getMetaValue('room')}`);
+        }
+        if (getMetaValue('duration') || getMetaValue('duration_minutes')) {
+          metadataDetails.push(`Duration: ${getMetaValue('duration') || getMetaValue('duration_minutes')} min`);
+        }
+        if (getMetaValue('promo_code') || getMetaValue('discount_code')) {
+          metadataDetails.push(`Promo: ${getMetaValue('promo_code') || getMetaValue('discount_code')}`);
+        }
+        if (getMetaValue('discount_amount')) {
+          metadataDetails.push(`Discount: $${parseFloat(String(getMetaValue('discount_amount'))).toFixed(2)}`);
+        }
+      }
     }
     
-    // Append metadata details naturally
+    // Append metadata details
     if (metadataDetails.length > 0) {
       description += ` • ${metadataDetails.join(' • ')}`;
     }
     
-    // Add original details if they provide additional context and aren't redundant
-    if (log.details && log.details !== description && !description.includes(log.details) && log.details.length > 0) {
+    // Add original details if not redundant
+    if (log.details && log.details.length > 0 && !description.includes(log.details)) {
       description += ` • ${log.details}`;
     }
     
-    return description;
+    return description.trim();
   };
 
   // Format metadata for CSV export - extracts all relevant fields into a readable string
