@@ -14,7 +14,10 @@ import {
   Zap,
   Trash2,
   Plus,
-  X
+  X,
+  ChevronDown,
+  ChevronUp,
+  Info
 } from 'lucide-react';
 
 import CounterAnimation from '../../../components/ui/CounterAnimation';
@@ -59,6 +62,7 @@ const AttendantActivityLogs = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [totalLogs, setTotalLogs] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
+  const [expandedLogIds, setExpandedLogIds] = useState<Set<string>>(new Set());
 
   // Action icons and colors
   const actionIcons = {
@@ -486,6 +490,76 @@ const AttendantActivityLogs = () => {
     }
     
     return description.trim();
+  };
+
+  // Toggle expanded state for a log
+  const toggleLogExpanded = (logId: string) => {
+    setExpandedLogIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(logId)) {
+        newSet.delete(logId);
+      } else {
+        newSet.add(logId);
+      }
+      return newSet;
+    });
+  };
+
+  // Format metadata for display in expanded view
+  const formatMetadataForDisplay = (metadata: Record<string, unknown> | undefined): { key: string; value: string; category: string }[] => {
+    if (!metadata || Object.keys(metadata).length === 0) return [];
+    
+    const result: { key: string; value: string; category: string }[] = [];
+    
+    const formatValue = (val: unknown): string => {
+      if (val === null || val === undefined) return '-';
+      if (typeof val === 'object') {
+        if (Array.isArray(val)) {
+          return val.map(v => typeof v === 'object' ? JSON.stringify(v) : String(v)).join(', ');
+        }
+        return JSON.stringify(val, null, 2);
+      }
+      return String(val);
+    };
+
+    const formatKey = (key: string): string => {
+      return key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    };
+
+    const categorizeKey = (key: string): string => {
+      const categories: Record<string, string[]> = {
+        'Customer Info': ['customer_name', 'guest_name', 'customer_id', 'customer_email', 'email', 'phone', 'customer_details'],
+        'Booking Details': ['reference_number', 'booking_reference', 'booking_date', 'booking_time', 'participants', 'duration', 'duration_unit', 'booking_details', 'status', 'booking_status', 'payment_status'],
+        'Financial': ['total_amount', 'amount_paid', 'amount', 'price', 'discount_amount', 'financial', 'payment_details', 'refund_amount'],
+        'Package/Room': ['package', 'package_name', 'room', 'room_name', 'room_details', 'package_details'],
+        'Location': ['location', 'location_id', 'location_name', 'location_details'],
+        'User Info': ['user_id', 'user_details', 'created_by', 'updated_by', 'deleted_by', 'recorded_by', 'changed_by', 'refunded_by'],
+        'Changes': ['changes', 'updated_fields', 'status_change', 'payment_status_change'],
+        'Timestamps': ['created_at', 'updated_at', 'deleted_at', 'login_at', 'logout_at', 'recorded_at', 'changed_at'],
+        'System': ['ip_address', 'user_agent', 'login_info', 'logout_info']
+      };
+      
+      for (const [category, keys] of Object.entries(categories)) {
+        if (keys.includes(key)) return category;
+      }
+      return 'Other';
+    };
+
+    Object.entries(metadata).forEach(([key, value]) => {
+      if (value !== null && value !== undefined && value !== '') {
+        result.push({
+          key: formatKey(key),
+          value: formatValue(value),
+          category: categorizeKey(key)
+        });
+      }
+    });
+
+    // Sort by category
+    const categoryOrder = ['Customer Info', 'Booking Details', 'Financial', 'Package/Room', 'Location', 'User Info', 'Changes', 'Timestamps', 'System', 'Other'];
+    result.sort((a, b) => categoryOrder.indexOf(a.category) - categoryOrder.indexOf(b.category));
+
+    return result;
   };
 
   // Format metadata for CSV export - extracts all relevant fields into a readable string
@@ -1487,6 +1561,9 @@ const AttendantActivityLogs = () => {
           ) : (
             currentLogs.map((log) => {
               const ActionIcon = actionIcons[log.action as keyof typeof actionIcons] || Clock;
+              const isExpanded = expandedLogIds.has(log.id);
+              const metadataItems = formatMetadataForDisplay(log.metadata as Record<string, unknown>);
+              const hasMetadata = metadataItems.length > 0;
               
               return (
                 <div key={log.id} className="p-6 hover:bg-gray-50 transition-colors">
@@ -1525,7 +1602,56 @@ const AttendantActivityLogs = () => {
                         <span className="text-xs text-gray-500" title={new Date(log.timestamp).toLocaleString()}>
                           {formatTimestamp(log.timestamp)}
                         </span>
+                        
+                        {/* View Metadata Button */}
+                        {hasMetadata && (
+                          <>
+                            <span className="text-gray-400">•</span>
+                            <button
+                              onClick={() => toggleLogExpanded(log.id)}
+                              className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium transition-colors ${
+                                isExpanded 
+                                  ? `bg-${themeColor}-100 text-${fullColor}` 
+                                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                              }`}
+                            >
+                              <Info size={12} />
+                              {isExpanded ? 'Hide Details' : 'View Details'}
+                              {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                            </button>
+                          </>
+                        )}
                       </div>
+                      
+                      {/* Expanded Metadata Section */}
+                      {isExpanded && hasMetadata && (
+                        <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                          <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                            <Info size={14} />
+                            Activity Metadata
+                          </h4>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {metadataItems.map((item, idx) => (
+                              <div key={idx} className="flex flex-col">
+                                <span className="text-xs text-gray-500 uppercase tracking-wide">{item.key}</span>
+                                <span className={`text-sm text-gray-800 ${item.value.includes('\n') ? 'whitespace-pre-wrap font-mono text-xs bg-white p-2 rounded border mt-1' : ''}`}>
+                                  {item.value}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                          
+                          {/* Raw JSON View */}
+                          <details className="mt-4">
+                            <summary className="text-xs text-gray-500 cursor-pointer hover:text-gray-700">
+                              View Raw JSON
+                            </summary>
+                            <pre className="mt-2 p-3 bg-white rounded border border-gray-200 text-xs font-mono overflow-x-auto max-h-60 overflow-y-auto">
+                              {JSON.stringify(log.metadata, null, 2)}
+                            </pre>
+                          </details>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
