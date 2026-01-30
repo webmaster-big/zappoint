@@ -356,17 +356,13 @@ const LocationManagerDashboard: React.FC = () => {
         const hasCachedBookings = await bookingCacheService.hasCachedData();
         
         if (hasCachedBookings) {
-          // Cache exists - use filtered results by date only (like SpaceSchedule)
+          // Cache exists - use filtered results by date only
           console.log('[ManagerDashboard] Cache exists, filtering for date:', dateStr);
           const cachedBookings = await bookingCacheService.getFilteredBookingsFromCache({
             booking_date: dateStr,
           });
-          // Filter by status like SpaceSchedule does (only confirmed, checked-in, pending)
-          const filteredBookings = (cachedBookings || []).filter((b: any) => 
-            b.status === 'confirmed' || b.status === 'checked-in' || b.status === 'pending'
-          );
-          console.log('[ManagerDashboard] Filtered bookings from cache:', filteredBookings.length);
-          setDailyBookings(filteredBookings);
+          console.log('[ManagerDashboard] Filtered bookings from cache:', cachedBookings?.length || 0);
+          setDailyBookings((cachedBookings || []) as any[]);
         } else {
           // No cache available, fetch from API
           console.log('🔄 [ManagerDashboard] No cache, fetching from API...');
@@ -376,12 +372,8 @@ const LocationManagerDashboard: React.FC = () => {
             per_page: 100,
           });
           const bookings = bookingsResponse.data.bookings || [];
-          // Filter by status like SpaceSchedule does (only confirmed, checked-in, pending)
-          const filteredBookings = bookings.filter((b: any) => 
-            b.status === 'confirmed' || b.status === 'checked-in' || b.status === 'pending'
-          );
-          console.log('✅ [ManagerDashboard] Fetched', filteredBookings.length, 'bookings');
-          setDailyBookings(filteredBookings);
+          console.log('✅ [ManagerDashboard] Fetched', bookings.length, 'bookings');
+          setDailyBookings(bookings);
           // Cache the fetched bookings
           if (bookings.length > 0) {
             await bookingCacheService.cacheBookings(bookings);
