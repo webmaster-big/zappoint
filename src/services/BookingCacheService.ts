@@ -207,7 +207,7 @@ class BookingCacheService {
         // Fetch all bookings with high per_page to get most data
         const response: PaginatedBookingResponse = await bookingService.getBookings({
           ...filters,
-          per_page: 1000, // Get a large batch
+          per_page: 500, // Get a large batch (500 max to avoid backend limits)
         });
 
         const bookings = response.data.bookings || [];

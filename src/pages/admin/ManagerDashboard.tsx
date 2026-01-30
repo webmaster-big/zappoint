@@ -128,7 +128,7 @@ const LocationManagerDashboard: React.FC = () => {
         console.log('🔄 [ManagerDashboard] Background sync: Fetching fresh bookings...');
         const bookingsResponse = await bookingService.getBookings({
           location_id: locationId,
-          per_page: 1000, // Get all bookings
+          per_page: 500, // Get all bookings (500 max to avoid backend limits)
         });
         
         const bookings = bookingsResponse.data.bookings || [];
@@ -180,50 +180,22 @@ const LocationManagerDashboard: React.FC = () => {
     fetchRooms();
   }, [locationId]);
 
-  // Fetch new bookings (created in last 24-48 hours) - use cache for faster loading
+  // Derive new bookings (created in last 48 hours) from allBookings - no separate API call
   useEffect(() => {
-    const fetchNewBookings = async () => {
-      if (!locationId) return;
-      try {
-        const now = new Date();
-        const twoDaysAgo = new Date(now);
-        twoDaysAgo.setDate(now.getDate() - 2);
-        
-        // Try cache first for instant loading
-        const cachedBookings = await bookingCacheService.getFilteredBookingsFromCache({
-          location_id: locationId,
-        });
-        
-        if (cachedBookings && cachedBookings.length > 0) {
-          const recentlyCreated = cachedBookings.filter((booking: any) => {
-            const createdAt = new Date(booking.created_at);
-            return createdAt >= twoDaysAgo;
-          });
-          setNewBookings(recentlyCreated);
-          console.log('📦 [ManagerDashboard] Loaded', recentlyCreated.length, 'new bookings from cache');
-          return;
-        }
-        
-        // Fallback to API if cache empty
-        const response = await bookingService.getBookings({
-          location_id: locationId,
-          per_page: 50,
-        });
-        
-        const allBookings = response.data.bookings || [];
-        // Filter bookings created in the last 48 hours
-        const recentlyCreated = allBookings.filter((booking: any) => {
-          const createdAt = new Date(booking.created_at);
-          return createdAt >= twoDaysAgo;
-        });
-        
-        setNewBookings(recentlyCreated);
-      } catch (error) {
-        console.error('Error fetching new bookings:', error);
-      }
-    };
-    fetchNewBookings();
-  }, [locationId]);
+    if (allBookings.length === 0) return;
+    
+    const now = new Date();
+    const twoDaysAgo = new Date(now);
+    twoDaysAgo.setDate(now.getDate() - 2);
+    
+    const recentlyCreated = allBookings.filter((booking: any) => {
+      const createdAt = new Date(booking.created_at);
+      return createdAt >= twoDaysAgo;
+    });
+    
+    setNewBookings(recentlyCreated);
+    console.log('📅 [ManagerDashboard] New bookings (last 48h) derived:', recentlyCreated.length);
+  }, [allBookings]);
 
   // Fetch metrics data (when location or timeframe changes)
   // PERFORMANCE OPTIMIZATION: Cache-first loading with background refresh
@@ -321,6 +293,7 @@ const LocationManagerDashboard: React.FC = () => {
   }, [allBookings, currentWeek]);
   
   // Daily calendar data - derived from allBookings (no API call needed)
+  // Matches SpaceSchedule: only show confirmed, pending, and checked-in bookings
   useEffect(() => {
     if (calendarView !== 'day' || allBookings.length === 0) return;
     
@@ -329,9 +302,11 @@ const LocationManagerDashboard: React.FC = () => {
     const day = String(currentDay.getDate()).padStart(2, '0');
     const dateStr = `${year}-${month}-${day}`;
     
+    const validStatuses = ['confirmed', 'pending', 'checked-in'];
     const daily = allBookings.filter(booking => {
       const bookingDatePart = booking.booking_date.split('T')[0];
-      return bookingDatePart === dateStr;
+      const status = booking.status?.toLowerCase();
+      return bookingDatePart === dateStr && validStatuses.includes(status);
     });
     
     setDailyBookings(daily);
@@ -476,40 +451,51 @@ const LocationManagerDashboard: React.FC = () => {
 
   const dailyTimeSlots = generateTimeSlots();
 
-  // Filter to only show time slots that have bookings
+  // Check if there are any bookings without a room assigned
+  const unassignedBookings = dailyBookings.filter(b => !b.room_id);
+
+  // Filter to show time slots that have bookings (including unassigned bookings)
   const visibleTimeSlots = dailyTimeSlots.filter(slot => {
-    return sortedRooms.some(space => {
-      return dailyBookings.some(booking => {
-        if (booking.room_id !== space.id) return false;
-        const [bookingHour, bookingMin] = booking.booking_time.split(':').map(Number);
-        const startInMinutes = bookingHour * 60 + bookingMin;
-        const slotInMinutes = slot.hour * 60 + slot.minute;
-        let durationMinutes = 60;
-        if (booking.duration && booking.duration_unit) {
-          if (booking.duration_unit === 'hours') durationMinutes = booking.duration * 60;
-          else if (booking.duration_unit === 'minutes') durationMinutes = booking.duration;
-          else durationMinutes = Math.floor(booking.duration) * 60 + Math.round((booking.duration % 1) * 60);
-        }
-        const endInMinutes = startInMinutes + durationMinutes;
-        return slotInMinutes >= startInMinutes && slotInMinutes < endInMinutes;
-      });
+    // Check if any booking (with or without room) covers this slot
+    return dailyBookings.some(booking => {
+      const [bookingHour, bookingMin] = (booking.booking_time || '00:00').split(':').map(Number);
+      const startInMinutes = bookingHour * 60 + bookingMin;
+      const slotInMinutes = slot.hour * 60 + slot.minute;
+      let durationMinutes = 60;
+      if (booking.duration && booking.duration_unit) {
+        if (booking.duration_unit === 'hours') durationMinutes = booking.duration * 60;
+        else if (booking.duration_unit === 'minutes') durationMinutes = booking.duration;
+        else durationMinutes = Math.floor(booking.duration) * 60 + Math.round((booking.duration % 1) * 60);
+      }
+      const endInMinutes = startInMinutes + durationMinutes;
+      return slotInMinutes >= startInMinutes && slotInMinutes < endInMinutes;
     });
   });
 
-  // Get booking for a specific space and time slot
+  // Get booking for a specific space and time slot (spaceId = 0 means unassigned)
   const getBookingForSlot = (spaceId: number, slot: { hour: number; minute: number }) => {
     return dailyBookings.find(booking => {
-      if (booking.room_id !== spaceId) return false;
-      const [bookingHour, bookingMin] = booking.booking_time.split(':').map(Number);
+      // For unassigned column (spaceId = 0), check for bookings without room
+      if (spaceId === 0) {
+        if (booking.room_id) return false; // Has a room, skip
+      } else {
+        if (booking.room_id !== spaceId) return false;
+      }
+      const [bookingHour, bookingMin] = (booking.booking_time || '00:00').split(':').map(Number);
       return bookingHour === slot.hour && bookingMin === slot.minute;
     });
   };
 
-  // Check if a slot is occupied by a booking that started earlier
+  // Check if a slot is occupied by a booking that started earlier (spaceId = 0 means unassigned)
   const isSlotOccupied = (spaceId: number, slot: { hour: number; minute: number }) => {
     return dailyBookings.some(booking => {
-      if (booking.room_id !== spaceId) return false;
-      const [startHour, startMin] = booking.booking_time.split(':').map(Number);
+      // For unassigned column (spaceId = 0), check for bookings without room
+      if (spaceId === 0) {
+        if (booking.room_id) return false; // Has a room, skip
+      } else {
+        if (booking.room_id !== spaceId) return false;
+      }
+      const [startHour, startMin] = (booking.booking_time || '00:00').split(':').map(Number);
       const startInMinutes = startHour * 60 + startMin;
       const slotInMinutes = slot.hour * 60 + slot.minute;
       
@@ -850,7 +836,7 @@ const LocationManagerDashboard: React.FC = () => {
                     {sortedRooms.map(space => (
                       <th 
                         key={space.id} 
-                        className="px-4 py-3 text-center text-sm font-semibold text-gray-700 border-r border-gray-200 min-w-[180px]"
+                        className="px-4 py-3 text-center text-sm font-semibold text-gray-700 border-r border-gray-200 min-w-[200px]"
                       >
                         <div className="flex flex-col items-center gap-1">
                           <span>{space.name}</span>
@@ -861,12 +847,23 @@ const LocationManagerDashboard: React.FC = () => {
                         </div>
                       </th>
                     ))}
+                    {/* Unassigned bookings column */}
+                    {unassignedBookings.length > 0 && (
+                      <th className="px-4 py-3 text-center text-sm font-semibold text-amber-700 border-r border-gray-200 min-w-[200px] bg-amber-50">
+                        <div className="flex flex-col items-center gap-1">
+                          <span>⚠️ No Room</span>
+                          <span className="text-xs font-normal text-amber-600">
+                            {unassignedBookings.length} booking{unassignedBookings.length > 1 ? 's' : ''} unassigned
+                          </span>
+                        </div>
+                      </th>
+                    )}
                   </tr>
                 </thead>
                 <tbody>
                   {visibleTimeSlots.map((slot, slotIndex) => (
-                    <tr key={slotIndex} className="border-b border-gray-100 hover:bg-gray-50" style={{ height: '50px' }}>
-                      <td className="sticky left-0 bg-white z-10 px-4 py-2 text-sm text-gray-600 border-r border-gray-200 font-medium">
+                    <tr key={slotIndex} className="border-b border-gray-100 hover:bg-gray-50" style={{ height: '60px' }}>
+                      <td className="sticky left-0 bg-white z-10 px-4 py-2 text-sm text-gray-600 border-r border-gray-200 font-medium" style={{ height: '60px' }}>
                         {slot.time}
                       </td>
                       {sortedRooms.map(space => {
@@ -921,12 +918,63 @@ const LocationManagerDashboard: React.FC = () => {
                           <td
                             key={space.id}
                             className="px-2 py-2 border-r border-gray-200 text-center text-gray-300 hover:bg-blue-50 transition"
-                            style={{ height: '50px' }}
+                            style={{ height: '60px' }}
                           >
                             —
                           </td>
                         );
                       })}
+                      {/* Unassigned bookings column */}
+                      {unassignedBookings.length > 0 && (() => {
+                        const booking = getBookingForSlot(0, slot);
+                        const isOccupied = isSlotOccupied(0, slot);
+                        
+                        if (isOccupied) return null;
+                        
+                        if (booking) {
+                          const rowSpan = getBookingRowSpan(booking);
+                          return (
+                            <td
+                              key="unassigned"
+                              rowSpan={rowSpan}
+                              className="px-2 py-2 border-r border-gray-200 cursor-pointer hover:opacity-80 transition bg-amber-50"
+                              style={{ verticalAlign: 'top' }}
+                              onClick={() => setSelectedBooking(booking)}
+                            >
+                              <div className="flex flex-col p-2 h-full">
+                                <div className="font-bold text-xs text-amber-900 mb-1">
+                                  {formatTime12Hour(booking.booking_time)} - {formatTime12Hour(calculateEndTime(booking.booking_time, booking.duration || 1, booking.duration_unit || 'hours'))}
+                                </div>
+                                <div className="font-semibold text-sm text-gray-900 mb-0.5 line-clamp-1">
+                                  {booking.guest_name || (booking.customer ? `${booking.customer.first_name} ${booking.customer.last_name}` : 'Guest')}
+                                </div>
+                                <div className="text-xs text-gray-600 line-clamp-1">{booking.package?.name || 'N/A'}</div>
+                                <div className="text-xs text-gray-500 mt-1">{booking.participants} guests</div>
+                                <div className="text-xs text-amber-600 mt-1 font-medium">⚠️ No room assigned</div>
+                                <div className="mt-auto pt-1 flex items-center justify-between text-xs border-t border-amber-300/50">
+                                  <span className={`font-semibold ${
+                                    booking.payment_status === 'paid' ? 'text-green-700' :
+                                    booking.payment_status === 'partial' ? 'text-yellow-700' : 'text-red-700'
+                                  }`}>
+                                    ${parseFloat(String(booking.total_amount || 0)).toFixed(2)}
+                                  </span>
+                                  <span className="text-gray-600 capitalize">{booking.status}</span>
+                                </div>
+                              </div>
+                            </td>
+                          );
+                        }
+                        
+                        return (
+                          <td
+                            key="unassigned"
+                            className="px-2 py-2 border-r border-gray-200 text-center text-amber-300 bg-amber-50/50"
+                            style={{ height: '60px' }}
+                          >
+                            —
+                          </td>
+                        );
+                      })()}
                     </tr>
                   ))}
                 </tbody>

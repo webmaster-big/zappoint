@@ -51,6 +51,7 @@ const AttendantDashboard: React.FC = () => {
    const [rooms, setRooms] = useState<Room[]>([]);
    
    // Data states
+   const [allBookings, setAllBookings] = useState<any[]>([]); // All-time bookings for this location
    const [weeklyBookings, setWeeklyBookings] = useState<any[]>([]);
    const [dailyBookings, setDailyBookings] = useState<any[]>([]);
    const [monthlyBookings, setMonthlyBookings] = useState<any[]>([]);
@@ -79,45 +80,50 @@ const AttendantDashboard: React.FC = () => {
      }
    }, []);
 
-   // Background sync: Fetch fresh bookings data on component mount
-   // This ensures the cache is always up-to-date when user visits the dashboard
+   // Load ALL bookings for this location (cache-first, then background sync)
+   // This is the primary data source for the table and calendar views
    useEffect(() => {
      if (!locationId) return;
      
-     const syncBookingsInBackground = async () => {
+     const loadAllBookings = async () => {
        try {
+         console.log('📦 [AttendantDashboard] Loading all bookings for location:', locationId);
+         
+         // Step 1: Try cache first for instant loading
+         const cachedBookings = await bookingCacheService.getFilteredBookingsFromCache({
+           location_id: locationId,
+         });
+         
+         if (cachedBookings && cachedBookings.length > 0) {
+           console.log('📦 [AttendantDashboard] Loaded', cachedBookings.length, 'bookings from cache');
+           setAllBookings(cachedBookings);
+           setLoading(false);
+         }
+         
+         // Step 2: Fetch fresh data from API in background (ALL bookings for location, no date filter)
          console.log('🔄 [AttendantDashboard] Background sync: Fetching fresh bookings...');
-         
-         // Fetch all bookings from API (last 30 days + next 30 days for comprehensive cache)
-         const today = new Date();
-         const thirtyDaysAgo = new Date(today);
-         thirtyDaysAgo.setDate(today.getDate() - 30);
-         const thirtyDaysAhead = new Date(today);
-         thirtyDaysAhead.setDate(today.getDate() + 30);
-         
          const bookingsResponse = await bookingService.getBookings({
            location_id: locationId,
-           date_from: thirtyDaysAgo.toISOString().split('T')[0],
-           date_to: thirtyDaysAhead.toISOString().split('T')[0],
-           per_page: 500,
+           per_page: 500, // Get all bookings (500 max to avoid backend limits)
          });
          
          const bookings = bookingsResponse.data.bookings || [];
-         console.log('✅ [AttendantDashboard] Background sync: Fetched', bookings.length, 'bookings');
+         console.log('✅ [AttendantDashboard] Fetched', bookings.length, 'bookings from API');
          
-         // Update cache with fresh data
+         // Update state and cache
+         setAllBookings(bookings);
          if (bookings.length > 0) {
            await bookingCacheService.cacheBookings(bookings, { locationId });
-           console.log('✅ [AttendantDashboard] Background sync: Cache updated');
+           console.log('✅ [AttendantDashboard] Cache updated');
          }
        } catch (error) {
-         console.error('⚠️ [AttendantDashboard] Background sync failed:', error);
-         // Don't throw - this is a background operation
+         console.error('⚠️ [AttendantDashboard] Error loading bookings:', error);
+       } finally {
+         setLoading(false);
        }
      };
      
-     // Run sync in background (don't block UI)
-     syncBookingsInBackground();
+     loadAllBookings();
    }, [locationId]);
 
    // Fetch rooms/spaces for daily view - use cache for faster loading
@@ -150,50 +156,22 @@ const AttendantDashboard: React.FC = () => {
      fetchRooms();
    }, [locationId]);
 
-   // Fetch new bookings (created in last 24-48 hours) - use cache for faster loading
+   // Derive new bookings (created in last 48 hours) from allBookings - no separate API call
    useEffect(() => {
-     const fetchNewBookings = async () => {
-       if (!locationId) return;
-       try {
-         const now = new Date();
-         const twoDaysAgo = new Date(now);
-         twoDaysAgo.setDate(now.getDate() - 2);
-         
-         // Try cache first for instant loading
-         const cachedBookings = await bookingCacheService.getFilteredBookingsFromCache({
-           location_id: locationId,
-         });
-         
-         if (cachedBookings && cachedBookings.length > 0) {
-           const recentlyCreated = cachedBookings.filter((booking: any) => {
-             const createdAt = new Date(booking.created_at);
-             return createdAt >= twoDaysAgo;
-           });
-           setNewBookings(recentlyCreated);
-           console.log('📦 [AttendantDashboard] Loaded', recentlyCreated.length, 'new bookings from cache');
-           return;
-         }
-         
-         // Fallback to API if cache empty
-         const response = await bookingService.getBookings({
-           location_id: locationId,
-           per_page: 50,
-         });
-         
-         const allBookings = response.data.bookings || [];
-         // Filter bookings created in the last 48 hours
-         const recentlyCreated = allBookings.filter((booking: any) => {
-           const createdAt = new Date(booking.created_at);
-           return createdAt >= twoDaysAgo;
-         });
-         
-         setNewBookings(recentlyCreated);
-       } catch (error) {
-         console.error('Error fetching new bookings:', error);
-       }
-     };
-     fetchNewBookings();
-   }, [locationId]);
+     if (allBookings.length === 0) return;
+     
+     const now = new Date();
+     const twoDaysAgo = new Date(now);
+     twoDaysAgo.setDate(now.getDate() - 2);
+     
+     const recentlyCreated = allBookings.filter((booking: any) => {
+       const createdAt = new Date(booking.created_at);
+       return createdAt >= twoDaysAgo;
+     });
+     
+     setNewBookings(recentlyCreated);
+     console.log('📅 [AttendantDashboard] New bookings (last 48h) derived:', recentlyCreated.length);
+   }, [allBookings]);
 
    // Fetch metrics data (when location or timeframe changes)
    // Uses cache-first approach: display cached data instantly, then refresh in background
@@ -269,46 +247,21 @@ const AttendantDashboard: React.FC = () => {
 
    const weekDates = getWeekDates(currentWeek);
 
-   // Fetch weekly calendar data (changes when week changes)
-   // Uses cache service for faster loading, syncs in background
+   // Weekly calendar data - derived from allBookings (no API call needed)
    useEffect(() => {
-     const fetchWeeklyData = async () => {
-       if (!locationId) return;
-       
-       try {
-         const weekStart = weekDates[0];
-         const weekEnd = weekDates[6];
-         
-         const bookingParams = {
-           location_id: locationId,
-           date_from: weekStart.toISOString().split('T')[0],
-           date_to: weekEnd.toISOString().split('T')[0],
-         };
-         
-         // Try to get from cache first
-         const cachedBookings = await bookingCacheService.getFilteredBookingsFromCache(bookingParams);
-         
-         if (cachedBookings && cachedBookings.length > 0) {
-           setWeeklyBookings(cachedBookings);
-         } else {
-           // No cache, fetch from API
-           const bookingsResponse = await bookingService.getBookings({
-             ...bookingParams,
-             per_page: 100,
-           });
-           const bookings = bookingsResponse.data.bookings || [];
-           setWeeklyBookings(bookings);
-           // Cache the fetched bookings
-           await bookingCacheService.cacheBookings(bookings, { locationId });
-         }
-         
-       } catch (error) {
-         console.error('Error fetching weekly data:', error);
-       }
-     };
+     if (allBookings.length === 0) return;
      
-     fetchWeeklyData();
-   }, [locationId, currentWeek, weekDates]);
+     const weekStart = weekDates[0];
+     const weekEnd = weekDates[6];
+     
+     const weekly = allBookings.filter(booking => {
+       const bookingDate = parseLocalDate(booking.booking_date);
+       return bookingDate >= weekStart && bookingDate <= weekEnd;
+     });
+     
+     setWeeklyBookings(weekly);
+     console.log('📅 [AttendantDashboard] Weekly bookings filtered:', weekly.length);
+   }, [allBookings, currentWeek]);
    
    // Navigate to previous/next week
    const goToPreviousWeek = () => {
@@ -349,54 +302,26 @@ const AttendantDashboard: React.FC = () => {
      setCurrentMonth(newDate);
    };
 
-   // Fetch daily calendar data
+   // Daily calendar data - derived from allBookings (no API call needed)
+   // Matches SpaceSchedule: only show confirmed, pending, and checked-in bookings
    useEffect(() => {
-     const fetchDailyData = async () => {
-       if (!locationId || calendarView !== 'day') return;
-       
-       try {
-         // Format date as YYYY-MM-DD for booking_date filter
-         const year = currentDay.getFullYear();
-         const month = String(currentDay.getMonth() + 1).padStart(2, '0');
-         const day = String(currentDay.getDate()).padStart(2, '0');
-         const dateStr = `${year}-${month}-${day}`;
-         console.log('📅 [AttendantDashboard] Fetching daily bookings for:', dateStr);
-         
-         // Check if cache has any data first (like SpaceSchedule)
-         const hasCachedBookings = await bookingCacheService.hasCachedData();
-         
-         if (hasCachedBookings) {
-           // Cache exists - use filtered results by date only
-           console.log('[AttendantDashboard] Cache exists, filtering for date:', dateStr);
-           const cachedBookings = await bookingCacheService.getFilteredBookingsFromCache({
-             booking_date: dateStr,
-           });
-           console.log('[AttendantDashboard] Filtered bookings from cache:', cachedBookings?.length || 0);
-           setDailyBookings((cachedBookings || []) as any[]);
-         } else {
-           // No cache available, fetch from API
-           console.log('🔄 [AttendantDashboard] No cache, fetching from API...');
-           const bookingsResponse = await bookingService.getBookings({
-             booking_date: dateStr,
-             user_id: getStoredUser()?.id,
-             per_page: 100,
-           });
-           const bookings = bookingsResponse.data.bookings || [];
-           console.log('✅ [AttendantDashboard] Fetched', bookings.length, 'bookings');
-           setDailyBookings(bookings);
-           // Cache the fetched bookings
-           if (bookings.length > 0) {
-             await bookingCacheService.cacheBookings(bookings);
-           }
-         }
-         
-       } catch (error) {
-         console.error('Error fetching daily data:', error);
-       }
-     };
+     if (calendarView !== 'day' || allBookings.length === 0) return;
      
-     fetchDailyData();
-   }, [locationId, currentDay, calendarView]);
+     const year = currentDay.getFullYear();
+     const month = String(currentDay.getMonth() + 1).padStart(2, '0');
+     const day = String(currentDay.getDate()).padStart(2, '0');
+     const dateStr = `${year}-${month}-${day}`;
+     
+     const validStatuses = ['confirmed', 'pending', 'checked-in'];
+     const daily = allBookings.filter(booking => {
+       const bookingDatePart = booking.booking_date.split('T')[0];
+       const status = booking.status?.toLowerCase();
+       return bookingDatePart === dateStr && validStatuses.includes(status);
+     });
+     
+     setDailyBookings(daily);
+     console.log('📅 [AttendantDashboard] Daily bookings filtered for', dateStr, ':', daily.length);
+   }, [allBookings, currentDay, calendarView]);
 
    // Get all days in the current month for calendar grid
    const getMonthDays = (date: Date) => {
@@ -424,50 +349,23 @@ const AttendantDashboard: React.FC = () => {
 
    const monthDays = getMonthDays(currentMonth);
 
-   // Fetch monthly calendar data (changes when month changes) - USE CACHE FIRST
+   // Monthly calendar data - derived from allBookings (no API call needed)
    useEffect(() => {
-     const fetchMonthlyData = async () => {
-       if (!locationId || calendarView !== 'month') return;
-       
-       try {
-         const year = currentMonth.getFullYear();
-         const month = currentMonth.getMonth();
-         const monthStart = new Date(year, month, 1);
-         const monthEnd = new Date(year, month + 1, 0);
-         
-         const dateParams = {
-           date_from: monthStart.toISOString().split('T')[0],
-           date_to: monthEnd.toISOString().split('T')[0],
-         };
-         
-         // Try cache first for instant loading
-         let bookings = await bookingCacheService.getFilteredBookingsFromCache(dateParams);
-         
-         if (bookings && bookings.length > 0) {
-           // Filter by location
-           bookings = bookings.filter(b => b.location_id === locationId);
-           setMonthlyBookings(bookings);
-         } else {
-           // No cache, fetch from API
-           const bookingsResponse = await bookingService.getBookings({
-             location_id: locationId,
-             ...dateParams,
-             per_page: 500,
-           });
-           
-           bookings = bookingsResponse.data.bookings || [];
-           setMonthlyBookings(bookings);
-           // Cache for next time
-           await bookingCacheService.cacheBookings(bookings);
-         }
-         
-       } catch (error) {
-         console.error('Error fetching monthly data:', error);
-       }
-     };
+     if (calendarView !== 'month' || allBookings.length === 0) return;
      
-     fetchMonthlyData();
-   }, [locationId, currentMonth, calendarView]);
+     const year = currentMonth.getFullYear();
+     const month = currentMonth.getMonth();
+     const monthStart = new Date(year, month, 1);
+     const monthEnd = new Date(year, month + 1, 0);
+     
+     const monthly = allBookings.filter(booking => {
+       const bookingDate = parseLocalDate(booking.booking_date);
+       return bookingDate >= monthStart && bookingDate <= monthEnd;
+     });
+     
+     setMonthlyBookings(monthly);
+     console.log('📅 [AttendantDashboard] Monthly bookings filtered:', monthly.length);
+   }, [allBookings, currentMonth, calendarView]);
 
    // Get bookings count for a specific day
    const getBookingsForDay = (date: Date) => {
@@ -625,41 +523,51 @@ const AttendantDashboard: React.FC = () => {
 
    const dailyTimeSlots = generateTimeSlots();
 
-   // Filter to only show time slots that have bookings (like SpaceSchedule)
+   // Check if there are any bookings without a room assigned
+   const unassignedBookings = dailyBookings.filter(b => !b.room_id);
+
+   // Filter to show time slots that have bookings (including unassigned bookings)
    const visibleTimeSlots = dailyTimeSlots.filter(slot => {
-     return sortedRooms.some(space => {
-       return dailyBookings.some(booking => {
-         if (booking.room_id !== space.id) return false;
-         const [bookingHour, bookingMin] = booking.booking_time.split(':').map(Number);
-         // Check if this slot is start of a booking or covered by a booking
-         const startInMinutes = bookingHour * 60 + bookingMin;
-         const slotInMinutes = slot.hour * 60 + slot.minute;
-         let durationMinutes = 60;
-         if (booking.duration && booking.duration_unit) {
-           if (booking.duration_unit === 'hours') durationMinutes = booking.duration * 60;
-           else if (booking.duration_unit === 'minutes') durationMinutes = booking.duration;
-           else durationMinutes = Math.floor(booking.duration) * 60 + Math.round((booking.duration % 1) * 60);
-         }
-         const endInMinutes = startInMinutes + durationMinutes;
-         return slotInMinutes >= startInMinutes && slotInMinutes < endInMinutes;
-       });
+     // Check if any booking (with or without room) covers this slot
+     return dailyBookings.some(booking => {
+       const [bookingHour, bookingMin] = (booking.booking_time || '00:00').split(':').map(Number);
+       const startInMinutes = bookingHour * 60 + bookingMin;
+       const slotInMinutes = slot.hour * 60 + slot.minute;
+       let durationMinutes = 60;
+       if (booking.duration && booking.duration_unit) {
+         if (booking.duration_unit === 'hours') durationMinutes = booking.duration * 60;
+         else if (booking.duration_unit === 'minutes') durationMinutes = booking.duration;
+         else durationMinutes = Math.floor(booking.duration) * 60 + Math.round((booking.duration % 1) * 60);
+       }
+       const endInMinutes = startInMinutes + durationMinutes;
+       return slotInMinutes >= startInMinutes && slotInMinutes < endInMinutes;
      });
    });
 
-   // Get booking for a specific space and time slot
+   // Get booking for a specific space and time slot (spaceId = 0 means unassigned)
    const getBookingForSlot = (spaceId: number, slot: { hour: number; minute: number }) => {
      return dailyBookings.find(booking => {
-       if (booking.room_id !== spaceId) return false;
-       const [bookingHour, bookingMin] = booking.booking_time.split(':').map(Number);
+       // For unassigned column (spaceId = 0), check for bookings without room
+       if (spaceId === 0) {
+         if (booking.room_id) return false; // Has a room, skip
+       } else {
+         if (booking.room_id !== spaceId) return false;
+       }
+       const [bookingHour, bookingMin] = (booking.booking_time || '00:00').split(':').map(Number);
        return bookingHour === slot.hour && bookingMin === slot.minute;
      });
    };
 
-   // Check if a slot is occupied by a booking that started earlier
+   // Check if a slot is occupied by a booking that started earlier (spaceId = 0 means unassigned)
    const isSlotOccupied = (spaceId: number, slot: { hour: number; minute: number }) => {
      return dailyBookings.some(booking => {
-       if (booking.room_id !== spaceId) return false;
-       const [startHour, startMin] = booking.booking_time.split(':').map(Number);
+       // For unassigned column (spaceId = 0), check for bookings without room
+       if (spaceId === 0) {
+         if (booking.room_id) return false; // Has a room, skip
+       } else {
+         if (booking.room_id !== spaceId) return false;
+       }
+       const [startHour, startMin] = (booking.booking_time || '00:00').split(':').map(Number);
        const startInMinutes = startHour * 60 + startMin;
        const slotInMinutes = slot.hour * 60 + slot.minute;
        
@@ -877,10 +785,21 @@ const AttendantDashboard: React.FC = () => {
                            Time
                          </div>
                        </th>
+                       {/* Unassigned column for bookings without rooms */}
+                       {unassignedBookings.length > 0 && (
+                         <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700 border-r border-gray-200 min-w-[200px] bg-amber-50">
+                           <div className="flex flex-col items-center gap-1">
+                             <span>No Room</span>
+                             <span className="text-xs font-normal text-amber-600">
+                               {unassignedBookings.length} booking(s)
+                             </span>
+                           </div>
+                         </th>
+                       )}
                        {sortedRooms.map(space => (
                          <th 
                            key={space.id} 
-                           className="px-4 py-3 text-center text-sm font-semibold text-gray-700 border-r border-gray-200 min-w-[180px]"
+                           className="px-4 py-3 text-center text-sm font-semibold text-gray-700 border-r border-gray-200 min-w-[200px]"
                          >
                            <div className="flex flex-col items-center gap-1">
                              <span>{space.name}</span>
@@ -895,10 +814,71 @@ const AttendantDashboard: React.FC = () => {
                    </thead>
                    <tbody>
                      {visibleTimeSlots.map((slot, slotIndex) => (
-                       <tr key={slotIndex} className="border-b border-gray-100 hover:bg-gray-50" style={{ height: '50px' }}>
-                         <td className="sticky left-0 bg-white z-10 px-4 py-2 text-sm text-gray-600 border-r border-gray-200 font-medium">
+                       <tr key={slotIndex} className="border-b border-gray-100 hover:bg-gray-50" style={{ height: '60px' }}>
+                         <td className="sticky left-0 bg-white z-10 px-4 py-2 text-sm text-gray-600 border-r border-gray-200 font-medium" style={{ height: '60px' }}>
                            {slot.time}
                          </td>
+                         {/* Unassigned column for bookings without rooms */}
+                         {unassignedBookings.length > 0 && (() => {
+                           const booking = getBookingForSlot(0, slot);
+                           const isOccupied = isSlotOccupied(0, slot);
+                           
+                           if (isOccupied) return null;
+                           
+                           if (booking) {
+                             const rowSpan = getBookingRowSpan(booking);
+                             const getBgColor = () => {
+                               const status = booking.status?.toLowerCase();
+                               if (status === 'confirmed') return 'bg-green-100';
+                               if (status === 'pending') return 'bg-yellow-100';
+                               if (status === 'checked-in') return 'bg-blue-100';
+                               if (status === 'cancelled') return 'bg-red-100';
+                               return 'bg-amber-50';
+                             };
+                             
+                             return (
+                               <td
+                                 key="unassigned"
+                                 rowSpan={rowSpan}
+                                 className={`px-2 py-2 border-r border-gray-200 cursor-pointer hover:opacity-80 transition ${getBgColor()}`}
+                                 style={{ verticalAlign: 'top' }}
+                               >
+                                 <Link to={`/admin/bookings/${booking.id}`} className="block h-full">
+                                   <div className="flex flex-col p-2 h-full">
+                                     <div className="font-bold text-xs text-gray-900 mb-1">
+                                       {formatTime12Hour(booking.booking_time || '00:00')} - {formatTime12Hour(calculateEndTime(booking.booking_time || '00:00', booking.duration || 1, booking.duration_unit || 'hours'))}
+                                     </div>
+                                     <div className="font-semibold text-sm text-gray-900 mb-0.5 line-clamp-1">
+                                       {booking.guest_name || (booking.customer ? `${booking.customer.first_name} ${booking.customer.last_name}` : 'Guest')}
+                                     </div>
+                                     <div className="text-xs text-amber-600 line-clamp-1 font-medium">⚠️ No room assigned</div>
+                                     <div className="text-xs text-gray-600 line-clamp-1">{booking.package?.name || 'N/A'}</div>
+                                     <div className="text-xs text-gray-500 mt-1">{booking.participants} guests</div>
+                                     <div className="mt-auto pt-1 flex items-center justify-between text-xs border-t border-gray-300/50">
+                                       <span className={`font-semibold ${
+                                         booking.payment_status === 'paid' ? 'text-green-700' :
+                                         booking.payment_status === 'partial' ? 'text-yellow-700' : 'text-red-700'
+                                       }`}>
+                                         ${parseFloat(String(booking.total_amount || 0)).toFixed(2)}
+                                       </span>
+                                       <span className="text-gray-600 capitalize">{booking.status}</span>
+                                     </div>
+                                   </div>
+                                 </Link>
+                               </td>
+                             );
+                           }
+                           
+                           return (
+                             <td
+                               key="unassigned"
+                               className="px-2 py-2 border-r border-gray-200 text-center text-gray-300 bg-amber-50/30"
+                               style={{ height: '60px' }}
+                             >
+                               —
+                             </td>
+                           );
+                         })()}
                          {sortedRooms.map(space => {
                            const booking = getBookingForSlot(space.id, slot);
                            const isOccupied = isSlotOccupied(space.id, slot);
@@ -955,7 +935,7 @@ const AttendantDashboard: React.FC = () => {
                              <td
                                key={space.id}
                                className="px-2 py-2 border-r border-gray-200 text-center text-gray-300 hover:bg-blue-50 transition"
-                               style={{ height: '50px' }}
+                               style={{ height: '60px' }}
                              >
                                —
                              </td>

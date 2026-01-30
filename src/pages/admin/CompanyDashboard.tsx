@@ -248,47 +248,61 @@ const CompanyDashboard: React.FC = () => {
 
   const dailyTimeSlots = generateTimeSlots();
 
-  // Filter to only show time slots that have bookings
+  // Check if there are any bookings without a room assigned
+  const unassignedBookings = dailyBookings.filter(b => !b.room_id);
+
+  // Filter to show time slots that have bookings (including unassigned bookings)
   const visibleTimeSlots = dailyTimeSlots.filter(slotObj => {
-    return sortedRooms.some(space => {
-      return dailyBookings.some(booking => {
-        if (booking.room_id !== space.id) return false;
-        const bookingTime = booking.booking_time?.substring(0, 5);
-        if (!bookingTime) return false;
-        const startMinutes = parseInt(bookingTime.split(':')[0]) * 60 + parseInt(bookingTime.split(':')[1]);
-        const slotMinutes = parseInt(slotObj.slot.split(':')[0]) * 60 + parseInt(slotObj.slot.split(':')[1]);
-        let durationMinutes = 60;
-        if (booking.duration && booking.duration_unit) {
-          if (booking.duration_unit === 'hours') durationMinutes = booking.duration * 60;
-          else if (booking.duration_unit === 'minutes') durationMinutes = booking.duration;
-          else durationMinutes = Math.floor(booking.duration) * 60 + Math.round((booking.duration % 1) * 60);
-        }
-        const endMinutes = startMinutes + durationMinutes;
-        return slotMinutes >= startMinutes && slotMinutes < endMinutes;
-      });
+    // Check if any booking (with or without room) covers this slot
+    return dailyBookings.some(booking => {
+      const bookingTime = booking.booking_time?.substring(0, 5);
+      if (!bookingTime) return false;
+      const startMinutes = parseInt(bookingTime.split(':')[0]) * 60 + parseInt(bookingTime.split(':')[1]);
+      const slotMinutes = parseInt(slotObj.slot.split(':')[0]) * 60 + parseInt(slotObj.slot.split(':')[1]);
+      let durationMinutes = 60;
+      if (booking.duration && booking.duration_unit) {
+        if (booking.duration_unit === 'hours') durationMinutes = booking.duration * 60;
+        else if (booking.duration_unit === 'minutes') durationMinutes = booking.duration;
+        else durationMinutes = Math.floor(booking.duration) * 60 + Math.round((booking.duration % 1) * 60);
+      }
+      const endMinutes = startMinutes + durationMinutes;
+      return slotMinutes >= startMinutes && slotMinutes < endMinutes;
     });
   });
 
-  // Get booking that starts at a specific time slot for a space
+  // Get booking that starts at a specific time slot for a space (spaceId = 0 means unassigned)
   const getBookingForSlot = (spaceId: number, slot: string) => {
     return dailyBookings.find(booking => {
-      if (booking.room_id !== spaceId) return false;
+      // For unassigned column (spaceId = 0), check for bookings without room
+      if (spaceId === 0) {
+        if (booking.room_id) return false; // Has a room, skip
+      } else {
+        if (booking.room_id !== spaceId) return false;
+      }
       const bookingTime = booking.booking_time?.substring(0, 5);
       return bookingTime === slot;
     });
   };
 
-  // Check if a slot is occupied by a booking that started earlier
+  // Check if a slot is occupied by a booking that started earlier (spaceId = 0 means unassigned)
   const isSlotOccupied = (spaceId: number, slot: string) => {
     const slotMinutes = parseInt(slot.split(':')[0]) * 60 + parseInt(slot.split(':')[1]);
     return dailyBookings.some(booking => {
-      if (booking.room_id !== spaceId) return false;
-      const startTime = booking.start_time?.substring(0, 5);
-      if (!startTime) return false;
-      const startMinutes = parseInt(startTime.split(':')[0]) * 60 + parseInt(startTime.split(':')[1]);
-      const durationMinutes = booking.duration_unit === 'hours' 
-        ? (booking.duration || 1) * 60 
-        : (booking.duration || 60);
+      // For unassigned column (spaceId = 0), check for bookings without room
+      if (spaceId === 0) {
+        if (booking.room_id) return false; // Has a room, skip
+      } else {
+        if (booking.room_id !== spaceId) return false;
+      }
+      const bookingTime = booking.booking_time?.substring(0, 5);
+      if (!bookingTime) return false;
+      const startMinutes = parseInt(bookingTime.split(':')[0]) * 60 + parseInt(bookingTime.split(':')[1]);
+      let durationMinutes = 60;
+      if (booking.duration && booking.duration_unit) {
+        if (booking.duration_unit === 'hours') durationMinutes = booking.duration * 60;
+        else if (booking.duration_unit === 'minutes') durationMinutes = booking.duration;
+        else durationMinutes = Math.floor(booking.duration) * 60 + Math.round((booking.duration % 1) * 60);
+      }
       const endMinutes = startMinutes + durationMinutes;
       return slotMinutes > startMinutes && slotMinutes < endMinutes;
     });
@@ -296,10 +310,13 @@ const CompanyDashboard: React.FC = () => {
 
   // Calculate row span based on booking duration
   const getBookingRowSpan = (booking: any) => {
-    const durationMinutes = booking.duration_unit === 'hours' 
-      ? (booking.duration || 1) * 60 
-      : (booking.duration || 60);
-    return Math.ceil(durationMinutes / 30);
+    let durationMinutes = 60;
+    if (booking.duration && booking.duration_unit) {
+      if (booking.duration_unit === 'hours') durationMinutes = booking.duration * 60;
+      else if (booking.duration_unit === 'minutes') durationMinutes = booking.duration;
+      else durationMinutes = Math.floor(booking.duration) * 60 + Math.round((booking.duration % 1) * 60);
+    }
+    return Math.max(1, Math.ceil(durationMinutes / 30));
   };
 
   // Format time to 12-hour format
@@ -366,48 +383,25 @@ const CompanyDashboard: React.FC = () => {
     fetchRooms();
   }, []);
 
-  // Fetch new bookings (created in last 24-48 hours) - use cache for faster loading
+  // Derive new bookings (created in last 48 hours) from allBookings - no separate API call
   useEffect(() => {
-    const fetchNewBookings = async () => {
-      try {
-        const now = new Date();
-        const twoDaysAgo = new Date(now);
-        twoDaysAgo.setDate(now.getDate() - 2);
-        
-        // Try cache first for instant loading
-        const cachedBookings = await bookingCacheService.getFilteredBookingsFromCache({});
-        
-        if (cachedBookings && cachedBookings.length > 0) {
-          const recentlyCreated = cachedBookings.filter((booking: any) => {
-            const createdAt = new Date(booking.created_at);
-            return createdAt >= twoDaysAgo;
-          });
-          setNewBookings(recentlyCreated);
-          console.log('📦 [CompanyDashboard] Loaded', recentlyCreated.length, 'new bookings from cache');
-          return;
-        }
-        
-        // Fallback to API if cache empty
-        const response = await bookingService.getBookings({
-          per_page: 50,
-        });
-        
-        const allBookings = response.data.bookings || [];
-        // Filter bookings created in the last 48 hours
-        const recentlyCreated = allBookings.filter((booking: any) => {
-          const createdAt = new Date(booking.created_at);
-          return createdAt >= twoDaysAgo;
-        });
-        
-        setNewBookings(recentlyCreated);
-      } catch (error) {
-        console.error('Error fetching new bookings:', error);
-      }
-    };
-    fetchNewBookings();
-  }, []);
+    if (allBookings.length === 0) return;
+    
+    const now = new Date();
+    const twoDaysAgo = new Date(now);
+    twoDaysAgo.setDate(now.getDate() - 2);
+    
+    const recentlyCreated = allBookings.filter((booking: any) => {
+      const createdAt = new Date(booking.created_at);
+      return createdAt >= twoDaysAgo;
+    });
+    
+    setNewBookings(recentlyCreated);
+    console.log('📅 [CompanyDashboard] New bookings (last 48h) derived:', recentlyCreated.length);
+  }, [allBookings]);
 
   // Daily calendar data - derived from allBookings (no API call needed)
+  // Matches SpaceSchedule: only show confirmed, pending, and checked-in bookings
   useEffect(() => {
     if (calendarView !== 'day' || allBookings.length === 0) return;
     
@@ -416,9 +410,11 @@ const CompanyDashboard: React.FC = () => {
     const day = String(currentDay.getDate()).padStart(2, '0');
     const dateStr = `${year}-${month}-${day}`;
     
+    const validStatuses = ['confirmed', 'pending', 'checked-in'];
     const daily = allBookings.filter(booking => {
       const bookingDatePart = booking.booking_date.split('T')[0];
-      return bookingDatePart === dateStr;
+      const status = booking.status?.toLowerCase();
+      return bookingDatePart === dateStr && validStatuses.includes(status);
     });
     
     setDailyBookings(daily);
@@ -447,7 +443,7 @@ const CompanyDashboard: React.FC = () => {
         console.log('🔄 [CompanyDashboard] Background sync: Fetching fresh bookings...');
         const bookingsResponse = await bookingService.getBookings({
           location_id: selectedLocation === 'all' ? undefined : selectedLocation as number,
-          per_page: 1000, // Get all bookings
+          per_page: 500, // Get all bookings (500 max to avoid backend limits)
         });
         
         const bookings = bookingsResponse.data.bookings || [];
@@ -1494,25 +1490,41 @@ const CompanyDashboard: React.FC = () => {
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse min-w-[800px]">
                   <thead>
-                    <tr className="bg-gray-100">
-                      <th className="sticky left-0 z-10 bg-gray-100 px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider border-r border-gray-200 w-24">
-                        Time
+                    <tr className="bg-gray-50 border-b-2 border-gray-200">
+                      <th className="sticky left-0 z-10 bg-gray-50 px-4 py-3 text-left text-sm font-semibold text-gray-700 border-r border-gray-200 w-24">
+                        <div className="flex items-center gap-2">
+                          <Clock className="w-4 h-4" />
+                          Time
+                        </div>
                       </th>
                       {sortedRooms.map((room) => (
-                        <th key={room.id} className="px-3 py-2 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider border-r border-gray-200 min-w-[150px]">
+                        <th key={room.id} className="px-4 py-3 text-center text-sm font-semibold text-gray-700 border-r border-gray-200 min-w-[200px]">
                           <div className="flex flex-col items-center gap-1">
-                            <House className={`w-4 h-4 text-${fullColor}`} />
                             <span>{room.name}</span>
-                            <span className="text-[10px] font-normal text-gray-400">Cap: {room.capacity || 'N/A'}</span>
+                            <span className="text-xs font-normal text-gray-500 flex items-center gap-1">
+                              <Users className="w-3 h-3" />
+                              Max {room.capacity || 'N/A'}
+                            </span>
                           </div>
                         </th>
                       ))}
+                      {/* Unassigned bookings column */}
+                      {unassignedBookings.length > 0 && (
+                        <th className="px-4 py-3 text-center text-sm font-semibold text-amber-700 border-r border-gray-200 min-w-[200px] bg-amber-50">
+                          <div className="flex flex-col items-center gap-1">
+                            <span>⚠️ No Room</span>
+                            <span className="text-xs font-normal text-amber-600">
+                              {unassignedBookings.length} unassigned
+                            </span>
+                          </div>
+                        </th>
+                      )}
                     </tr>
                   </thead>
                   <tbody>
                     {visibleTimeSlots.map((slotObj) => (
-                      <tr key={slotObj.slot} className="border-b border-gray-100 hover:bg-gray-50">
-                        <td className="sticky left-0 z-10 bg-white px-3 py-2 text-xs font-medium text-gray-500 border-r border-gray-200 whitespace-nowrap">
+                      <tr key={slotObj.slot} className="border-b border-gray-100 hover:bg-gray-50" style={{ height: '60px' }}>
+                        <td className="sticky left-0 z-10 bg-white px-4 py-2 text-sm text-gray-600 border-r border-gray-200 font-medium" style={{ height: '60px' }}>
                           {slotObj.time}
                         </td>
                         {sortedRooms.map((room) => {
@@ -1578,11 +1590,68 @@ const CompanyDashboard: React.FC = () => {
                           }
                           
                           return (
-                            <td key={room.id} className="px-2 py-1 border-r border-gray-200 h-10">
-                              {/* Empty slot */}
+                            <td key={room.id} className="px-2 py-2 border-r border-gray-200 text-center text-gray-300 hover:bg-blue-50 transition" style={{ height: '60px' }}>
+                              —
                             </td>
                           );
                         })}
+                        {/* Unassigned bookings column */}
+                        {unassignedBookings.length > 0 && (() => {
+                          const booking = getBookingForSlot(0, slotObj.slot);
+                          const isOccupied = isSlotOccupied(0, slotObj.slot);
+                          
+                          if (isOccupied) return null;
+                          
+                          if (booking) {
+                            const rowSpan = getBookingRowSpan(booking);
+                            const startTime = booking.booking_time?.substring(0, 5) || '';
+                            const endTime = calculateEndTime(startTime, booking.duration || 1, booking.duration_unit || 'hours');
+                            const isNew = new Date(booking.created_at) > new Date(Date.now() - 48 * 60 * 60 * 1000);
+                            
+                            return (
+                              <td 
+                                key="unassigned" 
+                                rowSpan={rowSpan}
+                                className="px-2 py-1 border-r border-gray-200 align-top bg-amber-50"
+                              >
+                                <Link
+                                  to={`/admin/bookings/${booking.id}`}
+                                  className="block h-full p-2 rounded-lg text-xs cursor-pointer transition-all hover:shadow-md bg-amber-100 border border-amber-300 text-amber-800"
+                                >
+                                  <div className="flex items-center justify-between mb-1">
+                                    <span className="font-semibold truncate">{booking.guest_name || (booking.customer ? `${booking.customer.first_name} ${booking.customer.last_name}` : 'Guest')}</span>
+                                    {isNew && (
+                                      <span className="flex items-center gap-0.5 text-[9px] font-bold bg-yellow-200 text-yellow-700 px-1 py-0.5 rounded">
+                                        <Sparkles size={8} />
+                                        NEW
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="text-[10px] opacity-75">
+                                    {formatTime12Hour(startTime)} - {formatTime12Hour(endTime)}
+                                  </div>
+                                  <div className="text-[10px] opacity-75 truncate mt-0.5">
+                                    {booking.package?.name || booking.attraction?.name || 'No package'}
+                                  </div>
+                                  <div className="text-[10px] text-amber-700 mt-0.5 font-medium">
+                                    ⚠️ No room assigned
+                                  </div>
+                                  <div className="mt-1">
+                                    <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-200">
+                                      {booking.status}
+                                    </span>
+                                  </div>
+                                </Link>
+                              </td>
+                            );
+                          }
+                          
+                          return (
+                            <td key="unassigned" className="px-2 py-2 border-r border-gray-200 text-center text-amber-300 bg-amber-50/50" style={{ height: '60px' }}>
+                              —
+                            </td>
+                          );
+                        })()}
                       </tr>
                     ))}
                   </tbody>
