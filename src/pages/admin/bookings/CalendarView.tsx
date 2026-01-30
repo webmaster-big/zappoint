@@ -426,8 +426,32 @@ const CalendarView: React.FC = () => {
     return booking.package?.name || 'Package Booking';
   };
 
-  const getBookingColor = () => {
-    return `bg-${themeColor}-100 text-${fullColor}`;
+  // Bookly-style color palette for different packages
+  const packageColors = [
+    { bg: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-200' },
+    { bg: 'bg-green-100', text: 'text-green-800', border: 'border-green-200' },
+    { bg: 'bg-purple-100', text: 'text-purple-800', border: 'border-purple-200' },
+    { bg: 'bg-orange-100', text: 'text-orange-800', border: 'border-orange-200' },
+    { bg: 'bg-pink-100', text: 'text-pink-800', border: 'border-pink-200' },
+    { bg: 'bg-teal-100', text: 'text-teal-800', border: 'border-teal-200' },
+    { bg: 'bg-indigo-100', text: 'text-indigo-800', border: 'border-indigo-200' },
+    { bg: 'bg-amber-100', text: 'text-amber-800', border: 'border-amber-200' },
+    { bg: 'bg-cyan-100', text: 'text-cyan-800', border: 'border-cyan-200' },
+    { bg: 'bg-rose-100', text: 'text-rose-800', border: 'border-rose-200' },
+    { bg: 'bg-lime-100', text: 'text-lime-800', border: 'border-lime-200' },
+    { bg: 'bg-fuchsia-100', text: 'text-fuchsia-800', border: 'border-fuchsia-200' },
+  ];
+
+  // Get consistent color for a package based on its ID or name
+  const getPackageColor = (booking: Booking) => {
+    const packageId = booking.package?.id || 0;
+    const packageName = booking.package?.name || '';
+    // Use package ID if available, otherwise hash the name for consistent coloring
+    const colorIndex = packageId > 0 
+      ? (packageId - 1) % packageColors.length 
+      : Math.abs(packageName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)) % packageColors.length;
+    const color = packageColors[colorIndex];
+    return `${color.bg} ${color.text}`;
   };
 
   const renderDayView = () => {
@@ -461,8 +485,8 @@ const CalendarView: React.FC = () => {
                     }`}>
                       {booking.status}
                     </span>
-                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${getBookingColor()}`}>
-                      Package
+                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${getPackageColor(booking)}`}>
+                      {booking.package?.name || 'Package'}
                     </span>
                   </div>
                 </div>
@@ -512,7 +536,7 @@ const CalendarView: React.FC = () => {
                 {dayBookings.map(booking => (
                   <div 
                     key={booking.id} 
-                    className={`text-xs rounded p-2 mb-2 cursor-pointer ${getBookingColor()}`}
+                    className={`text-xs rounded p-2 mb-2 cursor-pointer ${getPackageColor(booking)}`}
                     title={`${booking.guest_name || 'Guest'} - ${formatTime12Hour(booking.booking_time)}`}
                     onClick={() => setSelectedBooking(booking)}
                   >
@@ -586,7 +610,7 @@ const CalendarView: React.FC = () => {
                 {dayBookings.map(booking => (
                   <div 
                     key={booking.id} 
-                    className={`text-xs rounded p-2 mb-2 cursor-pointer ${getBookingColor()}`}
+                    className={`text-xs rounded p-2 mb-2 cursor-pointer ${getPackageColor(booking)}`}
                     title={`${booking.guest_name || 'Guest'} - ${formatTime12Hour(booking.booking_time)}`}
                     onClick={e => {
                       e.stopPropagation();
@@ -658,8 +682,8 @@ const CalendarView: React.FC = () => {
                     }`}>
                       {booking.status}
                     </span>
-                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${getBookingColor()}`}>
-                      Package
+                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${getPackageColor(booking)}`}>
+                      {booking.package?.name || 'Package'}
                     </span>
                   </div>
                 </div>
@@ -1067,7 +1091,7 @@ const CalendarView: React.FC = () => {
               <div className="p-6">
                 <div className="flex justify-between items-center mb-6">
                   <h3 className="text-xl font-semibold text-gray-900">
-                    Bookings for {new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+                    Bookings for {parseLocalDate(selectedDate).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
                   </h3>
                   <StandardButton
                     variant="ghost"
@@ -1078,14 +1102,14 @@ const CalendarView: React.FC = () => {
                     {''}
                   </StandardButton>
                 </div>
-                {getBookingsForDate(new Date(selectedDate)).length === 0 ? (
+                {getBookingsForDate(parseLocalDate(selectedDate)).length === 0 ? (
                   <div className="text-center text-gray-500 py-8">
                     <CalendarIcon className="mx-auto h-12 w-12 text-gray-400 mb-4" />
                     <p>No bookings for this day</p>
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {getBookingsForDate(new Date(selectedDate)).map(booking => (
+                    {getBookingsForDate(parseLocalDate(selectedDate)).map(booking => (
                       <div 
                         key={booking.id} 
                         className="border border-gray-200 rounded-lg p-5 hover:shadow-md transition-shadow cursor-pointer"

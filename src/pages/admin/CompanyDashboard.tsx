@@ -62,8 +62,8 @@ const CompanyDashboard: React.FC = () => {
   const [monthlyBookings, setMonthlyBookings] = useState<any[]>([]);
 
   // Timeframe selector for metrics
-  const [metricsTimeframe, setMetricsTimeframe] = useState<TimeframeType>('last_30d');
-  const [timeframeDescription, setTimeframeDescription] = useState('Last 30 Days');
+  const [metricsTimeframe, setMetricsTimeframe] = useState<TimeframeType>('all_time');
+  const [timeframeDescription, setTimeframeDescription] = useState('All Time');
   
   // Rooms for daily view
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -441,26 +441,29 @@ const CompanyDashboard: React.FC = () => {
       if (calendarView !== 'day') return;
       
       try {
-        const dateStr = currentDay.toISOString().split('T')[0];
+        // Format date as YYYY-MM-DD for booking_date filter
+        const year = currentDay.getFullYear();
+        const month = String(currentDay.getMonth() + 1).padStart(2, '0');
+        const day = String(currentDay.getDate()).padStart(2, '0');
+        const dateStr = `${year}-${month}-${day}`;
         console.log('📅 [CompanyDashboard] Fetching daily bookings for:', dateStr);
         
-        const bookingParams: any = {
-          booking_date: dateStr,
-        };
+        // Check if cache has any data first (like SpaceSchedule)
+        const hasCachedBookings = await bookingCacheService.hasCachedData();
         
-        if (selectedLocation !== 'all') {
-          bookingParams.location_id = selectedLocation;
-        }
-        
-        // Try to get from cache first - filter by exact date
-        const cachedBookings = await bookingCacheService.getFilteredBookingsFromCache(bookingParams);
-        
-        if (cachedBookings && cachedBookings.length > 0) {
-          console.log('📦 [CompanyDashboard] Using cached bookings:', cachedBookings.length);
-          setDailyBookings(cachedBookings);
+        if (hasCachedBookings) {
+          // Cache exists - use filtered results (even if empty for this date)
+          console.log('[CompanyDashboard] Cache exists, filtering for date:', dateStr);
+          const filterParams: any = { booking_date: dateStr };
+          if (selectedLocation !== 'all') {
+            filterParams.location_id = selectedLocation;
+          }
+          const cachedBookings = await bookingCacheService.getFilteredBookingsFromCache(filterParams);
+          console.log('[CompanyDashboard] Filtered bookings from cache:', cachedBookings?.length || 0);
+          setDailyBookings((cachedBookings || []) as any[]);
         } else {
-          // Fetch from API for specific date
-          console.log('🔄 [CompanyDashboard] Fetching from API...');
+          // No cache available, fetch from API
+          console.log('🔄 [CompanyDashboard] No cache, fetching from API...');
           const bookingsResponse = await bookingService.getBookings({
             booking_date: dateStr,
             location_id: selectedLocation === 'all' ? undefined : selectedLocation,

@@ -50,8 +50,8 @@ const LocationManagerDashboard: React.FC = () => {
   const [monthlyBookings, setMonthlyBookings] = useState<any[]>([]);
 
   // Timeframe selector for metrics
-  const [metricsTimeframe, setMetricsTimeframe] = useState<TimeframeType>('last_30d');
-  const [timeframeDescription, setTimeframeDescription] = useState('Last 30 Days');
+  const [metricsTimeframe, setMetricsTimeframe] = useState<TimeframeType>('all_time');
+  const [timeframeDescription, setTimeframeDescription] = useState('All Time');
   
   // Rooms for daily view
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -345,23 +345,28 @@ const LocationManagerDashboard: React.FC = () => {
       if (!locationId || calendarView !== 'day') return;
       
       try {
-        const dateStr = currentDay.toISOString().split('T')[0];
+        // Format date as YYYY-MM-DD for booking_date filter
+        const year = currentDay.getFullYear();
+        const month = String(currentDay.getMonth() + 1).padStart(2, '0');
+        const day = String(currentDay.getDate()).padStart(2, '0');
+        const dateStr = `${year}-${month}-${day}`;
         console.log('📅 [ManagerDashboard] Fetching daily bookings for:', dateStr);
         
-        const bookingParams = {
-          location_id: locationId,
-          booking_date: dateStr,
-        };
+        // Check if cache has any data first (like SpaceSchedule)
+        const hasCachedBookings = await bookingCacheService.hasCachedData();
         
-        // Try to get from cache first - filter by exact date
-        const cachedBookings = await bookingCacheService.getFilteredBookingsFromCache(bookingParams);
-        
-        if (cachedBookings && cachedBookings.length > 0) {
-          console.log('📦 [ManagerDashboard] Using cached bookings:', cachedBookings.length);
-          setDailyBookings(cachedBookings);
+        if (hasCachedBookings) {
+          // Cache exists - use filtered results (even if empty for this date)
+          console.log('[ManagerDashboard] Cache exists, filtering for date:', dateStr);
+          const cachedBookings = await bookingCacheService.getFilteredBookingsFromCache({
+            booking_date: dateStr,
+            location_id: locationId,
+          });
+          console.log('[ManagerDashboard] Filtered bookings from cache:', cachedBookings?.length || 0);
+          setDailyBookings((cachedBookings || []) as any[]);
         } else {
-          // Fetch from API for specific date
-          console.log('🔄 [ManagerDashboard] Fetching from API...');
+          // No cache available, fetch from API
+          console.log('🔄 [ManagerDashboard] No cache, fetching from API...');
           const bookingsResponse = await bookingService.getBookings({
             location_id: locationId,
             booking_date: dateStr,
@@ -372,7 +377,7 @@ const LocationManagerDashboard: React.FC = () => {
           setDailyBookings(bookings);
           // Cache the fetched bookings
           if (bookings.length > 0) {
-            await bookingCacheService.cacheBookings(bookings, { locationId });
+            await bookingCacheService.cacheBookings(bookings);
           }
         }
         
