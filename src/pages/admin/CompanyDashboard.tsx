@@ -21,7 +21,9 @@ import {
   PackageIcon,
   House,
   Grid,
-  List
+  List,
+  Sparkles,
+  CalendarDays,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useThemeColor } from '../../hooks/useThemeColor';
@@ -31,15 +33,18 @@ import LocationSelector from '../../components/admin/LocationSelector';
 import bookingService from '../../services/bookingService';
 import { bookingCacheService } from '../../services/BookingCacheService';
 import { locationService, type Location } from '../../services/LocationService';
-import { metricsService } from '../../services/MetricsService';
+import { metricsService, type TimeframeType } from '../../services/MetricsService';
 import { metricsCacheService } from '../../services/MetricsCacheService';
 import { formatDurationDisplay, convertTo12Hour, parseLocalDate } from '../../utils/timeFormat';
+import { roomService, type Room } from '../../services/RoomService';
+import { roomCacheService } from '../../services/RoomCacheService';
 
 const CompanyDashboard: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
   const [currentWeek, setCurrentWeek] = useState(new Date());
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [calendarView, setCalendarView] = useState<'week' | 'month'>('week');
+  const [currentDay, setCurrentDay] = useState(new Date());
+  const [calendarView, setCalendarView] = useState<'day' | 'week' | 'month'>('month');
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [selectedLocation, setSelectedLocation] = useState<number | 'all'>('all');
   const [calendarFilter, setCalendarFilter] = useState({
@@ -56,9 +61,20 @@ const CompanyDashboard: React.FC = () => {
   const [selectedDayBookings, setSelectedDayBookings] = useState<{ date: Date; bookings: any[] } | null>(null);
   const [monthlyBookings, setMonthlyBookings] = useState<any[]>([]);
 
+  // Timeframe selector for metrics
+  const [metricsTimeframe, setMetricsTimeframe] = useState<TimeframeType>('last_30d');
+  const [timeframeDescription, setTimeframeDescription] = useState('Last 30 Days');
+  
+  // Rooms for daily view
+  const [rooms, setRooms] = useState<Room[]>([]);
+  
+  // New bookings tracking
+  const [newBookings, setNewBookings] = useState<any[]>([]);
+
   // Data states
   const [locations, setLocations] = useState<Location[]>([]);
   const [weeklyBookings, setWeeklyBookings] = useState<any[]>([]);
+  const [dailyBookings, setDailyBookings] = useState<any[]>([]);
   // All data (unfiltered) for location performance
   const [allWeeklyBookings, setAllWeeklyBookings] = useState<any[]>([]);
   const [allTicketPurchases] = useState<any[]>([]);
@@ -96,6 +112,19 @@ const CompanyDashboard: React.FC = () => {
 
   const weekDates = getWeekDates(currentWeek);
   
+  // Navigate to previous/next day
+  const goToPreviousDay = () => {
+    const newDate = new Date(currentDay);
+    newDate.setDate(newDate.getDate() - 1);
+    setCurrentDay(newDate);
+  };
+
+  const goToNextDay = () => {
+    const newDate = new Date(currentDay);
+    newDate.setDate(newDate.getDate() + 1);
+    setCurrentDay(newDate);
+  };
+
   // Navigate to previous/next week
   const goToPreviousWeek = () => {
     const newDate = new Date(currentWeek);
@@ -203,6 +232,11 @@ const CompanyDashboard: React.FC = () => {
     });
   };
 
+  // Get bookings for a room (daily view)
+  const getBookingsForRoom = (roomId: number) => {
+    return dailyBookings.filter(booking => booking.room_id === roomId);
+  };
+
   // Fetch all locations on mount
   useEffect(() => {
     const fetchLocations = async () => {
@@ -222,6 +256,112 @@ const CompanyDashboard: React.FC = () => {
     
     fetchLocations();
   }, []);
+
+  // Fetch rooms/spaces for daily view - use cache for faster loading
+  useEffect(() => {
+    const fetchRooms = async () => {
+      try {
+        // Try cache first for instant loading
+        const cachedRooms = await roomCacheService.getCachedRooms();
+        if (cachedRooms && cachedRooms.length > 0) {
+          setRooms(cachedRooms);
+          console.log('📦 [CompanyDashboard] Loaded', cachedRooms.length, 'spaces from cache');
+          return;
+        }
+        // Fallback to API if cache empty
+        const response = await roomService.getRooms({ per_page: 100 });
+        const fetchedRooms = response.data.rooms || [];
+        setRooms(fetchedRooms);
+        // Update cache with fetched rooms
+        if (fetchedRooms.length > 0) {
+          await roomCacheService.cacheRooms(fetchedRooms);
+        }
+      } catch (error) {
+        console.error('Error fetching spaces:', error);
+      }
+    };
+    fetchRooms();
+  }, []);
+
+  // Fetch new bookings (created in last 24-48 hours) - use cache for faster loading
+  useEffect(() => {
+    const fetchNewBookings = async () => {
+      try {
+        const now = new Date();
+        const twoDaysAgo = new Date(now);
+        twoDaysAgo.setDate(now.getDate() - 2);
+        
+        // Try cache first for instant loading
+        const cachedBookings = await bookingCacheService.getFilteredBookingsFromCache({});
+        
+        if (cachedBookings && cachedBookings.length > 0) {
+          const recentlyCreated = cachedBookings.filter((booking: any) => {
+            const createdAt = new Date(booking.created_at);
+            return createdAt >= twoDaysAgo;
+          });
+          setNewBookings(recentlyCreated);
+          console.log('📦 [CompanyDashboard] Loaded', recentlyCreated.length, 'new bookings from cache');
+          return;
+        }
+        
+        // Fallback to API if cache empty
+        const response = await bookingService.getBookings({
+          per_page: 50,
+        });
+        
+        const allBookings = response.data.bookings || [];
+        // Filter bookings created in the last 48 hours
+        const recentlyCreated = allBookings.filter((booking: any) => {
+          const createdAt = new Date(booking.created_at);
+          return createdAt >= twoDaysAgo;
+        });
+        
+        setNewBookings(recentlyCreated);
+      } catch (error) {
+        console.error('Error fetching new bookings:', error);
+      }
+    };
+    fetchNewBookings();
+  }, []);
+
+  // Fetch daily calendar data
+  useEffect(() => {
+    const fetchDailyData = async () => {
+      if (calendarView !== 'day') return;
+      
+      try {
+        const dateStr = currentDay.toISOString().split('T')[0];
+        
+        const bookingParams = {
+          date_from: dateStr,
+          date_to: dateStr,
+          location_id: selectedLocation === 'all' ? undefined : selectedLocation,
+        };
+        
+        // Try to get from cache first
+        const cachedBookings = await bookingCacheService.getFilteredBookingsFromCache(bookingParams);
+        
+        if (cachedBookings && cachedBookings.length > 0) {
+          setDailyBookings(cachedBookings);
+        } else {
+          // No cache, fetch from API
+          const bookingsResponse = await bookingService.getBookings({
+            ...bookingParams,
+            per_page: 100,
+          });
+          const bookings = bookingsResponse.data.bookings || [];
+          setDailyBookings(bookings);
+          // Cache the fetched bookings
+          await bookingCacheService.cacheBookings(bookings);
+        }
+        
+      } catch (error) {
+        console.error('Error fetching daily data:', error);
+      }
+    };
+    
+    fetchDailyData();
+  }, [currentDay, calendarView, selectedLocation]);
 
   // Background sync: Fetch fresh bookings data on component mount
   // This ensures the cache is always up-to-date when user visits the dashboard
@@ -261,7 +401,7 @@ const CompanyDashboard: React.FC = () => {
     syncBookingsInBackground();
   }, []);
 
-  // Fetch metrics data when selectedLocation changes
+  // Fetch metrics data when selectedLocation or timeframe changes
   // PERFORMANCE OPTIMIZATION: Cache-first loading with background refresh
   // - Display cached metrics instantly
   // - Fetch fresh data in background
@@ -269,7 +409,7 @@ const CompanyDashboard: React.FC = () => {
   useEffect(() => {
     const fetchMetricsData = async () => {
       try {
-        console.log('🔄 Starting metrics fetch for location:', selectedLocation);
+        console.log('🔄 Starting metrics fetch for location:', selectedLocation, 'timeframe:', metricsTimeframe);
         
         // Step 1: Try to load from cache first for instant display
         const cachedData = await metricsCacheService.getCachedMetrics<typeof metrics>('company', selectedLocation);
@@ -283,10 +423,10 @@ const CompanyDashboard: React.FC = () => {
           setLoading(false);
         }
         
-        // Step 2: Fetch fresh data from API in background
-        console.log('📊 Fetching all-time metrics from API...');
+        // Step 2: Fetch fresh data from API in background with timeframe
+        console.log('📊 Fetching metrics from API with timeframe:', metricsTimeframe);
         const metricsResponse = await metricsService.getDashboardMetrics({
-          // No date_from/date_to for all-time metrics
+          timeframe: metricsTimeframe,
         });
         
         console.log('✅ Metrics API response:', metricsResponse);
@@ -298,6 +438,11 @@ const CompanyDashboard: React.FC = () => {
           setMetrics(metricsResponse.metrics);
         } else {
           console.error('⚠️ No metrics in API response');
+        }
+        
+        // Update timeframe description from API
+        if (metricsResponse.timeframe) {
+          setTimeframeDescription(metricsResponse.timeframe.description);
         }
         
         // For company_admin, we get locationStats directly from API
@@ -375,7 +520,7 @@ const CompanyDashboard: React.FC = () => {
     };
     
     fetchMetricsData();
-  }, [selectedLocation]);
+  }, [selectedLocation, metricsTimeframe]);
 
   // Fetch weekly calendar data when currentWeek changes
   // Uses cache service for faster loading, syncs in background
@@ -425,6 +570,16 @@ const CompanyDashboard: React.FC = () => {
       trend: 'up',
       icon: Calendar,
       accent: `bg-${themeColor}-100 text-${fullColor}`,
+      timeframe: timeframeDescription,
+    },
+    {
+      title: 'New Bookings',
+      value: newBookings.length.toString(),
+      change: 'Created in last 48 hours',
+      trend: newBookings.length > 0 ? 'up' : 'stable',
+      icon: Sparkles,
+      accent: 'bg-yellow-100 text-yellow-700',
+      timeframe: 'Last 48h',
     },
     {
       title: 'Active Locations',
@@ -433,6 +588,7 @@ const CompanyDashboard: React.FC = () => {
       trend: 'stable',
       icon: Building,
       accent: `bg-${themeColor}-100 text-${fullColor}`,
+      timeframe: 'All Time',
     },
     {
       title: 'Total Revenue',
@@ -441,6 +597,7 @@ const CompanyDashboard: React.FC = () => {
       trend: 'up',
       icon: DollarSign,
       accent: `bg-${themeColor}-100 text-${fullColor}`,
+      timeframe: timeframeDescription,
     },
     {
       title: 'Participants',
@@ -449,6 +606,7 @@ const CompanyDashboard: React.FC = () => {
       trend: 'up',
       icon: Users,
       accent: `bg-${themeColor}-100 text-${fullColor}`,
+      timeframe: timeframeDescription,
     },
     {
       title: 'Avg. Booking Value',
@@ -457,6 +615,7 @@ const CompanyDashboard: React.FC = () => {
       trend: 'up',
       icon: CreditCard,
       accent: `bg-${themeColor}-100 text-${fullColor}`,
+      timeframe: timeframeDescription,
     },
   ];
 
@@ -741,6 +900,20 @@ const CompanyDashboard: React.FC = () => {
           <p className="text-sm md:text-base text-gray-500">Multi-location booking overview and management</p>
         </div>
         <div className="flex items-center gap-3 mt-4 md:mt-0">
+          {/* Timeframe Selector */}
+          <div className="relative">
+            <select
+              value={metricsTimeframe}
+              onChange={(e) => setMetricsTimeframe(e.target.value as TimeframeType)}
+              className={`appearance-none bg-white border border-gray-200 text-gray-700 py-2 px-3 pr-8 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-${fullColor} focus:border-transparent cursor-pointer`}
+            >
+              <option value="last_24h">Last 24 Hours</option>
+              <option value="last_7d">Last 7 Days</option>
+              <option value="last_30d">Last 30 Days</option>
+              <option value="all_time">All Time</option>
+            </select>
+            <Clock className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+          </div>
           <LocationSelector
             locations={locations.map(loc => ({
               id: loc.id.toString(),
@@ -761,7 +934,7 @@ const CompanyDashboard: React.FC = () => {
       </div>
 
       {/* Metrics Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         {metricsCards.map((metric, index) => {
           const Icon = metric.icon;
           return (
@@ -769,9 +942,14 @@ const CompanyDashboard: React.FC = () => {
               key={index}
               className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 md:p-5 flex flex-col gap-2 hover:shadow-md transition-shadow min-h-[100px] md:min-h-[120px]"
             >
-              <div className="flex items-center gap-2">
-                <div className={`p-2 rounded-lg ${metric.accent}`}><Icon size={18} className="md:size-5" /></div>
-                <span className="text-sm md:text-base font-semibold text-gray-800">{metric.title}</span>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className={`p-2 rounded-lg ${metric.accent}`}><Icon size={18} className="md:size-5" /></div>
+                  <span className="text-sm md:text-base font-semibold text-gray-800">{metric.title}</span>
+                </div>
+                {metric.timeframe && (
+                  <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{metric.timeframe}</span>
+                )}
               </div>
               <div className="flex items-end gap-2 mt-2">
                 {loading ? (
@@ -911,6 +1089,17 @@ const CompanyDashboard: React.FC = () => {
             {/* View Toggle */}
             <div className="flex items-center bg-gray-100 rounded-lg p-1">
               <button
+                onClick={() => setCalendarView('day')}
+                className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                  calendarView === 'day' 
+                    ? `bg-white text-${fullColor} shadow-sm` 
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <CalendarDays size={14} />
+                Day
+              </button>
+              <button
                 onClick={() => setCalendarView('week')}
                 className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
                   calendarView === 'week' 
@@ -939,26 +1128,30 @@ const CompanyDashboard: React.FC = () => {
               variant="secondary"
               size="sm"
               icon={ChevronLeft}
-              onClick={calendarView === 'week' ? goToPreviousWeek : goToPreviousMonth}
+              onClick={calendarView === 'day' ? goToPreviousDay : calendarView === 'week' ? goToPreviousWeek : goToPreviousMonth}
             />
             <span className="text-sm font-medium text-gray-800 min-w-[200px] text-center">
-              {calendarView === 'week' 
-                ? `${weekDates[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${weekDates[6].toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`
-                : currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+              {calendarView === 'day'
+                ? currentDay.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
+                : calendarView === 'week' 
+                  ? `${weekDates[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${weekDates[6].toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`
+                  : currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
               }
             </span>
             <StandardButton 
               variant="secondary"
               size="sm"
               icon={ChevronRight}
-              onClick={calendarView === 'week' ? goToNextWeek : goToNextMonth}
+              onClick={calendarView === 'day' ? goToNextDay : calendarView === 'week' ? goToNextWeek : goToNextMonth}
             />
             <StandardButton 
               variant="secondary" 
               size="sm" 
               className="ml-2"
               onClick={() => {
-                if (calendarView === 'week') {
+                if (calendarView === 'day') {
+                  setCurrentDay(new Date());
+                } else if (calendarView === 'week') {
                   setCurrentWeek(new Date());
                 } else {
                   setCurrentMonth(new Date());
@@ -1231,6 +1424,99 @@ const CompanyDashboard: React.FC = () => {
             </tbody>
           </table>
         </div>
+        )}
+
+        {/* Day View - All spaces for a single day */}
+        {calendarView === 'day' && (
+          <div className="rounded-lg border border-gray-200 overflow-hidden">
+            <div className="bg-gray-50 border-b border-gray-200 px-4 py-3">
+              <h3 className="font-semibold text-gray-800">
+                {currentDay.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+              </h3>
+              <p className="text-sm text-gray-500">{dailyBookings.length} bookings across {rooms.length} spaces</p>
+            </div>
+            
+            {rooms.length === 0 ? (
+              <div className="p-8 text-center text-gray-500">
+                <House className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                <p>No spaces found for selected location</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-gray-200">
+                {rooms.map((room) => {
+                  const roomBookings = getBookingsForRoom(room.id);
+                  return (
+                    <div key={room.id} className="p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-10 h-10 rounded-lg bg-${themeColor}-100 flex items-center justify-center`}>
+                            <House className={`w-5 h-5 text-${fullColor}`} />
+                          </div>
+                          <div>
+                            <h4 className="font-semibold text-gray-900">{room.name}</h4>
+                            <p className="text-xs text-gray-500">Capacity: {room.capacity || 'N/A'}</p>
+                          </div>
+                        </div>
+                        <span className={`text-xs font-medium px-2 py-1 rounded-full ${
+                          roomBookings.length > 0 
+                            ? `bg-${themeColor}-100 text-${fullColor}` 
+                            : 'bg-gray-100 text-gray-500'
+                        }`}>
+                          {roomBookings.length} booking{roomBookings.length !== 1 ? 's' : ''}
+                        </span>
+                      </div>
+                      
+                      {roomBookings.length > 0 ? (
+                        <div className="space-y-2 ml-13">
+                          {roomBookings.map((booking) => {
+                            const isNew = new Date(booking.created_at) > new Date(Date.now() - 48 * 60 * 60 * 1000);
+                            return (
+                              <Link
+                                key={booking.id}
+                                to={`/admin/bookings/${booking.id}`}
+                                className={`block p-3 rounded-lg border transition-all hover:shadow-md ${
+                                  booking.status === 'confirmed' 
+                                    ? `bg-${themeColor}-50 border-${themeColor}-200` 
+                                    : 'bg-gray-50 border-gray-200'
+                                }`}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-medium text-gray-900">
+                                      {convertTo12HourFormat(booking.time_slot_start)}
+                                    </span>
+                                    {isNew && (
+                                      <span className="flex items-center gap-1 text-[10px] font-semibold bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded-full">
+                                        <Sparkles size={10} />
+                                        NEW
+                                      </span>
+                                    )}
+                                  </div>
+                                  <span className={`text-xs px-2 py-0.5 rounded-full ${
+                                    booking.status === 'confirmed' 
+                                      ? 'bg-green-100 text-green-700' 
+                                      : 'bg-yellow-100 text-yellow-700'
+                                  }`}>
+                                    {booking.status}
+                                  </span>
+                                </div>
+                                <p className="text-sm text-gray-600 mt-1">{booking.customer_name}</p>
+                                <p className="text-xs text-gray-400 mt-0.5">
+                                  {booking.package?.name || booking.attraction?.name || 'No package'}
+                                </p>
+                              </Link>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-gray-400 italic ml-13">No bookings scheduled</p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         )}
 
         {/* Month View */}

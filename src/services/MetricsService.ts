@@ -15,6 +15,15 @@ export interface DashboardMetrics {
   totalPurchases: number;
 }
 
+export type TimeframeType = 'last_24h' | 'last_7d' | 'last_30d' | 'all_time' | 'custom';
+
+export interface TimeframeInfo {
+  type: TimeframeType;
+  date_from: string | null;
+  date_to: string | null;
+  description: string;
+}
+
 export interface RecentPurchase {
   id: number;
   customer_name: string;
@@ -50,6 +59,7 @@ export interface LocationDetails {
 }
 
 export interface DashboardResponse {
+  timeframe: TimeframeInfo;
   metrics: DashboardMetrics;
   recentPurchases: RecentPurchase[];
   locationStats?: LocationStats; // Only for company_admin
@@ -75,6 +85,7 @@ export interface RecentBooking {
 }
 
 export interface AttendantResponse {
+  timeframe: TimeframeInfo;
   metrics: DashboardMetrics;
   recentPurchases: RecentPurchase[];
   recentBookings: RecentBooking[];
@@ -88,6 +99,7 @@ class MetricsService {
    * - attendant: Their specific location only
    */
   async getDashboardMetrics(params?: {
+    timeframe?: TimeframeType;
     date_from?: string;
     date_to?: string;
   }): Promise<DashboardResponse> {
@@ -99,6 +111,9 @@ class MetricsService {
 
     const queryParams = new URLSearchParams();
     
+    if (params?.timeframe) {
+      queryParams.append('timeframe', params.timeframe);
+    }
     if (params?.date_from) {
       queryParams.append('date_from', params.date_from);
     }
@@ -145,6 +160,7 @@ class MetricsService {
    */
   async getAttendantMetrics(params?: {
     location_id?: number;
+    timeframe?: TimeframeType;
     date_from?: string;
     date_to?: string;
   }): Promise<AttendantResponse> {
@@ -152,6 +168,9 @@ class MetricsService {
     
     if (params?.location_id) {
       queryParams.append('location_id', params.location_id.toString());
+    }
+    if (params?.timeframe) {
+      queryParams.append('timeframe', params.timeframe);
     }
     if (params?.date_from) {
       queryParams.append('date_from', params.date_from);
