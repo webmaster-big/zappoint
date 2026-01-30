@@ -47,10 +47,10 @@ class MetricsCacheService {
   private memoryCache: Map<string, CachedMetricsData<any>> = new Map();
 
   /**
-   * Generate cache key based on dashboard type and optional location
+   * Generate cache key based on dashboard type, location, and timeframe
    */
-  private getCacheKey(dashboardType: DashboardType, locationId?: number | 'all'): string {
-    return `metrics_${dashboardType}_${locationId || 'all'}`;
+  private getCacheKey(dashboardType: DashboardType, locationId?: number | 'all', timeframe?: string): string {
+    return `metrics_${dashboardType}_${locationId || 'all'}_${timeframe || 'last_30d'}`;
   }
 
   /**
@@ -65,9 +65,10 @@ class MetricsCacheService {
    */
   async getCachedMetrics<T>(
     dashboardType: DashboardType,
-    locationId?: number | 'all'
+    locationId?: number | 'all',
+    timeframe?: string
   ): Promise<CachedMetricsData<T> | null> {
-    const cacheKey = this.getCacheKey(dashboardType, locationId);
+    const cacheKey = this.getCacheKey(dashboardType, locationId, timeframe);
 
     // Check memory cache first (fastest)
     const memoryData = this.memoryCache.get(cacheKey);
@@ -110,9 +111,10 @@ class MetricsCacheService {
   async cacheMetrics<T>(
     dashboardType: DashboardType,
     data: Omit<CachedMetricsData<T>, 'timestamp'>,
-    locationId?: number | 'all'
+    locationId?: number | 'all',
+    timeframe?: string
   ): Promise<void> {
-    const cacheKey = this.getCacheKey(dashboardType, locationId);
+    const cacheKey = this.getCacheKey(dashboardType, locationId, timeframe);
     const cachedData: CachedMetricsData<T> = {
       ...data,
       timestamp: Date.now(),
@@ -142,9 +144,10 @@ class MetricsCacheService {
    */
   async hasCachedData(
     dashboardType: DashboardType,
-    locationId?: number | 'all'
+    locationId?: number | 'all',
+    timeframe?: string
   ): Promise<boolean> {
-    const cacheKey = this.getCacheKey(dashboardType, locationId);
+    const cacheKey = this.getCacheKey(dashboardType, locationId, timeframe);
 
     // Check memory first
     if (this.memoryCache.has(cacheKey)) {
@@ -166,13 +169,14 @@ class MetricsCacheService {
   }
 
   /**
-   * Invalidate cache for a specific dashboard/location
+   * Invalidate cache for a specific dashboard/location/timeframe
    */
   async invalidateCache(
     dashboardType: DashboardType,
-    locationId?: number | 'all'
+    locationId?: number | 'all',
+    timeframe?: string
   ): Promise<void> {
-    const cacheKey = this.getCacheKey(dashboardType, locationId);
+    const cacheKey = this.getCacheKey(dashboardType, locationId, timeframe);
 
     // Clear memory cache
     this.memoryCache.delete(cacheKey);

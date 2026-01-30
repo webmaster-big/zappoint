@@ -232,9 +232,69 @@ const CompanyDashboard: React.FC = () => {
     });
   };
 
-  // Get bookings for a room (daily view)
-  const getBookingsForRoom = (roomId: number) => {
-    return dailyBookings.filter(booking => booking.room_id === roomId);
+  // Generate time slots for the SpaceSchedule-style daily view (30-min intervals from 8 AM to 10 PM)
+  const generateTimeSlots = () => {
+    const slots: string[] = [];
+    for (let hour = 8; hour <= 22; hour++) {
+      slots.push(`${hour.toString().padStart(2, '0')}:00`);
+      if (hour < 22) {
+        slots.push(`${hour.toString().padStart(2, '0')}:30`);
+      }
+    }
+    return slots;
+  };
+
+  const dailyTimeSlots = generateTimeSlots();
+
+  // Get booking that starts at a specific time slot for a space
+  const getBookingForSlot = (spaceId: number, slot: string) => {
+    return dailyBookings.find(booking => {
+      if (booking.room_id !== spaceId) return false;
+      const bookingTime = booking.start_time?.substring(0, 5);
+      return bookingTime === slot;
+    });
+  };
+
+  // Check if a slot is occupied by a booking that started earlier
+  const isSlotOccupied = (spaceId: number, slot: string) => {
+    const slotMinutes = parseInt(slot.split(':')[0]) * 60 + parseInt(slot.split(':')[1]);
+    return dailyBookings.some(booking => {
+      if (booking.room_id !== spaceId) return false;
+      const startTime = booking.start_time?.substring(0, 5);
+      if (!startTime) return false;
+      const startMinutes = parseInt(startTime.split(':')[0]) * 60 + parseInt(startTime.split(':')[1]);
+      const durationMinutes = booking.duration_unit === 'hours' 
+        ? (booking.duration || 1) * 60 
+        : (booking.duration || 60);
+      const endMinutes = startMinutes + durationMinutes;
+      return slotMinutes > startMinutes && slotMinutes < endMinutes;
+    });
+  };
+
+  // Calculate row span based on booking duration
+  const getBookingRowSpan = (booking: any) => {
+    const durationMinutes = booking.duration_unit === 'hours' 
+      ? (booking.duration || 1) * 60 
+      : (booking.duration || 60);
+    return Math.ceil(durationMinutes / 30);
+  };
+
+  // Format time to 12-hour format
+  const formatTime12Hour = (time: string) => {
+    const [hours, minutes] = time.split(':').map(Number);
+    const period = hours >= 12 ? 'PM' : 'AM';
+    const hour12 = hours % 12 || 12;
+    return `${hour12}:${minutes.toString().padStart(2, '0')} ${period}`;
+  };
+
+  // Calculate end time based on start time and duration
+  const calculateEndTime = (startTime: string, duration: number, unit: string) => {
+    const [hours, minutes] = startTime.split(':').map(Number);
+    const durationMinutes = unit === 'hours' ? duration * 60 : duration;
+    const totalMinutes = hours * 60 + minutes + durationMinutes;
+    const endHours = Math.floor(totalMinutes / 60) % 24;
+    const endMins = totalMinutes % 60;
+    return `${endHours.toString().padStart(2, '0')}:${endMins.toString().padStart(2, '0')}`;
   };
 
   // Fetch all locations on mount
@@ -411,11 +471,11 @@ const CompanyDashboard: React.FC = () => {
       try {
         console.log('🔄 Starting metrics fetch for location:', selectedLocation, 'timeframe:', metricsTimeframe);
         
-        // Step 1: Try to load from cache first for instant display
-        const cachedData = await metricsCacheService.getCachedMetrics<typeof metrics>('company', selectedLocation);
+        // Step 1: Try to load from cache first for instant display (with timeframe)
+        const cachedData = await metricsCacheService.getCachedMetrics<typeof metrics>('company', selectedLocation, metricsTimeframe);
         
         if (cachedData) {
-          console.log('📦 [CompanyDashboard] Loaded metrics from cache');
+          console.log('📦 [CompanyDashboard] Loaded metrics from cache for timeframe:', metricsTimeframe);
           setMetrics(cachedData.metrics);
           if (cachedData.locationStats) {
             setApiLocationStats(cachedData.locationStats);
@@ -453,13 +513,13 @@ const CompanyDashboard: React.FC = () => {
           console.log('📍 Location details from API (manager/attendant):', metricsResponse.locationDetails.name);
         }
         
-        // Step 4: Cache the fresh data for next time
+        // Step 4: Cache the fresh data for next time (with timeframe)
         await metricsCacheService.cacheMetrics('company', {
           metrics: metricsResponse.metrics,
           locationStats: metricsResponse.locationStats,
-        }, selectedLocation);
+        }, selectedLocation, metricsTimeframe);
         
-        console.log('✅ [CompanyDashboard] Metrics cached successfully');
+        console.log('✅ [CompanyDashboard] Metrics cached successfully for timeframe:', metricsTimeframe);
         
         // Get current week for calendar and location performance
         const today = new Date();
@@ -1442,78 +1502,102 @@ const CompanyDashboard: React.FC = () => {
                 <p>No spaces found for selected location</p>
               </div>
             ) : (
-              <div className="divide-y divide-gray-200">
-                {rooms.map((room) => {
-                  const roomBookings = getBookingsForRoom(room.id);
-                  return (
-                    <div key={room.id} className="p-4">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-3">
-                          <div className={`w-10 h-10 rounded-lg bg-${themeColor}-100 flex items-center justify-center`}>
-                            <House className={`w-5 h-5 text-${fullColor}`} />
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse min-w-[800px]">
+                  <thead>
+                    <tr className="bg-gray-100">
+                      <th className="sticky left-0 z-10 bg-gray-100 px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider border-r border-gray-200 w-24">
+                        Time
+                      </th>
+                      {rooms.map((room) => (
+                        <th key={room.id} className="px-3 py-2 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider border-r border-gray-200 min-w-[150px]">
+                          <div className="flex flex-col items-center gap-1">
+                            <House className={`w-4 h-4 text-${fullColor}`} />
+                            <span>{room.name}</span>
+                            <span className="text-[10px] font-normal text-gray-400">Cap: {room.capacity || 'N/A'}</span>
                           </div>
-                          <div>
-                            <h4 className="font-semibold text-gray-900">{room.name}</h4>
-                            <p className="text-xs text-gray-500">Capacity: {room.capacity || 'N/A'}</p>
-                          </div>
-                        </div>
-                        <span className={`text-xs font-medium px-2 py-1 rounded-full ${
-                          roomBookings.length > 0 
-                            ? `bg-${themeColor}-100 text-${fullColor}` 
-                            : 'bg-gray-100 text-gray-500'
-                        }`}>
-                          {roomBookings.length} booking{roomBookings.length !== 1 ? 's' : ''}
-                        </span>
-                      </div>
-                      
-                      {roomBookings.length > 0 ? (
-                        <div className="space-y-2 ml-13">
-                          {roomBookings.map((booking) => {
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dailyTimeSlots.map((slot) => (
+                      <tr key={slot} className="border-b border-gray-100 hover:bg-gray-50">
+                        <td className="sticky left-0 z-10 bg-white px-3 py-2 text-xs font-medium text-gray-500 border-r border-gray-200 whitespace-nowrap">
+                          {formatTime12Hour(slot)}
+                        </td>
+                        {rooms.map((room) => {
+                          const booking = getBookingForSlot(room.id, slot);
+                          const isOccupied = isSlotOccupied(room.id, slot);
+                          
+                          if (isOccupied) return null; // Skip cells covered by rowSpan
+                          
+                          if (booking) {
+                            const rowSpan = getBookingRowSpan(booking);
+                            const startTime = booking.start_time?.substring(0, 5) || '';
+                            const endTime = calculateEndTime(startTime, booking.duration || 1, booking.duration_unit || 'hours');
                             const isNew = new Date(booking.created_at) > new Date(Date.now() - 48 * 60 * 60 * 1000);
+                            
                             return (
-                              <Link
-                                key={booking.id}
-                                to={`/admin/bookings/${booking.id}`}
-                                className={`block p-3 rounded-lg border transition-all hover:shadow-md ${
-                                  booking.status === 'confirmed' 
-                                    ? `bg-${themeColor}-50 border-${themeColor}-200` 
-                                    : 'bg-gray-50 border-gray-200'
-                                }`}
+                              <td 
+                                key={room.id} 
+                                rowSpan={rowSpan}
+                                className="px-2 py-1 border-r border-gray-200 align-top"
                               >
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-2">
-                                    <span className="font-medium text-gray-900">
-                                      {convertTo12HourFormat(booking.time_slot_start)}
-                                    </span>
+                                <Link
+                                  to={`/admin/bookings/${booking.id}`}
+                                  className={`block h-full p-2 rounded-lg text-xs cursor-pointer transition-all hover:shadow-md ${
+                                    booking.status === 'confirmed' 
+                                      ? 'bg-green-100 border border-green-300 text-green-800'
+                                      : booking.status === 'pending'
+                                      ? 'bg-yellow-100 border border-yellow-300 text-yellow-800'
+                                      : booking.status === 'checked_in'
+                                      ? 'bg-blue-100 border border-blue-300 text-blue-800'
+                                      : booking.status === 'cancelled'
+                                      ? 'bg-red-100 border border-red-300 text-red-800'
+                                      : 'bg-gray-100 border border-gray-300 text-gray-800'
+                                  }`}
+                                >
+                                  <div className="flex items-center justify-between mb-1">
+                                    <span className="font-semibold truncate">{booking.customer_name}</span>
                                     {isNew && (
-                                      <span className="flex items-center gap-1 text-[10px] font-semibold bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded-full">
-                                        <Sparkles size={10} />
+                                      <span className="flex items-center gap-0.5 text-[9px] font-bold bg-yellow-200 text-yellow-700 px-1 py-0.5 rounded">
+                                        <Sparkles size={8} />
                                         NEW
                                       </span>
                                     )}
                                   </div>
-                                  <span className={`text-xs px-2 py-0.5 rounded-full ${
-                                    booking.status === 'confirmed' 
-                                      ? 'bg-green-100 text-green-700' 
-                                      : 'bg-yellow-100 text-yellow-700'
-                                  }`}>
-                                    {booking.status}
-                                  </span>
-                                </div>
-                                <p className="text-sm text-gray-600 mt-1">{booking.customer_name}</p>
-                                <p className="text-xs text-gray-400 mt-0.5">
-                                  {booking.package?.name || booking.attraction?.name || 'No package'}
-                                </p>
-                              </Link>
+                                  <div className="text-[10px] opacity-75">
+                                    {formatTime12Hour(startTime)} - {formatTime12Hour(endTime)}
+                                  </div>
+                                  <div className="text-[10px] opacity-75 truncate mt-0.5">
+                                    {booking.package?.name || booking.attraction?.name || 'No package'}
+                                  </div>
+                                  <div className="mt-1">
+                                    <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${
+                                      booking.status === 'confirmed' ? 'bg-green-200' :
+                                      booking.status === 'pending' ? 'bg-yellow-200' :
+                                      booking.status === 'checked_in' ? 'bg-blue-200' :
+                                      'bg-gray-200'
+                                    }`}>
+                                      {booking.status}
+                                    </span>
+                                  </div>
+                                </Link>
+                              </td>
                             );
-                          })}
-                        </div>
-                      ) : (
-                        <p className="text-sm text-gray-400 italic ml-13">No bookings scheduled</p>
-                      )}
-                    </div>
-                  );
-                })}
+                          }
+                          
+                          return (
+                            <td key={room.id} className="px-2 py-1 border-r border-gray-200 h-10">
+                              {/* Empty slot */}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>

@@ -231,11 +231,11 @@ const LocationManagerDashboard: React.FC = () => {
       try {
         console.log('🔄 Starting metrics fetch for location:', locationId);
         
-        // Step 1: Try to load from cache first for instant display
-        const cachedData = await metricsCacheService.getCachedMetrics<typeof metrics>('manager', locationId);
+        // Step 1: Try to load from cache first for instant display (with timeframe)
+        const cachedData = await metricsCacheService.getCachedMetrics<typeof metrics>('manager', locationId, metricsTimeframe);
         
         if (cachedData) {
-          console.log('📦 [ManagerDashboard] Loaded metrics from cache');
+          console.log('📦 [ManagerDashboard] Loaded metrics from cache for timeframe:', metricsTimeframe);
           setMetrics(cachedData.metrics);
           if (cachedData.recentPurchases) {
             setTicketPurchases(cachedData.recentPurchases);
@@ -274,18 +274,18 @@ const LocationManagerDashboard: React.FC = () => {
           console.log('📍 Location details from API:', metricsResponse.locationDetails.name);
         }
         
-        // Step 4: Cache the fresh data for next time
+        // Step 4: Cache the fresh data for next time (with timeframe)
         await metricsCacheService.cacheMetrics('manager', {
           metrics: metricsResponse.metrics,
           recentPurchases: metricsResponse.recentPurchases || [],
-        }, locationId);
+        }, locationId, metricsTimeframe);
         
         // Update timeframe description from API
         if (metricsResponse.timeframe) {
           setTimeframeDescription(metricsResponse.timeframe.description);
         }
         
-        console.log('✅ [ManagerDashboard] Metrics cached successfully');
+        console.log('✅ [ManagerDashboard] Metrics cached successfully for timeframe:', metricsTimeframe);
         
       } catch (error: any) {
         console.error('❌ Error fetching metrics data:', error);
@@ -496,9 +496,91 @@ const LocationManagerDashboard: React.FC = () => {
     });
   };
 
-  // Get bookings for a room (daily view)
-  const getBookingsForRoom = (roomId: number) => {
-    return dailyBookings.filter(booking => booking.room_id === roomId);
+  // Generate time slots for daily view (matching SpaceSchedule)
+  const generateTimeSlots = () => {
+    const slots: { time: string; hour: number; minute: number }[] = [];
+    const startHour = 8; // 8 AM
+    const endHour = 22; // 10 PM
+    const interval = 30; // 30-minute intervals
+    
+    for (let hour = startHour; hour <= endHour; hour++) {
+      for (let minute = 0; minute < 60; minute += interval) {
+        if (hour === endHour && minute > 0) break;
+        const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
+        const ampm = hour >= 12 ? 'PM' : 'AM';
+        const timeString = `${displayHour}:${minute.toString().padStart(2, '0')} ${ampm}`;
+        slots.push({ time: timeString, hour, minute });
+      }
+    }
+    return slots;
+  };
+
+  const dailyTimeSlots = generateTimeSlots();
+
+  // Get booking for a specific space and time slot
+  const getBookingForSlot = (spaceId: number, slot: { hour: number; minute: number }) => {
+    return dailyBookings.find(booking => {
+      if (booking.room_id !== spaceId) return false;
+      const [bookingHour, bookingMin] = booking.booking_time.split(':').map(Number);
+      return bookingHour === slot.hour && bookingMin === slot.minute;
+    });
+  };
+
+  // Check if a slot is occupied by a booking that started earlier
+  const isSlotOccupied = (spaceId: number, slot: { hour: number; minute: number }) => {
+    return dailyBookings.some(booking => {
+      if (booking.room_id !== spaceId) return false;
+      const [startHour, startMin] = booking.booking_time.split(':').map(Number);
+      const startInMinutes = startHour * 60 + startMin;
+      const slotInMinutes = slot.hour * 60 + slot.minute;
+      
+      let durationMinutes = 60;
+      if (booking.duration && booking.duration_unit) {
+        if (booking.duration_unit === 'hours') durationMinutes = booking.duration * 60;
+        else if (booking.duration_unit === 'minutes') durationMinutes = booking.duration;
+        else durationMinutes = Math.floor(booking.duration) * 60 + Math.round((booking.duration % 1) * 60);
+      }
+      
+      const endInMinutes = startInMinutes + durationMinutes;
+      return slotInMinutes > startInMinutes && slotInMinutes < endInMinutes;
+    });
+  };
+
+  // Calculate row span for a booking
+  const getBookingRowSpan = (booking: any) => {
+    let durationMinutes = 60;
+    if (booking.duration && booking.duration_unit) {
+      if (booking.duration_unit === 'hours') durationMinutes = booking.duration * 60;
+      else if (booking.duration_unit === 'minutes') durationMinutes = booking.duration;
+      else durationMinutes = Math.floor(booking.duration) * 60 + Math.round((booking.duration % 1) * 60);
+    }
+    return Math.max(1, Math.ceil(durationMinutes / 30));
+  };
+
+  // Format time for display
+  const formatTime12Hour = (time: string): string => {
+    const [hourStr, minuteStr] = time.split(':');
+    let hour = parseInt(hourStr);
+    const minute = minuteStr?.substring(0, 2) || '00';
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    hour = hour % 12 || 12;
+    return `${hour}:${minute} ${ampm}`;
+  };
+
+  // Calculate end time
+  const calculateEndTime = (startTime: string, duration: number, unit: string): string => {
+    const [hourStr, minuteStr] = startTime.split(':');
+    let hour = parseInt(hourStr);
+    let minute = parseInt(minuteStr);
+    
+    let durationInMinutes = unit === 'hours' ? duration * 60 : unit === 'minutes' ? duration : Math.floor(duration) * 60 + Math.round((duration % 1) * 60);
+    
+    minute += durationInMinutes;
+    hour += Math.floor(minute / 60);
+    minute = minute % 60;
+    hour = hour % 24;
+    
+    return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
   };
 
   // Dynamic metrics cards
@@ -808,7 +890,7 @@ const LocationManagerDashboard: React.FC = () => {
           </div>
         </div>
         
-        {/* Day View - Shows all spaces */}
+        {/* Day View - Space Schedule Style (Time on left, Spaces as columns) */}
         {calendarView === 'day' && (
           <div className="overflow-x-auto rounded-lg border border-gray-200">
             {rooms.length === 0 ? (
@@ -816,84 +898,98 @@ const LocationManagerDashboard: React.FC = () => {
                 <p>No spaces configured for this location.</p>
                 <p className="text-sm mt-2">Add spaces in the Spaces section to see the daily schedule.</p>
               </div>
-            ) : dailyBookings.length === 0 ? (
-              <div className="p-8 text-center text-gray-500">
-                No bookings for {currentDay.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-              </div>
             ) : (
-              <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="w-32 px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-r border-gray-200">
-                      Space
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="bg-gray-50 border-b-2 border-gray-200">
+                    <th className="sticky left-0 bg-gray-50 z-10 px-4 py-3 text-left text-sm font-semibold text-gray-700 border-r border-gray-200 w-24">
+                      <div className="flex items-center gap-2">
+                        <Clock className="w-4 h-4" />
+                        Time
+                      </div>
                     </th>
-                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Bookings
-                    </th>
+                    {rooms.map(space => (
+                      <th 
+                        key={space.id} 
+                        className="px-4 py-3 text-center text-sm font-semibold text-gray-700 border-r border-gray-200 min-w-[180px]"
+                      >
+                        <div className="flex flex-col items-center gap-1">
+                          <span>{space.name}</span>
+                          <span className="text-xs font-normal text-gray-500 flex items-center gap-1">
+                            <Users className="w-3 h-3" />
+                            Max {space.capacity || 'N/A'}
+                          </span>
+                        </div>
+                      </th>
+                    ))}
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {rooms.map((room) => {
-                    const roomBookings = getBookingsForRoom(room.id);
-                    return (
-                      <tr key={room.id} className="hover:bg-gray-50">
-                        <td className="px-3 py-3 whitespace-nowrap text-sm font-medium text-gray-900 border-r border-gray-200 align-top">
-                          <div className="font-semibold">{room.name}</div>
-                          {room.capacity && (
-                            <div className="text-xs text-gray-500">Capacity: {room.capacity}</div>
-                          )}
-                          {room.area_group && (
-                            <div className="text-xs text-gray-400">{room.area_group}</div>
-                          )}
-                        </td>
-                        <td className="px-3 py-3 text-sm">
-                          {roomBookings.length === 0 ? (
-                            <span className="text-gray-400 italic">No bookings</span>
-                          ) : (
-                            <div className="flex flex-wrap gap-2">
-                              {roomBookings.sort((a, b) => a.booking_time.localeCompare(b.booking_time)).map((booking) => {
-                                const [hourStr, minuteStr] = booking.booking_time.split(':');
-                                const hour = parseInt(hourStr);
-                                const isPM = hour >= 12;
-                                const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
-                                const time12 = `${displayHour}:${minuteStr} ${isPM ? 'PM' : 'AM'}`;
-                                
-                                return (
-                                  <div
-                                    key={booking.id}
-                                    className={`p-2 rounded-lg border min-w-[180px] cursor-pointer hover:shadow-md transition-shadow ${
-                                      booking.status === 'confirmed' || booking.status === 'Confirmed'
-                                        ? 'bg-emerald-50 border-emerald-200'
-                                        : booking.status === 'pending' || booking.status === 'Pending'
-                                        ? 'bg-amber-50 border-amber-200'
-                                        : 'bg-rose-50 border-rose-200'
-                                    }`}
-                                    onClick={() => setSelectedBooking(booking)}
-                                  >
-                                    <div className="flex items-center gap-2 mb-1">
-                                      <Clock size={12} className="text-gray-500" />
-                                      <span className="text-xs font-medium text-gray-700">{time12}</span>
-                                      <span className={`ml-auto px-1.5 py-0.5 text-xs font-medium rounded ${getStatusColor(booking.status)}`}>
-                                        {booking.status}
-                                      </span>
-                                    </div>
-                                    <div className="text-sm font-medium text-gray-900 truncate">
-                                      {booking.guest_name || (booking.customer ? `${booking.customer.first_name} ${booking.customer.last_name}` : 'Guest')}
-                                    </div>
-                                    <div className="text-xs text-gray-600 truncate">{booking.package?.name || 'Package'}</div>
-                                    <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
-                                      <Users size={10} />
-                                      <span>{booking.participants} guests</span>
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
+                <tbody>
+                  {dailyTimeSlots.map((slot, slotIndex) => (
+                    <tr key={slotIndex} className="border-b border-gray-100 hover:bg-gray-50" style={{ height: '50px' }}>
+                      <td className="sticky left-0 bg-white z-10 px-4 py-2 text-sm text-gray-600 border-r border-gray-200 font-medium">
+                        {slot.time}
+                      </td>
+                      {rooms.map(space => {
+                        const booking = getBookingForSlot(space.id, slot);
+                        const isOccupied = isSlotOccupied(space.id, slot);
+                        
+                        if (isOccupied) return null;
+                        
+                        if (booking) {
+                          const rowSpan = getBookingRowSpan(booking);
+                          const getBgColor = () => {
+                            const status = booking.status?.toLowerCase();
+                            if (status === 'confirmed') return 'bg-green-100';
+                            if (status === 'pending') return 'bg-yellow-100';
+                            if (status === 'checked-in') return 'bg-blue-100';
+                            if (status === 'cancelled') return 'bg-red-100';
+                            return 'bg-gray-100';
+                          };
+                          
+                          return (
+                            <td
+                              key={space.id}
+                              rowSpan={rowSpan}
+                              className={`px-2 py-2 border-r border-gray-200 cursor-pointer hover:opacity-80 transition ${getBgColor()}`}
+                              style={{ verticalAlign: 'top' }}
+                              onClick={() => setSelectedBooking(booking)}
+                            >
+                              <div className="flex flex-col p-2 h-full">
+                                <div className="font-bold text-xs text-gray-900 mb-1">
+                                  {formatTime12Hour(booking.booking_time)} - {formatTime12Hour(calculateEndTime(booking.booking_time, booking.duration || 1, booking.duration_unit || 'hours'))}
+                                </div>
+                                <div className="font-semibold text-sm text-gray-900 mb-0.5 line-clamp-1">
+                                  {booking.guest_name || (booking.customer ? `${booking.customer.first_name} ${booking.customer.last_name}` : 'Guest')}
+                                </div>
+                                <div className="text-xs text-gray-600 line-clamp-1">{booking.package?.name || 'N/A'}</div>
+                                <div className="text-xs text-gray-500 mt-1">{booking.participants} guests</div>
+                                <div className="mt-auto pt-1 flex items-center justify-between text-xs border-t border-gray-300/50">
+                                  <span className={`font-semibold ${
+                                    booking.payment_status === 'paid' ? 'text-green-700' :
+                                    booking.payment_status === 'partial' ? 'text-yellow-700' : 'text-red-700'
+                                  }`}>
+                                    ${parseFloat(String(booking.total_amount || 0)).toFixed(2)}
+                                  </span>
+                                  <span className="text-gray-600 capitalize">{booking.status}</span>
+                                </div>
+                              </div>
+                            </td>
+                          );
+                        }
+                        
+                        return (
+                          <td
+                            key={space.id}
+                            className="px-2 py-2 border-r border-gray-200 text-center text-gray-300 hover:bg-blue-50 transition"
+                            style={{ height: '50px' }}
+                          >
+                            —
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             )}
