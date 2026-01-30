@@ -366,25 +366,32 @@ const AttendantDashboard: React.FC = () => {
          const hasCachedBookings = await bookingCacheService.hasCachedData();
          
          if (hasCachedBookings) {
-           // Cache exists - use filtered results (even if empty for this date)
+           // Cache exists - use filtered results by date only (like SpaceSchedule)
            console.log('[AttendantDashboard] Cache exists, filtering for date:', dateStr);
            const cachedBookings = await bookingCacheService.getFilteredBookingsFromCache({
              booking_date: dateStr,
-             location_id: locationId,
            });
-           console.log('[AttendantDashboard] Filtered bookings from cache:', cachedBookings?.length || 0);
-           setDailyBookings((cachedBookings || []) as any[]);
+           // Filter by status like SpaceSchedule does (only confirmed, checked-in, pending)
+           const filteredBookings = (cachedBookings || []).filter((b: any) => 
+             b.status === 'confirmed' || b.status === 'checked-in' || b.status === 'pending'
+           );
+           console.log('[AttendantDashboard] Filtered bookings from cache:', filteredBookings.length);
+           setDailyBookings(filteredBookings);
          } else {
            // No cache available, fetch from API
            console.log('🔄 [AttendantDashboard] No cache, fetching from API...');
            const bookingsResponse = await bookingService.getBookings({
-             location_id: locationId,
              booking_date: dateStr,
+             user_id: getStoredUser()?.id,
              per_page: 100,
            });
            const bookings = bookingsResponse.data.bookings || [];
-           console.log('✅ [AttendantDashboard] Fetched', bookings.length, 'bookings');
-           setDailyBookings(bookings);
+           // Filter by status like SpaceSchedule does (only confirmed, checked-in, pending)
+           const filteredBookings = bookings.filter((b: any) => 
+             b.status === 'confirmed' || b.status === 'checked-in' || b.status === 'pending'
+           );
+           console.log('✅ [AttendantDashboard] Fetched', filteredBookings.length, 'bookings');
+           setDailyBookings(filteredBookings);
            // Cache the fetched bookings
            if (bookings.length > 0) {
              await bookingCacheService.cacheBookings(bookings);
