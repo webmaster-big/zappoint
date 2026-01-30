@@ -232,13 +232,43 @@ const CompanyDashboard: React.FC = () => {
     });
   };
 
+  // Natural sort function: alphabetical first, then numerical (Table 1, 2, 3 not 1, 10, 2)
+  const naturalSort = (a: Room, b: Room): number => {
+    const nameA = a.name;
+    const nameB = b.name;
+    const chunksA = nameA.match(/(\d+|\D+)/g) || [];
+    const chunksB = nameB.match(/(\d+|\D+)/g) || [];
+    const maxLength = Math.max(chunksA.length, chunksB.length);
+    for (let i = 0; i < maxLength; i++) {
+      const chunkA = chunksA[i] || '';
+      const chunkB = chunksB[i] || '';
+      const isNumA = /^\d+$/.test(chunkA);
+      const isNumB = /^\d+$/.test(chunkB);
+      if (isNumA && isNumB) {
+        const diff = parseInt(chunkA) - parseInt(chunkB);
+        if (diff !== 0) return diff;
+      } else {
+        const comparison = chunkA.toLowerCase().localeCompare(chunkB.toLowerCase());
+        if (comparison !== 0) return comparison;
+      }
+    }
+    return 0;
+  };
+
+  // Sorted rooms for display
+  const sortedRooms = [...rooms].sort(naturalSort);
+
   // Generate time slots for the SpaceSchedule-style daily view (30-min intervals from 8 AM to 10 PM)
   const generateTimeSlots = () => {
-    const slots: string[] = [];
+    const slots: { time: string; slot: string }[] = [];
     for (let hour = 8; hour <= 22; hour++) {
-      slots.push(`${hour.toString().padStart(2, '0')}:00`);
+      const slot00 = `${hour.toString().padStart(2, '0')}:00`;
+      const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
+      const ampm = hour >= 12 ? 'PM' : 'AM';
+      slots.push({ time: `${displayHour}:00 ${ampm}`, slot: slot00 });
       if (hour < 22) {
-        slots.push(`${hour.toString().padStart(2, '0')}:30`);
+        const slot30 = `${hour.toString().padStart(2, '0')}:30`;
+        slots.push({ time: `${displayHour}:30 ${ampm}`, slot: slot30 });
       }
     }
     return slots;
@@ -246,11 +276,32 @@ const CompanyDashboard: React.FC = () => {
 
   const dailyTimeSlots = generateTimeSlots();
 
+  // Filter to only show time slots that have bookings
+  const visibleTimeSlots = dailyTimeSlots.filter(slotObj => {
+    return sortedRooms.some(space => {
+      return dailyBookings.some(booking => {
+        if (booking.room_id !== space.id) return false;
+        const bookingTime = booking.booking_time?.substring(0, 5);
+        if (!bookingTime) return false;
+        const startMinutes = parseInt(bookingTime.split(':')[0]) * 60 + parseInt(bookingTime.split(':')[1]);
+        const slotMinutes = parseInt(slotObj.slot.split(':')[0]) * 60 + parseInt(slotObj.slot.split(':')[1]);
+        let durationMinutes = 60;
+        if (booking.duration && booking.duration_unit) {
+          if (booking.duration_unit === 'hours') durationMinutes = booking.duration * 60;
+          else if (booking.duration_unit === 'minutes') durationMinutes = booking.duration;
+          else durationMinutes = Math.floor(booking.duration) * 60 + Math.round((booking.duration % 1) * 60);
+        }
+        const endMinutes = startMinutes + durationMinutes;
+        return slotMinutes >= startMinutes && slotMinutes < endMinutes;
+      });
+    });
+  });
+
   // Get booking that starts at a specific time slot for a space
   const getBookingForSlot = (spaceId: number, slot: string) => {
     return dailyBookings.find(booking => {
       if (booking.room_id !== spaceId) return false;
-      const bookingTime = booking.start_time?.substring(0, 5);
+      const bookingTime = booking.booking_time?.substring(0, 5);
       return bookingTime === slot;
     });
   };
@@ -391,28 +442,37 @@ const CompanyDashboard: React.FC = () => {
       
       try {
         const dateStr = currentDay.toISOString().split('T')[0];
+        console.log('📅 [CompanyDashboard] Fetching daily bookings for:', dateStr);
         
-        const bookingParams = {
-          date_from: dateStr,
-          date_to: dateStr,
-          location_id: selectedLocation === 'all' ? undefined : selectedLocation,
+        const bookingParams: any = {
+          booking_date: dateStr,
         };
         
-        // Try to get from cache first
+        if (selectedLocation !== 'all') {
+          bookingParams.location_id = selectedLocation;
+        }
+        
+        // Try to get from cache first - filter by exact date
         const cachedBookings = await bookingCacheService.getFilteredBookingsFromCache(bookingParams);
         
         if (cachedBookings && cachedBookings.length > 0) {
+          console.log('📦 [CompanyDashboard] Using cached bookings:', cachedBookings.length);
           setDailyBookings(cachedBookings);
         } else {
-          // No cache, fetch from API
+          // Fetch from API for specific date
+          console.log('🔄 [CompanyDashboard] Fetching from API...');
           const bookingsResponse = await bookingService.getBookings({
-            ...bookingParams,
+            booking_date: dateStr,
+            location_id: selectedLocation === 'all' ? undefined : selectedLocation,
             per_page: 100,
           });
           const bookings = bookingsResponse.data.bookings || [];
+          console.log('✅ [CompanyDashboard] Fetched', bookings.length, 'bookings');
           setDailyBookings(bookings);
           // Cache the fetched bookings
-          await bookingCacheService.cacheBookings(bookings);
+          if (bookings.length > 0) {
+            await bookingCacheService.cacheBookings(bookings);
+          }
         }
         
       } catch (error) {
@@ -1493,13 +1553,17 @@ const CompanyDashboard: React.FC = () => {
               <h3 className="font-semibold text-gray-800">
                 {currentDay.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
               </h3>
-              <p className="text-sm text-gray-500">{dailyBookings.length} bookings across {rooms.length} spaces</p>
+              <p className="text-sm text-gray-500">{dailyBookings.length} bookings across {sortedRooms.length} spaces</p>
             </div>
             
-            {rooms.length === 0 ? (
+            {sortedRooms.length === 0 ? (
               <div className="p-8 text-center text-gray-500">
                 <House className="w-12 h-12 mx-auto mb-3 text-gray-300" />
                 <p>No spaces found for selected location</p>
+              </div>
+            ) : visibleTimeSlots.length === 0 ? (
+              <div className="p-8 text-center text-gray-500">
+                <p>No bookings for {currentDay.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}.</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -1509,7 +1573,7 @@ const CompanyDashboard: React.FC = () => {
                       <th className="sticky left-0 z-10 bg-gray-100 px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider border-r border-gray-200 w-24">
                         Time
                       </th>
-                      {rooms.map((room) => (
+                      {sortedRooms.map((room) => (
                         <th key={room.id} className="px-3 py-2 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider border-r border-gray-200 min-w-[150px]">
                           <div className="flex flex-col items-center gap-1">
                             <House className={`w-4 h-4 text-${fullColor}`} />
@@ -1521,20 +1585,20 @@ const CompanyDashboard: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {dailyTimeSlots.map((slot) => (
-                      <tr key={slot} className="border-b border-gray-100 hover:bg-gray-50">
+                    {visibleTimeSlots.map((slotObj) => (
+                      <tr key={slotObj.slot} className="border-b border-gray-100 hover:bg-gray-50">
                         <td className="sticky left-0 z-10 bg-white px-3 py-2 text-xs font-medium text-gray-500 border-r border-gray-200 whitespace-nowrap">
-                          {formatTime12Hour(slot)}
+                          {slotObj.time}
                         </td>
-                        {rooms.map((room) => {
-                          const booking = getBookingForSlot(room.id, slot);
-                          const isOccupied = isSlotOccupied(room.id, slot);
+                        {sortedRooms.map((room) => {
+                          const booking = getBookingForSlot(room.id, slotObj.slot);
+                          const isOccupied = isSlotOccupied(room.id, slotObj.slot);
                           
                           if (isOccupied) return null; // Skip cells covered by rowSpan
                           
                           if (booking) {
                             const rowSpan = getBookingRowSpan(booking);
-                            const startTime = booking.start_time?.substring(0, 5) || '';
+                            const startTime = booking.booking_time?.substring(0, 5) || '';
                             const endTime = calculateEndTime(startTime, booking.duration || 1, booking.duration_unit || 'hours');
                             const isNew = new Date(booking.created_at) > new Date(Date.now() - 48 * 60 * 60 * 1000);
                             
@@ -1559,7 +1623,7 @@ const CompanyDashboard: React.FC = () => {
                                   }`}
                                 >
                                   <div className="flex items-center justify-between mb-1">
-                                    <span className="font-semibold truncate">{booking.customer_name}</span>
+                                    <span className="font-semibold truncate">{booking.guest_name || (booking.customer ? `${booking.customer.first_name} ${booking.customer.last_name}` : 'Guest')}</span>
                                     {isNew && (
                                       <span className="flex items-center gap-0.5 text-[9px] font-bold bg-yellow-200 text-yellow-700 px-1 py-0.5 rounded">
                                         <Sparkles size={8} />

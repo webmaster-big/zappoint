@@ -346,28 +346,34 @@ const LocationManagerDashboard: React.FC = () => {
       
       try {
         const dateStr = currentDay.toISOString().split('T')[0];
+        console.log('📅 [ManagerDashboard] Fetching daily bookings for:', dateStr);
         
         const bookingParams = {
           location_id: locationId,
-          date_from: dateStr,
-          date_to: dateStr,
+          booking_date: dateStr,
         };
         
-        // Try to get from cache first
+        // Try to get from cache first - filter by exact date
         const cachedBookings = await bookingCacheService.getFilteredBookingsFromCache(bookingParams);
         
         if (cachedBookings && cachedBookings.length > 0) {
+          console.log('📦 [ManagerDashboard] Using cached bookings:', cachedBookings.length);
           setDailyBookings(cachedBookings);
         } else {
-          // No cache, fetch from API
+          // Fetch from API for specific date
+          console.log('🔄 [ManagerDashboard] Fetching from API...');
           const bookingsResponse = await bookingService.getBookings({
-            ...bookingParams,
+            location_id: locationId,
+            booking_date: dateStr,
             per_page: 100,
           });
           const bookings = bookingsResponse.data.bookings || [];
+          console.log('✅ [ManagerDashboard] Fetched', bookings.length, 'bookings');
           setDailyBookings(bookings);
           // Cache the fetched bookings
-          await bookingCacheService.cacheBookings(bookings, { locationId });
+          if (bookings.length > 0) {
+            await bookingCacheService.cacheBookings(bookings, { locationId });
+          }
         }
         
       } catch (error) {
@@ -496,6 +502,32 @@ const LocationManagerDashboard: React.FC = () => {
     });
   };
 
+  // Natural sort function: alphabetical first, then numerical (Table 1, 2, 3 not 1, 10, 2)
+  const naturalSort = (a: Room, b: Room): number => {
+    const nameA = a.name;
+    const nameB = b.name;
+    const chunksA = nameA.match(/(\d+|\D+)/g) || [];
+    const chunksB = nameB.match(/(\d+|\D+)/g) || [];
+    const maxLength = Math.max(chunksA.length, chunksB.length);
+    for (let i = 0; i < maxLength; i++) {
+      const chunkA = chunksA[i] || '';
+      const chunkB = chunksB[i] || '';
+      const isNumA = /^\d+$/.test(chunkA);
+      const isNumB = /^\d+$/.test(chunkB);
+      if (isNumA && isNumB) {
+        const diff = parseInt(chunkA) - parseInt(chunkB);
+        if (diff !== 0) return diff;
+      } else {
+        const comparison = chunkA.toLowerCase().localeCompare(chunkB.toLowerCase());
+        if (comparison !== 0) return comparison;
+      }
+    }
+    return 0;
+  };
+
+  // Sorted rooms for display
+  const sortedRooms = [...rooms].sort(naturalSort);
+
   // Generate time slots for daily view (matching SpaceSchedule)
   const generateTimeSlots = () => {
     const slots: { time: string; hour: number; minute: number }[] = [];
@@ -516,6 +548,26 @@ const LocationManagerDashboard: React.FC = () => {
   };
 
   const dailyTimeSlots = generateTimeSlots();
+
+  // Filter to only show time slots that have bookings
+  const visibleTimeSlots = dailyTimeSlots.filter(slot => {
+    return sortedRooms.some(space => {
+      return dailyBookings.some(booking => {
+        if (booking.room_id !== space.id) return false;
+        const [bookingHour, bookingMin] = booking.booking_time.split(':').map(Number);
+        const startInMinutes = bookingHour * 60 + bookingMin;
+        const slotInMinutes = slot.hour * 60 + slot.minute;
+        let durationMinutes = 60;
+        if (booking.duration && booking.duration_unit) {
+          if (booking.duration_unit === 'hours') durationMinutes = booking.duration * 60;
+          else if (booking.duration_unit === 'minutes') durationMinutes = booking.duration;
+          else durationMinutes = Math.floor(booking.duration) * 60 + Math.round((booking.duration % 1) * 60);
+        }
+        const endInMinutes = startInMinutes + durationMinutes;
+        return slotInMinutes >= startInMinutes && slotInMinutes < endInMinutes;
+      });
+    });
+  });
 
   // Get booking for a specific space and time slot
   const getBookingForSlot = (spaceId: number, slot: { hour: number; minute: number }) => {
@@ -709,50 +761,6 @@ const LocationManagerDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* New Bookings Alert - Show if there are new bookings */}
-      {newBookings.length > 0 && (
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <Sparkles size={20} className="text-blue-600" />
-            </div>
-            <div>
-              <h3 className="font-semibold text-blue-900">New Bookings</h3>
-              <p className="text-sm text-blue-700">{newBookings.length} booking(s) created in the last 48 hours</p>
-            </div>
-          </div>
-          <div className="space-y-2 max-h-[200px] overflow-y-auto">
-            {newBookings.slice(0, 5).map((booking: any) => (
-              <div key={booking.id} className="flex items-center justify-between bg-white rounded-lg p-3 border border-blue-100">
-                <div className="flex items-center gap-3">
-                  <div>
-                    <p className="font-medium text-gray-900">
-                      {booking.guest_name || (booking.customer ? `${booking.customer.first_name} ${booking.customer.last_name}` : 'Guest')}
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      {booking.package?.name || 'Package'} • {booking.participants} guests • {new Date(booking.booking_date).toLocaleDateString()}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(booking.status)}`}>
-                    {booking.status}
-                  </span>
-                  <Link to={`/bookings/${booking.id}`} className={`text-sm text-${fullColor} hover:underline`}>
-                    View →
-                  </Link>
-                </div>
-              </div>
-            ))}
-            {newBookings.length > 5 && (
-              <Link to="/bookings" className={`block text-center text-sm text-${fullColor} hover:underline py-2`}>
-                View all {newBookings.length} new bookings →
-              </Link>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* Metrics Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         {metricsCards.map((metric, index) => {
@@ -893,10 +901,14 @@ const LocationManagerDashboard: React.FC = () => {
         {/* Day View - Space Schedule Style (Time on left, Spaces as columns) */}
         {calendarView === 'day' && (
           <div className="overflow-x-auto rounded-lg border border-gray-200">
-            {rooms.length === 0 ? (
+            {sortedRooms.length === 0 ? (
               <div className="p-8 text-center text-gray-500">
                 <p>No spaces configured for this location.</p>
                 <p className="text-sm mt-2">Add spaces in the Spaces section to see the daily schedule.</p>
+              </div>
+            ) : visibleTimeSlots.length === 0 ? (
+              <div className="p-8 text-center text-gray-500">
+                <p>No bookings for {currentDay.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}.</p>
               </div>
             ) : (
               <table className="w-full border-collapse">
@@ -908,7 +920,7 @@ const LocationManagerDashboard: React.FC = () => {
                         Time
                       </div>
                     </th>
-                    {rooms.map(space => (
+                    {sortedRooms.map(space => (
                       <th 
                         key={space.id} 
                         className="px-4 py-3 text-center text-sm font-semibold text-gray-700 border-r border-gray-200 min-w-[180px]"
@@ -925,12 +937,12 @@ const LocationManagerDashboard: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {dailyTimeSlots.map((slot, slotIndex) => (
+                  {visibleTimeSlots.map((slot, slotIndex) => (
                     <tr key={slotIndex} className="border-b border-gray-100 hover:bg-gray-50" style={{ height: '50px' }}>
                       <td className="sticky left-0 bg-white z-10 px-4 py-2 text-sm text-gray-600 border-r border-gray-200 font-medium">
                         {slot.time}
                       </td>
-                      {rooms.map(space => {
+                      {sortedRooms.map(space => {
                         const booking = getBookingForSlot(space.id, slot);
                         const isOccupied = isSlotOccupied(space.id, slot);
                         
@@ -1216,6 +1228,75 @@ const LocationManagerDashboard: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* New Bookings Table - Below Calendar */}
+      {newBookings.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
+            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <Sparkles className={`w-5 h-5 text-${fullColor}`} /> New Bookings
+              <span className="ml-2 text-xs font-medium bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
+                {newBookings.length} in last 48 hours
+              </span>
+            </h2>
+            <Link to="/bookings" className={`px-4 py-2 text-sm bg-${themeColor}-100 text-${fullColor} rounded-lg hover:bg-${themeColor}-200 transition`}>
+              View All
+            </Link>
+          </div>
+         
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="text-xs text-gray-500 uppercase bg-gray-50 border-b">
+                <tr>
+                  <th className="px-4 py-3 font-medium">Customer</th>
+                  <th className="px-4 py-3 font-medium">Package</th>
+                  <th className="px-4 py-3 font-medium">Date & Time</th>
+                  <th className="px-4 py-3 font-medium">Guests</th>
+                  <th className="px-4 py-3 font-medium">Amount</th>
+                  <th className="px-4 py-3 font-medium">Status</th>
+                  <th className="px-4 py-3 font-medium">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {newBookings.slice(0, 10).map((booking: any) => (
+                  <tr key={booking.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3">
+                      <div className="font-medium text-gray-900">
+                        {booking.guest_name || (booking.customer ? `${booking.customer.first_name} ${booking.customer.last_name}` : 'Guest')}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="text-gray-900">{booking.package?.name || 'N/A'}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="text-gray-900">
+                        {new Date(booking.booking_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {booking.booking_time ? formatTime12Hour(booking.booking_time) : 'N/A'}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-gray-900">{booking.participants || 0}</td>
+                    <td className="px-4 py-3 font-medium text-gray-900">
+                      ${parseFloat(String(booking.total_amount || 0)).toFixed(2)}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(booking.status)}`}>
+                        {booking.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <Link to={`/admin/bookings/${booking.id}`} className={`text-sm text-${fullColor} hover:underline`}>
+                        View
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Ticket Purchases Table */}
       <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
