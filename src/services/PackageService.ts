@@ -52,6 +52,8 @@ export interface Package {
   customer_notes?: string;
   invitation_download_link?: string;
   invitation_file?: string;
+  booking_window_days?: number | null;
+  min_booking_notice_hours?: number | null;
   created_at: string;
   updated_at: string;
   deleted_at?: string | null;
@@ -144,6 +146,8 @@ export interface CreatePackageData {
   customer_notes?: string;
   invitation_download_link?: string;
   invitation_file?: string;
+  booking_window_days?: number | null;
+  min_booking_notice_hours?: number | null;
   attraction_ids?: (number | undefined)[];
   room_ids?: (number | undefined)[];
   addon_ids?: (number | undefined)[];
@@ -354,6 +358,17 @@ class PackageService {
    */
   async deleteAvailabilitySchedule(packageId: number, scheduleId: number): Promise<ApiResponse<null>> {
     const response = await api.delete(`/packages/${packageId}/availability-schedules/${scheduleId}`);
+    return response.data;
+  }
+
+  /**
+   * Bulk update minimum booking notice hours for multiple packages
+   */
+  async bulkUpdateMinNotice(packageIds: number[], minBookingNoticeHours: number | null): Promise<ApiResponse<Package[]>> {
+    const response = await api.patch('/packages/bulk-update-min-notice', {
+      package_ids: packageIds,
+      min_booking_notice_hours: minBookingNoticeHours,
+    });
     return response.data;
   }
 }

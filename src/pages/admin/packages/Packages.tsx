@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Users, Tag, Search, Download, Upload, X, CheckSquare, Square, Pencil, Trash2, MapPin, Eye, Power, Plus, FileText } from "lucide-react";
+import { Users, Tag, Search, Download, Upload, X, CheckSquare, Square, Pencil, Trash2, MapPin, Eye, Power, Plus, FileText, Clock } from "lucide-react";
 import StandardButton from '../../../components/ui/StandardButton';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { packageService, type Package } from '../../../services';
@@ -32,6 +32,12 @@ const Packages: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [userData, setUserData] = useState<UserData | null>(null);
+  
+  // Bulk update min notice state
+  const [selectedForBulkUpdate, setSelectedForBulkUpdate] = useState<number[]>([]);
+  const [showBulkMinNoticeModal, setShowBulkMinNoticeModal] = useState(false);
+  const [bulkMinNoticeHours, setBulkMinNoticeHours] = useState<string>("");
+  const [bulkUpdating, setBulkUpdating] = useState(false);
 
   // Load user data from localStorage
   useEffect(() => {
@@ -388,6 +394,66 @@ const Packages: React.FC = () => {
     }
   };
 
+  // Bulk update handlers
+  const handleSelectForBulkUpdate = (id: number) => {
+    setSelectedForBulkUpdate(prev =>
+      prev.includes(id) ? prev.filter(pkgId => pkgId !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAllForBulkUpdate = () => {
+    if (selectedForBulkUpdate.length === filteredPackages.length) {
+      setSelectedForBulkUpdate([]);
+    } else {
+      setSelectedForBulkUpdate(filteredPackages.map(pkg => pkg.id));
+    }
+  };
+
+  const handleBulkUpdateMinNotice = async () => {
+    if (selectedForBulkUpdate.length === 0) return;
+    
+    try {
+      setBulkUpdating(true);
+      const minHours = bulkMinNoticeHours ? parseInt(bulkMinNoticeHours) : null;
+      
+      const response = await packageService.bulkUpdateMinNotice(selectedForBulkUpdate, minHours);
+      
+      if (response.success && response.data) {
+        // Update local state with the new values
+        const updatedPackages = response.data;
+        setPackages(prev => prev.map(pkg => {
+          const updated = updatedPackages.find((up: Package) => up.id === pkg.id);
+          return updated || pkg;
+        }));
+        
+        // Update cache
+        for (const updatedPkg of updatedPackages) {
+          await packageCacheService.updatePackageInCache(updatedPkg);
+        }
+        
+        alert(`Advance booking time updated successfully for ${updatedPackages.length} package(s)!`);
+        setShowBulkMinNoticeModal(false);
+        setSelectedForBulkUpdate([]);
+        setBulkMinNoticeHours("");
+      }
+    } catch (err) {
+      console.error('Error bulk updating packages:', err);
+      alert('Failed to update packages. Please try again.');
+    } finally {
+      setBulkUpdating(false);
+    }
+  };
+
+  // Format advance booking time for display
+  const formatMinNotice = (hours: number | null | undefined): string => {
+    if (!hours || hours === 0) return 'No buffer';
+    if (hours >= 24) {
+      const days = hours / 24;
+      return `${days % 1 === 0 ? days : days.toFixed(1)}d buffer`;
+    }
+    return `${hours}h buffer`;
+  };
+
   if (loading) {
     return (
       <div className="w-full mx-auto px-4 pb-6 flex flex-col items-center justify-center min-h-96">
@@ -424,6 +490,17 @@ const Packages: React.FC = () => {
           <p className="text-gray-600 mt-1">Manage and view all your packages</p>
         </div>
         <div className="flex items-center gap-2">
+          {/* Bulk Update Button - shows when packages are selected */}
+          {selectedForBulkUpdate.length > 0 && (
+            <StandardButton
+              variant="primary"
+              size="md"
+              icon={Clock}
+              onClick={() => setShowBulkMinNoticeModal(true)}
+            >
+              Set Advance Time ({selectedForBulkUpdate.length})
+            </StandardButton>
+          )}
           <Link to="/packages/global-notes">
             <StandardButton
               variant="secondary"
@@ -571,14 +648,49 @@ const Packages: React.FC = () => {
 
         {/* Packages Grid */}
         {filteredPackages.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <>
+            {/* Select All Checkbox */}
+            <div className="flex items-center gap-2 mb-4">
+              <button
+                onClick={handleSelectAllForBulkUpdate}
+                className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-800"
+              >
+                {selectedForBulkUpdate.length === filteredPackages.length ? (
+                  <CheckSquare className={`w-5 h-5 text-${fullColor}`} />
+                ) : (
+                  <Square className="w-5 h-5" />
+                )}
+                <span>Select all for bulk update</span>
+              </button>
+              {selectedForBulkUpdate.length > 0 && (
+                <span className="text-sm text-gray-500">
+                  ({selectedForBulkUpdate.length} selected)
+                </span>
+              )}
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {filteredPackages.map((pkg) => (
               <div 
                 key={pkg.id} 
-                className="border-2 border-gray-200 rounded-lg overflow-hidden hover:shadow-lg hover:scale-105 hover:border-gray-300 transition-all bg-white"
+                className={`border-2 rounded-lg overflow-hidden hover:shadow-lg hover:scale-105 transition-all bg-white ${
+                  selectedForBulkUpdate.includes(pkg.id) 
+                    ? `border-${fullColor} ring-2 ring-${themeColor}-100` 
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
               >
                 <div className="p-4">
                   <div className="flex justify-between items-start mb-3">
+                    {/* Checkbox for bulk selection */}
+                    <button
+                      onClick={() => handleSelectForBulkUpdate(pkg.id)}
+                      className="mr-2 flex-shrink-0"
+                    >
+                      {selectedForBulkUpdate.includes(pkg.id) ? (
+                        <CheckSquare className={`w-5 h-5 text-${fullColor}`} />
+                      ) : (
+                        <Square className="w-5 h-5 text-gray-300 hover:text-gray-400" />
+                      )}
+                    </button>
                     <div className="flex-1 min-w-0">
                       <h3 className="font-semibold text-base text-gray-900 truncate mb-1">{pkg.name || "Unnamed Package"}</h3>
                       {pkg.location && (
@@ -603,9 +715,17 @@ const Packages: React.FC = () => {
 
                   <div className="mb-3">
                     <p className="text-sm text-gray-600 line-clamp-2 mb-2">{pkg.description || "No description"}</p>
-                    <span className={`inline-block px-2 py-1 rounded text-xs font-medium bg-${themeColor}-100 text-${fullColor}`}>
-                      {pkg.category || "Uncategorized"}
-                    </span>
+                    <div className="flex flex-wrap gap-1">
+                      <span className={`inline-block px-2 py-1 rounded text-xs font-medium bg-${themeColor}-100 text-${fullColor}`}>
+                        {pkg.category || "Uncategorized"}
+                      </span>
+                      {pkg.min_booking_notice_hours && pkg.min_booking_notice_hours > 0 && (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-700">
+                          <Clock className="w-3 h-3" />
+                          {formatMinNotice(pkg.min_booking_notice_hours)}
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   <div className="pt-3 border-t border-gray-100">
@@ -648,6 +768,7 @@ const Packages: React.FC = () => {
               </div>
             ))}
           </div>
+          </>
         ) : (
           <div className="flex flex-col items-center py-16">
             <div className={`w-16 h-16 rounded-full bg-${themeColor}-100 flex items-center justify-center mb-4`}>
@@ -875,6 +996,119 @@ const Packages: React.FC = () => {
                 icon={Upload}
               >
                 Import Packages
+              </StandardButton>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Min Notice Modal */}
+      {showBulkMinNoticeModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl max-w-md w-full overflow-hidden">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">Set Advance Booking Time</h2>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Prevent last-minute bookings for {selectedForBulkUpdate.length} package{selectedForBulkUpdate.length !== 1 ? 's' : ''}
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowBulkMinNoticeModal(false);
+                    setBulkMinNoticeHours("");
+                  }}
+                  className="p-2 hover:bg-gray-100 rounded-lg"
+                >
+                  <X className="w-5 h-5 text-gray-400" />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Block bookings within this many hours of the time slot
+                </label>
+                
+                {/* Quick select buttons */}
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {[
+                    { hours: 2, label: '2 hours' },
+                    { hours: 6, label: '6 hours' },
+                    { hours: 24, label: '1 day' },
+                    { hours: 48, label: '2 days' },
+                    { hours: 168, label: '1 week' },
+                  ].map(({ hours, label }) => (
+                    <button
+                      key={hours}
+                      type="button"
+                      onClick={() => setBulkMinNoticeHours(String(hours))}
+                      className={`px-3 py-1.5 text-sm rounded-lg border transition-all ${
+                        bulkMinNoticeHours === String(hours)
+                          ? `bg-${themeColor}-100 border-${fullColor} text-${fullColor} font-medium`
+                          : 'border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                
+                {/* Custom input */}
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="0"
+                    max="8760"
+                    value={bulkMinNoticeHours}
+                    onChange={(e) => setBulkMinNoticeHours(e.target.value)}
+                    placeholder="Custom hours"
+                    className={`flex-1 px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-${themeColor}-500 focus:border-${fullColor} border-gray-200`}
+                  />
+                  <span className="text-sm text-gray-500">hours</span>
+                </div>
+                
+                <button
+                  type="button"
+                  onClick={() => setBulkMinNoticeHours("")}
+                  className={`mt-2 px-3 py-1.5 text-sm rounded-lg border transition-all ${
+                    bulkMinNoticeHours === ""
+                      ? `bg-${themeColor}-100 border-${fullColor} text-${fullColor} font-medium`
+                      : 'border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  Allow last-minute bookings (no buffer)
+                </button>
+                
+                {bulkMinNoticeHours && parseInt(bulkMinNoticeHours) > 0 && (
+                  <p className={`text-xs text-${themeColor}-600 mt-2`}>
+                    Last-minute bookings blocked: Customers cannot book within {bulkMinNoticeHours} hours ({(parseInt(bulkMinNoticeHours) / 24).toFixed(1)} days) of the time slot
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
+              <StandardButton
+                onClick={() => {
+                  setShowBulkMinNoticeModal(false);
+                  setBulkMinNoticeHours("");
+                }}
+                variant="secondary"
+                size="md"
+              >
+                Cancel
+              </StandardButton>
+              <StandardButton
+                onClick={handleBulkUpdateMinNotice}
+                disabled={bulkUpdating}
+                variant="primary"
+                size="md"
+                icon={Clock}
+              >
+                {bulkUpdating ? 'Updating...' : `Update ${selectedForBulkUpdate.length} Package${selectedForBulkUpdate.length !== 1 ? 's' : ''}`}
               </StandardButton>
             </div>
           </div>

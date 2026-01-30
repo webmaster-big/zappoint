@@ -241,6 +241,7 @@ const CreatePackage: React.FC = () => {
         invitation_file: "", // Base64 encoded invitation file
         invitationType: "link" as "link" | "file", // Tab selection for invitation
         bookingWindowDays: "", // Max days in advance for booking (1-365)
+        minBookingNoticeHours: "" as string, // Min hours in advance for booking (0-8760)
         
         // NEW: Replace old availability fields with schedules array
         availability_schedules: [] as AvailabilitySchedule[],
@@ -612,6 +613,7 @@ const CreatePackage: React.FC = () => {
                 invitation_download_link: form.invitationType === 'link' ? (form.invitation_download_link.trim() || undefined) : undefined,
                 invitation_file: form.invitationType === 'file' ? (form.invitation_file || undefined) : undefined,
                 booking_window_days: form.bookingWindowDays ? parseInt(form.bookingWindowDays) : null,
+                min_booking_notice_hours: form.minBookingNoticeHours ? parseInt(form.minBookingNoticeHours) : null,
                 
                 // NEW: Send availability schedules
                 availability_schedules: form.availability_schedules,
@@ -696,6 +698,7 @@ const CreatePackage: React.FC = () => {
                 invitation_file: "",
                 invitationType: "link",
                 bookingWindowDays: "",
+                minBookingNoticeHours: "",
                 availability_schedules: [],
             });
             setImagePreview("");
@@ -1880,6 +1883,79 @@ const CreatePackage: React.FC = () => {
                                 )}
                             </div>
 
+                            {/* Advance Booking Time */}
+                            <div>
+                                <label className="block font-semibold mb-3 text-base text-neutral-800">
+                                    Advance Booking Time
+                                    <span className="text-gray-400 font-normal text-sm ml-2">(optional)</span>
+                                </label>
+                                <p className="text-sm text-gray-500 mb-3">Prevent last-minute bookings. Customers must book at least this many hours before the time slot. Useful to ensure staff has time to prepare or avoid bookings too close to closing time.</p>
+                                
+                                {/* Quick select buttons */}
+                                <div className="flex flex-wrap gap-2 mb-3">
+                                    {[
+                                        { hours: 2, label: '2 hours' },
+                                        { hours: 6, label: '6 hours' },
+                                        { hours: 12, label: '12 hours' },
+                                        { hours: 24, label: '1 day' },
+                                        { hours: 48, label: '2 days' },
+                                        { hours: 72, label: '3 days' },
+                                        { hours: 168, label: '1 week' },
+                                    ].map(({ hours, label }) => {
+                                        const isSelected = form.minBookingNoticeHours === String(hours);
+                                        return (
+                                            <button
+                                                key={hours}
+                                                type="button"
+                                                onClick={() => setForm(prev => ({ ...prev, minBookingNoticeHours: String(hours) }))}
+                                                className={`px-3 py-1.5 text-sm rounded-lg border transition-all ${
+                                                    isSelected
+                                                        ? `bg-${themeColor}-100 border-${fullColor} text-${fullColor} font-medium`
+                                                        : 'border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'
+                                                }`}
+                                            >
+                                                {label}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                                
+                                {/* Custom hours input */}
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        max="8760"
+                                        value={form.minBookingNoticeHours}
+                                        onChange={(e) => setForm(prev => ({ ...prev, minBookingNoticeHours: e.target.value }))}
+                                        placeholder="Custom hours (e.g., 24)"
+                                        className={`w-48 px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-${themeColor}-500 focus:border-${fullColor} ${
+                                            form.minBookingNoticeHours && ![2,6,12,24,48,72,168].includes(parseInt(form.minBookingNoticeHours))
+                                                ? `border-${fullColor} bg-${themeColor}-50`
+                                                : 'border-gray-200'
+                                        }`}
+                                    />
+                                    <span className="text-sm text-gray-500">hours</span>
+                                    <button
+                                        type="button"
+                                        onClick={() => setForm(prev => ({ ...prev, minBookingNoticeHours: '' }))}
+                                        className={`px-3 py-2 text-sm rounded-lg border transition-all ${
+                                            form.minBookingNoticeHours === ''
+                                                ? `bg-${themeColor}-100 border-${fullColor} text-${fullColor} font-medium`
+                                                : 'border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'
+                                        }`}
+                                    >
+                                        Allow last-minute
+                                    </button>
+                                </div>
+                                
+                                {form.minBookingNoticeHours && parseInt(form.minBookingNoticeHours) > 0 && (
+                                    <p className={`text-xs text-${themeColor}-600 mt-2`}>
+                                        Last-minute bookings blocked: Customers cannot book within {form.minBookingNoticeHours} hours ({(parseInt(form.minBookingNoticeHours) / 24).toFixed(1)} days) of the time slot
+                                    </p>
+                                )}
+                            </div>
+
                             {/* Invitation */}
                             <div>
                                 <label className="block font-semibold mb-3 text-base text-neutral-800">Invitation Template</label>
@@ -1989,6 +2065,7 @@ const CreatePackage: React.FC = () => {
                                         invitation_file: "",
                                         invitationType: "link",
                                         bookingWindowDays: "",
+                                        minBookingNoticeHours: "",
                                         availability_schedules: [],
                                     })}
                                 >

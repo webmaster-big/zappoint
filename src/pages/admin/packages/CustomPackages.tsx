@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Users, Tag, Search, Pencil, Trash2, MapPin, Eye, Power, Sparkles, CalendarHeart, Calendar } from "lucide-react";
+import { Users, Tag, Search, Pencil, Trash2, MapPin, Eye, Power, Sparkles, CalendarHeart, Calendar, Clock } from "lucide-react";
 import StandardButton from '../../../components/ui/StandardButton';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { packageService, packageCacheService, type Package } from '../../../services';
@@ -445,6 +445,15 @@ const CustomPackages: React.FC = () => {
                         {pkg.category && (
                           <span className={`inline-block px-2 py-1 rounded text-xs font-medium bg-${themeColor}-100 text-${fullColor}`}>
                             {pkg.category}
+                          </span>
+                        )}
+                        {pkg.min_booking_notice_hours && pkg.min_booking_notice_hours > 0 && (
+                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-700">
+                            <Clock className="w-3 h-3" />
+                            {pkg.min_booking_notice_hours >= 24
+                              ? `${(pkg.min_booking_notice_hours / 24) % 1 === 0 ? pkg.min_booking_notice_hours / 24 : (pkg.min_booking_notice_hours / 24).toFixed(1)} day${pkg.min_booking_notice_hours / 24 !== 1 ? 's' : ''}`
+                              : `${pkg.min_booking_notice_hours} hr${pkg.min_booking_notice_hours !== 1 ? 's' : ''}`
+                            }
                           </span>
                         )}
                       </div>
