@@ -14,7 +14,8 @@ import {
   PackageIcon,
   RefreshCw,
   MapPin,
-  Loader2
+  Loader2,
+  Info
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import bookingService from '../../../services/bookingService';
@@ -71,6 +72,7 @@ const CalendarView: React.FC = () => {
   const [locations, setLocations] = useState<Array<{ id: number; name: string }>>([]);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [pickerMonth, setPickerMonth] = useState(new Date());
+  const [showColorLegend, setShowColorLegend] = useState(false);
 
   // Load user data from localStorage
   useEffect(() => {
@@ -452,6 +454,26 @@ const CalendarView: React.FC = () => {
       : Math.abs(packageName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)) % packageColors.length;
     const color = packageColors[colorIndex];
     return `${color.bg} ${color.text}`;
+  };
+
+  // Get color for a package by its ID and name (for legend display)
+  const getPackageColorByPackage = (packageId: number, packageName: string) => {
+    const colorIndex = packageId > 0 
+      ? (packageId - 1) % packageColors.length 
+      : Math.abs(packageName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)) % packageColors.length;
+    const color = packageColors[colorIndex];
+    return `${color.bg} ${color.text}`;
+  };
+
+  // Get unique packages with their IDs for the color legend
+  const getPackagesWithColors = () => {
+    const packagesMap = new Map<number, { id: number; name: string }>();
+    bookings.forEach(booking => {
+      if (booking.package?.id && booking.package?.name) {
+        packagesMap.set(booking.package.id, { id: booking.package.id, name: booking.package.name });
+      }
+    });
+    return Array.from(packagesMap.values());
   };
 
   const renderDayView = () => {
@@ -927,6 +949,45 @@ const CalendarView: React.FC = () => {
                 <option value="month">Month</option>
                 <option value="range">Date Range</option>
               </select>
+              
+              {/* Color Legend Info Button */}
+              <div className="relative">
+                <button
+                  onMouseEnter={() => setShowColorLegend(true)}
+                  onMouseLeave={() => setShowColorLegend(false)}
+                  onClick={() => setShowColorLegend(!showColorLegend)}
+                  className={`inline-flex items-center justify-center w-9 h-9 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50 hover:text-${fullColor} transition-colors`}
+                  title="Package Color Legend"
+                >
+                  <Info className="w-4 h-4" />
+                </button>
+                
+                {/* Color Legend Dropdown */}
+                {showColorLegend && (
+                  <div 
+                    className="absolute top-full right-0 mt-2 bg-white rounded-lg shadow-xl border border-gray-200 p-4 z-50 min-w-[220px] animate-scale-in"
+                    onMouseEnter={() => setShowColorLegend(true)}
+                    onMouseLeave={() => setShowColorLegend(false)}
+                  >
+                    <div className="flex items-center gap-2 mb-3 pb-2 border-b border-gray-200">
+                      <PackageIcon className={`w-4 h-4 text-${fullColor}`} />
+                      <h4 className="font-semibold text-gray-900 text-sm">Package Colors</h4>
+                    </div>
+                    {getPackagesWithColors().length === 0 ? (
+                      <p className="text-sm text-gray-500 italic">No packages in current view</p>
+                    ) : (
+                      <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                        {getPackagesWithColors().map(pkg => (
+                          <div key={pkg.id} className="flex items-center gap-2">
+                            <span className={`w-4 h-4 rounded ${getPackageColorByPackage(pkg.id, pkg.name)}`}></span>
+                            <span className="text-sm text-gray-700 truncate">{pkg.name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
               
               <StandardButton
                 variant="secondary"
