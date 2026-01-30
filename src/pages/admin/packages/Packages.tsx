@@ -418,20 +418,35 @@ const Packages: React.FC = () => {
       
       const response = await packageService.bulkUpdateMinNotice(selectedForBulkUpdate, minHours);
       
-      if (response.success && response.data) {
+      if (response.success) {
         // Update local state with the new values
-        const updatedPackages = response.data;
-        setPackages(prev => prev.map(pkg => {
-          const updated = updatedPackages.find((up: Package) => up.id === pkg.id);
-          return updated || pkg;
-        }));
+        // API may return packages in response.data.packages or response.data directly
+        const responseData = response.data as unknown as { packages?: Package[] } | Package[];
+        const updatedPackages: Package[] = Array.isArray(responseData) 
+          ? responseData 
+          : (responseData?.packages || []);
         
-        // Update cache
-        for (const updatedPkg of updatedPackages) {
-          await packageCacheService.updatePackageInCache(updatedPkg);
+        if (Array.isArray(updatedPackages) && updatedPackages.length > 0) {
+          setPackages(prev => prev.map(pkg => {
+            const updated = updatedPackages.find((up: Package) => up.id === pkg.id);
+            return updated || pkg;
+          }));
+          
+          // Update cache
+          for (const updatedPkg of updatedPackages) {
+            await packageCacheService.updatePackageInCache(updatedPkg);
+          }
+        } else {
+          // If no packages returned, just update local state directly
+          setPackages(prev => prev.map(pkg => {
+            if (selectedForBulkUpdate.includes(pkg.id)) {
+              return { ...pkg, min_booking_notice_hours: minHours };
+            }
+            return pkg;
+          }));
         }
         
-        alert(`Advance booking time updated successfully for ${updatedPackages.length} package(s)!`);
+        alert(`Advance booking time updated successfully for ${selectedForBulkUpdate.length} package(s)!`);
         setShowBulkMinNoticeModal(false);
         setSelectedForBulkUpdate([]);
         setBulkMinNoticeHours("");
