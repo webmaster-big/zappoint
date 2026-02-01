@@ -306,7 +306,7 @@ const EditAttraction = () => {
         pricing_type: formData.pricingType,
         max_capacity: Number(formData.maxCapacity),
         category: formData.category,
-        duration: formData.duration === '' || formData.duration === '0' || Number(formData.duration) === 0 ? undefined : Number(formData.duration),
+        duration: formData.duration === '' || formData.duration === '0' || Number(formData.duration) === 0 ? 0 : Number(formData.duration),
         duration_unit: formData.durationUnit as 'hours' | 'minutes' | 'hours and minutes',
         availability: formData.availability,
         image: formData.images.length > 0 ? formData.images : undefined, // Send all images as array
