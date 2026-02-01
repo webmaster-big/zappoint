@@ -63,7 +63,7 @@ export interface CreatePurchaseData {
   guest_email?: string;
   guest_phone?: string;
   quantity: number;
-  payment_method: 'card' | 'in-store' | 'paylater';
+  payment_method: 'card' | 'in-store' | 'paylater' | 'authorize.net';
   purchase_date: string;
   notes?: string;
   // Optional fields for payment tracking

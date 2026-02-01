@@ -76,7 +76,7 @@ interface BookingData extends Omit<OnsiteBookingData, 'customer'> {
     email: string;
     phone: string;
   };
-  paymentMethod: 'card' | 'in-store' | 'paylater';
+  paymentMethod: 'card' | 'in-store' | 'paylater' | 'authorize.net';
   paymentType: 'full' | 'partial' | 'custom';
   inStoreAmountPaid: number;
   customPaymentAmount: number;
@@ -128,7 +128,7 @@ const OnsiteBooking: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   
   // Card payment details
-  const [useAuthorizeNet, setUseAuthorizeNet] = useState(false);
+  const [useAuthorizeNet, setUseAuthorizeNet] = useState(true);
   const [cardNumber, setCardNumber] = useState('');
   const [cardMonth, setCardMonth] = useState('');
   const [cardYear, setCardYear] = useState('');
@@ -158,7 +158,7 @@ const OnsiteBooking: React.FC = () => {
       phone: ''
     },
     room: '',
-    paymentMethod: 'in-store',
+    paymentMethod: 'authorize.net',
     paymentType: 'partial',
     customPaymentAmount: 0,
     inStoreAmountPaid: 0,
@@ -1205,7 +1205,7 @@ const OnsiteBooking: React.FC = () => {
         phone: ''
       },
       room: '',
-      paymentMethod: 'in-store',
+      paymentMethod: 'authorize.net',
       paymentType: 'partial',
       customPaymentAmount: 0,
       inStoreAmountPaid: 0,
@@ -1226,7 +1226,7 @@ const OnsiteBooking: React.FC = () => {
     setCardMonth('');
     setCardYear('');
     setCardCVV('');
-    setUseAuthorizeNet(false);
+    setUseAuthorizeNet(true);
     setPaymentError('');
     setSelectedRoomId(null);
     setStep(1);
@@ -1249,7 +1249,7 @@ const OnsiteBooking: React.FC = () => {
     }
     
     // Validate card details if using Authorize.Net
-    if (bookingData.paymentMethod === 'card' && useAuthorizeNet) {
+    if (bookingData.paymentMethod === 'authorize.net' || (bookingData.paymentMethod === 'card' && useAuthorizeNet)) {
       if (!validateCardNumber(cardNumber)) {
         setPaymentError('Please enter a valid card number');
         return;
@@ -1445,7 +1445,7 @@ const OnsiteBooking: React.FC = () => {
       console.log('================================\n');
       
       // Step 1: Process card payment if using Authorize.Net
-      if (bookingData.paymentMethod === 'card' && useAuthorizeNet) {
+      if (bookingData.paymentMethod === 'authorize.net' || (bookingData.paymentMethod === 'card' && useAuthorizeNet)) {
         try {
           setIsProcessingPayment(true);
           setPaymentError('');
@@ -2852,7 +2852,16 @@ const OnsiteBooking: React.FC = () => {
           {/* Payment Method */}
           <div className="mb-4">
             <h3 className="text-sm font-medium text-gray-700 mb-3">Payment Method</h3>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-4 gap-2">
+              <StandardButton
+                type="button"
+                variant={bookingData.paymentMethod === 'authorize.net' ? 'primary' : 'secondary'}
+                onClick={() => setBookingData(prev => ({ ...prev, paymentMethod: 'authorize.net' }))}
+              >
+                <CreditCard className="h-5 w-5 mx-auto mb-1" />
+                <span className="text-sm font-medium">Online</span>
+              </StandardButton>
+              
               <StandardButton
                 type="button"
                 variant={bookingData.paymentMethod === 'in-store' ? 'primary' : 'secondary'}
@@ -2937,39 +2946,10 @@ const OnsiteBooking: React.FC = () => {
         </div>
       )}
       
-      {/* Card Payment Options - Show only when card is selected */}
-      {bookingData.paymentMethod === 'card' && (
+      {/* Card Payment Options - Show when card or authorize.net is selected */}
+      {(bookingData.paymentMethod === 'card' || bookingData.paymentMethod === 'authorize.net') && (
         <div className="mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-          <div className="mb-4">
-            <h3 className="text-sm font-medium text-gray-700 mb-3">Card Payment Type</h3>
-            <div className="flex gap-2">
-              <StandardButton
-                type="button"
-                variant={!useAuthorizeNet ? 'primary' : 'secondary'}
-                size="sm"
-                onClick={() => setUseAuthorizeNet(false)}
-                className="flex-1"
-              >
-                Manual Card
-              </StandardButton>
-              <StandardButton
-                type="button"
-                variant={useAuthorizeNet ? 'primary' : 'secondary'}
-                size="sm"
-                onClick={() => setUseAuthorizeNet(true)}
-                className="flex-1"
-              >
-                Process with Authorize.Net
-              </StandardButton>
-            </div>
-            <p className="text-xs text-gray-500 mt-2">
-              {useAuthorizeNet ? 'Process payment online with Authorize.Net' : 'Customer paid by card - no online processing'}
-            </p>
-          </div>
-          
-          {useAuthorizeNet && (
-            <>
-              <h3 className="text-sm font-medium text-gray-700 mb-3">Card Details</h3>
+          <h3 className="text-sm font-medium text-gray-700 mb-3">Card Details</h3>
               
               {/* Card Number */}
               <div className="mb-3">
@@ -3064,8 +3044,6 @@ const OnsiteBooking: React.FC = () => {
                 </svg>
                 <span>Secure payment powered by Authorize.Net</span>
               </div>
-            </>
-          )}
         </div>
       )}
       

@@ -39,7 +39,7 @@ const CreatePurchase = () => {
     email: '',
     phone: ''
   });
-  const [paymentMethod, setPaymentMethod] = useState('in-store');
+  const [paymentMethod, setPaymentMethod] = useState('authorize.net');
   const [discount, setDiscount] = useState(0);
   const [notes, setNotes] = useState('');
   const [amountPaid, setAmountPaid] = useState<number>(0);
@@ -52,7 +52,7 @@ const CreatePurchase = () => {
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
   
   // Card payment details
-  const [useAuthorizeNet, setUseAuthorizeNet] = useState(false); // Toggle for Authorize.Net vs manual card
+  const [useAuthorizeNet, setUseAuthorizeNet] = useState(true); // Toggle for Authorize.Net vs manual card
   const [cardNumber, setCardNumber] = useState('');
   const [cardMonth, setCardMonth] = useState('');
   const [cardYear, setCardYear] = useState('');
@@ -329,8 +329,8 @@ const CreatePurchase = () => {
   const handleCompletePurchase = async () => {
     if (!selectedAttraction) return;
 
-    // Validate card information if payment method is card AND using Authorize.Net
-    if (paymentMethod === 'card' && useAuthorizeNet) {
+    // Validate card information if payment method is authorize.net OR (card AND using Authorize.Net)
+    if (paymentMethod === 'authorize.net' || (paymentMethod === 'card' && useAuthorizeNet)) {
       if (!cardNumber || !cardMonth || !cardYear || !cardCVV) {
         setPaymentError('Please fill in all card details');
         return;
@@ -353,8 +353,8 @@ const CreatePurchase = () => {
       const totalAmount = calculateTotal();
       let transactionId: string | undefined;
 
-      // Process card payment if payment method is card AND using Authorize.Net
-      if (paymentMethod === 'card' && useAuthorizeNet) {
+      // Process card payment if payment method is authorize.net OR (card AND using Authorize.Net)
+      if (paymentMethod === 'authorize.net' || (paymentMethod === 'card' && useAuthorizeNet)) {
         const cardData = {
           cardNumber: cardNumber.replace(/\s/g, ''),
           month: cardMonth,
@@ -403,10 +403,10 @@ const CreatePurchase = () => {
         guest_phone: customerInfo.phone || undefined,
         quantity: quantity,
         amount: totalAmount,
-        amount_paid: paymentMethod === 'paylater' ? 0 : (paymentMethod === 'card' ? totalAmount : cashAmountPaid),
+        amount_paid: paymentMethod === 'paylater' ? 0 : ((paymentMethod === 'card' || paymentMethod === 'authorize.net') ? totalAmount : cashAmountPaid),
         currency: 'USD',
-        method: paymentMethod === 'in-store' ? 'cash' : paymentMethod as 'card' | 'paylater',
-        payment_method: paymentMethod as 'card' | 'in-store' | 'paylater',
+        method: paymentMethod === 'in-store' ? 'cash' : paymentMethod as 'card' | 'paylater' | 'authorize.net',
+        payment_method: paymentMethod as 'card' | 'in-store' | 'paylater' | 'authorize.net',
         status: (paymentMethod === 'paylater' || paymentMethod === 'in-store' ? 'pending' : 'completed') as 'pending' | 'completed' | 'cancelled',
         payment_id: transactionId, // Only present if Authorize.Net was used
         location_id: selectedAttraction.locationId || 1,
@@ -429,7 +429,7 @@ const CreatePurchase = () => {
       }
 
       // Create payment record if amount_paid > 0
-      const actualAmountPaid = paymentMethod === 'paylater' ? 0 : (paymentMethod === 'card' ? totalAmount : cashAmountPaid);
+      const actualAmountPaid = paymentMethod === 'paylater' ? 0 : ((paymentMethod === 'card' || paymentMethod === 'authorize.net') ? totalAmount : cashAmountPaid);
       if (actualAmountPaid > 0) {
         try {
           const paymentData = {
@@ -478,14 +478,14 @@ const CreatePurchase = () => {
       setDiscount(0);
       setNotes('');
       setAmountPaid(0);
-      setPaymentMethod('in-store');
+      setPaymentMethod('authorize.net');
       setSelectedCustomerId(null);
       setCardNumber('');
       setCardMonth('');
       setCardYear('');
       setCardCVV('');
       setPaymentError('');
-      setUseAuthorizeNet(false);
+      setUseAuthorizeNet(true);
       setSendEmail(true);
 
     } catch (error: any) {
@@ -781,7 +781,16 @@ const CreatePurchase = () => {
                   {/* Payment Method */}
                   <div className="mb-6">
                     <h3 className="text-sm font-medium text-gray-700 mb-3">Payment Method</h3>
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-4 gap-2">
+                      <StandardButton
+                        variant={paymentMethod === 'authorize.net' ? 'primary' : 'secondary'}
+                        size="md"
+                        onClick={() => setPaymentMethod('authorize.net')}
+                        icon={CreditCard}
+                      >
+                        Online
+                      </StandardButton>
+                      
                       <StandardButton
                         variant={paymentMethod === 'in-store' ? 'primary' : 'secondary'}
                         size="md"
@@ -834,39 +843,10 @@ const CreatePurchase = () => {
                     </div>
                   )}
 
-                  {/* Card Payment Form - Show only when card is selected */}
-                  {paymentMethod === 'card' && (
+                  {/* Card Payment Form - Show when card or authorize.net is selected */}
+                  {(paymentMethod === 'card' || paymentMethod === 'authorize.net') && (
                     <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                      <div className="mb-4">
-                        <h3 className="text-sm font-medium text-gray-700 mb-3">Card Payment Type</h3>
-                        <div className="flex gap-2">
-                          <StandardButton
-                            variant={!useAuthorizeNet ? 'primary' : 'secondary'}
-                            size="sm"
-                            onClick={() => setUseAuthorizeNet(false)}
-                            fullWidth
-                          >
-                            Manual Card
-                          </StandardButton>
-                          <StandardButton
-                            variant={useAuthorizeNet ? 'primary' : 'secondary'}
-                            size="sm"
-                            onClick={() => setUseAuthorizeNet(true)}
-                            fullWidth
-                          >
-                            Process with Authorize.Net
-                          </StandardButton>
-                        </div>
-                        <p className="text-xs text-gray-500 mt-2">
-                          {useAuthorizeNet 
-                            ? 'Process payment online with Authorize.Net' 
-                            : 'Customer paid by card - no online processing'}
-                        </p>
-                      </div>
-                      
-                      {useAuthorizeNet && (
-                        <>
-                          <h3 className="text-sm font-medium text-gray-700 mb-3">Card Details</h3>
+                      <h3 className="text-sm font-medium text-gray-700 mb-3">Card Details</h3>
                       
                       {/* Card Number */}
                       <div className="mb-3">
@@ -965,8 +945,6 @@ const CreatePurchase = () => {
                             </svg>
                             <span>Secure payment powered by Authorize.Net</span>
                           </div>
-                        </>
-                      )}
                     </div>
                   )}
 
