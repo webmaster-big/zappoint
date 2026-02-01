@@ -22,7 +22,7 @@ import { customerService, type Customer } from '../../../services/CustomerServic
 import { generatePurchaseQRCode } from '../../../utils/qrcode';
 import Toast from '../../../components/ui/Toast';
 import { ASSET_URL } from '../../../utils/storage';
-import { loadAcceptJS, processCardPayment, validateCardNumber, formatCardNumber, getCardType } from '../../../services/PaymentService';
+import { loadAcceptJS, processCardPayment, validateCardNumber, formatCardNumber, getCardType, updatePaymentPayable, PAYMENT_TYPE } from '../../../services/PaymentService';
 import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
 import { extractIdFromSlug } from '../../../utils/slug';
 import StandardButton from '../../../components/ui/StandardButton';
@@ -457,6 +457,7 @@ const PurchaseAttraction = () => {
         amount: totalAmount, // Full payment amount
         order_id: `A${attraction.id}-${Date.now().toString().slice(-8)}`, // Max 20 chars for Authorize.Net
         description: `Attraction Purchase: ${attraction.name}`,
+        customer_id: selectedCustomerId || undefined,
       };
       
       const paymentResponse = await processCardPayment(
@@ -497,6 +498,19 @@ const PurchaseAttraction = () => {
       // Create purchase via API
       const response = await attractionPurchaseService.createPurchase(purchaseData);
       const createdPurchase = response.data;
+
+      // Update payment record with payable_id and payable_type
+      if (paymentResponse.payment?.id) {
+        try {
+          await updatePaymentPayable(paymentResponse.payment.id, {
+            payable_id: createdPurchase.id,
+            payable_type: PAYMENT_TYPE.ATTRACTION_PURCHASE,
+          });
+        } catch (paymentUpdateError) {
+          // Payment update error - handled silently in production
+          console.error('Failed to update payment with purchase ID:', paymentUpdateError);
+        }
+      }
 
       // Generate QR code
       const qrData = await generatePurchaseQRCode(createdPurchase.id);

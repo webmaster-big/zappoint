@@ -16,7 +16,7 @@ interface DayOffWithTime {
   package_ids?: number[] | null;  // If set, only applies to these packages
   room_ids?: number[] | null;     // If set, only blocks these rooms
 }
-import { loadAcceptJS, processCardPayment, validateCardNumber, formatCardNumber, getCardType, updatePayment, PAYMENT_TYPE } from '../../../services/PaymentService';
+import { loadAcceptJS, processCardPayment, validateCardNumber, formatCardNumber, getCardType, updatePaymentPayable, PAYMENT_TYPE } from '../../../services/PaymentService';
 import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
 import customerService from '../../../services/CustomerService';
 import DatePicker from '../../../components/ui/DatePicker';
@@ -1023,7 +1023,7 @@ const BookPackage: React.FC = () => {
         // Update payment record with payable_id and payable_type
         if (paymentResponse.payment?.id) {
           try {
-            await updatePayment(paymentResponse.payment.id, { 
+            await updatePaymentPayable(paymentResponse.payment.id, { 
               payable_id: bookingId,
               payable_type: PAYMENT_TYPE.BOOKING
             });
