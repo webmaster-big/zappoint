@@ -29,6 +29,8 @@ interface ExtendedBookingData extends CreateBookingData {
   guest_state?: string;
   guest_zip?: string;
   guest_country?: string;
+  // Email notification flags
+  sent_email_to_staff?: boolean;
 }
 
 // Helper function to sort rooms numerically (extracts numbers from room names)
@@ -58,6 +60,7 @@ const ManualBooking: React.FC = () => {
   const [selectedAttractions, setSelectedAttractions] = useState<{ [id: number]: number }>({});
   const [creatingRoom, setCreatingRoom] = useState(false);
   const [sendEmail, setSendEmail] = useState(true);
+  const [sendEmailToStaff, setSendEmailToStaff] = useState(true);
   const [calculatedTotal, setCalculatedTotal] = useState(0);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [form, setForm] = useState<{
@@ -531,6 +534,8 @@ const ManualBooking: React.FC = () => {
         guest_state: form.guestState || undefined,
         guest_zip: form.guestZip || undefined,
         guest_country: form.guestCountry || undefined,
+        // Email notification flags
+        sent_email_to_staff: sendEmailToStaff,
         skip_date_validation: true, // Allow past dates for manual booking records
         is_manual_entry: true, // Flag this as a manually entered historical record
       };
@@ -1500,6 +1505,24 @@ const ManualBooking: React.FC = () => {
                   {!sendEmail && (
                     <p className="text-xs text-gray-500 mt-2">
                       Customer will not receive a booking confirmation email
+                    </p>
+                  )}
+                  
+                  {/* Staff Email Toggle */}
+                  <label className="flex items-center space-x-3 cursor-pointer group mt-4">
+                    <input
+                      type="checkbox"
+                      checked={sendEmailToStaff}
+                      onChange={(e) => setSendEmailToStaff(e.target.checked)}
+                      className={`w-4 h-4 rounded border-gray-300 text-${themeColor}-600 focus:ring-${themeColor}-500 cursor-pointer`}
+                    />
+                    <span className="text-sm text-gray-700 group-hover:text-gray-900">
+                      Send notification email to staff
+                    </span>
+                  </label>
+                  {!sendEmailToStaff && (
+                    <p className="text-xs text-gray-500 mt-2">
+                      Staff members will not receive booking notification
                     </p>
                   )}
                 </div>

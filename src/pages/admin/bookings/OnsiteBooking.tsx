@@ -65,6 +65,8 @@ interface ExtendedBookingData extends CreateBookingData {
   guest_state?: string;
   guest_zip?: string;
   guest_country?: string;
+  // Email notification flags
+  sent_email_to_staff?: boolean;
 }
 
 interface BookingData extends Omit<OnsiteBookingData, 'customer'> {
@@ -141,6 +143,7 @@ const OnsiteBooking: React.FC = () => {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [showEmptyModal, setShowEmptyModal] = useState(false);
   const [sendEmail, setSendEmail] = useState(true);
+  const [sendEmailToStaff, setSendEmailToStaff] = useState(true);
   const [bookingData, setBookingData] = useState<BookingData>({
     packageId: null,
     selectedAttractions: [],
@@ -1427,6 +1430,8 @@ const OnsiteBooking: React.FC = () => {
         guest_state: bookingData.guestState || undefined,
         guest_zip: bookingData.guestZip || undefined,
         guest_country: bookingData.guestCountry || undefined,
+        // Email notification flags
+        sent_email_to_staff: sendEmailToStaff,
       };
       
       console.log('📤 Sending on-site booking request:', bookingData_request);
@@ -3286,6 +3291,26 @@ const OnsiteBooking: React.FC = () => {
         {!sendEmail && (
           <p className="text-xs text-gray-500 mt-1 ml-7">
             Customer will not receive a booking confirmation email
+          </p>
+        )}
+      </div>
+      
+      {/* Send Email to Staff Checkbox */}
+      <div className="mb-4">
+        <label className="flex items-center space-x-3 cursor-pointer group">
+          <input
+            type="checkbox"
+            checked={sendEmailToStaff}
+            onChange={(e) => setSendEmailToStaff(e.target.checked)}
+            className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+          />
+          <span className="text-sm text-gray-700 group-hover:text-gray-900">
+            Send notification email to staff
+          </span>
+        </label>
+        {!sendEmailToStaff && (
+          <p className="text-xs text-gray-500 mt-1 ml-7">
+            Staff members will not receive booking notification
           </p>
         )}
       </div>
