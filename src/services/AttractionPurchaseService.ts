@@ -35,7 +35,7 @@ export interface AttractionPurchase {
   guest_phone?: string;
   quantity: number;
   total_amount: number;
-  payment_method: 'card' | 'in-store' | 'paylater';
+  payment_method: 'card' | 'in-store' | 'paylater' | 'authorize.net';
   status: 'pending' | 'completed' | 'cancelled';
   purchase_date: string;
   notes?: string;

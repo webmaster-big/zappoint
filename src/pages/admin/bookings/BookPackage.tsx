@@ -994,7 +994,7 @@ const BookPackage: React.FC = () => {
         duration_unit: pkg.duration_unit,
         total_amount: total,
         amount_paid: amountToPay,
-        payment_method: 'card' as const,
+        payment_method: 'authorize.net' as const,
         payment_status: (partialAmount > 0 ? 'partial' : 'paid') as 'paid' | 'partial',
         status: 'confirmed' as const,
         additional_attractions: additionalAttractions.length > 0 ? additionalAttractions : undefined,

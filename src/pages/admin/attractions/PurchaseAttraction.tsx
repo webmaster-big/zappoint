@@ -486,7 +486,7 @@ const PurchaseAttraction = () => {
         amount_paid: totalAmount, // Full payment
         currency: 'USD',
         method: 'card',
-        payment_method: 'card' as 'card' | 'in-store',
+        payment_method: 'authorize.net' as 'card' | 'in-store' | 'paylater' | 'authorize.net',
         status: 'completed' as 'pending' | 'completed' | 'cancelled',
         payment_id: transactionId,
         location_id: attraction.locationId || 1, // Use attraction's location_id from API

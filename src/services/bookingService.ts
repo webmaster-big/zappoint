@@ -57,7 +57,7 @@ export interface CreateBookingData {
   total_amount: number;
   amount_paid?: number;
   discount_amount?: number;
-  payment_method?: 'card' | 'in-store' | 'paylater';
+  payment_method?: 'card' | 'in-store' | 'paylater' | 'authorize.net';
   payment_status?: 'paid' | 'partial' | 'pending';
   
   // Status and notes
