@@ -77,7 +77,7 @@ const EntertainmentLandingPage = () => {
             image: Array.isArray(attr.image) ? attr.image[0] : attr.image,
             category: attr.category,
             availableLocations: attr.locations.map(loc => loc.location_name),
-            duration: attr.duration === 0 || !attr.duration ? 'Unlimited' : formatDurationDisplay(attr.duration, attr.duration_unit),
+            duration: !attr.duration || attr.duration === 0 || String(attr.duration) === '0' ? 'Unlimited' : formatDurationDisplay(attr.duration, attr.duration_unit),
             pricingType: attr.pricing_type,
             purchaseLinks: attr.purchase_links,
             availability: undefined, // Will be loaded when modal opens
@@ -121,7 +121,7 @@ const EntertainmentLandingPage = () => {
             name: pkg.name,
             description: pkg.description,
             price: pkg.price,
-            duration: pkg.duration === 0 || !pkg.duration ? 'Unlimited' : formatDurationDisplay(pkg.duration, pkg.duration_unit),
+            duration: !pkg.duration || pkg.duration === 0 || String(pkg.duration) === '0' ? 'Unlimited' : formatDurationDisplay(pkg.duration, pkg.duration_unit),
             participants: participantsText,
             includes: [], // This would need to be added to backend if needed
             rating: 4.8, // Default rating, backend doesn't return this yet
