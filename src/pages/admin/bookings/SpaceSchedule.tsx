@@ -756,56 +756,74 @@ const SpaceSchedule = () => {
                       const { booking, rowSpan } = cellData;
                       const totalAmount = parseFloat(String(booking.total_amount));
                       
-                      // Get color based on status
-                      const getBgColor = () => {
-                        switch (booking.status) {
-                          case 'confirmed': return 'bg-green-100';
-                          case 'pending': return 'bg-yellow-100';
-                          case 'checked-in': return 'bg-blue-100';
-                          case 'cancelled': return 'bg-red-100';
-                          default: return 'bg-gray-100';
+                      // Package color palette (same as CalendarView for consistency)
+                      const packageColors = [
+                        { bg: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-200' },
+                        { bg: 'bg-green-100', text: 'text-green-800', border: 'border-green-200' },
+                        { bg: 'bg-purple-100', text: 'text-purple-800', border: 'border-purple-200' },
+                        { bg: 'bg-orange-100', text: 'text-orange-800', border: 'border-orange-200' },
+                        { bg: 'bg-pink-100', text: 'text-pink-800', border: 'border-pink-200' },
+                        { bg: 'bg-teal-100', text: 'text-teal-800', border: 'border-teal-200' },
+                        { bg: 'bg-indigo-100', text: 'text-indigo-800', border: 'border-indigo-200' },
+                        { bg: 'bg-amber-100', text: 'text-amber-800', border: 'border-amber-200' },
+                        { bg: 'bg-cyan-100', text: 'text-cyan-800', border: 'border-cyan-200' },
+                        { bg: 'bg-rose-100', text: 'text-rose-800', border: 'border-rose-200' },
+                        { bg: 'bg-lime-100', text: 'text-lime-800', border: 'border-lime-200' },
+                        { bg: 'bg-fuchsia-100', text: 'text-fuchsia-800', border: 'border-fuchsia-200' },
+                      ];
+                      
+                      // Generate consistent hash from package name for fixed colors
+                      const getPackageNameHash = (packageName: string): number => {
+                        if (!packageName) return 0;
+                        let hash = 0;
+                        for (let i = 0; i < packageName.length; i++) {
+                          const char = packageName.charCodeAt(i);
+                          hash = ((hash << 5) - hash) + char;
+                          hash = hash & hash;
                         }
+                        return Math.abs(hash);
                       };
+                      
+                      // Get color based on package name (fixed, consistent across views)
+                      const packageName = booking.package?.name || '';
+                      const colorIndex = getPackageNameHash(packageName) % packageColors.length;
+                      const packageColor = packageColors[colorIndex];
                       
                       return (
                         <td
                           key={space.id}
                           rowSpan={rowSpan}
-                          className={`px-2 py-2 border-r border-gray-200 cursor-pointer hover:bg-gray-50 transition ${getBgColor()}`}
+                          className={`px-2 py-2 border-r border-gray-200 cursor-pointer hover:opacity-80 transition ${packageColor.bg}`}
                           style={{ verticalAlign: 'top' }}
                           onClick={() => setSelectedBooking(booking)}
                         >
                           <div className="h-full min-h-full flex flex-col p-2">
                             {/* Time Range */}
-                            <div className="font-bold text-sm text-gray-900 mb-2">
+                            <div className={`font-bold text-sm ${packageColor.text} mb-2`}>
                               {formatTime12Hour(booking.booking_time)} - {formatTime12Hour(calculateEndTime(booking.booking_time, booking.duration, booking.duration_unit))}
                             </div>
 
                             {/* Customer Name */}
-                            <div className="font-semibold text-sm text-gray-900 mb-1 line-clamp-1">
+                            <div className={`font-semibold text-sm ${packageColor.text} mb-1 line-clamp-1`}>
                               {booking.guest_name || 'Walk-in'}
                             </div>
 
                             {/* Package */}
-                            <div className="text-xs text-gray-700 mb-1 line-clamp-1">
+                            <div className={`text-xs ${packageColor.text} opacity-80 mb-1 line-clamp-1`}>
                               {booking.package?.name || 'N/A'}
                             </div>
 
                             {/* Guests */}
-                            <div className="text-xs text-gray-600 mb-2">
+                            <div className={`text-xs ${packageColor.text} opacity-70 mb-2`}>
                               {booking.participants} {booking.participants === 1 ? 'guest' : 'guests'}
                             </div>
 
                             {/* Payment & Status */}
-                            <div className="mt-auto pt-2 border-t border-gray-300 flex items-center justify-between text-xs">
-                              <span className={`font-semibold ${
-                                booking.payment_status === 'paid' ? 'text-green-700' :
-                                booking.payment_status === 'partial' ? 'text-yellow-700' :
-                                'text-red-700'
-                              }`}>
+                            <div className={`mt-auto pt-2 border-t ${packageColor.border} flex items-center justify-between text-xs`}>
+                              <span className={`font-semibold ${packageColor.text}`}>
                                 ${totalAmount.toFixed(2)}
                               </span>
-                              <span className="text-gray-600 capitalize">
+                              <span className={`${packageColor.text} opacity-80 capitalize`}>
                                 {booking.status}
                               </span>
                             </div>

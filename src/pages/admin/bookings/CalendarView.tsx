@@ -444,23 +444,30 @@ const CalendarView: React.FC = () => {
     { bg: 'bg-fuchsia-100', text: 'text-fuchsia-800', border: 'border-fuchsia-200' },
   ];
 
-  // Get consistent color for a package based on its ID or name
+  // Generate a consistent hash from package name for fixed colors
+  const getPackageNameHash = (packageName: string): number => {
+    if (!packageName) return 0;
+    // Use a simple but consistent hash algorithm based on package name
+    let hash = 0;
+    for (let i = 0; i < packageName.length; i++) {
+      const char = packageName.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32-bit integer
+    }
+    return Math.abs(hash);
+  };
+
+  // Get consistent color for a package based on its name (fixed, never changes)
   const getPackageColor = (booking: Booking) => {
-    const packageId = booking.package?.id || 0;
     const packageName = booking.package?.name || '';
-    // Use package ID if available, otherwise hash the name for consistent coloring
-    const colorIndex = packageId > 0 
-      ? (packageId - 1) % packageColors.length 
-      : Math.abs(packageName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)) % packageColors.length;
+    const colorIndex = getPackageNameHash(packageName) % packageColors.length;
     const color = packageColors[colorIndex];
     return `${color.bg} ${color.text}`;
   };
 
-  // Get color for a package by its ID and name (for legend display)
-  const getPackageColorByPackage = (packageId: number, packageName: string) => {
-    const colorIndex = packageId > 0 
-      ? (packageId - 1) % packageColors.length 
-      : Math.abs(packageName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)) % packageColors.length;
+  // Get color for a package by its name (for legend display)
+  const getPackageColorByPackage = (_packageId: number, packageName: string) => {
+    const colorIndex = getPackageNameHash(packageName) % packageColors.length;
     const color = packageColors[colorIndex];
     return `${color.bg} ${color.text}`;
   };
