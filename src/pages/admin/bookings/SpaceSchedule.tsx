@@ -631,26 +631,40 @@ const SpaceSchedule = () => {
               <button className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition">
                 <Info className="w-5 h-5" />
               </button>
-              <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 p-3 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20">
-                <div className="text-xs font-medium text-gray-700 mb-2">Legend</div>
-                <div className="space-y-2 text-xs">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 bg-green-100 rounded"></div>
-                    <span className="text-gray-600">Confirmed</span>
+              <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 p-4 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20">
+                <div className="text-xs font-semibold text-gray-800 mb-3">Legend</div>
+                
+                {/* Status Indicators */}
+                <div className="mb-3">
+                  <div className="text-xs font-medium text-gray-600 mb-2">Booking Status</div>
+                  <div className="space-y-2 text-xs">
+                    <div className="flex items-center gap-2">
+                      <span className="px-2 py-0.5 bg-green-500 text-white rounded-full text-[10px] font-semibold">Confirmed</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="px-2 py-0.5 bg-yellow-500 text-white rounded-full text-[10px] font-semibold">Pending</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="px-2 py-0.5 bg-blue-500 text-white rounded-full text-[10px] font-semibold">Checked-in</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="px-2 py-0.5 bg-gray-500 text-white rounded-full text-[10px] font-semibold">Completed</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="px-2 py-0.5 bg-red-500 text-white rounded-full text-[10px] font-semibold">Cancelled</span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 bg-yellow-100 rounded"></div>
-                    <span className="text-gray-600">Pending</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 bg-blue-100 rounded"></div>
-                    <span className="text-gray-600">Checked In</span>
-                  </div>
+                </div>
+                
+                {/* Color Coding */}
+                <div className="pt-3 border-t border-gray-200">
+                  <div className="text-xs font-medium text-gray-600 mb-2">Color Coding</div>
+                  <p className="text-xs text-gray-500 mb-2">Each package has a unique color</p>
                   <div className="flex items-center gap-2">
                     <div className="w-3 h-3 bg-gray-200 rounded border border-dashed border-gray-400 flex items-center justify-center">
                       <Coffee className="w-1.5 h-1.5 text-gray-500" />
                     </div>
-                    <span className="text-gray-600">Break Time</span>
+                    <span className="text-gray-600 text-xs">Break Time</span>
                   </div>
                 </div>
               </div>
@@ -798,8 +812,25 @@ const SpaceSchedule = () => {
                           onClick={() => setSelectedBooking(booking)}
                         >
                           <div className="h-full min-h-full flex flex-col p-2">
+                            {/* Status Badge - Prominent at top */}
+                            <div className="flex items-center justify-between mb-2">
+                              <span className={`px-2 py-0.5 text-[10px] font-bold uppercase rounded-full ${
+                                booking.status === 'confirmed' ? 'bg-green-500 text-white' :
+                                booking.status === 'pending' ? 'bg-yellow-500 text-white' :
+                                booking.status === 'checked-in' ? 'bg-blue-500 text-white' :
+                                booking.status === 'completed' ? 'bg-gray-500 text-white' :
+                                booking.status === 'cancelled' ? 'bg-red-500 text-white' :
+                                'bg-gray-400 text-white'
+                              }`}>
+                                {booking.status}
+                              </span>
+                              <span className={`text-[10px] font-medium ${packageColor.text} opacity-70`}>
+                                #{booking.reference_number?.slice(-6)}
+                              </span>
+                            </div>
+                            
                             {/* Time Range */}
-                            <div className={`font-bold text-sm ${packageColor.text} mb-2`}>
+                            <div className={`font-bold text-sm ${packageColor.text} mb-1`}>
                               {formatTime12Hour(booking.booking_time)} - {formatTime12Hour(calculateEndTime(booking.booking_time, booking.duration, booking.duration_unit))}
                             </div>
 
@@ -814,17 +845,22 @@ const SpaceSchedule = () => {
                             </div>
 
                             {/* Guests */}
-                            <div className={`text-xs ${packageColor.text} opacity-70 mb-2`}>
+                            <div className={`text-xs ${packageColor.text} opacity-70 mb-1`}>
+                              <Users className="w-3 h-3 inline mr-1" />
                               {booking.participants} {booking.participants === 1 ? 'guest' : 'guests'}
                             </div>
 
-                            {/* Payment & Status */}
+                            {/* Payment Info */}
                             <div className={`mt-auto pt-2 border-t ${packageColor.border} flex items-center justify-between text-xs`}>
-                              <span className={`font-semibold ${packageColor.text}`}>
+                              <span className={`font-bold ${packageColor.text}`}>
                                 ${totalAmount.toFixed(2)}
                               </span>
-                              <span className={`${packageColor.text} opacity-80 capitalize`}>
-                                {booking.status}
+                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                                booking.payment_status === 'paid' ? 'bg-green-100 text-green-700' :
+                                booking.payment_status === 'partial' ? 'bg-yellow-100 text-yellow-700' :
+                                'bg-red-100 text-red-700'
+                              }`}>
+                                {booking.payment_status}
                               </span>
                             </div>
                           </div>
