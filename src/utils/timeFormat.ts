@@ -69,6 +69,9 @@ export function formatDurationDisplay(
   
   if (isNaN(durationValue)) return 'Not specified';
   
+  // 0 duration means unlimited
+  if (durationValue === 0) return 'Unlimited';
+  
   // Handle 'hours and minutes' unit with decimal value (e.g., 1.90 = 1 hr 54 min)
   if (durationUnit === 'hours and minutes') {
     const hours = Math.floor(durationValue);
