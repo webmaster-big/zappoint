@@ -61,6 +61,7 @@ const EditAttraction = () => {
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [isActive, setIsActive] = useState<boolean>(true);
 
   // Load attraction data
   useEffect(() => {
@@ -97,6 +98,9 @@ const EditAttraction = () => {
                 end_time: '17:00'
               }],
         });
+        
+        // Preserve the current active status
+        setIsActive(attraction.is_active ?? true);
 
         // Set image previews if images exist (handle both string and array)
         if (attraction.image) {
@@ -302,11 +306,11 @@ const EditAttraction = () => {
         pricing_type: formData.pricingType,
         max_capacity: Number(formData.maxCapacity),
         category: formData.category,
-        duration: (formData.duration && Number(formData.duration) > 0) ? Number(formData.duration) : undefined,
+        duration: formData.duration === '' || formData.duration === '0' || Number(formData.duration) === 0 ? undefined : Number(formData.duration),
         duration_unit: formData.durationUnit as 'hours' | 'minutes' | 'hours and minutes',
         availability: formData.availability,
         image: formData.images.length > 0 ? formData.images : undefined, // Send all images as array
-        is_active: true,
+        is_active: isActive,
       };
 
       console.log('Updating attraction data:', attractionData);
