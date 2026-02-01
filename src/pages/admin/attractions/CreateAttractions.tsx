@@ -271,7 +271,7 @@ const CreateAttraction = () => {
         pricing_type: formData.pricingType,
         max_capacity: Number(formData.maxCapacity),
         category: formData.category,
-        duration: (formData.duration && Number(formData.duration) > 0) ? Number(formData.duration) : undefined,
+        duration: formData.duration === '' || formData.duration === '0' || Number(formData.duration) === 0 ? null : Number(formData.duration),
         duration_unit: formData.durationUnit as 'hours' | 'minutes' | 'hours and minutes',
         availability: formData.availability,
         image: formData.images.length > 0 ? formData.images : undefined, // Send all images as array
@@ -581,6 +581,7 @@ const CreateAttraction = () => {
                         type="number"
                         name="duration"
                         min="0"
+                        step="any"
                         value={formData.duration}
                         onChange={handleInputChange}
                         className="flex-1 px-4 py-2 focus:outline-none text-neutral-900"
