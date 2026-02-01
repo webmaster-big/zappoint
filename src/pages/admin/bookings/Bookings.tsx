@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
   Eye, 
+  EyeOff,
   Pencil, 
   Trash2, 
   Search, 
@@ -21,12 +22,14 @@ import {
   Edit3,
   Clock,
   Home,
-  FileDown
+  FileDown,
+  Columns
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import StandardButton from '../../../components/ui/StandardButton';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
-import type { BookingsPageBooking, BookingsPageFilterOptions } from '../../../types/Bookings.types';
+import type { BookingsPageBooking, BookingsPageFilterOptions, BookingsColumnVisibility, BookingsColumnKey } from '../../../types/Bookings.types';
+import { derivePaymentStatus, DEFAULT_COLUMN_ORDER } from '../../../types/Bookings.types';
 import bookingService from '../../../services/bookingService';
 import { bookingCacheService } from '../../../services/BookingCacheService';
 import { createPayment, PAYMENT_TYPE } from '../../../services/PaymentService';
@@ -72,7 +75,10 @@ const Bookings: React.FC = () => {
       end: ''
     },
     search: '',
-    payment: 'all'
+    payment: 'all',
+    packageId: 'all',
+    roomId: 'all',
+    customerId: 'all'
   });
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
@@ -107,6 +113,157 @@ const Bookings: React.FC = () => {
   const currentUser = getStoredUser();
   const isCompanyAdmin = currentUser?.role === 'company_admin';
   const [selectedLocation, setSelectedLocation] = useState<number | null>(null);
+
+  // Column visibility state - persisted to localStorage
+  const getDefaultColumnVisibility = (): BookingsColumnVisibility => {
+    const saved = localStorage.getItem('bookings_column_visibility');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {
+        // fallback to defaults
+      }
+    }
+    return {
+      // Booking identifiers
+      id: true,                    // Confirmation #
+      referenceNumber: false,      // Reference number (hidden by default)
+      
+      // Date & Time
+      bookingDate: true,           // Booking date
+      bookingTime: true,           // Booking time
+      duration: true,              // Duration
+      
+      // Customer info
+      guestName: true,             // Guest name
+      guestEmail: true,            // Guest email
+      guestPhone: true,            // Guest phone
+      
+      // Customer address
+      guestAddress: false,         // Address (hidden by default)
+      
+      // Package & Room
+      packageName: true,           // Package name
+      roomName: true,              // Room name
+      location: isCompanyAdmin,    // Location (only for company admin)
+      
+      // Booking details
+      participants: true,          // Participants
+      status: true,                // Status
+      
+      // Payment
+      paymentMethod: true,         // Payment method
+      paymentStatus: true,         // Payment status
+      totalAmount: true,           // Total amount
+      amountPaid: true,            // Amount paid
+      
+      // Guest of Honor
+      guestOfHonor: false,         // Guest of honor (hidden by default)
+      
+      // Notes
+      notes: false,                // Notes (hidden by default)
+      specialRequests: false,      // Special requests (hidden by default)
+      
+      // Timestamps
+      createdAt: false,            // Created date (hidden by default)
+      updatedAt: false,            // Updated date (hidden by default)
+    };
+  };
+  
+  const [columnVisibility, setColumnVisibility] = useState<BookingsColumnVisibility>(getDefaultColumnVisibility);
+  const [showColumnSelector, setShowColumnSelector] = useState(false);
+  
+  // Column order state for drag-and-drop reordering
+  const getDefaultColumnOrder = (): BookingsColumnKey[] => {
+    const saved = localStorage.getItem('bookings_column_order');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {
+        // fallback to defaults
+      }
+    }
+    return DEFAULT_COLUMN_ORDER;
+  };
+  
+  const [columnOrder, setColumnOrder] = useState<BookingsColumnKey[]>(getDefaultColumnOrder);
+  const [draggedColumn, setDraggedColumn] = useState<BookingsColumnKey | null>(null);
+  const [dragOverColumn, setDragOverColumn] = useState<BookingsColumnKey | null>(null);
+  
+  // Drag and drop handlers for column reordering
+  const handleDragStart = (e: React.DragEvent, columnKey: BookingsColumnKey) => {
+    setDraggedColumn(columnKey);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', columnKey);
+    // Add a slight delay to show drag effect
+    setTimeout(() => {
+      (e.target as HTMLElement).style.opacity = '0.5';
+    }, 0);
+  };
+
+  const handleDragEnd = (e: React.DragEvent) => {
+    (e.target as HTMLElement).style.opacity = '1';
+    setDraggedColumn(null);
+    setDragOverColumn(null);
+  };
+
+  const handleDragOver = (e: React.DragEvent, columnKey: BookingsColumnKey) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (draggedColumn && columnKey !== draggedColumn) {
+      setDragOverColumn(columnKey);
+    }
+  };
+
+  const handleDragLeave = () => {
+    setDragOverColumn(null);
+  };
+
+  const handleDrop = (e: React.DragEvent, targetColumnKey: BookingsColumnKey) => {
+    e.preventDefault();
+    
+    if (!draggedColumn || draggedColumn === targetColumnKey) {
+      setDraggedColumn(null);
+      setDragOverColumn(null);
+      return;
+    }
+
+    const newOrder = [...columnOrder];
+    const draggedIndex = newOrder.indexOf(draggedColumn);
+    const targetIndex = newOrder.indexOf(targetColumnKey);
+
+    // Remove dragged item and insert at new position
+    newOrder.splice(draggedIndex, 1);
+    newOrder.splice(targetIndex, 0, draggedColumn);
+
+    setColumnOrder(newOrder);
+    localStorage.setItem('bookings_column_order', JSON.stringify(newOrder));
+    
+    setDraggedColumn(null);
+    setDragOverColumn(null);
+  };
+
+  const resetColumnOrder = () => {
+    setColumnOrder(DEFAULT_COLUMN_ORDER);
+    localStorage.removeItem('bookings_column_order');
+  };
+  
+  // Filter dropdown data
+  const [filterPackages, setFilterPackages] = useState<Array<{id: number, name: string}>>([]);
+  const [filterRooms, setFilterRooms] = useState<Array<{id: number, name: string}>>([]);
+  const [filterCustomers, setFilterCustomers] = useState<Array<{id: number, name: string}>>([]);
+  
+  // Save column visibility to localStorage
+  const updateColumnVisibility = (column: keyof BookingsColumnVisibility, visible: boolean) => {
+    const updated = { ...columnVisibility, [column]: visible };
+    setColumnVisibility(updated);
+    localStorage.setItem('bookings_column_visibility', JSON.stringify(updated));
+  };
+
+  // Toggle column visibility
+  const toggleColumnVisibility = (column: keyof BookingsColumnVisibility) => {
+    updateColumnVisibility(column, !columnVisibility[column]);
+  };
 
   // Inline editing state
   const [editingCell, setEditingCell] = useState<{ bookingId: string; field: string } | null>(null);
@@ -221,6 +378,32 @@ const Bookings: React.FC = () => {
     },
   ];
 
+  // Column configuration for drag-and-drop table
+  const columnConfig: Record<BookingsColumnKey, { 
+    label: string; 
+    isVisible: () => boolean;
+  }> = {
+    id: { label: 'Conf #', isVisible: () => columnVisibility.id },
+    referenceNumber: { label: 'Ref #', isVisible: () => columnVisibility.referenceNumber },
+    dateTime: { label: 'Date/Time', isVisible: () => columnVisibility.bookingDate || columnVisibility.bookingTime },
+    customer: { label: 'Customer', isVisible: () => columnVisibility.guestName || columnVisibility.guestEmail || columnVisibility.guestPhone },
+    guestAddress: { label: 'Address', isVisible: () => columnVisibility.guestAddress },
+    packageRoom: { label: 'Package/Room', isVisible: () => columnVisibility.packageName || columnVisibility.roomName },
+    location: { label: 'Location', isVisible: () => columnVisibility.location },
+    duration: { label: 'Duration', isVisible: () => columnVisibility.duration },
+    participants: { label: 'Guests', isVisible: () => columnVisibility.participants },
+    status: { label: 'Status', isVisible: () => columnVisibility.status },
+    paymentMethod: { label: 'Payment', isVisible: () => columnVisibility.paymentMethod },
+    paymentStatus: { label: 'Pay Status', isVisible: () => columnVisibility.paymentStatus },
+    amountPaid: { label: 'Paid', isVisible: () => columnVisibility.amountPaid },
+    totalAmount: { label: 'Total', isVisible: () => columnVisibility.totalAmount },
+    guestOfHonor: { label: 'Guest of Honor', isVisible: () => columnVisibility.guestOfHonor },
+    notes: { label: 'Notes', isVisible: () => columnVisibility.notes },
+    specialRequests: { label: 'Requests', isVisible: () => columnVisibility.specialRequests },
+    createdAt: { label: 'Created', isVisible: () => columnVisibility.createdAt },
+    updatedAt: { label: 'Updated', isVisible: () => columnVisibility.updatedAt },
+  };
+
   // Load bookings from backend API
   useEffect(() => {
     loadLocations();
@@ -279,43 +462,68 @@ const Bookings: React.FC = () => {
         if (cachedBookings && cachedBookings.length > 0) {
           // Transform cached booking data to match BookingsPageBooking interface
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const transformedBookings: BookingsPageBooking[] = cachedBookings.map((booking: any) => ({
-            id: booking.id.toString(),
-            type: 'package',
-            packageName: booking.package?.name || 'N/A',
-            room: booking.room?.name || 'N/A',
-            customerName: booking.customer 
-              ? `${booking.customer.first_name} ${booking.customer.last_name}`
-              : booking.guest_name || 'Guest',
-            email: booking.customer?.email || booking.guest_email || '',
-            phone: booking.customer?.phone || booking.guest_phone || '',
-            date: booking.booking_date,
-            time: booking.booking_time,
-            participants: booking.participants,
-            status: booking.status as BookingsPageBooking['status'],
-            totalAmount: Number(booking.total_amount),
-            amountPaid: Number(booking.amount_paid || booking.total_amount),
-            paymentStatus: (booking.payment_status || 'pending') as BookingsPageBooking['paymentStatus'],
-            createdAt: booking.created_at,
-            paymentMethod: booking.payment_method as BookingsPageBooking['paymentMethod'],
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            attractions: booking.attractions?.map((attr: any) => ({
-              name: attr.name,
-              quantity: attr.pivot?.quantity || 1
-            })) || [],
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            addOns: booking.add_ons?.map((addon: any) => ({
-              name: addon.name,
-              quantity: addon.pivot?.quantity || 1
-            })) || [],
-            duration: booking.duration && booking.duration_unit 
-              ? formatDurationDisplay(booking.duration, booking.duration_unit)
-              : '2 hours',
-            activity: booking.package?.category || 'Package Booking',
-            notes: booking.notes,
-            referenceNumber: booking.reference_number,
-            location: booking.location?.name || 'N/A',
-          }));
+          const transformedBookings: BookingsPageBooking[] = cachedBookings.map((booking: any) => {
+            const totalAmount = Number(booking.total_amount);
+            const amountPaid = Number(booking.amount_paid || 0);
+            return {
+              id: booking.id.toString(),
+              type: 'package',
+              packageName: booking.package?.name || 'N/A',
+              packageId: booking.package_id,
+              room: booking.room?.name || 'N/A',
+              roomId: booking.room_id,
+              customerName: booking.customer 
+                ? `${booking.customer.first_name} ${booking.customer.last_name}`
+                : booking.guest_name || 'Guest',
+              customerId: booking.customer_id,
+              email: booking.customer?.email || booking.guest_email || '',
+              phone: booking.customer?.phone || booking.guest_phone || '',
+              date: booking.booking_date,
+              time: booking.booking_time,
+              participants: booking.participants,
+              status: booking.status as BookingsPageBooking['status'],
+              totalAmount,
+              amountPaid,
+              paymentStatus: derivePaymentStatus(amountPaid, totalAmount),
+              createdAt: booking.created_at,
+              paymentMethod: booking.payment_method as BookingsPageBooking['paymentMethod'],
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              attractions: booking.attractions?.map((attr: any) => ({
+                name: attr.name,
+                quantity: attr.pivot?.quantity || 1
+              })) || [],
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              addOns: booking.add_ons?.map((addon: any) => ({
+                name: addon.name,
+                quantity: addon.pivot?.quantity || 1
+              })) || [],
+              duration: booking.duration && booking.duration_unit 
+                ? formatDurationDisplay(booking.duration, booking.duration_unit)
+                : '2 hours',
+              activity: booking.package?.category || 'Package Booking',
+              notes: booking.notes,
+              specialRequests: booking.special_requests,
+              referenceNumber: booking.reference_number,
+              location: booking.location?.name || 'N/A',
+              locationId: booking.location_id,
+              updatedAt: booking.updated_at,
+              transactionId: booking.transaction_id,
+              // Guest of Honor
+              guestOfHonorName: booking.guest_of_honor_name,
+              guestOfHonorAge: booking.guest_of_honor_age,
+              guestOfHonorGender: booking.guest_of_honor_gender,
+              // Address
+              guestAddress: booking.guest_address || booking.customer?.address,
+              guestCity: booking.guest_city || booking.customer?.city,
+              guestState: booking.guest_state || booking.customer?.state,
+              guestZip: booking.guest_zip || booking.customer?.zip,
+              guestCountry: booking.guest_country || booking.customer?.country,
+            };
+          });
+          
+          // Extract unique packages, rooms, customers for filter dropdowns
+          extractFilterOptions(transformedBookings);
+          
           console.log('[Bookings] Loaded from cache:', transformedBookings.length, 'bookings');
           setBookings(transformedBookings);
           setLoading(false);
@@ -340,80 +548,29 @@ const Bookings: React.FC = () => {
       if (response.success && response.data) {
         // Transform backend booking data to match BookingsPageBooking interface
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const transformedBookings: BookingsPageBooking[] = response.data.bookings.map((booking: any) => ({
-          id: booking.id.toString(),
-          type: 'package',
-          packageName: booking.package?.name || 'N/A',
-          room: booking.room?.name || 'N/A',
-          customerName: booking.customer 
-            ? `${booking.customer.first_name} ${booking.customer.last_name}`
-            : booking.guest_name || 'Guest',
-          email: booking.customer?.email || booking.guest_email || '',
-          phone: booking.customer?.phone || booking.guest_phone || '',
-          date: booking.booking_date,
-          time: booking.booking_time,
-          participants: booking.participants,
-          status: booking.status as BookingsPageBooking['status'],
-          totalAmount: Number(booking.total_amount),
-          amountPaid: Number(booking.amount_paid || booking.total_amount),
-          paymentStatus: (booking.payment_status || 'pending') as BookingsPageBooking['paymentStatus'],
-          createdAt: booking.created_at,
-          paymentMethod: booking.payment_method as BookingsPageBooking['paymentMethod'],
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          attractions: booking.attractions?.map((attr: any) => ({
-            name: attr.name,
-            quantity: attr.pivot?.quantity || 1
-          })) || [],
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          addOns: booking.add_ons?.map((addon: any) => ({
-            name: addon.name,
-            quantity: addon.pivot?.quantity || 1
-          })) || [],
-          duration: booking.duration && booking.duration_unit 
-            ? formatDurationDisplay(booking.duration, booking.duration_unit)
-            : '2 hours',
-          activity: booking.package?.category || 'Package Booking',
-          notes: booking.notes,
-          referenceNumber: booking.reference_number,
-          location: booking.location?.name || 'N/A',
-        }));
-        console.log('[Bookings] Fetched from API:', transformedBookings.length, 'bookings');
-        setBookings(transformedBookings);
-        
-        // Cache the raw API data for next time
-        await bookingCacheService.cacheBookings(response.data.bookings);
-      }
-    } catch (error) {
-      console.error('Error loading bookings:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const applyFilters = async () => {
-    // If search term exists, use backend search
-    if (filters.search && filters.search.length >= 2) {
-      try {
-        const response = await bookingService.searchBookings(filters.search);
-        if (response.success && response.data) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const transformedResults = response.data.map((booking: any) => ({
+        const transformedBookings: BookingsPageBooking[] = response.data.bookings.map((booking: any) => {
+          const totalAmount = Number(booking.total_amount);
+          const amountPaid = Number(booking.amount_paid || 0);
+          return {
             id: booking.id.toString(),
-            type: 'package' as const,
+            type: 'package',
             packageName: booking.package?.name || 'N/A',
-              room: booking.room?.name || 'N/A',
+            packageId: booking.package_id,
+            room: booking.room?.name || 'N/A',
+            roomId: booking.room_id,
             customerName: booking.customer 
               ? `${booking.customer.first_name} ${booking.customer.last_name}`
               : booking.guest_name || 'Guest',
+            customerId: booking.customer_id,
             email: booking.customer?.email || booking.guest_email || '',
             phone: booking.customer?.phone || booking.guest_phone || '',
             date: booking.booking_date,
             time: booking.booking_time,
             participants: booking.participants,
             status: booking.status as BookingsPageBooking['status'],
-            totalAmount: Number(booking.total_amount),
-            amountPaid: Number(booking.amount_paid || booking.total_amount),
-            paymentStatus: (booking.payment_status || 'pending') as BookingsPageBooking['paymentStatus'],
+            totalAmount,
+            amountPaid,
+            paymentStatus: derivePaymentStatus(amountPaid, totalAmount),
             createdAt: booking.created_at,
             paymentMethod: booking.payment_method as BookingsPageBooking['paymentMethod'],
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -431,9 +588,117 @@ const Bookings: React.FC = () => {
               : '2 hours',
             activity: booking.package?.category || 'Package Booking',
             notes: booking.notes,
+            specialRequests: booking.special_requests,
             referenceNumber: booking.reference_number,
-            location: booking.location.name || 'N/A'
-          }));
+            location: booking.location?.name || 'N/A',
+            locationId: booking.location_id,
+            updatedAt: booking.updated_at,
+            transactionId: booking.transaction_id,
+            // Guest of Honor
+            guestOfHonorName: booking.guest_of_honor_name,
+            guestOfHonorAge: booking.guest_of_honor_age,
+            guestOfHonorGender: booking.guest_of_honor_gender,
+            // Address
+            guestAddress: booking.guest_address || booking.customer?.address,
+            guestCity: booking.guest_city || booking.customer?.city,
+            guestState: booking.guest_state || booking.customer?.state,
+            guestZip: booking.guest_zip || booking.customer?.zip,
+            guestCountry: booking.guest_country || booking.customer?.country,
+          };
+        });
+        console.log('[Bookings] Fetched from API:', transformedBookings.length, 'bookings');
+        
+        // Extract unique packages, rooms, customers for filter dropdowns
+        extractFilterOptions(transformedBookings);
+        
+        setBookings(transformedBookings);
+        
+        // Cache the raw API data for next time
+        await bookingCacheService.cacheBookings(response.data.bookings);
+      }
+    } catch (error) {
+      console.error('Error loading bookings:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // Extract unique filter options from bookings
+  const extractFilterOptions = (bookingsList: BookingsPageBooking[]) => {
+    // Extract unique packages
+    const uniquePackages = new Map<number, string>();
+    const uniqueRooms = new Map<number, string>();
+    const uniqueCustomers = new Map<number, string>();
+    
+    bookingsList.forEach(b => {
+      if (b.packageId && b.packageName !== 'N/A') {
+        uniquePackages.set(b.packageId, b.packageName);
+      }
+      if (b.roomId && b.room !== 'N/A') {
+        uniqueRooms.set(b.roomId, b.room);
+      }
+      if (b.customerId && b.customerName !== 'Guest') {
+        uniqueCustomers.set(b.customerId, b.customerName);
+      }
+    });
+    
+    setFilterPackages(Array.from(uniquePackages.entries()).map(([id, name]) => ({ id, name })));
+    setFilterRooms(Array.from(uniqueRooms.entries()).map(([id, name]) => ({ id, name })));
+    setFilterCustomers(Array.from(uniqueCustomers.entries()).map(([id, name]) => ({ id, name })));
+  };
+
+  const applyFilters = async () => {
+    // If search term exists, use backend search
+    if (filters.search && filters.search.length >= 2) {
+      try {
+        const response = await bookingService.searchBookings(filters.search);
+        if (response.success && response.data) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const transformedResults = response.data.map((booking: any) => {
+            const totalAmount = Number(booking.total_amount);
+            const amountPaid = Number(booking.amount_paid || 0);
+            return {
+              id: booking.id.toString(),
+              type: 'package' as const,
+              packageName: booking.package?.name || 'N/A',
+              packageId: booking.package_id,
+              room: booking.room?.name || 'N/A',
+              roomId: booking.room_id,
+              customerName: booking.customer 
+                ? `${booking.customer.first_name} ${booking.customer.last_name}`
+                : booking.guest_name || 'Guest',
+              customerId: booking.customer_id,
+              email: booking.customer?.email || booking.guest_email || '',
+              phone: booking.customer?.phone || booking.guest_phone || '',
+              date: booking.booking_date,
+              time: booking.booking_time,
+              participants: booking.participants,
+              status: booking.status as BookingsPageBooking['status'],
+              totalAmount,
+              amountPaid,
+              paymentStatus: derivePaymentStatus(amountPaid, totalAmount),
+              createdAt: booking.created_at,
+              paymentMethod: booking.payment_method as BookingsPageBooking['paymentMethod'],
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              attractions: booking.attractions?.map((attr: any) => ({
+                name: attr.name,
+                quantity: attr.pivot?.quantity || 1
+              })) || [],
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              addOns: booking.add_ons?.map((addon: any) => ({
+                name: addon.name,
+                quantity: addon.pivot?.quantity || 1
+              })) || [],
+              duration: booking.duration && booking.duration_unit 
+                ? formatDurationDisplay(booking.duration, booking.duration_unit)
+                : '2 hours',
+              activity: booking.package?.category || 'Package Booking',
+              notes: booking.notes,
+              referenceNumber: booking.reference_number,
+              location: booking.location?.name || 'N/A',
+              locationId: booking.location_id,
+            };
+          });
           
           let result: BookingsPageBooking[] = transformedResults;
           
@@ -443,6 +708,15 @@ const Bookings: React.FC = () => {
           }
           if (filters.payment !== 'all') {
             result = result.filter(booking => booking.paymentMethod === filters.payment);
+          }
+          if (filters.packageId !== 'all') {
+            result = result.filter(booking => booking.packageId?.toString() === filters.packageId);
+          }
+          if (filters.roomId !== 'all') {
+            result = result.filter(booking => booking.roomId?.toString() === filters.roomId);
+          }
+          if (filters.customerId !== 'all') {
+            result = result.filter(booking => booking.customerId?.toString() === filters.customerId);
           }
           if (filters.dateRange.start) {
             result = result.filter(booking => booking.date >= filters.dateRange.start);
@@ -462,14 +736,16 @@ const Bookings: React.FC = () => {
     // Client-side filtering when no search or search fails
     let result = [...bookings];
 
-    // Apply search filter
+    // Apply search filter (includes confirmation number/reference number and booking ID)
     if (filters.search) {
       const searchTerm = filters.search.toLowerCase();
       result = result.filter(booking =>
         booking.customerName.toLowerCase().includes(searchTerm) ||
         booking.email.toLowerCase().includes(searchTerm) ||
         booking.packageName.toLowerCase().includes(searchTerm) ||
-        booking.phone.includes(searchTerm)
+        booking.phone.includes(searchTerm) ||
+        booking.referenceNumber?.toLowerCase().includes(searchTerm) ||
+        booking.id.includes(searchTerm)
       );
     }
 
@@ -481,6 +757,21 @@ const Bookings: React.FC = () => {
     // Apply payment filter
     if (filters.payment !== 'all') {
       result = result.filter(booking => booking.paymentMethod === filters.payment);
+    }
+    
+    // Apply package filter
+    if (filters.packageId !== 'all') {
+      result = result.filter(booking => booking.packageId?.toString() === filters.packageId);
+    }
+    
+    // Apply room filter
+    if (filters.roomId !== 'all') {
+      result = result.filter(booking => booking.roomId?.toString() === filters.roomId);
+    }
+    
+    // Apply customer filter
+    if (filters.customerId !== 'all') {
+      result = result.filter(booking => booking.customerId?.toString() === filters.customerId);
     }
 
     // Apply date range filter
@@ -519,7 +810,10 @@ const Bookings: React.FC = () => {
         end: ''
       },
       search: '',
-      payment: 'all'
+      payment: 'all',
+      packageId: 'all',
+      roomId: 'all',
+      customerId: 'all'
     });
   };
 
@@ -588,7 +882,9 @@ const Bookings: React.FC = () => {
     }
   };
 
-  const handlePaymentStatusChange = async (id: string, newPaymentStatus: BookingsPageBooking['paymentStatus']) => {
+  /* UNUSED - Commenting out to satisfy TypeScript noUnusedLocals
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _handlePaymentStatusChange = async (id: string, newPaymentStatus: BookingsPageBooking['paymentStatus']) => {
     try {
       // Find the booking to get total amount
       const booking = bookings.find(b => b.id === id);
@@ -636,6 +932,7 @@ const Bookings: React.FC = () => {
       alert('Failed to update payment status. Please try again.');
     }
   };
+  */
 
   // Activity logging function
   const logBookingActivity = async (
@@ -1435,6 +1732,227 @@ const Bookings: React.FC = () => {
     );
   };
 
+  // Render cell content based on column key - for drag-and-drop column ordering
+  const renderColumnCell = (booking: BookingsPageBooking, columnKey: BookingsColumnKey): React.ReactNode => {
+    switch (columnKey) {
+      case 'id':
+        return (
+          <td key={columnKey} className="px-4 py-3 whitespace-nowrap">
+            <span className={`text-xs font-semibold text-${fullColor} bg-${themeColor}-50 px-2 py-1 rounded`}>
+              #{booking.id}
+            </span>
+          </td>
+        );
+      case 'referenceNumber':
+        return (
+          <td key={columnKey} className="px-4 py-3 whitespace-nowrap">
+            <span className="text-xs font-mono text-gray-600 bg-gray-100 px-2 py-1 rounded">
+              {booking.referenceNumber || '-'}
+            </span>
+          </td>
+        );
+      case 'dateTime':
+        return (
+          <td key={columnKey} className="px-4 py-3 whitespace-nowrap">
+            {columnVisibility.bookingDate && (
+              <div 
+                className="font-medium text-gray-900 group cursor-pointer flex items-center gap-1 hover:bg-gray-100 rounded px-1 py-0.5 -mx-1"
+                onClick={() => handleOpenDateModal(booking)}
+                title="Click to change date"
+              >
+                <Calendar className="w-3 h-3 text-gray-400 mr-1" />
+                <span>{parseLocalDate(booking.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                <Edit3 className="w-2.5 h-2.5 text-gray-400 opacity-0 group-hover:opacity-100 flex-shrink-0" />
+              </div>
+            )}
+            {columnVisibility.bookingTime && (
+              <div 
+                className="text-xs text-gray-500 group cursor-pointer flex items-center gap-1 hover:bg-gray-100 rounded px-1 py-0.5 -mx-1"
+                onClick={() => handleOpenTimeModal(booking)}
+                title="Click to change time"
+              >
+                <Clock className="w-3 h-3 text-gray-400 mr-1" />
+                <span>{formatTime12Hour(booking.time)}</span>
+                <Edit3 className="w-2.5 h-2.5 text-gray-400 opacity-0 group-hover:opacity-100 flex-shrink-0" />
+              </div>
+            )}
+          </td>
+        );
+      case 'customer':
+        return (
+          <td key={columnKey} className="px-4 py-3 whitespace-nowrap">
+            {columnVisibility.guestName && (
+              <div className="font-medium text-gray-900">
+                {renderEditableCell(booking, 'customerName', booking.customerName)}
+              </div>
+            )}
+            {columnVisibility.guestEmail && (
+              <div className="text-xs text-gray-500">
+                {renderEditableCell(booking, 'email', booking.email)}
+              </div>
+            )}
+            {columnVisibility.guestPhone && (
+              <div className="text-xs text-gray-500">
+                {renderEditableCell(booking, 'phone', booking.phone)}
+              </div>
+            )}
+          </td>
+        );
+      case 'guestAddress':
+        const addressParts = [
+          booking.guestAddress,
+          booking.guestCity,
+          booking.guestState,
+          booking.guestZip,
+          booking.guestCountry
+        ].filter(Boolean);
+        const fullAddress = addressParts.join(', ');
+        return (
+          <td key={columnKey} className="px-4 py-3 text-xs text-gray-600 max-w-[200px] truncate" title={fullAddress}>
+            {fullAddress || <span className="text-gray-400">-</span>}
+          </td>
+        );
+      case 'packageRoom':
+        return (
+          <td key={columnKey} className="px-4 py-3 whitespace-nowrap">
+            {columnVisibility.packageName && (
+              <div 
+                className="font-medium text-gray-900 group cursor-pointer flex items-center gap-1 hover:bg-gray-100 rounded px-1 py-0.5 -mx-1"
+                onClick={() => handleOpenPackageModal(booking)}
+                title="Click to change package"
+              >
+                <Package className="w-3 h-3 text-gray-400 mr-1" />
+                <span>{booking.packageName}</span>
+                <Edit3 className="w-2.5 h-2.5 text-gray-400 opacity-0 group-hover:opacity-100 flex-shrink-0" />
+              </div>
+            )}
+            {columnVisibility.roomName && (
+              <div 
+                className={`text-xs text-${fullColor} group cursor-pointer flex items-center gap-1 hover:bg-gray-100 rounded px-1 py-0.5 -mx-1`}
+                onClick={() => handleOpenRoomModal(booking)}
+                title="Click to change room"
+              >
+                <Home className="w-2.5 h-2.5 text-gray-400 mr-0.5" />
+                <span>{booking.room}</span>
+                <Edit3 className="w-2.5 h-2.5 text-gray-400 opacity-0 group-hover:opacity-100 flex-shrink-0" />
+              </div>
+            )}
+            {booking.attractions && booking.attractions.length > 0 && columnVisibility.packageName && (
+              <div className="text-xs text-gray-500 mt-1">
+                +{booking.attractions.length} attraction(s)
+              </div>
+            )}
+          </td>
+        );
+      case 'location':
+        return (
+          <td key={columnKey} className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+            <MapPin className={`inline-block mr-1 text-${fullColor} h-4 w-4`} /> {booking.location || <span className="text-gray-400">-</span>}
+          </td>
+        );
+      case 'duration':
+        return (
+          <td key={columnKey} className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+            <div 
+              className="group cursor-pointer flex items-center gap-1 hover:bg-gray-100 rounded px-1 py-0.5 -mx-1"
+              onClick={() => handleOpenDurationModal(booking)}
+              title="Click to edit duration"
+            >
+              <Clock className="w-3 h-3 text-gray-400 mr-1" />
+              <span>{booking.duration || '-'}</span>
+              <Edit3 className="w-2.5 h-2.5 text-gray-400 opacity-0 group-hover:opacity-100 flex-shrink-0" />
+            </div>
+          </td>
+        );
+      case 'participants':
+        return (
+          <td key={columnKey} className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+            {renderEditableCell(booking, 'participants', booking.participants)}
+          </td>
+        );
+      case 'status':
+        return (
+          <td key={columnKey} className="px-4 py-3 whitespace-nowrap">
+            <select
+              value={booking.status}
+              onChange={(e) => handleStatusChange(booking.id, e.target.value as BookingsPageBooking['status'])}
+              className={`text-xs font-medium px-2 py-1 rounded-full ${statusColors[booking.status as keyof typeof statusColors] || 'bg-gray-100 text-gray-800'} border-none focus:ring-2 focus:ring-${themeColor}-600`}
+            >
+              <option value="pending">Pending</option>
+              <option value="confirmed">Confirmed</option>
+              <option value="checked-in">Checked In</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </td>
+        );
+      case 'paymentMethod':
+        return (
+          <td key={columnKey} className="px-4 py-3 whitespace-nowrap">
+            <span className={`text-xs font-medium px-2 py-1 rounded-full ${paymentColors[booking.paymentMethod as keyof typeof paymentColors] || 'bg-gray-100 text-gray-800'}`}>
+              {(booking.paymentMethod ?? 'N/A').replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+            </span>
+          </td>
+        );
+      case 'paymentStatus':
+        return (
+          <td key={columnKey} className="px-4 py-3 whitespace-nowrap">
+            <span className={`text-xs font-medium px-2 py-1 rounded-full ${paymentStatusColors[(booking.paymentStatus || 'pending') as keyof typeof paymentStatusColors]}`}>
+              {(booking.paymentStatus || 'pending').charAt(0).toUpperCase() + (booking.paymentStatus || 'pending').slice(1)}
+            </span>
+          </td>
+        );
+      case 'amountPaid':
+        return (
+          <td key={columnKey} className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+            ${typeof booking.amountPaid === 'number' && !isNaN(booking.amountPaid) ? booking.amountPaid.toFixed(2) : '0.00'}
+          </td>
+        );
+      case 'totalAmount':
+        return (
+          <td key={columnKey} className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+            ${typeof booking.totalAmount === 'number' && !isNaN(booking.totalAmount) ? booking.totalAmount.toFixed(2) : '0.00'}
+          </td>
+        );
+      case 'guestOfHonor':
+        const gohParts = [];
+        if (booking.guestOfHonorName) gohParts.push(booking.guestOfHonorName);
+        if (booking.guestOfHonorAge) gohParts.push(`${booking.guestOfHonorAge}yo`);
+        if (booking.guestOfHonorGender) gohParts.push(booking.guestOfHonorGender);
+        const gohDisplay = gohParts.length > 0 ? gohParts.join(', ') : null;
+        return (
+          <td key={columnKey} className="px-4 py-3 whitespace-nowrap text-xs text-gray-600">
+            {gohDisplay || <span className="text-gray-400">-</span>}
+          </td>
+        );
+      case 'notes':
+        return (
+          <td key={columnKey} className="px-4 py-3 text-xs text-gray-600 max-w-[150px] truncate" title={booking.notes || ''}>
+            {booking.notes || <span className="text-gray-400">-</span>}
+          </td>
+        );
+      case 'specialRequests':
+        return (
+          <td key={columnKey} className="px-4 py-3 text-xs text-gray-600 max-w-[150px] truncate" title={booking.specialRequests || ''}>
+            {booking.specialRequests || <span className="text-gray-400">-</span>}
+          </td>
+        );
+      case 'createdAt':
+        return (
+          <td key={columnKey} className="px-4 py-3 whitespace-nowrap text-xs text-gray-500">
+            {booking.createdAt ? new Date(booking.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' }) : '-'}
+          </td>
+        );
+      case 'updatedAt':
+        return (
+          <td key={columnKey} className="px-4 py-3 whitespace-nowrap text-xs text-gray-500">
+            {booking.updatedAt ? new Date(booking.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' }) : <span className="text-gray-400">-</span>}
+          </td>
+        );
+      default:
+        return null;
+    }
+  };
+
   const handleBulkDelete = async () => {
     if (selectedBookings.length === 0) return;
     
@@ -2016,6 +2534,135 @@ const Bookings: React.FC = () => {
               >
                 Filters
               </StandardButton>
+              {/* Column Visibility Selector */}
+              <div className="relative">
+                <StandardButton
+                  variant="secondary"
+                  size="sm"
+                  icon={showColumnSelector ? EyeOff : Columns}
+                  onClick={() => setShowColumnSelector(!showColumnSelector)}
+                >
+                  Columns
+                </StandardButton>
+                {showColumnSelector && (
+                  <div className="absolute right-0 mt-1 w-64 bg-white rounded-lg shadow-lg border border-gray-200 z-50 p-3 max-h-[80vh] overflow-y-auto">
+                    <div className="text-xs font-semibold text-gray-700 mb-2">Toggle Columns</div>
+                    
+                    {/* Booking Identifiers */}
+                    <div className="mb-2">
+                      <div className="text-[10px] font-medium text-gray-500 uppercase tracking-wide mb-1">Identifiers</div>
+                      {(['id', 'referenceNumber'] as const).map(key => (
+                        <label key={key} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded text-sm">
+                          <input type="checkbox" checked={columnVisibility[key]} onChange={() => toggleColumnVisibility(key)} className={`rounded border-gray-300 text-${fullColor} focus:ring-${themeColor}-600 w-3.5 h-3.5`} />
+                          <span className="text-gray-700">{key === 'id' ? 'Confirmation #' : 'Reference #'}</span>
+                        </label>
+                      ))}
+                    </div>
+                    
+                    {/* Date & Time */}
+                    <div className="mb-2">
+                      <div className="text-[10px] font-medium text-gray-500 uppercase tracking-wide mb-1">Date & Time</div>
+                      {(['bookingDate', 'bookingTime', 'duration'] as const).map(key => (
+                        <label key={key} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded text-sm">
+                          <input type="checkbox" checked={columnVisibility[key]} onChange={() => toggleColumnVisibility(key)} className={`rounded border-gray-300 text-${fullColor} focus:ring-${themeColor}-600 w-3.5 h-3.5`} />
+                          <span className="text-gray-700">{key === 'bookingDate' ? 'Date' : key === 'bookingTime' ? 'Time' : 'Duration'}</span>
+                        </label>
+                      ))}
+                    </div>
+                    
+                    {/* Customer Info */}
+                    <div className="mb-2">
+                      <div className="text-[10px] font-medium text-gray-500 uppercase tracking-wide mb-1">Customer</div>
+                      {(['guestName', 'guestEmail', 'guestPhone', 'guestAddress'] as const).map(key => (
+                        <label key={key} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded text-sm">
+                          <input type="checkbox" checked={columnVisibility[key]} onChange={() => toggleColumnVisibility(key)} className={`rounded border-gray-300 text-${fullColor} focus:ring-${themeColor}-600 w-3.5 h-3.5`} />
+                          <span className="text-gray-700">{key === 'guestName' ? 'Name' : key === 'guestEmail' ? 'Email' : key === 'guestPhone' ? 'Phone' : 'Address'}</span>
+                        </label>
+                      ))}
+                    </div>
+                    
+                    {/* Package & Location */}
+                    <div className="mb-2">
+                      <div className="text-[10px] font-medium text-gray-500 uppercase tracking-wide mb-1">Package & Location</div>
+                      {(['packageName', 'roomName', 'location'] as const).map(key => (
+                        <label key={key} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded text-sm">
+                          <input type="checkbox" checked={columnVisibility[key]} onChange={() => toggleColumnVisibility(key)} className={`rounded border-gray-300 text-${fullColor} focus:ring-${themeColor}-600 w-3.5 h-3.5`} />
+                          <span className="text-gray-700">{key === 'packageName' ? 'Package' : key === 'roomName' ? 'Room' : 'Location'}</span>
+                        </label>
+                      ))}
+                    </div>
+                    
+                    {/* Booking Details */}
+                    <div className="mb-2">
+                      <div className="text-[10px] font-medium text-gray-500 uppercase tracking-wide mb-1">Details</div>
+                      {(['participants', 'status'] as const).map(key => (
+                        <label key={key} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded text-sm">
+                          <input type="checkbox" checked={columnVisibility[key]} onChange={() => toggleColumnVisibility(key)} className={`rounded border-gray-300 text-${fullColor} focus:ring-${themeColor}-600 w-3.5 h-3.5`} />
+                          <span className="text-gray-700">{key === 'participants' ? 'Guests' : 'Status'}</span>
+                        </label>
+                      ))}
+                    </div>
+                    
+                    {/* Payment */}
+                    <div className="mb-2">
+                      <div className="text-[10px] font-medium text-gray-500 uppercase tracking-wide mb-1">Payment</div>
+                      {(['paymentMethod', 'paymentStatus', 'totalAmount', 'amountPaid'] as const).map(key => (
+                        <label key={key} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded text-sm">
+                          <input type="checkbox" checked={columnVisibility[key]} onChange={() => toggleColumnVisibility(key)} className={`rounded border-gray-300 text-${fullColor} focus:ring-${themeColor}-600 w-3.5 h-3.5`} />
+                          <span className="text-gray-700">{key === 'paymentMethod' ? 'Method' : key === 'paymentStatus' ? 'Status' : key === 'totalAmount' ? 'Total' : 'Paid'}</span>
+                        </label>
+                      ))}
+                    </div>
+                    
+                    {/* Extra Info */}
+                    <div className="mb-2">
+                      <div className="text-[10px] font-medium text-gray-500 uppercase tracking-wide mb-1">Additional</div>
+                      {(['guestOfHonor', 'notes', 'specialRequests'] as const).map(key => (
+                        <label key={key} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded text-sm">
+                          <input type="checkbox" checked={columnVisibility[key]} onChange={() => toggleColumnVisibility(key)} className={`rounded border-gray-300 text-${fullColor} focus:ring-${themeColor}-600 w-3.5 h-3.5`} />
+                          <span className="text-gray-700">{key === 'guestOfHonor' ? 'Guest of Honor' : key === 'notes' ? 'Notes' : 'Special Requests'}</span>
+                        </label>
+                      ))}
+                    </div>
+                    
+                    {/* Timestamps */}
+                    <div className="mb-2">
+                      <div className="text-[10px] font-medium text-gray-500 uppercase tracking-wide mb-1">Timestamps</div>
+                      {(['createdAt', 'updatedAt'] as const).map(key => (
+                        <label key={key} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded text-sm">
+                          <input type="checkbox" checked={columnVisibility[key]} onChange={() => toggleColumnVisibility(key)} className={`rounded border-gray-300 text-${fullColor} focus:ring-${themeColor}-600 w-3.5 h-3.5`} />
+                          <span className="text-gray-700">{key === 'createdAt' ? 'Created' : 'Updated'}</span>
+                        </label>
+                      ))}
+                    </div>
+                    
+                    <div className="mt-2 pt-2 border-t border-gray-100 flex gap-2">
+                      <button
+                        onClick={() => {
+                          const allVisible = Object.fromEntries(
+                            Object.keys(columnVisibility).map(k => [k, true])
+                          ) as unknown as BookingsColumnVisibility;
+                          setColumnVisibility(allVisible);
+                          localStorage.setItem('bookings_column_visibility', JSON.stringify(allVisible));
+                        }}
+                        className="text-xs text-blue-600 hover:text-blue-800"
+                      >
+                        Show All
+                      </button>
+                      <button
+                        onClick={() => {
+                          const defaults = getDefaultColumnVisibility();
+                          setColumnVisibility(defaults);
+                          localStorage.setItem('bookings_column_visibility', JSON.stringify(defaults));
+                        }}
+                        className="text-xs text-gray-500 hover:text-gray-700"
+                      >
+                        Reset
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
               <StandardButton
                 variant="secondary"
                 size="sm"
@@ -2076,6 +2723,48 @@ const Bookings: React.FC = () => {
                   />
                 </div>
               </div>
+              {/* Second row of filters */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-800 mb-1">Package</label>
+                  <select
+                    value={filters.packageId || ''}
+                    onChange={(e) => handleFilterChange('packageId', e.target.value || 'all')}
+                    className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
+                  >
+                    <option value="">All Packages</option>
+                    {filterPackages.map(pkg => (
+                      <option key={pkg.id} value={pkg.id}>{pkg.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-800 mb-1">Room/Space</label>
+                  <select
+                    value={filters.roomId || ''}
+                    onChange={(e) => handleFilterChange('roomId', e.target.value || 'all')}
+                    className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
+                  >
+                    <option value="">All Rooms</option>
+                    {filterRooms.map(room => (
+                      <option key={room.id} value={room.id}>{room.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-800 mb-1">Customer</label>
+                  <select
+                    value={filters.customerId || ''}
+                    onChange={(e) => handleFilterChange('customerId', e.target.value || 'all')}
+                    className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
+                  >
+                    <option value="">All Customers</option>
+                    {filterCustomers.map(customer => (
+                      <option key={customer.id} value={customer.id}>{customer.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
               <div className="mt-3 flex justify-end">
                 <StandardButton
                   variant="ghost"
@@ -2119,6 +2808,19 @@ const Bookings: React.FC = () => {
 
         {/* Bookings Table */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          {/* Reset Column Order Button */}
+          <div className="px-4 py-2 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
+            <span className="text-xs text-gray-500">
+              <span className="font-medium">Tip:</span> Drag column headers to reorder
+            </span>
+            <button
+              onClick={resetColumnOrder}
+              className={`text-xs text-${themeColor}-600 hover:text-${fullColor} flex items-center gap-1`}
+            >
+              <RefreshCcw className="w-3 h-3" />
+              Reset Order
+            </button>
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-left">
               <thead className="text-xs text-gray-500 uppercase bg-gray-50 border-b">
@@ -2131,24 +2833,42 @@ const Bookings: React.FC = () => {
                       className={`rounded border-gray-300 text-${fullColor} focus:ring-${themeColor}-600`}
                     />
                   </th>
-                  <th scope="col" className="px-4 py-3 font-medium w-40">Date & Time</th>
-                  <th scope="col" className="px-4 py-3 font-medium w-48">Customer</th>
-                  <th scope="col" className="px-4 py-3 font-medium w-48">Package Details</th>
-                  <th scope="col" className="px-4 py-3 font-medium w-48">Location</th>
-                  <th scope="col" className="px-4 py-3 font-medium w-40">Duration</th>
-                  <th scope="col" className="px-4 py-3 font-medium w-20">Participants</th>
-                  <th scope="col" className="px-4 py-3 font-medium w-24">Status</th>
-                  <th scope="col" className="px-4 py-3 font-medium w-24">Payment</th>
-                  <th scope="col" className="px-4 py-3 font-medium w-28">Payment Status</th>
-                  <th scope="col" className="px-4 py-3 font-medium w-28">Paid Amount</th>
-                  <th scope="col" className="px-4 py-3 font-medium w-28">Total Amount</th>
+                  {columnOrder.map((columnKey) => {
+                    const config = columnConfig[columnKey];
+                    if (!config || !config.isVisible()) return null;
+                    
+                    return (
+                      <th
+                        key={columnKey}
+                        scope="col"
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, columnKey)}
+                        onDragEnd={handleDragEnd}
+                        onDragOver={(e) => handleDragOver(e, columnKey)}
+                        onDragLeave={handleDragLeave}
+                        onDrop={(e) => handleDrop(e, columnKey)}
+                        className={`px-4 py-3 font-medium cursor-grab active:cursor-grabbing select-none transition-all duration-150 ${
+                          draggedColumn === columnKey ? 'opacity-50' : ''
+                        } ${
+                          dragOverColumn === columnKey ? `bg-${themeColor}-100 border-l-2 border-${themeColor}-400` : ''
+                        }`}
+                      >
+                        <div className="flex items-center gap-1">
+                          <span>{config.label}</span>
+                          <svg className="w-3 h-3 text-gray-300" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M7 2a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 2zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 8zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 14zm6-8a2 2 0 1 0-.001-4.001A2 2 0 0 0 13 6zm0 2a2 2 0 1 0 .001 4.001A2 2 0 0 0 13 8zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 13 14z"/>
+                          </svg>
+                        </div>
+                      </th>
+                    );
+                  })}
                   <th scope="col" className="px-4 py-3 font-medium w-20">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {currentBookings.length === 0 ? (
                   <tr>
-                    <td colSpan={12} className="px-6 py-8 text-center text-gray-500">
+                    <td colSpan={Object.values(columnVisibility).filter(Boolean).length + 2} className="px-6 py-8 text-center text-gray-500">
                       No package bookings found
                     </td>
                   </tr>
@@ -2206,118 +2926,15 @@ const Bookings: React.FC = () => {
                           className={`rounded border-gray-300 text-${fullColor} focus:ring-${themeColor}-600`}
                         />
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <div 
-                          className="font-medium text-gray-900 group cursor-pointer flex items-center gap-1 hover:bg-gray-100 rounded px-1 py-0.5 -mx-1"
-                          onClick={() => handleOpenDateModal(booking)}
-                          title="Click to change date"
-                        >
-                          <Calendar className="w-3 h-3 text-gray-400 mr-1" />
-                          <span>{parseLocalDate(booking.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
-                          <Edit3 className="w-2.5 h-2.5 text-gray-400 opacity-0 group-hover:opacity-100 flex-shrink-0" />
-                        </div>
-                        <div 
-                          className="text-xs text-gray-500 group cursor-pointer flex items-center gap-1 hover:bg-gray-100 rounded px-1 py-0.5 -mx-1"
-                          onClick={() => handleOpenTimeModal(booking)}
-                          title="Click to change time"
-                        >
-                          <Clock className="w-3 h-3 text-gray-400 mr-1" />
-                          <span>{formatTime12Hour(booking.time)}</span>
-                          <Edit3 className="w-2.5 h-2.5 text-gray-400 opacity-0 group-hover:opacity-100 flex-shrink-0" />
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <div className="font-medium text-gray-900">
-                          {renderEditableCell(booking, 'customerName', booking.customerName)}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          {renderEditableCell(booking, 'email', booking.email)}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          {renderEditableCell(booking, 'phone', booking.phone)}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <div 
-                          className="font-medium text-gray-900 group cursor-pointer flex items-center gap-1 hover:bg-gray-100 rounded px-1 py-0.5 -mx-1"
-                          onClick={() => handleOpenPackageModal(booking)}
-                          title="Click to change package"
-                        >
-                          <Package className="w-3 h-3 text-gray-400 mr-1" />
-                          <span>{booking.packageName}</span>
-                          <Edit3 className="w-2.5 h-2.5 text-gray-400 opacity-0 group-hover:opacity-100 flex-shrink-0" />
-                        </div>
-                        <div className="text-xs text-gray-500">{booking.activity}</div>
-                        <div 
-                          className={`text-xs text-${fullColor} group cursor-pointer flex items-center gap-1 hover:bg-gray-100 rounded px-1 py-0.5 -mx-1`}
-                          onClick={() => handleOpenRoomModal(booking)}
-                          title="Click to change room"
-                        >
-                          <Home className="w-2.5 h-2.5 text-gray-400 mr-0.5" />
-                          <span>{booking.room}</span>
-                          <Edit3 className="w-2.5 h-2.5 text-gray-400 opacity-0 group-hover:opacity-100 flex-shrink-0" />
-                        </div>
-                        {booking.attractions && booking.attractions.length > 0 && (
-                          <div className="text-xs text-gray-500 mt-1">
-                            Includes: {booking.attractions.map(a => `${a.name} (${a.quantity})`).join(', ')}
-                          </div>
-                        )}
-                      </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                          {/* small size mappin */}
-
-                        <MapPin className={`inline-block mr-1 text-${fullColor} h-4 w-4 `} /> {booking.location || <span className="text-gray-600 ">-</span>}
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                        <div 
-                          className="group cursor-pointer flex items-center gap-1 hover:bg-gray-100 rounded px-1 py-0.5 -mx-1"
-                          onClick={() => handleOpenDurationModal(booking)}
-                          title="Click to edit duration"
-                        >
-                          <Clock className="w-3 h-3 text-gray-400 mr-1" />
-                          <span>{booking.duration || '-'}</span>
-                          <Edit3 className="w-2.5 h-2.5 text-gray-400 opacity-0 group-hover:opacity-100 flex-shrink-0" />
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                        {renderEditableCell(booking, 'participants', booking.participants)}
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <select
-                          value={booking.status}
-                          onChange={(e) => handleStatusChange(booking.id, e.target.value as BookingsPageBooking['status'])}
-                          className={`text-xs font-medium px-2 py-1 rounded-full ${statusColors[booking.status as keyof typeof statusColors] || 'bg-gray-100 text-gray-800'} border-none focus:ring-2 focus:ring-${themeColor}-600`}
-                        >
-                          <option value="pending">Pending</option>
-                          <option value="confirmed">Confirmed</option>
-                          <option value="checked-in">Checked In</option>
-                          <option value="cancelled">Cancelled</option>
-                        </select>
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <span className={`text-xs font-medium px-2 py-1 rounded-full ${paymentColors[booking.paymentMethod as keyof typeof paymentColors] || 'bg-gray-100 text-gray-800'}`}>
-                          {(booking.paymentMethod ?? 'N/A').replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <select
-                          value={booking.paymentStatus || 'pending'}
-                          onChange={(e) => handlePaymentStatusChange(booking.id, e.target.value as BookingsPageBooking['paymentStatus'])}
-                          className={`text-xs font-medium px-2 py-1 rounded-full ${paymentStatusColors[(booking.paymentStatus || 'pending') as keyof typeof paymentStatusColors]} border-none focus:ring-2 focus:ring-${themeColor}-600`}
-                        >
-                          <option value="pending">Pending</option>
-                          <option value="partial">Partial</option>
-                          <option value="paid">Paid</option>
-                        </select>
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
-                        ${typeof booking.amountPaid === 'number' && !isNaN(booking.amountPaid) ? booking.amountPaid.toFixed(2) : '0.00'}
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
-                        ${typeof booking.totalAmount === 'number' && !isNaN(booking.totalAmount) ? booking.totalAmount.toFixed(2) : '0.00'}
-                      </td>
+                      {/* Render columns in drag-and-drop order */}
+                      {columnOrder.map((columnKey) => {
+                        const config = columnConfig[columnKey];
+                        if (!config || !config.isVisible()) return null;
+                        return renderColumnCell(booking, columnKey);
+                      })}
+                      {/* Actions - always last */}
                       <td className="px-4 py-3 whitespace-nowrap text-sm font-medium">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1">
                           {booking.paymentStatus !== 'paid' && (
                             <StandardButton
                               variant="ghost"

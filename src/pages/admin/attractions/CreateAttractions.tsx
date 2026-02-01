@@ -271,7 +271,7 @@ const CreateAttraction = () => {
         pricing_type: formData.pricingType,
         max_capacity: Number(formData.maxCapacity),
         category: formData.category,
-        duration: formData.duration ? Number(formData.duration) : undefined,
+        duration: (formData.duration && Number(formData.duration) > 0) ? Number(formData.duration) : undefined,
         duration_unit: formData.durationUnit as 'hours' | 'minutes' | 'hours and minutes',
         availability: formData.availability,
         image: formData.images.length > 0 ? formData.images : undefined, // Send all images as array

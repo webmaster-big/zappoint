@@ -42,7 +42,7 @@ const EditBooking: React.FC = () => {
     guestOfHonorGender: '',
   });
 
-  // Load booking data and package details from backend
+  // Load booking data and package details - try cache first for faster load
   useEffect(() => {
     const loadBookingAndPackage = async () => {
       if (!id && !referenceNumber) {
@@ -54,17 +54,41 @@ const EditBooking: React.FC = () => {
       try {
         let bookingData: Booking | null = null;
         
-        if (referenceNumber) {
-          const response = await bookingService.getBookings({ reference_number: referenceNumber });
-          if (response.success && response.data && response.data.bookings.length > 0) {
-            bookingData = response.data.bookings[0];
-
-            console.log('Loaded booking by reference number:', bookingData);
+        // Try cache first for faster load
+        if (id) {
+          bookingData = await bookingCacheService.getBookingFromCache(Number(id));
+          if (bookingData) {
+            console.log('Loaded booking from cache by ID:', bookingData.id);
           }
-        } else if (id) {
-          const response = await bookingService.getBookingById(Number(id));
-          if (response.success && response.data) {
-            bookingData = response.data;
+        } else if (referenceNumber) {
+          // Search cache by reference number
+          const cachedBookings = await bookingCacheService.getCachedBookings();
+          if (cachedBookings) {
+            bookingData = cachedBookings.find(b => b.reference_number === referenceNumber) || null;
+            if (bookingData) {
+              console.log('Loaded booking from cache by reference number:', bookingData.reference_number);
+            }
+          }
+        }
+        
+        // If not in cache, fetch from API
+        if (!bookingData) {
+          if (referenceNumber) {
+            const response = await bookingService.getBookings({ reference_number: referenceNumber });
+            if (response.success && response.data && response.data.bookings.length > 0) {
+              bookingData = response.data.bookings[0];
+              console.log('Loaded booking from API by reference number:', bookingData);
+              // Update cache with fetched booking
+              await bookingCacheService.updateBookingInCache(bookingData);
+            }
+          } else if (id) {
+            const response = await bookingService.getBookingById(Number(id));
+            if (response.success && response.data) {
+              bookingData = response.data;
+              console.log('Loaded booking from API by ID:', bookingData.id);
+              // Update cache with fetched booking
+              await bookingCacheService.updateBookingInCache(bookingData);
+            }
           }
         }
 
@@ -667,6 +691,25 @@ const EditBooking: React.FC = () => {
                 {formData.status.charAt(0).toUpperCase() + formData.status.slice(1).replace('-', ' ')}
               </span>
             </div>
+
+            {/* Customer Notes */}
+            {formData.notes && (
+              <div className="pb-4 border-b border-gray-100">
+                <p className="text-sm text-gray-500 mb-1">Customer Notes</p>
+                <p className="text-sm text-gray-700 whitespace-pre-wrap">{formData.notes}</p>
+              </div>
+            )}
+
+            {/* Internal Notes */}
+            {formData.internalNotes && (
+              <div className="pb-4 border-b border-gray-100">
+                <div className="flex items-center gap-2 mb-1">
+                  <p className="text-sm text-gray-500">Internal Notes</p>
+                  <span className="text-xs text-amber-700 font-medium bg-amber-100 px-1.5 py-0.5 rounded">Staff Only</span>
+                </div>
+                <p className="text-sm text-amber-800 bg-amber-50 p-2 rounded whitespace-pre-wrap">{formData.internalNotes}</p>
+              </div>
+            )}
 
             {/* Payment Summary */}
             <div>

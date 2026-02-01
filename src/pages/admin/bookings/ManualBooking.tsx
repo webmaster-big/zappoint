@@ -14,6 +14,7 @@ import { locationService } from '../../../services/LocationService';
 import LocationSelector from '../../../components/admin/LocationSelector';
 import { getStoredUser, getImageUrl } from '../../../utils/storage';
 import { formatDurationDisplay } from '../../../utils/timeFormat';
+import { derivePaymentStatus } from '../../../types/Bookings.types';
 
 // Extended booking data interface for manual booking (includes guest of honor fields)
 interface ExtendedBookingData extends CreateBookingData {
@@ -22,6 +23,12 @@ interface ExtendedBookingData extends CreateBookingData {
   guest_of_honor_gender?: 'male' | 'female' | 'other';
   skip_date_validation?: boolean;
   is_manual_entry?: boolean;
+  // Optional address fields
+  guest_address?: string;
+  guest_city?: string;
+  guest_state?: string;
+  guest_zip?: string;
+  guest_country?: string;
 }
 
 // Helper function to sort rooms numerically (extracts numbers from room names)
@@ -71,6 +78,12 @@ const ManualBooking: React.FC = () => {
     guestOfHonorName: string;
     guestOfHonorAge: string;
     guestOfHonorGender: string;
+    // Optional address fields
+    guestAddress: string;
+    guestCity: string;
+    guestState: string;
+    guestZip: string;
+    guestCountry: string;
   }>({
     customerName: '',
     email: '',
@@ -88,7 +101,13 @@ const ManualBooking: React.FC = () => {
     amountPaid: '',
     guestOfHonorName: '',
     guestOfHonorAge: '',
-    guestOfHonorGender: ''
+    guestOfHonorGender: '',
+    // Optional address fields
+    guestAddress: '',
+    guestCity: '',
+    guestState: '',
+    guestZip: '',
+    guestCountry: ''
   });
 
   // Fetch locations for company admin
@@ -398,8 +417,10 @@ const ManualBooking: React.FC = () => {
       const user = getStoredUser();
       const calculatedTotal = calculateTotal();
       const finalTotalAmount = form.totalAmount ? Number(form.totalAmount) : calculatedTotal;
-      const finalAmountPaid = form.paymentMethod === 'paylater' ? 0 : (form.amountPaid ? Number(form.amountPaid) : 
-        (form.paymentStatus === 'paid' ? finalTotalAmount : (form.paymentStatus === 'partial' ? finalTotalAmount / 2 : 0)));
+      const finalAmountPaid = form.paymentMethod === 'paylater' ? 0 : (form.amountPaid ? Number(form.amountPaid) : finalTotalAmount);
+      
+      // Auto-derive payment status from amounts
+      const derivedPaymentStatus = derivePaymentStatus(finalAmountPaid, finalTotalAmount);
       
       console.log('📦 Building additional attractions/addons...', {
         selectedAttractions,
@@ -494,7 +515,7 @@ const ManualBooking: React.FC = () => {
         total_amount: finalTotalAmount,
         amount_paid: finalAmountPaid,
         payment_method: (form.paymentMethod === 'in-store' ? 'in-store' : form.paymentMethod) as 'card' | 'in-store' | 'paylater',
-        payment_status: form.paymentStatus as 'paid' | 'partial' | 'pending',
+        payment_status: derivedPaymentStatus,
         status: form.status as 'pending' | 'confirmed' | 'checked-in' | 'completed' | 'cancelled',
         notes: form.notes || undefined,
         location_id: locationId,
@@ -504,6 +525,12 @@ const ManualBooking: React.FC = () => {
         guest_of_honor_name: pkg.has_guest_of_honor && form.guestOfHonorName ? form.guestOfHonorName : undefined,
         guest_of_honor_age: pkg.has_guest_of_honor && form.guestOfHonorAge ? parseInt(form.guestOfHonorAge) : undefined,
         guest_of_honor_gender: pkg.has_guest_of_honor && form.guestOfHonorGender ? form.guestOfHonorGender as 'male' | 'female' | 'other' : undefined,
+        // Optional address fields
+        guest_address: form.guestAddress || undefined,
+        guest_city: form.guestCity || undefined,
+        guest_state: form.guestState || undefined,
+        guest_zip: form.guestZip || undefined,
+        guest_country: form.guestCountry || undefined,
         skip_date_validation: true, // Allow past dates for manual booking records
         is_manual_entry: true, // Flag this as a manually entered historical record
       };
@@ -810,6 +837,63 @@ const ManualBooking: React.FC = () => {
                             onChange={handleInputChange}
                             className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring--500 focus:border-transparent transition-all"
                             placeholder="+1 (555) 123-4567"
+                          />
+                        </div>
+                        
+                        {/* Optional Address Fields */}
+                        <div className="md:col-span-2 mt-2">
+                          <label className="block text-sm font-medium text-gray-700 mb-2">Address <span className="text-gray-400 font-normal">(Optional)</span></label>
+                          <input
+                            type="text"
+                            name="guestAddress"
+                            value={form.guestAddress}
+                            onChange={handleInputChange}
+                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring--500 focus:border-transparent transition-all"
+                            placeholder="123 Main St"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">City <span className="text-gray-400 font-normal">(Optional)</span></label>
+                          <input
+                            type="text"
+                            name="guestCity"
+                            value={form.guestCity}
+                            onChange={handleInputChange}
+                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring--500 focus:border-transparent transition-all"
+                            placeholder="New York"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">State <span className="text-gray-400 font-normal">(Optional)</span></label>
+                          <input
+                            type="text"
+                            name="guestState"
+                            value={form.guestState}
+                            onChange={handleInputChange}
+                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring--500 focus:border-transparent transition-all"
+                            placeholder="NY"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">ZIP Code <span className="text-gray-400 font-normal">(Optional)</span></label>
+                          <input
+                            type="text"
+                            name="guestZip"
+                            value={form.guestZip}
+                            onChange={handleInputChange}
+                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring--500 focus:border-transparent transition-all"
+                            placeholder="10001"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">Country <span className="text-gray-400 font-normal">(Optional)</span></label>
+                          <input
+                            type="text"
+                            name="guestCountry"
+                            value={form.guestCountry}
+                            onChange={handleInputChange}
+                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring--500 focus:border-transparent transition-all"
+                            placeholder="United States"
                           />
                         </div>
                       </div>
@@ -1314,16 +1398,24 @@ const ManualBooking: React.FC = () => {
                     
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">Payment Status</label>
-                      <select
-                        name="paymentStatus"
-                        value={form.paymentStatus}
-                        onChange={handleInputChange}
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
-                      >
-                        <option value="paid">Paid</option>
-                        <option value="partial">Partial</option>
-                        <option value="pending">Pending</option>
-                      </select>
+                      {(() => {
+                        const calculatedTotal = form.totalAmount ? Number(form.totalAmount) : calculateTotal();
+                        const amountPaid = form.paymentMethod === 'paylater' ? 0 : (form.amountPaid ? Number(form.amountPaid) : calculatedTotal);
+                        const status = derivePaymentStatus(amountPaid, calculatedTotal);
+                        const statusColors: Record<string, string> = {
+                          paid: 'bg-green-100 text-green-800',
+                          partial: 'bg-yellow-100 text-yellow-800',
+                          pending: 'bg-red-100 text-red-800'
+                        };
+                        return (
+                          <div className="w-full px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50">
+                            <span className={`text-sm font-medium px-3 py-1 rounded-full ${statusColors[status]}`}>
+                              {status.charAt(0).toUpperCase() + status.slice(1)}
+                            </span>
+                            <p className="text-xs text-gray-500 mt-2">Auto-calculated based on amounts</p>
+                          </div>
+                        );
+                      })()}
                     </div>
 
                     <div>

@@ -1006,6 +1006,12 @@ const BookPackage: React.FC = () => {
         guest_of_honor_name: pkg.has_guest_of_honor && form.guestOfHonorName ? form.guestOfHonorName : undefined,
         guest_of_honor_age: pkg.has_guest_of_honor && form.guestOfHonorAge ? parseInt(form.guestOfHonorAge) : undefined,
         guest_of_honor_gender: pkg.has_guest_of_honor && form.guestOfHonorGender ? form.guestOfHonorGender as 'male' | 'female' | 'other' : undefined,
+        // Address fields
+        guest_address: form.address || undefined,
+        guest_city: form.city || undefined,
+        guest_state: form.state || undefined,
+        guest_zip: form.zip || undefined,
+        guest_country: form.country || undefined,
       };
       
       const response = await bookingService.createBooking(bookingData);

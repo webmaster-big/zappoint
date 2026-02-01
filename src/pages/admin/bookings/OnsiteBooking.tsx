@@ -59,6 +59,12 @@ interface ExtendedBookingData extends CreateBookingData {
   guest_of_honor_name?: string;
   guest_of_honor_age?: number;
   guest_of_honor_gender?: 'male' | 'female' | 'other';
+  // Optional address fields
+  guest_address?: string;
+  guest_city?: string;
+  guest_state?: string;
+  guest_zip?: string;
+  guest_country?: string;
 }
 
 interface BookingData extends Omit<OnsiteBookingData, 'customer'> {
@@ -78,6 +84,12 @@ interface BookingData extends Omit<OnsiteBookingData, 'customer'> {
   guestOfHonorName: string;
   guestOfHonorAge: string;
   guestOfHonorGender: string;
+  // Optional address fields
+  guestAddress: string;
+  guestCity: string;
+  guestState: string;
+  guestZip: string;
+  guestCountry: string;
 }
 
 const OnsiteBooking: React.FC = () => {
@@ -153,7 +165,12 @@ const OnsiteBooking: React.FC = () => {
     total: 0,
     guestOfHonorName: '',
     guestOfHonorAge: '',
-    guestOfHonorGender: ''
+    guestOfHonorGender: '',
+    guestAddress: '',
+    guestCity: '',
+    guestState: '',
+    guestZip: '',
+    guestCountry: ''
   });
 
   // Check if all required fields are filled for final submission
@@ -1195,7 +1212,12 @@ const OnsiteBooking: React.FC = () => {
       total: 0,
       guestOfHonorName: '',
       guestOfHonorAge: '',
-      guestOfHonorGender: ''
+      guestOfHonorGender: '',
+      guestAddress: '',
+      guestCity: '',
+      guestState: '',
+      guestZip: '',
+      guestCountry: ''
     });
     setCardNumber('');
     setCardMonth('');
@@ -1399,6 +1421,12 @@ const OnsiteBooking: React.FC = () => {
         guest_of_honor_name: selectedPackage.has_guest_of_honor && bookingData.guestOfHonorName ? bookingData.guestOfHonorName : undefined,
         guest_of_honor_age: selectedPackage.has_guest_of_honor && bookingData.guestOfHonorAge ? parseInt(bookingData.guestOfHonorAge) : undefined,
         guest_of_honor_gender: selectedPackage.has_guest_of_honor && bookingData.guestOfHonorGender ? bookingData.guestOfHonorGender as 'male' | 'female' | 'other' : undefined,
+        // Optional address fields
+        guest_address: bookingData.guestAddress || undefined,
+        guest_city: bookingData.guestCity || undefined,
+        guest_state: bookingData.guestState || undefined,
+        guest_zip: bookingData.guestZip || undefined,
+        guest_country: bookingData.guestCountry || undefined,
       };
       
       console.log('📤 Sending on-site booking request:', bookingData_request);
@@ -2561,6 +2589,74 @@ const OnsiteBooking: React.FC = () => {
             </div>
           </div>
         )}
+
+        {/* Guest Address Section (Optional) */}
+        <div className="pt-6 border-t border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            Guest Address (Optional)
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Street Address (Optional)</label>
+              <input
+                type="text"
+                name="guestAddress"
+                value={bookingData.guestAddress}
+                onChange={handleInputChange}
+                className={`w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:ring-2 focus:ring-${themeColor}-400 focus:border-${themeColor}-500 transition-colors`}
+                placeholder="Enter street address"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">City (Optional)</label>
+              <input
+                type="text"
+                name="guestCity"
+                value={bookingData.guestCity}
+                onChange={handleInputChange}
+                className={`w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:ring-2 focus:ring-${themeColor}-400 focus:border-${themeColor}-500 transition-colors`}
+                placeholder="City"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">State/Province (Optional)</label>
+              <input
+                type="text"
+                name="guestState"
+                value={bookingData.guestState}
+                onChange={handleInputChange}
+                className={`w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:ring-2 focus:ring-${themeColor}-400 focus:border-${themeColor}-500 transition-colors`}
+                placeholder="State/Province"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">ZIP/Postal Code (Optional)</label>
+              <input
+                type="text"
+                name="guestZip"
+                value={bookingData.guestZip}
+                onChange={handleInputChange}
+                className={`w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:ring-2 focus:ring-${themeColor}-400 focus:border-${themeColor}-500 transition-colors`}
+                placeholder="ZIP/Postal Code"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Country (Optional)</label>
+              <input
+                type="text"
+                name="guestCountry"
+                value={bookingData.guestCountry}
+                onChange={handleInputChange}
+                className={`w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:ring-2 focus:ring-${themeColor}-400 focus:border-${themeColor}-500 transition-colors`}
+                placeholder="Country"
+              />
+            </div>
+          </div>
+        </div>
       </div>
       
       <div className="flex gap-3 pt-4">
