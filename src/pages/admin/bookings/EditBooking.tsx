@@ -9,6 +9,7 @@ import packageService from '../../../services/PackageService';
 import type { Package as PackageType } from '../../../services/PackageService';
 import roomService from '../../../services/RoomService';
 import { roomCacheService } from '../../../services/RoomCacheService';
+import { packageCacheService } from '../../../services/PackageCacheService';
 
 const EditBooking: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
@@ -98,45 +99,11 @@ const EditBooking: React.FC = () => {
           return;
         }
 
+        // Set booking data immediately so form renders faster
         setOriginalBooking(bookingData);
         setOriginalAmountPaid(Number(bookingData.amount_paid || 0));
-
-        // Load available packages
-        const packagesResponse = await packageService.getPackages({ location_id: bookingData.location_id });
-        if (packagesResponse.success && packagesResponse.data) {
-          setAvailablePackages(packagesResponse.data.packages || []);
-        }
-
-        // Load all rooms from location - try cache first
-        const cachedRooms = await roomCacheService.getFilteredRoomsFromCache({ location_id: bookingData.location_id });
         
-        if (cachedRooms && cachedRooms.length > 0) {
-          setAvailableRooms(cachedRooms.map(room => ({
-            id: room.id,
-            name: room.name
-          })));
-        } else {
-          // No cache, fetch from API
-          const roomsResponse = await roomService.getRooms({ location_id: bookingData.location_id });
-          if (roomsResponse.success && roomsResponse.data) {
-            const rooms = roomsResponse.data.rooms || roomsResponse.data;
-            const roomsArray = Array.isArray(rooms) ? rooms : [];
-            setAvailableRooms(roomsArray.map((room: any) => ({
-              id: room.id,
-              name: room.name
-            })));
-            // Cache the fetched rooms
-            await roomCacheService.cacheRooms(roomsArray);
-          }
-        }
-
-        if (bookingData.package_id) {
-          const packageResponse = await packageService.getPackage(bookingData.package_id);
-          if (packageResponse.success && packageResponse.data) {
-            setPackageDetails(packageResponse.data);
-          }
-        }
-
+        // Set form data immediately
         setFormData({
           customerName: bookingData.guest_name || '',
           email: bookingData.guest_email || '',
@@ -154,11 +121,70 @@ const EditBooking: React.FC = () => {
           guestOfHonorAge: bookingData.guest_of_honor_age ? String(bookingData.guest_of_honor_age) : '',
           guestOfHonorGender: bookingData.guest_of_honor_gender || '',
         });
+        
+        // End loading state early - form can render while we load dropdown data
+        setLoading(false);
+
+        // Load packages, rooms, and package details in parallel using cache first
+        const locationId = bookingData.location_id;
+        const packageId = bookingData.package_id;
+
+        // Use Promise.all to load all data in parallel
+        const [packagesResult, roomsResult, packageDetailResult] = await Promise.all([
+          // Load packages - try cache first
+          (async () => {
+            const cachedPackages = await packageCacheService.getCachedPackages();
+            if (cachedPackages && cachedPackages.length > 0) {
+              // Filter by location
+              return cachedPackages.filter((pkg: PackageType) => pkg.location_id === locationId);
+            }
+            // Fallback to API
+            const response = await packageService.getPackages({ location_id: locationId });
+            return response.success && response.data ? (response.data.packages || []) : [];
+          })(),
+          
+          // Load rooms - try cache first
+          (async () => {
+            const cachedRooms = await roomCacheService.getFilteredRoomsFromCache({ location_id: locationId });
+            if (cachedRooms && cachedRooms.length > 0) {
+              return cachedRooms.map(room => ({ id: room.id, name: room.name }));
+            }
+            // Fallback to API
+            const response = await roomService.getRooms({ location_id: locationId });
+            if (response.success && response.data) {
+              const rooms = response.data.rooms || response.data;
+              const roomsArray = Array.isArray(rooms) ? rooms : [];
+              // Cache for next time
+              roomCacheService.cacheRooms(roomsArray);
+              return roomsArray.map((room: any) => ({ id: room.id, name: room.name }));
+            }
+            return [];
+          })(),
+          
+          // Load package details - try cache first
+          (async () => {
+            if (!packageId) return null;
+            // Try to find in cached packages first
+            const cachedPackages = await packageCacheService.getCachedPackages();
+            if (cachedPackages) {
+              const found = cachedPackages.find((pkg: PackageType) => pkg.id === packageId);
+              if (found) return found;
+            }
+            // Fallback to API
+            const response = await packageService.getPackage(packageId);
+            return response.success && response.data ? response.data : null;
+          })()
+        ]);
+
+        setAvailablePackages(packagesResult);
+        setAvailableRooms(roomsResult);
+        if (packageDetailResult) {
+          setPackageDetails(packageDetailResult);
+        }
 
       } catch (error) {
         console.error('Error loading booking:', error);
         setNotFound(true);
-      } finally {
         setLoading(false);
       }
     };
@@ -171,6 +197,14 @@ const EditBooking: React.FC = () => {
     setFormData(prev => ({ ...prev, packageId }));
     
     try {
+      // Try to find in cached packages first (already loaded in availablePackages)
+      const cachedPackage = availablePackages.find(pkg => pkg.id === packageId);
+      if (cachedPackage) {
+        setPackageDetails(cachedPackage);
+        return;
+      }
+      
+      // Fallback to API if not in available packages
       const packageResponse = await packageService.getPackage(packageId);
       if (packageResponse.success && packageResponse.data) {
         setPackageDetails(packageResponse.data);

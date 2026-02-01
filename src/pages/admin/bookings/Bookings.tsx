@@ -1781,21 +1781,33 @@ const Bookings: React.FC = () => {
       case 'customer':
         return (
           <td key={columnKey} className="px-4 py-3 whitespace-nowrap">
-            {columnVisibility.guestName && (
-              <div className="font-medium text-gray-900">
-                {renderEditableCell(booking, 'customerName', booking.customerName)}
-              </div>
-            )}
-            {columnVisibility.guestEmail && (
-              <div className="text-xs text-gray-500">
-                {renderEditableCell(booking, 'email', booking.email)}
-              </div>
-            )}
-            {columnVisibility.guestPhone && (
-              <div className="text-xs text-gray-500">
-                {renderEditableCell(booking, 'phone', booking.phone)}
-              </div>
-            )}
+            <div className="relative group/customer">
+              {/* Edit Booking Button - Top Right */}
+              <Link
+                to={`/bookings/edit/${booking.id}`}
+                className="absolute -top-1 -right-1 p-1 rounded bg-white border border-gray-200 shadow-sm opacity-0 group-hover/customer:opacity-100 transition-opacity hover:bg-gray-50 hover:border-gray-300 z-10"
+                title="Edit Booking"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <Pencil className={`w-3 h-3 text-${fullColor}`} />
+              </Link>
+              
+              {columnVisibility.guestName && (
+                <div className="font-medium text-gray-900">
+                  {renderEditableCell(booking, 'customerName', booking.customerName)}
+                </div>
+              )}
+              {columnVisibility.guestEmail && (
+                <div className="text-xs text-gray-500">
+                  {renderEditableCell(booking, 'email', booking.email)}
+                </div>
+              )}
+              {columnVisibility.guestPhone && (
+                <div className="text-xs text-gray-500">
+                  {renderEditableCell(booking, 'phone', booking.phone)}
+                </div>
+              )}
+            </div>
           </td>
         );
       case 'guestAddress':
