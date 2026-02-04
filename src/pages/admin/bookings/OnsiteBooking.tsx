@@ -314,8 +314,13 @@ const OnsiteBooking: React.FC = () => {
         
         if (cachedPackages && cachedPackages.length > 0) {
           console.log('📦 Using cached packages:', cachedPackages.length);
+          
+          // Filter only active packages from cache
+          const activeCachedPackages = cachedPackages.filter((pkg: any) => pkg.is_active === true || pkg.is_active === 1);
+          console.log('Active cached packages:', activeCachedPackages.length, 'of', cachedPackages.length);
+          
           // Transform cached packages to match OnsiteBookingPackage interface
-          const transformedPackages: OnsiteBookingPackage[] = cachedPackages.map((pkg: any) => ({
+          const transformedPackages: OnsiteBookingPackage[] = activeCachedPackages.map((pkg: any) => ({
             id: pkg.id,
             name: pkg.name,
             description: pkg.description,
@@ -411,8 +416,14 @@ const OnsiteBooking: React.FC = () => {
           
           // Transform backend package data to match OnsiteBookingPackage interface
           console.log('Fetched packages:', response.data.packages);
+          
+          // Filter only active packages
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const transformedPackages: OnsiteBookingPackage[] = response.data.packages.map((pkg: any) => {
+          const activePackages = response.data.packages.filter((pkg: any) => pkg.is_active === true || pkg.is_active === 1);
+          console.log('Active packages:', activePackages.length, 'of', response.data.packages.length);
+          
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const transformedPackages: OnsiteBookingPackage[] = activePackages.map((pkg: any) => {
             console.log('🔍 Transforming package:', {
               id: pkg.id,
               name: pkg.name,
@@ -507,9 +518,9 @@ const OnsiteBooking: React.FC = () => {
           console.log('✅ All transformed packages:', transformedPackages);
           setPackages(transformedPackages);
           
-          // Cache the raw packages for future use
-          if (response.data.packages.length > 0) {
-            await packageCacheService.cachePackages(response.data.packages);
+          // Cache only active packages for future use
+          if (activePackages.length > 0) {
+            await packageCacheService.cachePackages(activePackages);
           }
           
           // Show modal if no packages available

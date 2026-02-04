@@ -258,7 +258,12 @@ const ManualBooking: React.FC = () => {
       
       if (cachedPackages && cachedPackages.length > 0) {
         console.log('📦 Using cached packages:', cachedPackages.length);
-        setPackages(cachedPackages);
+        
+        // Filter only active packages from cache
+        const activeCachedPackages = cachedPackages.filter((pkg: any) => pkg.is_active === true || pkg.is_active === 1);
+        console.log('Active cached packages:', activeCachedPackages.length, 'of', cachedPackages.length);
+        
+        setPackages(activeCachedPackages);
         setLoadingPackages(false);
         return;
       }
@@ -273,10 +278,14 @@ const ManualBooking: React.FC = () => {
       console.log('📦 Packages response:', response);
       
       if (response.success && response.data && response.data.packages) {
-        const pkgs = Array.isArray(response.data.packages) ? response.data.packages : [];
+        // Filter only active packages
+        const allPackages = Array.isArray(response.data.packages) ? response.data.packages : [];
+        const pkgs = allPackages.filter((pkg: any) => pkg.is_active === true || pkg.is_active === 1);
+        console.log('Active packages:', pkgs.length, 'of', allPackages.length);
+        
         setPackages(pkgs);
         
-        // Cache the packages for future use
+        // Cache only active packages for future use
         if (pkgs.length > 0) {
           await packageCacheService.cachePackages(pkgs);
         }
