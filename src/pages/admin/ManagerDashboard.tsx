@@ -43,6 +43,7 @@ const LocationManagerDashboard: React.FC = () => {
   const [calendarView, setCalendarView] = useState<'day' | 'week' | 'month'>('month');
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [loading, setLoading] = useState(true);
+  const [metricsLoading, setMetricsLoading] = useState(false);
   const [locationId, setLocationId] = useState<number>(1);
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<{ date: Date; hour: number; minute: string; bookings: any[] } | null>(null);
   const [selectedBooking, setSelectedBooking] = useState<any | null>(null);
@@ -52,6 +53,8 @@ const LocationManagerDashboard: React.FC = () => {
   // Timeframe selector for metrics
   const [metricsTimeframe, setMetricsTimeframe] = useState<TimeframeType>('all_time');
   const [timeframeDescription, setTimeframeDescription] = useState('All Time');
+  const [customDateFrom, setCustomDateFrom] = useState('');
+  const [customDateTo, setCustomDateTo] = useState('');
   
   // Rooms for daily view
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -206,6 +209,8 @@ const LocationManagerDashboard: React.FC = () => {
     const fetchMetricsData = async () => {
       if (!locationId) return;
       
+      setMetricsLoading(true);
+      
       try {
         console.log('🔄 Starting metrics fetch for location:', locationId);
         
@@ -228,9 +233,17 @@ const LocationManagerDashboard: React.FC = () => {
         await locationService.getLocation(locationId);
         
         // Fetch metrics with timeframe filter
-        const metricsResponse = await metricsService.getDashboardMetrics({
+        const metricsParams: any = {
           timeframe: metricsTimeframe,
-        });
+        };
+        
+        // Add custom dates if timeframe is custom
+        if (metricsTimeframe === 'custom' && customDateFrom && customDateTo) {
+          metricsParams.date_from = customDateFrom;
+          metricsParams.date_to = customDateTo;
+        }
+        
+        const metricsResponse = await metricsService.getDashboardMetrics(metricsParams);
         
         console.log('✅ Metrics API response:', metricsResponse);
         console.log('📊 Metrics:', metricsResponse.metrics);
@@ -270,11 +283,12 @@ const LocationManagerDashboard: React.FC = () => {
         console.error('Error details:', error.message || error);
       } finally {
         setLoading(false);
+        setMetricsLoading(false);
       }
     };
     
     fetchMetricsData();
-  }, [locationId, metricsTimeframe]);
+  }, [locationId, metricsTimeframe, customDateFrom, customDateTo]);
 
   // Weekly calendar data - derived from allBookings (no API call needed)
   useEffect(() => {
@@ -661,18 +675,45 @@ const LocationManagerDashboard: React.FC = () => {
         </div>
         
         {/* Timeframe Selector */}
-        <div className="flex items-center gap-2 mt-4 md:mt-0">
-          <Clock size={16} className="text-gray-500" />
-          <select
-            value={metricsTimeframe}
-            onChange={(e) => setMetricsTimeframe(e.target.value as TimeframeType)}
-            className="bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="last_24h">Last 24 Hours</option>
-            <option value="last_7d">Last 7 Days</option>
-            <option value="last_30d">Last 30 Days</option>
-            <option value="all_time">All Time</option>
-          </select>
+        <div className="flex flex-col md:flex-row items-start md:items-center gap-2 mt-4 md:mt-0">
+          <div className="flex items-center gap-2">
+            <Clock size={16} className="text-gray-500" />
+            <select
+              value={metricsTimeframe}
+              onChange={(e) => setMetricsTimeframe(e.target.value as TimeframeType)}
+              className="bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="last_24h">Last 24 Hours</option>
+              <option value="last_7d">Last 7 Days</option>
+              <option value="last_30d">Last 30 Days</option>
+              <option value="all_time">All Time</option>
+              <option value="custom">Custom Range</option>
+            </select>
+            {metricsLoading && (
+              <div className="w-3 h-3 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin"></div>
+            )}
+          </div>
+          
+          {/* Custom Date Range Inputs */}
+          {metricsTimeframe === 'custom' && (
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={customDateFrom}
+                onChange={(e) => setCustomDateFrom(e.target.value)}
+                className="bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="From"
+              />
+              <span className="text-gray-500 text-sm">to</span>
+              <input
+                type="date"
+                value={customDateTo}
+                onChange={(e) => setCustomDateTo(e.target.value)}
+                className="bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="To"
+              />
+            </div>
+          )}
         </div>
       </div>
 

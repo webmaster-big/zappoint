@@ -42,6 +42,11 @@ import { useThemeColor } from '../../hooks/useThemeColor';
 import type { NavItem, UserData, SidebarProps } from '../../types/sidebar.types';
 import { API_BASE_URL, getImageUrl } from '../../utils/storage';
 import { notificationStreamService, type NotificationObject } from '../../services/NotificationStreamService';
+import { bookingCacheService } from '../../services/BookingCacheService';
+import { roomCacheService } from '../../services/RoomCacheService';
+import { packageCacheService } from '../../services/PackageCacheService';
+import { addOnCacheService } from '../../services/AddOnCacheService';
+import { attractionCacheService } from '../../services/AttractionCacheService';
 
 // Helper function to add descriptions to navigation items
 const addDescriptions = (navItems: NavItem[]): NavItem[] => {
@@ -509,14 +514,26 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
   };
 
   // Force logout helper - clears all storage and redirects
-  const forceLogout = () => {
+  const forceLogout = async () => {
     console.warn('[AdminSidebar] Forcing logout - clearing all user data');
+    
+    // Clear all caches
+    await Promise.all([
+      bookingCacheService.clearCache(),
+      roomCacheService.clearCache(),
+      packageCacheService.clearCache(),
+      addOnCacheService.clearCache(),
+      attractionCacheService.clearCache()
+    ]);
+    
     // Clear all possible user data
     localStorage.removeItem('zapzone_user');
     localStorage.removeItem('zapzone_token');
     sessionStorage.clear();
+    
     // Disconnect notification stream
     notificationStreamService.disconnect();
+    
     // Force hard redirect to login page
     window.location.replace('/admin');
   };

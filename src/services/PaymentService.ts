@@ -11,7 +11,6 @@ import type {
   PaymentOpaqueData,
   PaymentFilters,
   PaginatedPaymentsResponse,
-  PaymentPayableType,
 } from '../types/Payment.types';
 import { PAYMENT_TYPE } from '../types/Payment.types';
 
@@ -129,25 +128,6 @@ export const updatePayment = async (
   data: Partial<CreatePaymentRequest>
 ): Promise<PaymentApiResponse<Payment>> => {
   const response = await api.put<PaymentApiResponse<Payment>>(`/payments/${id}`, data);
-  return response.data;
-};
-
-/**
- * Update payment payable_id and payable_type
- * Used after creating a booking or attraction purchase to link the payment
- * 
- * @param id - Payment ID
- * @param data - Payable data (payable_id and payable_type)
- * @returns Updated payment
- */
-export const updatePaymentPayable = async (
-  id: number,
-  data: {
-    payable_id: number;
-    payable_type: PaymentPayableType;
-  }
-): Promise<PaymentApiResponse<Payment>> => {
-  const response = await api.patch<PaymentApiResponse<Payment>>(`/payments/${id}/payable`, data);
   return response.data;
 };
 
@@ -861,7 +841,6 @@ export default {
   getPaymentsForBooking,
   getPaymentsForAttractionPurchase,
   updatePayment,
-  updatePaymentPayable,
   deletePayment,
   downloadInvoice,
   viewInvoice,

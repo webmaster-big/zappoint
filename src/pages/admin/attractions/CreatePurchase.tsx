@@ -20,8 +20,7 @@ import LocationSelector from '../../../components/admin/LocationSelector';
 import Toast from '../../../components/ui/Toast';
 import EmptyStateModal from '../../../components/ui/EmptyStateModal';
 import { ASSET_URL, getStoredUser } from '../../../utils/storage';
-import { loadAcceptJS, processCardPayment, validateCardNumber, formatCardNumber, getCardType, createPayment } from '../../../services/PaymentService';
-import { PAYMENT_TYPE } from '../../../types/Payment.types';
+import { loadAcceptJS, processCardPayment, validateCardNumber, formatCardNumber, getCardType, createPayment, PAYMENT_TYPE } from '../../../services/PaymentService';
 import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
 import { generatePurchaseQRCode } from '../../../utils/qrcode';
 import StandardButton from '../../../components/ui/StandardButton';
@@ -352,9 +351,38 @@ const CreatePurchase = () => {
 
       const totalAmount = calculateTotal();
       let transactionId: string | undefined;
+      
+      // Determine if this is a card payment
+      const isCardPayment = paymentMethod === 'authorize.net' || (paymentMethod === 'card' && useAuthorizeNet);
 
-      // Process card payment if payment method is authorize.net OR (card AND using Authorize.Net)
-      if (paymentMethod === 'authorize.net' || (paymentMethod === 'card' && useAuthorizeNet)) {
+      // For cash payments, use amountPaid if explicitly set, otherwise default to full payment
+      const cashAmountPaid = amountPaid > 0 ? amountPaid : totalAmount;
+
+      // Step 1: Create purchase FIRST (so we have the purchase ID for payment)
+      const purchaseData = {
+        attraction_id: Number(selectedAttraction.id),
+        customer_id: selectedCustomerId || undefined,
+        guest_name: customerInfo.name || 'Walk-in Customer',
+        guest_email: customerInfo.email || undefined,
+        guest_phone: customerInfo.phone || undefined,
+        quantity: quantity,
+        amount: totalAmount,
+        amount_paid: paymentMethod === 'paylater' ? 0 : (isCardPayment ? totalAmount : cashAmountPaid),
+        currency: 'USD',
+        method: paymentMethod === 'in-store' ? 'cash' : paymentMethod as 'card' | 'paylater' | 'authorize.net',
+        payment_method: paymentMethod as 'card' | 'in-store' | 'paylater' | 'authorize.net',
+        status: (paymentMethod === 'paylater' || paymentMethod === 'in-store' ? 'pending' : 'completed') as 'pending' | 'completed' | 'cancelled',
+        location_id: selectedAttraction.locationId || 1,
+        purchase_date: new Date().toISOString().split('T')[0],
+        notes: notes || `Attraction Purchase: ${selectedAttraction.name} (${quantity} ticket${quantity > 1 ? 's' : ''})`,
+        send_email: sendEmail,
+      };
+
+      const response = await attractionPurchaseService.createPurchase(purchaseData);
+      const createdPurchase = response.data;
+
+      // Step 2: Process card payment if using Authorize.Net (now we have purchase ID)
+      if (isCardPayment) {
         const cardData = {
           cardNumber: cardNumber.replace(/\s/g, ''),
           month: cardMonth,
@@ -373,72 +401,52 @@ const CreatePurchase = () => {
         const paymentData = {
           location_id: selectedAttraction.locationId || 1,
           amount: totalAmount,
-          order_id: `A${selectedAttraction.id}-${Date.now().toString().slice(-8)}`, // Max 20 chars for Authorize.Net
+          order_id: `A${selectedAttraction.id}-${Date.now().toString().slice(-8)}`,
           description: `Attraction Purchase: ${selectedAttraction.name}`,
+          payable_id: createdPurchase.id,
+          payable_type: PAYMENT_TYPE.ATTRACTION_PURCHASE,
+          customer_id: selectedCustomerId || undefined,
         };
         
         const paymentResponse = await processCardPayment(
           cardData,
           paymentData,
           authorizeApiLoginId,
-          undefined, // No client key for this flow
-          customerData // Pass customer billing data
+          undefined,
+          customerData
         );
         
         if (!paymentResponse.success) {
-          throw new Error(paymentResponse.message || 'Payment failed');
+          // Payment failed - delete the purchase we just created
+          try {
+            await attractionPurchaseService.deletePurchase(createdPurchase.id);
+            console.log('🗑️ Purchase deleted due to payment failure');
+          } catch (deleteErr) {
+            console.error('⚠️ Failed to delete purchase after payment failure:', deleteErr);
+          }
+          throw new Error(paymentResponse.message || 'Payment failed. Please try again.');
         }
         
         transactionId = paymentResponse.transaction_id;
-      }
 
-      // Create purchase data matching backend Payment model
-      // For cash payments, use amountPaid if explicitly set, otherwise default to full payment
-      const cashAmountPaid = amountPaid > 0 ? amountPaid : totalAmount;
-      const purchaseData = {
-        attraction_id: Number(selectedAttraction.id),
-        customer_id: selectedCustomerId || undefined,
-        guest_name: customerInfo.name || 'Walk-in Customer',
-        guest_email: customerInfo.email || undefined,
-        guest_phone: customerInfo.phone || undefined,
-        quantity: quantity,
-        amount: totalAmount,
-        amount_paid: paymentMethod === 'paylater' ? 0 : ((paymentMethod === 'card' || paymentMethod === 'authorize.net') ? totalAmount : cashAmountPaid),
-        currency: 'USD',
-        method: paymentMethod === 'in-store' ? 'cash' : paymentMethod as 'card' | 'paylater' | 'authorize.net',
-        payment_method: paymentMethod as 'card' | 'in-store' | 'paylater' | 'authorize.net',
-        status: (paymentMethod === 'paylater' || paymentMethod === 'in-store' ? 'pending' : 'completed') as 'pending' | 'completed' | 'cancelled',
-        payment_id: transactionId, // Only present if Authorize.Net was used
-        location_id: selectedAttraction.locationId || 1,
-        purchase_date: new Date().toISOString().split('T')[0],
-        notes: notes || `Attraction Purchase: ${selectedAttraction.name} (${quantity} ticket${quantity > 1 ? 's' : ''})`,
-        send_email: sendEmail,
-        // transaction_id is auto-generated by backend
-      };
-
-      // Create purchase via API
-      const response = await attractionPurchaseService.createPurchase(purchaseData);
-      const createdPurchase = response.data;
-
-      // Generate QR code for email (not displayed in UI)
-      let qrCodeData = '';
-      try {
-        qrCodeData = await generatePurchaseQRCode(createdPurchase.id);
-      } catch (qrError) {
-        // QR code generation failed - handled silently
-      }
-
-      // Create payment record if amount_paid > 0
-      const actualAmountPaid = paymentMethod === 'paylater' ? 0 : ((paymentMethod === 'card' || paymentMethod === 'authorize.net') ? totalAmount : cashAmountPaid);
-      if (actualAmountPaid > 0) {
+        // Update purchase with payment_id (transaction_id)
+        try {
+          await attractionPurchaseService.updatePurchase(createdPurchase.id, {
+            payment_id: transactionId
+          });
+        } catch (updateError) {
+          // Non-critical - purchase and payment succeeded
+        }
+      } else if (cashAmountPaid > 0 && paymentMethod !== 'paylater') {
+        // Step 2b: For non-card payments (in-store/cash), create payment record
         try {
           const paymentData = {
             payable_id: createdPurchase.id,
             payable_type: PAYMENT_TYPE.ATTRACTION_PURCHASE,
             customer_id: selectedCustomerId || null,
-            amount: actualAmountPaid,
+            amount: cashAmountPaid,
             currency: 'USD',
-            method: paymentMethod as 'card' | 'cash',
+            method: 'cash' as 'card' | 'cash',
             status: 'completed' as const,
             location_id: selectedAttraction.locationId || 1,
             notes: `Payment for attraction purchase: ${selectedAttraction.name}`,
@@ -446,9 +454,16 @@ const CreatePurchase = () => {
           
           await createPayment(paymentData);
         } catch (paymentError) {
-          // Failed to create payment record - handled silently
-          // Don't fail the entire process if payment record creation fails
+          // Non-critical - purchase succeeded
         }
+      }
+
+      // Generate QR code for email (not displayed in UI)
+      let qrCodeData = '';
+      try {
+        qrCodeData = await generatePurchaseQRCode(createdPurchase.id);
+      } catch (qrError) {
+        // QR code generation failed - handled silently
       }
 
       // Send receipt email with QR code only if QR code was generated

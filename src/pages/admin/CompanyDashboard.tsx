@@ -56,6 +56,7 @@ const CompanyDashboard: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const itemsPerPage = 10;
   const [loading, setLoading] = useState(true);
+  const [metricsLoading, setMetricsLoading] = useState(false);
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<{ date: Date; time: string; bookings: any[] } | null>(null);
   const [selectedBooking, setSelectedBooking] = useState<any | null>(null);
   const [selectedDayBookings, setSelectedDayBookings] = useState<{ date: Date; bookings: any[] } | null>(null);
@@ -64,6 +65,8 @@ const CompanyDashboard: React.FC = () => {
   // Timeframe selector for metrics
   const [metricsTimeframe, setMetricsTimeframe] = useState<TimeframeType>('all_time');
   const [timeframeDescription, setTimeframeDescription] = useState('All Time');
+  const [customDateFrom, setCustomDateFrom] = useState('');
+  const [customDateTo, setCustomDateTo] = useState('');
   
   // Rooms for daily view
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -473,6 +476,8 @@ const CompanyDashboard: React.FC = () => {
   // - Smooth update when new data arrives
   useEffect(() => {
     const fetchMetricsData = async () => {
+      setMetricsLoading(true);
+      
       try {
         console.log('🔄 Starting metrics fetch for location:', selectedLocation, 'timeframe:', metricsTimeframe);
         
@@ -490,9 +495,17 @@ const CompanyDashboard: React.FC = () => {
         
         // Step 2: Fetch fresh data from API in background with timeframe
         console.log('📊 Fetching metrics from API with timeframe:', metricsTimeframe);
-        const metricsResponse = await metricsService.getDashboardMetrics({
+        const metricsParams: any = {
           timeframe: metricsTimeframe,
-        });
+        };
+        
+        // Add custom dates if timeframe is custom
+        if (metricsTimeframe === 'custom' && customDateFrom && customDateTo) {
+          metricsParams.date_from = customDateFrom;
+          metricsParams.date_to = customDateTo;
+        }
+        
+        const metricsResponse = await metricsService.getDashboardMetrics(metricsParams);
         
         console.log('✅ Metrics API response:', metricsResponse);
         console.log('📊 Metrics:', metricsResponse.metrics);
@@ -581,11 +594,12 @@ const CompanyDashboard: React.FC = () => {
         console.error('Error details:', error.message || error);
       } finally {
         setLoading(false);
+        setMetricsLoading(false);
       }
     };
     
     fetchMetricsData();
-  }, [selectedLocation, metricsTimeframe]);
+  }, [selectedLocation, metricsTimeframe, customDateFrom, customDateTo]);
 
   // Weekly calendar data - derived from allBookings (no API call needed)
   useEffect(() => {
@@ -941,21 +955,48 @@ const CompanyDashboard: React.FC = () => {
           </h1>
           <p className="text-sm md:text-base text-gray-500">Multi-location booking overview and management</p>
         </div>
-        <div className="flex items-center gap-3 mt-4 md:mt-0">
+        <div className="flex flex-col md:flex-row items-start md:items-center gap-3 mt-4 md:mt-0">
           {/* Timeframe Selector */}
-          <div className="relative">
-            <select
-              value={metricsTimeframe}
-              onChange={(e) => setMetricsTimeframe(e.target.value as TimeframeType)}
-              className={`appearance-none bg-white border border-gray-200 text-gray-700 py-2 px-3 pr-8 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-${fullColor} focus:border-transparent cursor-pointer`}
-            >
-              <option value="last_24h">Last 24 Hours</option>
-              <option value="last_7d">Last 7 Days</option>
-              <option value="last_30d">Last 30 Days</option>
-              <option value="all_time">All Time</option>
-            </select>
-            <Clock className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <select
+                value={metricsTimeframe}
+                onChange={(e) => setMetricsTimeframe(e.target.value as TimeframeType)}
+                className={`appearance-none bg-white border border-gray-200 text-gray-700 py-2 px-3 pr-8 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-${fullColor} focus:border-transparent cursor-pointer`}
+              >
+                <option value="last_24h">Last 24 Hours</option>
+                <option value="last_7d">Last 7 Days</option>
+                <option value="last_30d">Last 30 Days</option>
+                <option value="all_time">All Time</option>
+                <option value="custom">Custom Range</option>
+              </select>
+              <Clock className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+            </div>
+            {metricsLoading && (
+              <div className="w-3 h-3 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin"></div>
+            )}
           </div>
+          
+          {/* Custom Date Range Inputs */}
+          {metricsTimeframe === 'custom' && (
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={customDateFrom}
+                onChange={(e) => setCustomDateFrom(e.target.value)}
+                className="bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="From"
+              />
+              <span className="text-gray-500 text-sm">to</span>
+              <input
+                type="date"
+                value={customDateTo}
+                onChange={(e) => setCustomDateTo(e.target.value)}
+                className="bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="To"
+              />
+            </div>
+          )}
           <LocationSelector
             locations={locations.map(loc => ({
               id: loc.id.toString(),

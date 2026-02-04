@@ -109,6 +109,7 @@ export interface UpdateBookingData {
   guest_of_honor_age?: number;
   guest_of_honor_gender?: 'male' | 'female' | 'other';
   send_notification?: boolean; // Control whether to send customer notification on update
+  transaction_id?: string; // Payment transaction ID from Authorize.Net
   additional_attractions?: Array<{
     attraction_id: number;
     quantity: number;

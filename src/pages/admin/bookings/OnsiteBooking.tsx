@@ -1444,42 +1444,73 @@ const OnsiteBooking: React.FC = () => {
       console.log('📍 Selected time slot details:', availableTimeSlots.find(slot => slot.start_time === bookingData.time));
       console.log('================================\n');
       
-      // Step 1: Process card payment if using Authorize.Net
-      if (bookingData.paymentMethod === 'authorize.net' || (bookingData.paymentMethod === 'card' && useAuthorizeNet)) {
+      // Determine if using card payment via Authorize.Net
+      const isCardPayment = bookingData.paymentMethod === 'authorize.net' || (bookingData.paymentMethod === 'card' && useAuthorizeNet);
+      
+      // Step 1: Create booking FIRST via API (backend handles time slot creation)
+      const response = await bookingService.createBooking(bookingData_request);
+      
+      if (!response.success || !response.data) {
+        throw new Error('Failed to create booking');
+      }
+      
+      const bookingId = response.data.id;
+      const referenceNumber = response.data.reference_number;
+      const customerId = response.data.customer_id;
+      
+      console.log('✅ Booking created:', { bookingId, referenceNumber });
+      
+      // Add the new booking to cache
+      await bookingCacheService.addBookingToCache(response.data);
+      
+      // Step 2: Process card payment if using Authorize.Net (now we have bookingId)
+      if (isCardPayment && amountPaid > 0) {
         try {
           setIsProcessingPayment(true);
           setPaymentError('');
           
-          // Ensure Accept.js library is loaded (should already be loaded from settings)
+          // Ensure Accept.js library is loaded
           if (!window.Accept) {
             await loadAcceptJS(authorizeEnvironment);
           }
           
-          // Process payment
-        // Customer billing data for Authorize.Net
-        const customerData = {
-          first_name: bookingData.customer.firstName || '',
-          last_name: bookingData.customer.lastName || '',
-          email: bookingData.customer.email || '',
-          phone: bookingData.customer.phone || '',
-        };
-        
-        const paymentResult = await processCardPayment(
-          {
-            cardNumber: cardNumber.replace(/\s/g, ''),
-            month: cardMonth,
-            year: cardYear,
-            cardCode: cardCVV
-          },
-          {
-            location_id: 1,
-            amount: amountPaid
-          },
-          authorizeApiLoginId,
-          undefined, // clientKey
-          customerData // Pass customer billing data as optional parameter
-        );          if (!paymentResult.success) {
-            setPaymentError(paymentResult.message || 'Payment processing failed');
+          // Customer billing data for Authorize.Net
+          const customerData = {
+            first_name: bookingData.customer.firstName || '',
+            last_name: bookingData.customer.lastName || '',
+            email: bookingData.customer.email || '',
+            phone: bookingData.customer.phone || '',
+          };
+          
+          const paymentResult = await processCardPayment(
+            {
+              cardNumber: cardNumber.replace(/\s/g, ''),
+              month: cardMonth,
+              year: cardYear,
+              cardCode: cardCVV
+            },
+            {
+              location_id: bookingData_request.location_id,
+              amount: amountPaid,
+              // Include payable_id and payable_type from the start
+              payable_id: bookingId,
+              payable_type: PAYMENT_TYPE.BOOKING,
+              customer_id: customerId || undefined,
+            },
+            authorizeApiLoginId,
+            undefined, // clientKey
+            customerData // Pass customer billing data
+          );
+          
+          if (!paymentResult.success) {
+            // Payment failed - delete the booking we just created
+            try {
+              await bookingService.deleteBooking(bookingId);
+              console.log('🗑️ Booking deleted due to payment failure');
+            } catch (deleteErr) {
+              console.error('⚠️ Failed to delete booking after payment failure:', deleteErr);
+            }
+            setPaymentError(paymentResult.message || 'Payment processing failed. Please try again.');
             setIsProcessingPayment(false);
             return;
           }
@@ -1487,6 +1518,14 @@ const OnsiteBooking: React.FC = () => {
           console.log('✅ Payment processed successfully:', paymentResult.transaction_id);
         } catch (paymentErr: any) {
           console.error('❌ Payment processing error:', paymentErr);
+          
+          // Payment failed - delete the booking we just created
+          try {
+            await bookingService.deleteBooking(bookingId);
+            console.log('🗑️ Booking deleted due to payment failure');
+          } catch (deleteErr) {
+            console.error('⚠️ Failed to delete booking after payment failure:', deleteErr);
+          }
           
           // Check for HTTPS requirement error
           if (paymentErr?.message?.includes('HTTPS') || paymentErr?.message?.includes('https')) {
@@ -1498,72 +1537,57 @@ const OnsiteBooking: React.FC = () => {
           setIsProcessingPayment(false);
           return;
         }
-      }
-      
-      // Step 2: Create booking via API (backend handles time slot creation)
-      const response = await bookingService.createBooking(bookingData_request);
-      
-      if (response.success && response.data) {
-        const bookingId = response.data.id;
-        const referenceNumber = response.data.reference_number;
-        
-        console.log('✅ Booking created:', { bookingId, referenceNumber });
-        
-        // Add the new booking to cache
-        await bookingCacheService.addBookingToCache(response.data);
-        
-        // Step 3: Generate QR code with the actual reference number
-        const qrCodeBase64 = await QRCode.toDataURL(referenceNumber, {
-          width: 300,
-          margin: 2,
-          color: { dark: '#000000', light: '#FFFFFF' }
-        });
-        
-        console.log('📱 QR Code generated for reference:', referenceNumber);
-        
-        // Step 4: Store QR code with email preference
+      } else if (amountPaid > 0) {
+        // Step 2b: For non-card payments (in-store, pay later), create payment record
         try {
-          await bookingService.storeQrCode(bookingId, qrCodeBase64, sendEmail);
-          console.log('✅ QR code stored with email preference:', sendEmail);
-        } catch (qrError) {
-          console.error('⚠️ Failed to store QR code, but booking was created:', qrError);
-          // Don't fail the entire process if QR storage fails
+          const paymentData = {
+            payable_id: bookingId,
+            payable_type: PAYMENT_TYPE.BOOKING,
+            customer_id: customerId || null,
+            amount: amountPaid,
+            currency: 'USD',
+            method: (bookingData.paymentMethod === 'in-store' ? 'cash' : bookingData.paymentMethod) as 'card' | 'cash',
+            status: 'completed' as const,
+            location_id: bookingData_request.location_id,
+            notes: bookingData.paymentMethod === 'in-store' 
+              ? `In-store payment for booking ${referenceNumber}` 
+              : `Payment for booking ${referenceNumber}`,
+          };
+          
+          await createPayment(paymentData);
+          console.log('✅ Payment record created for booking:', bookingId);
+        } catch (paymentError) {
+          console.error('⚠️ Failed to create payment record:', paymentError);
+          // Don't fail - booking was created successfully
         }
-        
-        // Step 5: Create payment record if amount_paid > 0
-        if (amountPaid > 0) {
-          try {
-            const paymentData = {
-              payable_id: bookingId,
-              payable_type: PAYMENT_TYPE.BOOKING,
-              customer_id: response.data.customer_id || null,
-              amount: amountPaid,
-              currency: 'USD',
-              method: (bookingData.paymentMethod === 'in-store' ? 'cash' : bookingData.paymentMethod) as 'card' | 'cash',
-              status: 'completed' as const,
-              location_id: bookingData_request.location_id,
-              notes: bookingData.paymentMethod === 'in-store' 
-                ? `In-store payment for booking ${referenceNumber}` 
-                : `Payment for booking ${referenceNumber}`,
-            };
-            
-            await createPayment(paymentData);
-            console.log('✅ Payment record created for booking:', bookingId);
-          } catch (paymentError) {
-            console.error('⚠️ Failed to create payment record:', paymentError);
-            // Don't fail the entire process if payment record creation fails
-          }
-        }
-        
-        // Show success toast
-        setToast({ 
-          message: `Booking created successfully! Reference: ${referenceNumber}`, 
-          type: 'success' 
-        });
-        
-        // Reset form for new booking
-        resetForm();
       }
+      
+      // Step 3: Generate QR code with the actual reference number
+      const qrCodeBase64 = await QRCode.toDataURL(referenceNumber, {
+        width: 300,
+        margin: 2,
+        color: { dark: '#000000', light: '#FFFFFF' }
+      });
+      
+      console.log('📱 QR Code generated for reference:', referenceNumber);
+      
+      // Step 4: Store QR code with email preference
+      try {
+        await bookingService.storeQrCode(bookingId, qrCodeBase64, sendEmail);
+        console.log('✅ QR code stored with email preference:', sendEmail);
+      } catch (qrError) {
+        console.error('⚠️ Failed to store QR code, but booking was created:', qrError);
+        // Don't fail the entire process if QR storage fails
+      }
+      
+      // Show success toast
+      setToast({ 
+        message: `Booking created successfully! Reference: ${referenceNumber}`, 
+        type: 'success' 
+      });
+      
+      // Reset form for new booking
+      resetForm();
     } catch (err) {
       console.error('❌ Error creating booking:', err);
       setToast({ message: 'Failed to create booking. Please try again.', type: 'error' });

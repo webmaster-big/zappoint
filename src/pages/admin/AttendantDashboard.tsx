@@ -40,12 +40,15 @@ const AttendantDashboard: React.FC = () => {
    const [currentDay, setCurrentDay] = useState(new Date());
    const [calendarView, setCalendarView] = useState<'day' | 'week' | 'month'>('month');
    const [loading, setLoading] = useState(true);
+   const [metricsLoading, setMetricsLoading] = useState(false);
    const [locationId, setLocationId] = useState<number>(1);
    const [selectedDayBookings, setSelectedDayBookings] = useState<{ date: Date; bookings: any[] } | null>(null);
    
    // Timeframe selector for metrics
    const [metricsTimeframe, setMetricsTimeframe] = useState<TimeframeType>('all_time');
    const [timeframeDescription, setTimeframeDescription] = useState('All Time');
+   const [customDateFrom, setCustomDateFrom] = useState('');
+   const [customDateTo, setCustomDateTo] = useState('');
    
    // Rooms for daily view
    const [rooms, setRooms] = useState<Room[]>([]);
@@ -179,6 +182,8 @@ const AttendantDashboard: React.FC = () => {
      const fetchMetricsData = async () => {
        if (!locationId) return;
        
+       setMetricsLoading(true);
+       
        try {
          // Step 1: Try to load from cache first for instant display (with timeframe)
          const cachedData = await metricsCacheService.getCachedMetrics<typeof metrics>('attendant', locationId, metricsTimeframe);
@@ -193,10 +198,18 @@ const AttendantDashboard: React.FC = () => {
          
          // Step 2: Fetch fresh data from API in background with timeframe
          console.log('🔄 [AttendantDashboard] Fetching fresh metrics from API...');
-         const metricsResponse = await MetricsService.getAttendantMetrics({
+         const metricsParams: any = {
            location_id: locationId,
            timeframe: metricsTimeframe,
-         });
+         };
+         
+         // Add custom dates if timeframe is custom
+         if (metricsTimeframe === 'custom' && customDateFrom && customDateTo) {
+           metricsParams.date_from = customDateFrom;
+           metricsParams.date_to = customDateTo;
+         }
+         
+         const metricsResponse = await MetricsService.getAttendantMetrics(metricsParams);
          
          console.log('📊 Attendant Metrics Response:', metricsResponse);
          
@@ -223,11 +236,12 @@ const AttendantDashboard: React.FC = () => {
          console.error('Error fetching metrics data:', error);
        } finally {
          setLoading(false);
+         setMetricsLoading(false);
        }
      };
      
      fetchMetricsData();
-   }, [locationId, metricsTimeframe]);
+   }, [locationId, metricsTimeframe, customDateFrom, customDateTo]);
 
    // Get dates for the current week
    const getWeekDates = (date: Date): Date[] => {
@@ -635,18 +649,45 @@ const AttendantDashboard: React.FC = () => {
            </div>
            
            {/* Timeframe Selector */}
-           <div className="flex items-center gap-2 mt-4 md:mt-0">
-             <Clock size={16} className="text-gray-500" />
-             <select
-               value={metricsTimeframe}
-               onChange={(e) => setMetricsTimeframe(e.target.value as TimeframeType)}
-               className="bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-             >
-               <option value="last_24h">Last 24 Hours</option>
-               <option value="last_7d">Last 7 Days</option>
-               <option value="last_30d">Last 30 Days</option>
-               <option value="all_time">All Time</option>
-             </select>
+           <div className="flex flex-col md:flex-row items-start md:items-center gap-2 mt-4 md:mt-0">
+             <div className="flex items-center gap-2">
+               <Clock size={16} className="text-gray-500" />
+               <select
+                 value={metricsTimeframe}
+                 onChange={(e) => setMetricsTimeframe(e.target.value as TimeframeType)}
+                 className="bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+               >
+                 <option value="last_24h">Last 24 Hours</option>
+                 <option value="last_7d">Last 7 Days</option>
+                 <option value="last_30d">Last 30 Days</option>
+                 <option value="all_time">All Time</option>
+                 <option value="custom">Custom Range</option>
+               </select>
+               {metricsLoading && (
+                 <div className="w-3 h-3 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin"></div>
+               )}
+             </div>
+             
+             {/* Custom Date Range Inputs */}
+             {metricsTimeframe === 'custom' && (
+               <div className="flex items-center gap-2">
+                 <input
+                   type="date"
+                   value={customDateFrom}
+                   onChange={(e) => setCustomDateFrom(e.target.value)}
+                   className="bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                   placeholder="From"
+                 />
+                 <span className="text-gray-500 text-sm">to</span>
+                 <input
+                   type="date"
+                   value={customDateTo}
+                   onChange={(e) => setCustomDateTo(e.target.value)}
+                   className="bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                   placeholder="To"
+                 />
+               </div>
+             )}
            </div>
          </div>
 

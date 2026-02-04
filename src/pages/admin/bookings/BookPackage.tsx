@@ -16,7 +16,7 @@ interface DayOffWithTime {
   package_ids?: number[] | null;  // If set, only applies to these packages
   room_ids?: number[] | null;     // If set, only blocks these rooms
 }
-import { loadAcceptJS, processCardPayment, validateCardNumber, formatCardNumber, getCardType, updatePaymentPayable, PAYMENT_TYPE } from '../../../services/PaymentService';
+import { loadAcceptJS, processCardPayment, validateCardNumber, formatCardNumber, getCardType, PAYMENT_TYPE } from '../../../services/PaymentService';
 import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
 import customerService from '../../../services/CustomerService';
 import DatePicker from '../../../components/ui/DatePicker';
@@ -901,7 +901,7 @@ const BookPackage: React.FC = () => {
       // Calculate payment amount - customers pay deposit if available, otherwise full
       const amountToPay = partialAmount > 0 ? partialAmount : total;
       
-      // Step 1: Process payment first
+      // Prepare card data
       const cardData = {
         cardNumber: cardNumber.replace(/\s/g, ''),
         month: cardMonth,
@@ -923,27 +923,7 @@ const BookPackage: React.FC = () => {
         country: form.country,
       };
       
-      const paymentData = {
-        location_id: pkg.location_id || 1,
-        amount: amountToPay,
-        order_id: `P${pkg.id}-${Date.now().toString().slice(-8)}`, // Max 20 chars for Authorize.Net
-        description: `Package Booking: ${pkg.name}`,
-        customer_id: customerId || undefined,
-      };
-      
-      const paymentResponse = await processCardPayment(
-        cardData,
-        paymentData,
-        authorizeApiLoginId,
-        authorizeClientKey, // Pass the client key
-        customerData // Pass customer billing data
-      );
-      
-      if (!paymentResponse.success) {
-        throw new Error(paymentResponse.message || 'Payment failed');
-      }
-      
-      // Step 2: Create booking with payment info
+      // Step 1: Prepare booking data FIRST
       const additionalAttractions = Object.entries(selectedAttractions)
         .filter(([, qty]) => qty > 0)
         .map(([id, qty]) => {
@@ -951,7 +931,6 @@ const BookPackage: React.FC = () => {
           if (!attraction) {
             return null;
           }
-          // price_at_booking should be unit price, backend calculates total
           const unitPrice = Number(attraction.price);
           return {
             attraction_id: Number(id),
@@ -968,7 +947,6 @@ const BookPackage: React.FC = () => {
           if (!addon) {
             return null;
           }
-          // Use package-specific price if available
           const unitPrice = getAddOnPrice(addon, pkg.id);
           return {
             addon_id: Number(id),
@@ -1002,11 +980,9 @@ const BookPackage: React.FC = () => {
         promo_code: appliedPromo ? appliedPromo.code : undefined,
         gift_card_code: appliedGiftCard ? appliedGiftCard.code : undefined,
         notes: form.notes || undefined,
-        transaction_id: paymentResponse.transaction_id,
         guest_of_honor_name: pkg.has_guest_of_honor && form.guestOfHonorName ? form.guestOfHonorName : undefined,
         guest_of_honor_age: pkg.has_guest_of_honor && form.guestOfHonorAge ? parseInt(form.guestOfHonorAge) : undefined,
         guest_of_honor_gender: pkg.has_guest_of_honor && form.guestOfHonorGender ? form.guestOfHonorGender as 'male' | 'female' | 'other' : undefined,
-        // Address fields
         guest_address: form.address || undefined,
         guest_city: form.city || undefined,
         guest_state: form.state || undefined,
@@ -1014,49 +990,81 @@ const BookPackage: React.FC = () => {
         guest_country: form.country || undefined,
       };
       
+      // Step 2: Create booking FIRST
       const response = await bookingService.createBooking(bookingData);
       
-      if (response.success && response.data) {
-        const bookingId = response.data.id;
-        const referenceNumber = response.data.reference_number;
-        
-        // Update payment record with payable_id and payable_type
-        if (paymentResponse.payment?.id) {
-          try {
-            await updatePaymentPayable(paymentResponse.payment.id, { 
-              payable_id: bookingId,
-              payable_type: PAYMENT_TYPE.BOOKING
-            });
-          } catch (paymentUpdateError) {
-            // Payment update error - handled silently in production
-          }
-        }
-        
-        // Generate and store QR code
-        const qrCodeBase64 = await QRCode.toDataURL(referenceNumber, {
-          width: 300,
-          margin: 2,
-          color: {
-            dark: '#000000',
-            light: '#FFFFFF'
-          }
-        });
-        
-        try {
-          await bookingService.storeQrCode(bookingId, qrCodeBase64);
-        } catch (qrError) {
-          // QR code storage error - handled silently in production
-        }
-        
-        // Show confirmation modal
-        setConfirmationData({
-          referenceNumber,
-          qrCode: qrCodeBase64,
-          bookingId
-        });
-        setShowConfirmation(true);
+      if (!response.success || !response.data) {
+        throw new Error('Failed to create booking');
       }
+      
+      const bookingId = response.data.id;
+      const referenceNumber = response.data.reference_number;
+      
+      // Step 3: Process payment with payable_id (now we have bookingId)
+      const paymentData = {
+        location_id: pkg.location_id || 1,
+        amount: amountToPay,
+        order_id: `P${pkg.id}-${Date.now().toString().slice(-8)}`,
+        description: `Package Booking: ${pkg.name}`,
+        customer_id: customerId || undefined,
+        payable_id: bookingId,
+        payable_type: PAYMENT_TYPE.BOOKING,
+      };
+      
+      const paymentResponse = await processCardPayment(
+        cardData,
+        paymentData,
+        authorizeApiLoginId,
+        authorizeClientKey,
+        customerData
+      );
+      
+      if (!paymentResponse.success) {
+        // Payment failed - delete the booking we just created
+        try {
+          await bookingService.deleteBooking(bookingId);
+          console.log('🗑️ Booking deleted due to payment failure');
+        } catch (deleteErr) {
+          console.error('⚠️ Failed to delete booking after payment failure:', deleteErr);
+        }
+        throw new Error(paymentResponse.message || 'Payment failed. Please try again.');
+      }
+      
+      // Update booking with transaction_id
+      try {
+        await bookingService.updateBooking(bookingId, {
+          transaction_id: paymentResponse.transaction_id
+        });
+      } catch (updateError) {
+        // Non-critical - booking and payment succeeded
+      }
+      
+      // Generate and store QR code
+      const qrCodeBase64 = await QRCode.toDataURL(referenceNumber, {
+        width: 300,
+        margin: 2,
+        color: {
+          dark: '#000000',
+          light: '#FFFFFF'
+        }
+      });
+      
+      try {
+        await bookingService.storeQrCode(bookingId, qrCodeBase64);
+      } catch (qrError) {
+        // QR code storage error - handled silently
+      }
+      
+      // Show confirmation modal
+      setConfirmationData({
+        referenceNumber,
+        qrCode: qrCodeBase64,
+        bookingId
+      });
+      setShowConfirmation(true);
     } catch (err: any) {
+      // If we have a bookingId and it's a payment error, try to delete the booking
+      // Note: bookingId might not be defined if booking creation failed
       const userFriendlyMessage = getPaymentErrorMessage(err);
       setPaymentError(userFriendlyMessage);
     } finally {
