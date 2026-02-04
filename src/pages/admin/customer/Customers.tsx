@@ -8,8 +8,6 @@ import {
   Building2,
   Trash2,
   Eye,
-  ChevronLeft,
-  ChevronRight,
   Download,
   Tag,
   X,
@@ -23,8 +21,12 @@ import {
   Plus,
   UserPlus,
   Save,
+  UserCheck,
+  UserX,
+  Calendar,
 } from 'lucide-react';
 import StandardButton from '../../../components/ui/StandardButton';
+import CounterAnimation from '../../../components/ui/CounterAnimation';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import contactService, { 
   type Contact, 
@@ -716,25 +718,52 @@ const CustomerListing: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="flex justify-center items-center h-64">
         <div className={`animate-spin rounded-full h-12 w-12 border-b-2 border-${fullColor}`}></div>
       </div>
     );
   }
 
+  // Metrics configuration for the cards
+  const metrics = [
+    {
+      icon: Users,
+      title: 'Total Customers',
+      value: totalContacts,
+      change: 'All registered customers',
+      accentColor: themeColor,
+    },
+    {
+      icon: UserCheck,
+      title: 'Active',
+      value: statistics?.active || 0,
+      change: 'Currently active',
+      accentColor: 'green',
+    },
+    {
+      icon: UserX,
+      title: 'Inactive',
+      value: statistics?.inactive || 0,
+      change: 'Currently inactive',
+      accentColor: 'red',
+    },
+    {
+      icon: Calendar,
+      title: 'Recently Added',
+      value: statistics?.recently_added || 0,
+      change: 'New customers',
+      accentColor: 'blue',
+    },
+  ];
+
   return (
-    <div className="min-h-screen bg-gray-50 px-6 py-8">
+    <div className="px-6 py-8">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Customers</h1>
-          <p className="text-gray-600 mt-2">
+          <p className="text-gray-600 mt-1">
             Manage and view all customer contacts
-            {statistics && (
-              <span className="ml-2 text-sm">
-                ({statistics.active} active, {statistics.inactive} inactive)
-              </span>
-            )}
           </p>
         </div>
         <div className="flex gap-2 mt-4 sm:mt-0">
@@ -765,6 +794,28 @@ const CustomerListing: React.FC = () => {
             Add Customer
           </StandardButton>
         </div>
+      </div>
+
+      {/* Metrics Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        {metrics.map((metric, index) => {
+          const Icon = metric.icon;
+          return (
+            <div
+              key={index}
+              className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 flex flex-col gap-2 hover:shadow-md transition-shadow min-h-[120px]"
+            >
+              <div className="flex items-center gap-2">
+                <div className={`p-2 rounded-lg bg-${metric.accentColor}-100 text-${metric.accentColor}-600`}><Icon size={20} /></div>
+                <span className="text-base font-semibold text-gray-800">{metric.title}</span>
+              </div>
+              <div className="flex items-end gap-2 mt-2">
+                <CounterAnimation value={metric.value} className="text-2xl font-bold text-gray-900" />
+              </div>
+              <p className="text-xs mt-1 text-gray-600">{metric.change}</p>
+            </div>
+          );
+        })}
       </div>
 
       {/* Filters and Search */}
@@ -884,20 +935,41 @@ const CustomerListing: React.FC = () => {
             </div>
           </div>
         )}
-        
-        {/* Results count */}
-        <div className="text-sm text-gray-500 mt-3">
-          Showing {totalContacts > 0 ? startIndex + 1 : 0}-{Math.min(startIndex + itemsPerPage, totalContacts)} of {totalContacts} customer{totalContacts !== 1 ? 's' : ''}
-        </div>
       </div>
+
+      {/* Bulk Actions */}
+      {selectedContacts.length > 0 && (
+        <div className={`bg-${themeColor}-50 p-4 rounded-lg mb-6 flex flex-wrap items-center gap-4`}>
+          <span className={`text-${fullColor} font-medium`}>
+            {selectedContacts.length} customer(s) selected
+          </span>
+          <div className="flex gap-2">
+            <StandardButton
+              variant="secondary"
+              size="sm"
+              icon={CheckSquare}
+              onClick={() => setShowBulkActionsModal(true)}
+            >
+              Bulk Actions
+            </StandardButton>
+          </div>
+        </div>
+      )}
 
       {/* Customers Table */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="px-4 py-2 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
+          <span className="text-xs text-gray-500">
+            Showing <span className="font-medium">{totalContacts > 0 ? startIndex + 1 : 0}</span> to{' '}
+            <span className="font-medium">{Math.min(startIndex + itemsPerPage, totalContacts)}</span>{' '}
+            of <span className="font-medium">{totalContacts}</span> customers
+          </span>
+        </div>
         <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-100">
+          <table className="w-full text-sm text-left">
+            <thead className="text-xs text-gray-500 uppercase bg-gray-50 border-b">
               <tr>
-                <th scope="col" className="px-3 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                <th scope="col" className="px-4 py-3 font-medium w-12">
                   <input
                     type="checkbox"
                     checked={selectedContacts.length === contacts.length && contacts.length > 0}
@@ -905,15 +977,15 @@ const CustomerListing: React.FC = () => {
                     className={`rounded border-gray-300 text-${fullColor} focus:ring-${themeColor}-500`}
                   />
                 </th>
-                <th scope="col" className="px-3 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Name</th>
-                <th scope="col" className="px-3 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Email</th>
-                <th scope="col" className="px-3 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Phone</th>
-                <th scope="col" className="px-3 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Company</th>
-                <th scope="col" className="px-3 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Job Title</th>
-                <th scope="col" className="px-3 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Location</th>
-                <th scope="col" className="px-3 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Tags</th>
-                <th scope="col" className="px-3 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
-                <th scope="col" className="px-3 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
+                <th scope="col" className="px-4 py-3 font-medium">Name</th>
+                <th scope="col" className="px-4 py-3 font-medium">Email</th>
+                <th scope="col" className="px-4 py-3 font-medium">Phone</th>
+                <th scope="col" className="px-4 py-3 font-medium">Company</th>
+                <th scope="col" className="px-4 py-3 font-medium">Job Title</th>
+                <th scope="col" className="px-4 py-3 font-medium">Location</th>
+                <th scope="col" className="px-4 py-3 font-medium">Tags</th>
+                <th scope="col" className="px-4 py-3 font-medium">Status</th>
+                <th scope="col" className="px-4 py-3 font-medium w-20">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -935,8 +1007,8 @@ const CustomerListing: React.FC = () => {
                 </tr>
               ) : (
                 contacts.map((contact) => (
-                  <tr key={contact.id} className="hover:bg-gray-50">
-                    <td className="px-3 py-3">
+                  <tr key={contact.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-3 whitespace-nowrap">
                       <input
                         type="checkbox"
                         checked={selectedContacts.includes(contact.id)}
@@ -944,7 +1016,7 @@ const CustomerListing: React.FC = () => {
                         className={`rounded border-gray-300 text-${fullColor} focus:ring-${themeColor}-500`}
                       />
                     </td>
-                    <td className="px-3 py-3">
+                    <td className="px-4 py-3 whitespace-nowrap">
                       <div className="space-y-0.5">
                         <div className="flex items-center gap-2 text-sm">
                           {renderEditableCell(contact, 'first_name', contact.first_name, 'font-medium text-gray-900')}
@@ -954,31 +1026,31 @@ const CustomerListing: React.FC = () => {
                         </div>
                       </div>
                     </td>
-                    <td className="px-3 py-3">
+                    <td className="px-4 py-3 whitespace-nowrap">
                       <div className="flex items-center gap-1.5 text-sm">
                         <Mail className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
                         {renderEditableCell(contact, 'email', contact.email, 'text-gray-600 max-w-[180px]')}
                       </div>
                     </td>
-                    <td className="px-3 py-3">
+                    <td className="px-4 py-3 whitespace-nowrap">
                       <div className="flex items-center gap-1.5 text-sm">
                         <Phone className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
                         {renderEditableCell(contact, 'phone', contact.phone, 'text-gray-600')}
                       </div>
                     </td>
-                    <td className="px-3 py-3">
+                    <td className="px-4 py-3 whitespace-nowrap">
                       <div className="flex items-center gap-1.5 text-sm">
                         <Building2 className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
                         {renderEditableCell(contact, 'company_name', contact.company_name, 'text-gray-600')}
                       </div>
                     </td>
-                    <td className="px-3 py-3">
+                    <td className="px-4 py-3 whitespace-nowrap">
                       <div className="flex items-center gap-1.5 text-sm">
                         <Briefcase className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
                         {renderEditableCell(contact, 'job_title', contact.job_title, 'text-gray-600')}
                       </div>
                     </td>
-                    <td className="px-3 py-3">
+                    <td className="px-4 py-3 whitespace-nowrap">
                       {contact.location ? (
                         <div className="flex items-center gap-1.5 text-sm text-gray-600">
                           <MapPin className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
@@ -988,7 +1060,7 @@ const CustomerListing: React.FC = () => {
                         <span className="text-sm text-gray-400 italic">—</span>
                       )}
                     </td>
-                    <td className="px-3 py-3">
+                    <td className="px-4 py-3 whitespace-nowrap">
                       <div className="flex flex-wrap gap-1 max-w-[150px]">
                         {contact.tags && contact.tags.length > 0 ? (
                           <>
@@ -1021,7 +1093,7 @@ const CustomerListing: React.FC = () => {
                         </button>
                       </div>
                     </td>
-                    <td className="px-3 py-3">
+                    <td className="px-4 py-3 whitespace-nowrap">
                       <button
                         onClick={() => handleToggleStatus(contact)}
                         title={`Click to ${contact.status === 'active' ? 'deactivate' : 'activate'}`}
@@ -1029,25 +1101,26 @@ const CustomerListing: React.FC = () => {
                         <StatusBadge status={contact.status} />
                       </button>
                     </td>
-                    <td className="px-3 py-3">
+                    <td className="px-4 py-3 whitespace-nowrap text-sm font-medium">
                       <div className="flex items-center gap-1">
                         <button 
-                          className="p-1.5 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
+                          className={`p-1 text-${themeColor}-600 hover:text-${fullColor}`}
                           title="View Details"
                           onClick={() => {
                             setSelectedContactForView(contact);
                             setShowViewModal(true);
                           }}
                         >
-                          <Eye className="w-4 h-4" />
+                          <Eye className="h-4 w-4" />
                         </button>
-                        <button 
-                          className="p-1.5 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
-                          title="Delete Customer"
+                        <StandardButton
+                          variant="danger"
+                          size="sm"
+                          icon={Trash2}
                           onClick={() => handleDeleteContact(contact.id)}
                         >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                          {''}
+                        </StandardButton>
                       </div>
                     </td>
                   </tr>
@@ -1058,52 +1131,58 @@ const CustomerListing: React.FC = () => {
         </div>
 
         {/* Pagination */}
-        {totalContacts > 0 && (
-          <div className="px-6 py-4 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="text-sm text-gray-700">
-              Page <span className="font-medium">{currentPage}</span> of <span className="font-medium">{totalPages}</span>
-            </div>
-            <div className="flex gap-2">
-              <StandardButton
-                variant="secondary"
-                size="md"
-                onClick={() => goToPage(currentPage - 1)}
-                disabled={currentPage === 1}
-                icon={ChevronLeft}
-              />
-
-              {/* Page numbers */}
-              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                let pageNum: number;
-                if (totalPages <= 5) {
-                  pageNum = i + 1;
-                } else if (currentPage <= 3) {
-                  pageNum = i + 1;
-                } else if (currentPage >= totalPages - 2) {
-                  pageNum = totalPages - 4 + i;
-                } else {
-                  pageNum = currentPage - 2 + i;
-                }
-
-                return (
-                  <StandardButton
-                    key={pageNum}
-                    variant={currentPage === pageNum ? "primary" : "secondary"}
-                    size="md"
-                    onClick={() => goToPage(pageNum)}
-                  >
-                    {pageNum}
-                  </StandardButton>
-                );
-              })}
-
-              <StandardButton
-                variant="secondary"
-                size="md"
-                onClick={() => goToPage(currentPage + 1)}
-                disabled={currentPage === totalPages}
-                icon={ChevronRight}
-              />
+        {totalPages > 1 && (
+          <div className="bg-white px-6 py-4 border-t border-gray-100">
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-gray-800">
+                Showing <span className="font-medium">{startIndex + 1}</span> to{' '}
+                <span className="font-medium">
+                  {Math.min(startIndex + itemsPerPage, totalContacts)}
+                </span>{' '}
+                of <span className="font-medium">{totalContacts}</span> results
+              </div>
+              <div className="flex gap-2">
+                <StandardButton
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => goToPage(currentPage - 1)}
+                  disabled={currentPage === 1}
+                >
+                  Previous
+                </StandardButton>
+                
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter(page => {
+                    // Show first page, last page, and pages around current
+                    if (totalPages <= 7) return true;
+                    if (page === 1 || page === totalPages) return true;
+                    if (Math.abs(page - currentPage) <= 1) return true;
+                    return false;
+                  })
+                  .map((page, idx, arr) => (
+                    <React.Fragment key={page}>
+                      {idx > 0 && arr[idx - 1] !== page - 1 && (
+                        <span className="px-2 text-gray-400">...</span>
+                      )}
+                      <StandardButton
+                        variant={currentPage === page ? 'primary' : 'secondary'}
+                        size="sm"
+                        onClick={() => goToPage(page)}
+                      >
+                        {page}
+                      </StandardButton>
+                    </React.Fragment>
+                  ))}
+                
+                <StandardButton
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => goToPage(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                >
+                  Next
+                </StandardButton>
+              </div>
             </div>
           </div>
         )}

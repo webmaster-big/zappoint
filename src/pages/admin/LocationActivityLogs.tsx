@@ -152,7 +152,7 @@ const LocationActivityLogs = () => {
         if (bookingDetails?.booking_date) metadataDetails.push(`Date: ${bookingDetails.booking_date}`);
         if (bookingDetails?.booking_time) metadataDetails.push(`Time: ${bookingDetails.booking_time}`);
         if (bookingDetails?.participants) metadataDetails.push(`${bookingDetails.participants} participants`);
-        if (financial?.total_amount) metadataDetails.push(`Total: $${financial.total_amount.toFixed(2)}`);
+        if (financial?.total_amount) metadataDetails.push(`Total: $${Number(financial.total_amount).toFixed(2)}`);
         break;
       }
       
@@ -216,7 +216,7 @@ const LocationActivityLogs = () => {
         const customer = getMetaValue('customer') as { name?: string } | undefined;
         
         description = `Payment recorded`;
-        if (paymentDetails?.amount) metadataDetails.push(`Amount: $${paymentDetails.amount.toFixed(2)}`);
+        if (paymentDetails?.amount) metadataDetails.push(`Amount: $${Number(paymentDetails.amount).toFixed(2)}`);
         if (paymentDetails?.method) metadataDetails.push(`Method: ${paymentDetails.method}`);
         if (customer?.name) metadataDetails.push(`Customer: ${customer.name}`);
         if (txnId) metadataDetails.push(`Transaction: ${txnId}`);
@@ -228,7 +228,7 @@ const LocationActivityLogs = () => {
         const customer = getMetaValue('customer') as { name?: string } | undefined;
         
         description = `Payment refunded`;
-        if (paymentDetails?.amount) metadataDetails.push(`Amount: $${paymentDetails.amount.toFixed(2)}`);
+        if (paymentDetails?.amount) metadataDetails.push(`Amount: $${Number(paymentDetails.amount).toFixed(2)}`);
         if (customer?.name) metadataDetails.push(`Customer: ${customer.name}`);
         break;
       }
@@ -293,7 +293,7 @@ const LocationActivityLogs = () => {
         description = `Attraction purchase created`;
         if (purchaseDetails?.attraction_name) metadataDetails.push(`Attraction: ${purchaseDetails.attraction_name}`);
         if (purchaseDetails?.quantity) metadataDetails.push(`Qty: ${purchaseDetails.quantity}`);
-        if (purchaseDetails?.total_amount) metadataDetails.push(`Total: $${purchaseDetails.total_amount.toFixed(2)}`);
+        if (purchaseDetails?.total_amount) metadataDetails.push(`Total: $${Number(purchaseDetails.total_amount).toFixed(2)}`);
         if (customerDetails?.name) metadataDetails.push(`Customer: ${customerDetails.name}`);
         break;
       }
@@ -330,7 +330,7 @@ const LocationActivityLogs = () => {
         if (changes?.original_name && changes?.new_name) {
           metadataDetails.push(`Name: "${changes.original_name}" → "${changes.new_name}"`);
         }
-        if (addonDetails?.price) metadataDetails.push(`Price: $${addonDetails.price.toFixed(2)}`);
+        if (addonDetails?.price) metadataDetails.push(`Price: $${Number(addonDetails.price).toFixed(2)}`);
         break;
       }
       
@@ -357,7 +357,7 @@ const LocationActivityLogs = () => {
       case 'Gift Card Updated': {
         const gcDetails = getMetaValue('gift_card_details') as { code?: string; balance?: number } | undefined;
         description = `Gift card ${gcDetails?.code || ''} updated`;
-        if (gcDetails?.balance) metadataDetails.push(`Balance: $${gcDetails.balance.toFixed(2)}`);
+        if (gcDetails?.balance) metadataDetails.push(`Balance: $${Number(gcDetails.balance).toFixed(2)}`);
         break;
       }
       
@@ -372,8 +372,8 @@ const LocationActivityLogs = () => {
         const redemptionDetails = getMetaValue('redemption_details') as { amount_redeemed?: number; remaining_balance?: number } | undefined;
         
         description = `Gift card ${gcDetails?.code || ''} redeemed`;
-        if (redemptionDetails?.amount_redeemed) metadataDetails.push(`Amount: $${redemptionDetails.amount_redeemed.toFixed(2)}`);
-        if (redemptionDetails?.remaining_balance !== undefined) metadataDetails.push(`Remaining: $${redemptionDetails.remaining_balance.toFixed(2)}`);
+        if (redemptionDetails?.amount_redeemed) metadataDetails.push(`Amount: $${Number(redemptionDetails.amount_redeemed).toFixed(2)}`);
+        if (redemptionDetails?.remaining_balance !== undefined) metadataDetails.push(`Remaining: $${Number(redemptionDetails.remaining_balance).toFixed(2)}`);
         break;
       }
       
