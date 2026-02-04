@@ -333,12 +333,14 @@ const CreateEmailCampaign: React.FC = () => {
     setTimeout(() => setCopiedVariable(null), 2000);
   };
 
-  // Toggle variable group
+  // Toggle variable group - only one open at a time
   const toggleGroup = (groupName: string) => {
-    setExpandedGroups(prev => ({
-      ...prev,
-      [groupName]: !prev[groupName]
-    }));
+    setExpandedGroups(prev => {
+      const isCurrentlyOpen = prev[groupName];
+      // Close all groups, then toggle the clicked one
+      const allClosed = Object.keys(prev).reduce((acc, key) => ({ ...acc, [key]: false }), {} as Record<string, boolean>);
+      return { ...allClosed, [groupName]: !isCurrentlyOpen };
+    });
   };
 
   // Format group name

@@ -71,6 +71,10 @@ import EditEmailTemplate from "./pages/admin/email/EditEmailTemplate";
 import EmailCampaigns from "./pages/admin/email/EmailCampaigns";
 import CreateEmailCampaign from "./pages/admin/email/CreateEmailCampaign";
 import EmailCampaignDetails from "./pages/admin/email/EmailCampaignDetails";
+import EmailNotifications from "./pages/admin/email/EmailNotifications";
+import CreateEmailNotification from "./pages/admin/email/CreateEmailNotification";
+import EditEmailNotification from "./pages/admin/email/EditEmailNotification";
+import EmailNotificationDetails from "./pages/admin/email/EmailNotificationDetails";
 
 
 function App() {
@@ -149,6 +153,12 @@ function App() {
           <Route path="/admin/email/campaigns" element={<EmailCampaigns />} />
           <Route path="/admin/email/campaigns/create" element={<CreateEmailCampaign />} />
           <Route path="/admin/email/campaigns/:id" element={<EmailCampaignDetails />} />
+          
+          {/* Email Notifications Routes - All authenticated users */}
+          <Route path="/admin/email/notifications" element={<EmailNotifications />} />
+          <Route path="/admin/email/notifications/create" element={<CreateEmailNotification />} />
+          <Route path="/admin/email/notifications/edit/:id" element={<EditEmailNotification />} />
+          <Route path="/admin/email/notifications/:id" element={<EmailNotificationDetails />} />
           
           {/* Profile Routes - Role-specific */}
           <Route path="/admin/profile" element={<ProtectedRoute allowedRoles={['company_admin']}><CompanyAdminProfile /></ProtectedRoute>} />

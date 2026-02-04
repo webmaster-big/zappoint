@@ -2479,7 +2479,7 @@ const Bookings: React.FC = () => {
               icon={Plus}
               onClick={() => navigate('/bookings/manual')}
             >
-              Record Past Booking
+              Manual Booking
             </StandardButton>
             <StandardButton
               variant="primary"

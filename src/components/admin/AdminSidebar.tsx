@@ -158,7 +158,9 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
           { label: 'Email Templates', href: '/admin/email/templates', icon: FileText },
           { label: 'Create Template', href: '/admin/email/templates/create', icon: Plus },
           { label: 'Campaigns', href: '/admin/email/campaigns', icon: Send },
-          { label: 'Create Campaign', href: '/admin/email/campaigns/create', icon: Plus }
+          { label: 'Create Campaign', href: '/admin/email/campaigns/create', icon: Plus },
+          { label: 'Email Notifications', href: '/admin/email/notifications', icon: Bell },
+          { label: 'Create Notification', href: '/admin/email/notifications/create', icon: Plus }
         ]},
         { label: 'Profile', icon: User, href: '/attendant/profile', section: 'Account' },
         { label: 'Settings', icon: Settings, href: '/attendant/settings', section: 'Account' }
@@ -198,7 +200,9 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
           { label: 'Email Templates', href: '/admin/email/templates', icon: FileText },
           { label: 'Create Template', href: '/admin/email/templates/create', icon: Plus },
           { label: 'Campaigns', href: '/admin/email/campaigns', icon: Send },
-          { label: 'Create Campaign', href: '/admin/email/campaigns/create', icon: Plus }
+          { label: 'Create Campaign', href: '/admin/email/campaigns/create', icon: Plus },
+          { label: 'Email Notifications', href: '/admin/email/notifications', icon: Bell },
+          { label: 'Create Notification', href: '/admin/email/notifications/create', icon: Plus }
         ]},
         { label: 'Payments', icon: CreditCard, href: '/manager/payments', section: 'Financial' },
         { label: 'Attendants Management', icon: UserCog, section: 'Team', items: [
@@ -245,7 +249,9 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
           { label: 'Email Templates', href: '/admin/email/templates', icon: FileText },
           { label: 'Create Template', href: '/admin/email/templates/create', icon: Plus },
           { label: 'Campaigns', href: '/admin/email/campaigns', icon: Send },
-          { label: 'Create Campaign', href: '/admin/email/campaigns/create', icon: Plus }
+          { label: 'Create Campaign', href: '/admin/email/campaigns/create', icon: Plus },
+          { label: 'Email Notifications', href: '/admin/email/notifications', icon: Bell },
+          { label: 'Create Notification', href: '/admin/email/notifications/create', icon: Plus }
         ]},
         { label: 'Payments', icon: CreditCard, href: '/admin/payments', section: 'Financial' },
         { label: 'User Management', icon: UserCog, section: 'Administration', items: [
