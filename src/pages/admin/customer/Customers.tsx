@@ -48,6 +48,7 @@ const CustomerListing: React.FC = () => {
   const [sortBy, setSortBy] = useState<string>('created_at');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [totalContacts, setTotalContacts] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const currentUser = getStoredUser();
@@ -132,6 +133,10 @@ const CustomerListing: React.FC = () => {
     if (!currentUser?.company_id) return;
     
     try {
+      // Only show loading spinner on initial load, not on pagination
+      if (contacts.length === 0) {
+        setInitialLoading(true);
+      }
       setLoading(true);
       
       const filters: ContactFilters = {
@@ -162,6 +167,7 @@ const CustomerListing: React.FC = () => {
       console.error('Error fetching contacts:', error);
     } finally {
       setLoading(false);
+      setInitialLoading(false);
     }
   }, [currentUser?.company_id, currentUser?.location_id, currentPage, itemsPerPage, debouncedSearchTerm, statusFilter, tagFilter, sourceFilter, sortBy, sortOrder]);
 
@@ -716,7 +722,7 @@ const CustomerListing: React.FC = () => {
     return name || contact.email || 'Unknown';
   };
 
-  if (loading) {
+  if (initialLoading) {
     return (
       <div className="flex justify-center items-center h-64">
         <div className={`animate-spin rounded-full h-12 w-12 border-b-2 border-${fullColor}`}></div>
@@ -1135,18 +1141,27 @@ const CustomerListing: React.FC = () => {
           <div className="bg-white px-6 py-4 border-t border-gray-100">
             <div className="flex items-center justify-between">
               <div className="text-sm text-gray-800">
-                Showing <span className="font-medium">{startIndex + 1}</span> to{' '}
-                <span className="font-medium">
-                  {Math.min(startIndex + itemsPerPage, totalContacts)}
-                </span>{' '}
-                of <span className="font-medium">{totalContacts}</span> results
+                {loading ? (
+                  <span className="flex items-center gap-2">
+                    <div className="animate-spin rounded-full h-3 w-3 border-2 border-gray-400 border-t-transparent"></div>
+                    Loading...
+                  </span>
+                ) : (
+                  <>
+                    Showing <span className="font-medium">{startIndex + 1}</span> to{' '}
+                    <span className="font-medium">
+                      {Math.min(startIndex + itemsPerPage, totalContacts)}
+                    </span>{' '}
+                    of <span className="font-medium">{totalContacts}</span> results
+                  </>
+                )}
               </div>
               <div className="flex gap-2">
                 <StandardButton
                   variant="secondary"
                   size="sm"
                   onClick={() => goToPage(currentPage - 1)}
-                  disabled={currentPage === 1}
+                  disabled={currentPage === 1 || loading}
                 >
                   Previous
                 </StandardButton>
@@ -1168,6 +1183,7 @@ const CustomerListing: React.FC = () => {
                         variant={currentPage === page ? 'primary' : 'secondary'}
                         size="sm"
                         onClick={() => goToPage(page)}
+                        disabled={loading}
                       >
                         {page}
                       </StandardButton>
@@ -1178,7 +1194,7 @@ const CustomerListing: React.FC = () => {
                   variant="secondary"
                   size="sm"
                   onClick={() => goToPage(currentPage + 1)}
-                  disabled={currentPage === totalPages}
+                  disabled={currentPage === totalPages || loading}
                 >
                   Next
                 </StandardButton>

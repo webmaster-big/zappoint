@@ -22,7 +22,8 @@ const Notifications = () => {
   const [notifications, setNotifications] = useState<NotificationsNotification[]>([]);
   const [filter, setFilter] = useState<'all' | 'unread' | 'bookings' | 'purchases'>('all');
   const [showFilters, setShowFilters] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalNotifications, setTotalNotifications] = useState(0);
@@ -92,6 +93,10 @@ const Notifications = () => {
   }, [filter, currentPage]);
 
   const loadNotifications = async () => {
+    // Only show loading spinner on initial load, not on pagination
+    if (notifications.length === 0) {
+      setInitialLoading(true);
+    }
     setLoading(true);
     try {
       const { token, isCompanyAdmin, locationId } = getUserAuth();
@@ -99,6 +104,7 @@ const Notifications = () => {
       if (!token) {
         console.error('No auth token found');
         setLoading(false);
+        setInitialLoading(false);
         return;
       }
 
@@ -152,6 +158,7 @@ const Notifications = () => {
       console.error('Error loading notifications:', error);
     } finally {
       setLoading(false);
+      setInitialLoading(false);
     }
   };
 
@@ -291,7 +298,7 @@ const Notifications = () => {
   const unreadCount = notifications.filter(n => !n.read).length;
   const filteredNotifications = getFilteredNotifications();
 
-  if (loading) {
+  if (initialLoading) {
     return (
       <div className="min-h-screen px-4 py-6 flex items-center justify-center">
         <div className="text-center">
@@ -513,14 +520,21 @@ const Notifications = () => {
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mt-4">
           <div className="flex items-center justify-between">
             <div className="text-sm text-gray-600">
-              Showing page {currentPage} of {totalPages} ({totalNotifications} total)
+              {loading ? (
+                <span className="flex items-center gap-2">
+                  <div className="animate-spin rounded-full h-3 w-3 border-2 border-gray-400 border-t-transparent"></div>
+                  Loading...
+                </span>
+              ) : (
+                `Showing page ${currentPage} of ${totalPages} (${totalNotifications} total)`
+              )}
             </div>
             <div className="flex gap-2">
               <StandardButton
                 variant="secondary"
                 size="sm"
                 onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                disabled={currentPage === 1}
+                disabled={currentPage === 1 || loading}
               >
                 Previous
               </StandardButton>
@@ -528,7 +542,7 @@ const Notifications = () => {
                 variant="secondary"
                 size="sm"
                 onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                disabled={currentPage === totalPages}
+                disabled={currentPage === totalPages || loading}
               >
                 Next
               </StandardButton>
