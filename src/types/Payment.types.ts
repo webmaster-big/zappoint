@@ -220,6 +220,33 @@ export interface RefundErrorData {
 }
 
 /**
+ * Manual refund request payload (for non-Authorize.Net payments: in-store, cash, card)
+ * Notes field is REQUIRED for manual refunds to document offline processing
+ */
+export interface ManualRefundRequest {
+  amount?: number;
+  notes: string;
+  cancel?: boolean;
+}
+
+/**
+ * Manual refund response from the API
+ */
+export interface ManualRefundResponse {
+  success: boolean;
+  message: string;
+  data: {
+    original_payment: Payment;
+    refund_payment: Payment;
+  };
+  refund_amount: number;
+  total_refunded: number;
+  remaining_balance: number;
+  is_full_refund: boolean;
+  payable_cancelled: boolean;
+}
+
+/**
  * Paginated payments response
  */
 export interface PaginatedPaymentsResponse {

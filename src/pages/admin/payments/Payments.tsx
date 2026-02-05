@@ -39,6 +39,7 @@ import {
   exportPackageInvoices,
   canRefund,
   canVoid,
+  canManualRefund,
   isRefundRecord,
   isVoidRecord,
   extractOriginalPaymentId,
@@ -53,9 +54,10 @@ import Toast from '../../../components/ui/Toast';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
 import RefundModal from '../../../components/admin/payments/RefundModal';
 import VoidDialog from '../../../components/admin/payments/VoidDialog';
+import ManualRefundModal from '../../../components/admin/payments/ManualRefundModal';
 import { getStoredUser } from '../../../utils/storage';
 import type { PaymentsPagePayment, PaymentsFilterOptions, PaymentsMetrics } from '../../../types/Payments.types';
-import type { Payment, PaymentFilters, RefundResponse, VoidResponse } from '../../../types/Payment.types';
+import type { Payment, PaymentFilters, RefundResponse, VoidResponse, ManualRefundResponse } from '../../../types/Payment.types';
 
 const Payments: React.FC = () => {
   const navigate = useNavigate();
@@ -648,6 +650,7 @@ const Payments: React.FC = () => {
   const [selectedPaymentForAction, setSelectedPaymentForAction] = useState<PaymentsPagePayment | null>(null);
   const [showRefundModal, setShowRefundModal] = useState(false);
   const [showVoidDialog, setShowVoidDialog] = useState(false);
+  const [showManualRefundModal, setShowManualRefundModal] = useState(false);
   const [openActionsMenu, setOpenActionsMenu] = useState<number | null>(null);
 
   const handleRefundClick = (payment: PaymentsPagePayment) => {
@@ -659,6 +662,12 @@ const Payments: React.FC = () => {
   const handleVoidClick = (payment: PaymentsPagePayment) => {
     setSelectedPaymentForAction(payment);
     setShowVoidDialog(true);
+    setOpenActionsMenu(null);
+  };
+
+  const handleManualRefundClick = (payment: PaymentsPagePayment) => {
+    setSelectedPaymentForAction(payment);
+    setShowManualRefundModal(true);
     setOpenActionsMenu(null);
   };
 
@@ -750,6 +759,49 @@ const Payments: React.FC = () => {
         updated.splice(originalIndex + 1, 0, voidRecord);
       } else {
         updated.unshift(voidRecord);
+      }
+      return updated;
+    });
+  };
+
+  const handleManualRefundComplete = (response: ManualRefundResponse) => {
+    // Same pattern as handleRefundComplete — update original + add refund record
+    setPayments((prev) => {
+      const updated = prev.map((p) =>
+        p.id === response.data.original_payment.id
+          ? { ...p, notes: response.data.original_payment.notes ?? p.notes }
+          : p
+      );
+      const refundPmt = response.data.refund_payment;
+      const originalPayment = prev.find(p => p.id === response.data.original_payment.id);
+      const refundRecord: PaymentsPagePayment = {
+        id: refundPmt.id,
+        payable_id: refundPmt.payable_id,
+        payable_type: refundPmt.payable_type,
+        customer_id: refundPmt.customer_id ?? undefined,
+        location_id: refundPmt.location_id,
+        amount: Number(refundPmt.amount),
+        currency: refundPmt.currency,
+        method: refundPmt.method,
+        status: refundPmt.status,
+        transaction_id: refundPmt.transaction_id,
+        payment_id: refundPmt.payment_id ?? undefined,
+        notes: refundPmt.notes ?? undefined,
+        paid_at: refundPmt.paid_at ?? undefined,
+        refunded_at: refundPmt.refunded_at ?? undefined,
+        created_at: refundPmt.created_at,
+        updated_at: refundPmt.updated_at,
+        customerName: originalPayment?.customerName || 'Guest',
+        customerEmail: originalPayment?.customerEmail || 'N/A',
+        locationName: originalPayment?.locationName || 'N/A',
+        payableReference: `Refund #${refundPmt.id}`,
+        payableDescription: `Manual Refund from Payment #${response.data.original_payment.id}`,
+      };
+      const originalIndex = updated.findIndex(p => p.id === response.data.original_payment.id);
+      if (originalIndex >= 0) {
+        updated.splice(originalIndex + 1, 0, refundRecord);
+      } else {
+        updated.unshift(refundRecord);
       }
       return updated;
     });
@@ -1214,8 +1266,8 @@ const Payments: React.FC = () => {
                           >
                             <Download className="w-4 h-4" />
                           </button>
-                          {/* Actions dropdown for refund/void */}
-                          {(canRefund(payment) || canVoid(payment)) && (
+                          {/* Actions dropdown for refund/void/manual-refund */}
+                          {(canRefund(payment) || canVoid(payment) || canManualRefund(payment)) && (
                             <div className="relative">
                               <button
                                 onClick={() => setOpenActionsMenu(openActionsMenu === payment.id ? null : payment.id)}
@@ -1227,14 +1279,14 @@ const Payments: React.FC = () => {
                               {openActionsMenu === payment.id && (
                                 <>
                                   <div className="fixed inset-0 z-40" onClick={() => setOpenActionsMenu(null)} />
-                                  <div className={`absolute right-0 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50 py-1 ${paymentIndex >= currentPayments.length - 3 ? 'bottom-full mb-1' : 'top-full mt-1'}`}>
+                                  <div className={`absolute right-0 w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-50 py-1 ${paymentIndex >= currentPayments.length - 3 ? 'bottom-full mb-1' : 'top-full mt-1'}`}>
                                     {canRefund(payment) && (
                                       <button
                                         onClick={() => handleRefundClick(payment)}
                                         className="w-full flex items-center gap-2 px-3 py-2 text-sm text-orange-600 hover:bg-orange-50 transition-colors"
                                       >
                                         <RotateCcw className="w-4 h-4" />
-                                        Refund
+                                        Refund (Authorize.Net)
                                       </button>
                                     )}
                                     {canVoid(payment) && (
@@ -1244,6 +1296,15 @@ const Payments: React.FC = () => {
                                       >
                                         <Ban className="w-4 h-4" />
                                         Void Transaction
+                                      </button>
+                                    )}
+                                    {canManualRefund(payment) && (
+                                      <button
+                                        onClick={() => handleManualRefundClick(payment)}
+                                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-orange-600 hover:bg-orange-50 transition-colors"
+                                      >
+                                        <RotateCcw className="w-4 h-4" />
+                                        Manual Refund ({payment.method === 'in-store' ? 'In-Store' : payment.method === 'cash' ? 'Cash' : 'Card'})
                                       </button>
                                     )}
                                     <button
@@ -1265,8 +1326,8 @@ const Payments: React.FC = () => {
                               )}
                             </div>
                           )}
-                          {/* Simple details button for non-refundable/voidable payments */}
-                          {!canRefund(payment) && !canVoid(payment) && (
+                          {/* Simple details button for non-actionable payments */}
+                          {!canRefund(payment) && !canVoid(payment) && !canManualRefund(payment) && (
                             <button
                               onClick={() => {
                                 if (payment.payable_type === PAYMENT_TYPE.BOOKING) {
@@ -1724,6 +1785,18 @@ const Payments: React.FC = () => {
           setSelectedPaymentForAction(null);
         }}
         onVoidComplete={handleVoidComplete}
+        onToast={(message, type) => setToast({ message, type })}
+      />
+
+      {/* Manual Refund Modal */}
+      <ManualRefundModal
+        payment={selectedPaymentForAction}
+        open={showManualRefundModal}
+        onClose={() => {
+          setShowManualRefundModal(false);
+          setSelectedPaymentForAction(null);
+        }}
+        onRefundComplete={handleManualRefundComplete}
         onToast={(message, type) => setToast({ message, type })}
       />
     </div>

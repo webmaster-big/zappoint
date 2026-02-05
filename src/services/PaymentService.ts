@@ -14,6 +14,8 @@ import type {
   RefundRequest,
   RefundResponse,
   VoidResponse,
+  ManualRefundRequest,
+  ManualRefundResponse,
 } from '../types/Payment.types';
 import { PAYMENT_TYPE } from '../types/Payment.types';
 
@@ -182,23 +184,79 @@ export const voidPayment = async (
 };
 
 /**
- * Helper: Check if a payment can be refunded
- * Only completed authorize.net payments can be refunded
+ * Manually refund a non-gateway payment (in-store, cash, card)
+ * The original payment stays "completed" — a new record with status "refunded" is created.
+ * Notes are REQUIRED for manual refunds to document offline processing.
+ * 
+ * @param paymentId - The ID of the original completed payment to refund
+ * @param data - Manual refund details (amount, notes (required), cancel)
+ * @returns Manual refund response with original and new refund payment records
  */
-export const canRefund = (payment: { status: string; method: string }): boolean => {
-  return payment.status === 'completed' && 
-    (payment.method === 'authorize.net' || payment.method === 'card');
+export const manualRefundPayment = async (
+  paymentId: number,
+  data: ManualRefundRequest
+): Promise<ManualRefundResponse> => {
+  const response = await api.patch<ManualRefundResponse>(`/payments/${paymentId}/manual-refund`, data);
+  return response.data;
+};
+
+/** Common payment shape used by action helpers */
+type ActionablePayment = {
+  status: string;
+  method: string;
+  payable_id?: number | null;
+  payable_type?: string | null;
+  created_at?: string;
+  paid_at?: string | null;
+};
+
+/** Returns true when the payment has a valid payable link */
+const hasPayable = (payment: ActionablePayment): boolean => {
+  return !!payment.payable_id && !!payment.payable_type;
+};
+
+/**
+ * Helper: Check if a payment can be refunded via Authorize.Net gateway
+ * Only completed authorize.net payments with a valid payable can be gateway-refunded
+ */
+export const canRefund = (payment: ActionablePayment): boolean => {
+  return hasPayable(payment) &&
+    payment.status === 'completed' &&
+    payment.method === 'authorize.net';
 };
 
 /**
  * Helper: Check if a payment can be voided
- * Void is for unsettled transactions — typically same day as charge
+ * Void is for unsettled Authorize.Net transactions only.
+ * Not available if payable is missing or more than 2 days have passed since payment.
  */
-export const canVoid = (payment: { status: string; method: string }): boolean => {
-  return (
-    (payment.status === 'completed' || payment.status === 'pending') &&
-    (payment.method === 'authorize.net' || payment.method === 'card')
-  );
+export const canVoid = (payment: ActionablePayment): boolean => {
+  if (!hasPayable(payment)) return false;
+  if (
+    !(payment.status === 'completed' || payment.status === 'pending') ||
+    payment.method !== 'authorize.net'
+  ) {
+    return false;
+  }
+  // Void window: 2 days from payment creation
+  const paymentDate = payment.paid_at || payment.created_at;
+  if (paymentDate) {
+    const twoDaysMs = 2 * 24 * 60 * 60 * 1000;
+    if (Date.now() - new Date(paymentDate).getTime() > twoDaysMs) {
+      return false;
+    }
+  }
+  return true;
+};
+
+/**
+ * Helper: Check if a payment can be manually refunded (non-gateway)
+ * For in-store, cash, and card payments that were completed with a valid payable
+ */
+export const canManualRefund = (payment: ActionablePayment): boolean => {
+  return hasPayable(payment) &&
+    payment.status === 'completed' &&
+    ['in-store', 'cash', 'card'].includes(payment.method);
 };
 
 /**
@@ -927,8 +985,10 @@ export default {
   deletePayment,
   refundPayment,
   voidPayment,
+  manualRefundPayment,
   canRefund,
   canVoid,
+  canManualRefund,
   isRefundRecord,
   isVoidRecord,
   extractOriginalPaymentId,
