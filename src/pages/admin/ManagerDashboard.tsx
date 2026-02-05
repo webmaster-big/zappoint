@@ -51,8 +51,8 @@ const LocationManagerDashboard: React.FC = () => {
   const [monthlyBookings, setMonthlyBookings] = useState<any[]>([]);
 
   // Timeframe selector for metrics
-  const [metricsTimeframe, setMetricsTimeframe] = useState<TimeframeType>('all_time');
-  const [timeframeDescription, setTimeframeDescription] = useState('All Time');
+  const [metricsTimeframe, setMetricsTimeframe] = useState<TimeframeType>('last_24h');
+  const [timeframeDescription, setTimeframeDescription] = useState('Last 24 Hours');
   const [customDateFrom, setCustomDateFrom] = useState('');
   const [customDateTo, setCustomDateTo] = useState('');
   
@@ -1288,7 +1288,7 @@ const LocationManagerDashboard: React.FC = () => {
                     </td>
                     <td className="px-4 py-3">
                       <div className="text-gray-900">
-                        {new Date(booking.booking_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        {parseLocalDate(booking.booking_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                       </div>
                       <div className="text-xs text-gray-500">
                         {booking.booking_time ? formatTime12Hour(booking.booking_time) : 'N/A'}
