@@ -1253,13 +1253,6 @@ const Payments: React.FC = () => {
                       <td className="px-4 py-4 text-right">
                         <div className="relative flex items-center justify-end gap-1">
                           <button
-                            onClick={() => handleInvoice(payment.id, true)}
-                            className={`p-2 text-gray-400 hover:text-${themeColor}-600 hover:bg-${themeColor}-50 rounded-lg transition-colors`}
-                            title="View Invoice"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-                          <button
                             onClick={() => handleInvoice(payment.id, false)}
                             className={`p-2 text-gray-400 hover:text-${themeColor}-600 hover:bg-${themeColor}-50 rounded-lg transition-colors`}
                             title="Download Invoice"
@@ -1307,27 +1300,29 @@ const Payments: React.FC = () => {
                                         Manual Refund ({payment.method === 'in-store' ? 'In-Store' : payment.method === 'cash' ? 'Cash' : 'Card'})
                                       </button>
                                     )}
-                                    <button
-                                      onClick={() => {
-                                        if (payment.payable_type === PAYMENT_TYPE.BOOKING) {
-                                          navigate(`/bookings/${payment.payable_id}`);
-                                        } else if (payment.payable_type === PAYMENT_TYPE.ATTRACTION_PURCHASE) {
-                                          navigate(`/attractions/purchases/${payment.payable_id}`);
-                                        }
-                                        setOpenActionsMenu(null);
-                                      }}
-                                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                                    >
-                                      <FileText className="w-4 h-4" />
-                                      View Details
-                                    </button>
+                                    {payment.payable_id && (
+                                      <button
+                                        onClick={() => {
+                                          if (payment.payable_type === PAYMENT_TYPE.BOOKING) {
+                                            navigate(`/bookings/${payment.payable_id}`);
+                                          } else if (payment.payable_type === PAYMENT_TYPE.ATTRACTION_PURCHASE) {
+                                            navigate(`/attractions/purchases/${payment.payable_id}`);
+                                          }
+                                          setOpenActionsMenu(null);
+                                        }}
+                                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                                      >
+                                        <FileText className="w-4 h-4" />
+                                        View Details
+                                      </button>
+                                    )}
                                   </div>
                                 </>
                               )}
                             </div>
                           )}
                           {/* Simple details button for non-actionable payments */}
-                          {!canRefund(payment) && !canVoid(payment) && !canManualRefund(payment) && (
+                          {!canRefund(payment) && !canVoid(payment) && !canManualRefund(payment) && payment.payable_id && (
                             <button
                               onClick={() => {
                                 if (payment.payable_type === PAYMENT_TYPE.BOOKING) {
