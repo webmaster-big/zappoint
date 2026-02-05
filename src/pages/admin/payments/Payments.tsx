@@ -22,7 +22,10 @@ import {
   CheckSquare,
   Square,
   X,
-  Calendar
+  Calendar,
+  RotateCcw,
+  Ban,
+  MoreVertical
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { 
@@ -34,6 +37,11 @@ import {
   exportInvoicesForWeek,
   exportBulkInvoices,
   exportPackageInvoices,
+  canRefund,
+  canVoid,
+  isRefundRecord,
+  isVoidRecord,
+  extractOriginalPaymentId,
   type InvoiceExportFilters,
   type PackageInvoiceFilters
 } from '../../../services/PaymentService';
@@ -43,9 +51,11 @@ import LocationSelector from '../../../components/admin/LocationSelector';
 import StandardButton from '../../../components/ui/StandardButton';
 import Toast from '../../../components/ui/Toast';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
+import RefundModal from '../../../components/admin/payments/RefundModal';
+import VoidDialog from '../../../components/admin/payments/VoidDialog';
 import { getStoredUser } from '../../../utils/storage';
 import type { PaymentsPagePayment, PaymentsFilterOptions, PaymentsMetrics } from '../../../types/Payments.types';
-import type { Payment, PaymentFilters } from '../../../types/Payment.types';
+import type { Payment, PaymentFilters, RefundResponse, VoidResponse } from '../../../types/Payment.types';
 
 const Payments: React.FC = () => {
   const navigate = useNavigate();
@@ -102,12 +112,15 @@ const Payments: React.FC = () => {
     pending: { color: 'bg-yellow-100 text-yellow-800', icon: Clock, label: 'Pending' },
     completed: { color: 'bg-green-100 text-green-800', icon: CheckCircle, label: 'Completed' },
     failed: { color: 'bg-red-100 text-red-800', icon: XCircle, label: 'Failed' },
-    refunded: { color: `bg-${themeColor}-100 text-${fullColor}`, icon: RefreshCcw, label: 'Refunded' }
+    refunded: { color: 'bg-orange-100 text-orange-800', icon: RotateCcw, label: 'Refunded' },
+    voided: { color: 'bg-red-100 text-red-800', icon: Ban, label: 'Voided' }
   };
 
-  const methodConfig = {
+  const methodConfig: Record<string, { icon: typeof CreditCard; label: string }> = {
     card: { icon: CreditCard, label: 'Card' },
-    cash: { icon: DollarSign, label: 'Cash' }
+    cash: { icon: DollarSign, label: 'Cash' },
+    'authorize.net': { icon: CreditCard, label: 'Authorize.Net' },
+    'in-store': { icon: DollarSign, label: 'In-Store' }
   };
 
   const payableTypeConfig = {
@@ -124,7 +137,9 @@ const Payments: React.FC = () => {
     pendingPayments: payments.filter(p => p.status === 'pending').length,
     pendingRevenue: payments.filter(p => p.status === 'pending').reduce((sum, p) => sum + p.amount, 0),
     refundedPayments: payments.filter(p => p.status === 'refunded').length,
-    refundedAmount: payments.filter(p => p.status === 'refunded').reduce((sum, p) => sum + p.amount, 0)
+    refundedAmount: payments.filter(p => p.status === 'refunded').reduce((sum, p) => sum + p.amount, 0),
+    voidedPayments: payments.filter(p => p.status === 'voided').length,
+    voidedAmount: payments.filter(p => p.status === 'voided').reduce((sum, p) => sum + p.amount, 0)
   };
 
   const metricCards = [
@@ -150,11 +165,11 @@ const Payments: React.FC = () => {
       accent: `bg-${themeColor}-100 text-${fullColor}`
     },
     {
-      title: 'Refunded',
-      value: metrics.refundedPayments.toString(),
-      change: `$${metrics.refundedAmount.toFixed(2)} returned`,
-      icon: RefreshCcw,
-      accent: `bg-${themeColor}-100 text-${fullColor}`
+      title: 'Refunded / Voided',
+      value: (metrics.refundedPayments + metrics.voidedPayments).toString(),
+      change: `$${(metrics.refundedAmount + metrics.voidedAmount).toFixed(2)} returned`,
+      icon: RotateCcw,
+      accent: 'bg-orange-100 text-orange-600'
     }
   ];
 
@@ -629,6 +644,117 @@ const Payments: React.FC = () => {
     setToast({ message: 'Payments exported successfully', type: 'success' });
   };
 
+  // Refund/Void state
+  const [selectedPaymentForAction, setSelectedPaymentForAction] = useState<PaymentsPagePayment | null>(null);
+  const [showRefundModal, setShowRefundModal] = useState(false);
+  const [showVoidDialog, setShowVoidDialog] = useState(false);
+  const [openActionsMenu, setOpenActionsMenu] = useState<number | null>(null);
+
+  const handleRefundClick = (payment: PaymentsPagePayment) => {
+    setSelectedPaymentForAction(payment);
+    setShowRefundModal(true);
+    setOpenActionsMenu(null);
+  };
+
+  const handleVoidClick = (payment: PaymentsPagePayment) => {
+    setSelectedPaymentForAction(payment);
+    setShowVoidDialog(true);
+    setOpenActionsMenu(null);
+  };
+
+  const handleRefundComplete = (response: RefundResponse) => {
+    // Update the payments list:
+    // 1. Update the original payment (notes changed)
+    // 2. Add the new refund payment record to the list
+    setPayments((prev) => {
+      const updated = prev.map((p) =>
+        p.id === response.data.original_payment.id
+          ? { ...p, notes: response.data.original_payment.notes ?? p.notes }
+          : p
+      );
+      // Create a new display-friendly refund record
+      const refundPmt = response.data.refund_payment;
+      const originalPayment = prev.find(p => p.id === response.data.original_payment.id);
+      const refundRecord: PaymentsPagePayment = {
+        id: refundPmt.id,
+        payable_id: refundPmt.payable_id,
+        payable_type: refundPmt.payable_type,
+        customer_id: refundPmt.customer_id ?? undefined,
+        location_id: refundPmt.location_id,
+        amount: Number(refundPmt.amount),
+        currency: refundPmt.currency,
+        method: refundPmt.method,
+        status: refundPmt.status,
+        transaction_id: refundPmt.transaction_id,
+        payment_id: refundPmt.payment_id ?? undefined,
+        notes: refundPmt.notes ?? undefined,
+        paid_at: refundPmt.paid_at ?? undefined,
+        refunded_at: refundPmt.refunded_at ?? undefined,
+        created_at: refundPmt.created_at,
+        updated_at: refundPmt.updated_at,
+        customerName: originalPayment?.customerName || 'Guest',
+        customerEmail: originalPayment?.customerEmail || 'N/A',
+        locationName: originalPayment?.locationName || 'N/A',
+        payableReference: `Refund #${refundPmt.id}`,
+        payableDescription: `Refund from Payment #${response.data.original_payment.id}`,
+      };
+      // Insert the refund record right after the original
+      const originalIndex = updated.findIndex(p => p.id === response.data.original_payment.id);
+      if (originalIndex >= 0) {
+        updated.splice(originalIndex + 1, 0, refundRecord);
+      } else {
+        updated.unshift(refundRecord);
+      }
+      return updated;
+    });
+  };
+
+  const handleVoidComplete = (response: VoidResponse) => {
+    // Update the payments list:
+    // 1. Update the original payment (status → voided)
+    // 2. Add the new void payment record
+    setPayments((prev) => {
+      const updated = prev.map((p) =>
+        p.id === response.data.original_payment.id
+          ? { ...p, status: 'voided' as const, notes: response.data.original_payment.notes ?? p.notes }
+          : p
+      );
+      // Create a void audit record
+      const voidPmt = response.data.void_payment;
+      const originalPayment = prev.find(p => p.id === response.data.original_payment.id);
+      const voidRecord: PaymentsPagePayment = {
+        id: voidPmt.id,
+        payable_id: voidPmt.payable_id,
+        payable_type: voidPmt.payable_type,
+        customer_id: voidPmt.customer_id ?? undefined,
+        location_id: voidPmt.location_id,
+        amount: Number(voidPmt.amount),
+        currency: voidPmt.currency,
+        method: voidPmt.method,
+        status: voidPmt.status,
+        transaction_id: voidPmt.transaction_id,
+        payment_id: voidPmt.payment_id ?? undefined,
+        notes: voidPmt.notes ?? undefined,
+        paid_at: voidPmt.paid_at ?? undefined,
+        refunded_at: voidPmt.refunded_at ?? undefined,
+        created_at: voidPmt.created_at,
+        updated_at: voidPmt.updated_at,
+        customerName: originalPayment?.customerName || 'Guest',
+        customerEmail: originalPayment?.customerEmail || 'N/A',
+        locationName: originalPayment?.locationName || 'N/A',
+        payableReference: `Void #${voidPmt.id}`,
+        payableDescription: `Void of Payment #${response.data.original_payment.id}`,
+      };
+      const originalIndex = updated.findIndex(p => p.id === response.data.original_payment.id);
+      if (originalIndex >= 0) {
+        updated.splice(originalIndex + 1, 0, voidRecord);
+      } else {
+        updated.unshift(voidRecord);
+      }
+      return updated;
+    });
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -813,6 +939,7 @@ const Payments: React.FC = () => {
                   <option value="pending">Pending</option>
                   <option value="failed">Failed</option>
                   <option value="refunded">Refunded</option>
+                  <option value="voided">Voided</option>
                 </select>
               </div>
               <div>
@@ -888,7 +1015,7 @@ const Payments: React.FC = () => {
       </div>
 
       {/* Payments Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-100">
@@ -967,16 +1094,23 @@ const Payments: React.FC = () => {
                   </td>
                 </tr>
               ) : (
-                currentPayments.map((payment) => {
+                currentPayments.map((payment, paymentIndex) => {
                   const StatusIcon = statusConfig[payment.status]?.icon || Clock;
                   const MethodIcon = methodConfig[payment.method]?.icon || CreditCard;
                   const TypeIcon = payment.payable_type ? payableTypeConfig[payment.payable_type]?.icon : FileText;
                   const isSelected = selectedPayments.has(payment.id);
+                  const isRefund = isRefundRecord(payment);
+                  const isVoid = isVoidRecord(payment);
+                  const originalId = extractOriginalPaymentId(payment.notes);
                   
                   return (
                     <tr 
                       key={payment.id} 
-                      className={`hover:bg-gray-50 transition-colors ${isSelected ? `bg-${themeColor}-50` : ''}`}
+                      className={`hover:bg-gray-50 transition-colors ${
+                        isSelected ? `bg-${themeColor}-50` : 
+                        isRefund ? 'bg-orange-50/50' : 
+                        isVoid ? 'bg-red-50/50' : ''
+                      }`}
                     >
                       <td className="px-4 py-4">
                         <button
@@ -997,20 +1131,32 @@ const Payments: React.FC = () => {
                           </span>
                           <span className="text-xs text-gray-500">
                             ID: {payment.id}
+                            {isRefund && originalId && (
+                              <span className="ml-1 text-orange-600">(↩ from #{originalId})</span>
+                            )}
+                            {isVoid && originalId && (
+                              <span className="ml-1 text-red-600">(✕ from #{originalId})</span>
+                            )}
                           </span>
                         </div>
                       </td>
                       <td className="px-4 py-4">
                         <div className="flex items-center gap-2">
-                          <div className={`p-1.5 rounded-lg ${payment.payable_type ? payableTypeConfig[payment.payable_type]?.color : 'bg-gray-100 text-gray-600'}`}>
-                            {TypeIcon && <TypeIcon className="w-4 h-4" />}
+                          <div className={`p-1.5 rounded-lg ${
+                            isRefund ? 'bg-orange-100 text-orange-600' :
+                            isVoid ? 'bg-red-100 text-red-600' :
+                            payment.payable_type ? payableTypeConfig[payment.payable_type]?.color : 'bg-gray-100 text-gray-600'
+                          }`}>
+                            {isRefund ? <RotateCcw className="w-4 h-4" /> :
+                             isVoid ? <Ban className="w-4 h-4" /> :
+                             TypeIcon && <TypeIcon className="w-4 h-4" />}
                           </div>
                           <div className="flex flex-col">
                             <span className="text-sm font-medium text-gray-900">
                               {payment.payableReference}
                             </span>
                             <span className="text-xs text-gray-500">
-                              {payment.payableDescription}
+                              {isRefund ? 'Refund Record' : isVoid ? 'Void Record' : payment.payableDescription}
                             </span>
                           </div>
                         </div>
@@ -1022,9 +1168,15 @@ const Payments: React.FC = () => {
                         </div>
                       </td>
                       <td className="px-4 py-4">
-                        <span className="text-sm font-bold text-gray-900">
-                          ${payment.amount.toFixed(2)}
-                        </span>
+                        {payment.status === 'refunded' || payment.status === 'voided' ? (
+                          <span className="text-sm font-bold text-red-600">
+                            -${payment.amount.toFixed(2)}
+                          </span>
+                        ) : (
+                          <span className="text-sm font-bold text-gray-900">
+                            ${payment.amount.toFixed(2)}
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-4">
                         <div className="flex items-center gap-2">
@@ -1047,7 +1199,7 @@ const Payments: React.FC = () => {
                         <span className="text-sm text-gray-900 whitespace-nowrap">{formatDate(payment.created_at)}</span>
                       </td>
                       <td className="px-4 py-4 text-right">
-                        <div className="flex items-center justify-end gap-1">
+                        <div className="relative flex items-center justify-end gap-1">
                           <button
                             onClick={() => handleInvoice(payment.id, true)}
                             className={`p-2 text-gray-400 hover:text-${themeColor}-600 hover:bg-${themeColor}-50 rounded-lg transition-colors`}
@@ -1062,19 +1214,73 @@ const Payments: React.FC = () => {
                           >
                             <Download className="w-4 h-4" />
                           </button>
-                          <button
-                            onClick={() => {
-                              if (payment.payable_type === PAYMENT_TYPE.BOOKING) {
-                                navigate(`/bookings/${payment.payable_id}`);
-                              } else if (payment.payable_type === PAYMENT_TYPE.ATTRACTION_PURCHASE) {
-                                navigate(`/attractions/purchases/${payment.payable_id}`);
-                              }
-                            }}
-                            className={`p-2 text-gray-400 hover:text-${themeColor}-600 hover:bg-${themeColor}-50 rounded-lg transition-colors`}
-                            title="View Details"
-                          >
-                            <FileText className="w-4 h-4" />
-                          </button>
+                          {/* Actions dropdown for refund/void */}
+                          {(canRefund(payment) || canVoid(payment)) && (
+                            <div className="relative">
+                              <button
+                                onClick={() => setOpenActionsMenu(openActionsMenu === payment.id ? null : payment.id)}
+                                className={`p-2 text-gray-400 hover:text-${themeColor}-600 hover:bg-${themeColor}-50 rounded-lg transition-colors`}
+                                title="More actions"
+                              >
+                                <MoreVertical className="w-4 h-4" />
+                              </button>
+                              {openActionsMenu === payment.id && (
+                                <>
+                                  <div className="fixed inset-0 z-40" onClick={() => setOpenActionsMenu(null)} />
+                                  <div className={`absolute right-0 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50 py-1 ${paymentIndex >= currentPayments.length - 3 ? 'bottom-full mb-1' : 'top-full mt-1'}`}>
+                                    {canRefund(payment) && (
+                                      <button
+                                        onClick={() => handleRefundClick(payment)}
+                                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-orange-600 hover:bg-orange-50 transition-colors"
+                                      >
+                                        <RotateCcw className="w-4 h-4" />
+                                        Refund
+                                      </button>
+                                    )}
+                                    {canVoid(payment) && (
+                                      <button
+                                        onClick={() => handleVoidClick(payment)}
+                                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                                      >
+                                        <Ban className="w-4 h-4" />
+                                        Void Transaction
+                                      </button>
+                                    )}
+                                    <button
+                                      onClick={() => {
+                                        if (payment.payable_type === PAYMENT_TYPE.BOOKING) {
+                                          navigate(`/bookings/${payment.payable_id}`);
+                                        } else if (payment.payable_type === PAYMENT_TYPE.ATTRACTION_PURCHASE) {
+                                          navigate(`/attractions/purchases/${payment.payable_id}`);
+                                        }
+                                        setOpenActionsMenu(null);
+                                      }}
+                                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                                    >
+                                      <FileText className="w-4 h-4" />
+                                      View Details
+                                    </button>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          )}
+                          {/* Simple details button for non-refundable/voidable payments */}
+                          {!canRefund(payment) && !canVoid(payment) && (
+                            <button
+                              onClick={() => {
+                                if (payment.payable_type === PAYMENT_TYPE.BOOKING) {
+                                  navigate(`/bookings/${payment.payable_id}`);
+                                } else if (payment.payable_type === PAYMENT_TYPE.ATTRACTION_PURCHASE) {
+                                  navigate(`/attractions/purchases/${payment.payable_id}`);
+                                }
+                              }}
+                              className={`p-2 text-gray-400 hover:text-${themeColor}-600 hover:bg-${themeColor}-50 rounded-lg transition-colors`}
+                              title="View Details"
+                            >
+                              <FileText className="w-4 h-4" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -1496,6 +1702,30 @@ const Payments: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Refund Modal */}
+      <RefundModal
+        payment={selectedPaymentForAction}
+        open={showRefundModal}
+        onClose={() => {
+          setShowRefundModal(false);
+          setSelectedPaymentForAction(null);
+        }}
+        onRefundComplete={handleRefundComplete}
+        onToast={(message, type) => setToast({ message, type })}
+      />
+
+      {/* Void Dialog */}
+      <VoidDialog
+        payment={selectedPaymentForAction}
+        open={showVoidDialog}
+        onClose={() => {
+          setShowVoidDialog(false);
+          setSelectedPaymentForAction(null);
+        }}
+        onVoidComplete={handleVoidComplete}
+        onToast={(message, type) => setToast({ message, type })}
+      />
     </div>
   );
 };

@@ -20,6 +20,8 @@ import type {
   SettingsLocation,
 } from '../../types/settings.types';
 import { getStoredUser } from '../../utils/storage';
+import locationService from '../../services/LocationService';
+import type { Location } from '../../services/LocationService';
 
 
 const AVAILABLE_COLORS: SettingsColorOption[] = [
@@ -176,18 +178,24 @@ const Settings = () => {
         const accounts = response.data || [];
         setAllAuthorizeAccounts(accounts);
         
-        // For company_admin, determine which locations don't have accounts
+        // For company_admin, fetch all company locations and filter out connected ones
         if (userRole === 'company_admin') {
-          // Get all unique locations from accounts
-          const allLocations = accounts.map(acc => acc.location);
           const connectedLocationIds = accounts.map(acc => acc.location_id);
           
-          // Filter to get locations without accounts
-          // Note: Backend should ideally provide all locations, not just connected ones
-          // For now, we'll use locations from accounts
-          setAvailableLocations(allLocations.filter(loc => 
-            !connectedLocationIds.includes(loc.id)
-          ));
+          try {
+            const locationsResponse = await locationService.getLocations();
+            const allLocations: Location[] = locationsResponse.data || [];
+            
+            // Filter to only show locations that don't already have an Authorize.Net account
+            setAvailableLocations(
+              allLocations
+                .filter((loc: Location) => !connectedLocationIds.includes(loc.id))
+                .map((loc: Location) => ({ id: loc.id, name: loc.name, city: loc.city || '', state: loc.state || '' }))
+            );
+          } catch (locError) {
+            console.error('Error fetching locations:', locError);
+            setAvailableLocations([]);
+          }
         }
       }
     } catch (error) {
@@ -197,8 +205,8 @@ const Settings = () => {
     }
   };
   
-  const fetchAuthorizeAccount = async () => {
-    setLoadingAuthorizeAccount(true);
+  const fetchAuthorizeAccount = async (showLoading = true) => {
+    if (showLoading) setLoadingAuthorizeAccount(true);
     try {
       const data = await getAuthorizeNetAccount();
       if (data.connected && data.account) {
@@ -272,8 +280,8 @@ const Settings = () => {
         // Update localStorage with new user data
         updateStoredUser(response.data);
         
-        // Update UI state immediately
-        setCurrentEmail(newEmail);
+        // Update UI state immediately using server response
+        setCurrentEmail(response.data?.email || newEmail);
         
         // Show success message
         setSuccessMessage('Email updated successfully!');
@@ -404,8 +412,13 @@ const Settings = () => {
           // For company_admin, refetch all accounts to get updated list
           fetchAllAuthorizeAccounts();
         } else {
-          // For location_admin, refetch their account status
-          fetchAuthorizeAccount();
+          // For location_admin, immediately show connected state
+          if (response.data) {
+            setAuthorizeConnected(true);
+            setAuthorizeAccount(response.data);
+          }
+          // Also silently refetch in background to ensure data consistency
+          fetchAuthorizeAccount(false);
         }
       } else {
         setLoadingAuthorize(false);
@@ -435,6 +448,11 @@ const Settings = () => {
         // Update UI state immediately
         setAuthorizeConnected(false);
         setAuthorizeAccount(null);
+        
+        // For company_admin, also refresh the all-accounts list if it was loaded
+        if (userRole === 'company_admin' && allAuthorizeAccounts.length > 0) {
+          fetchAllAuthorizeAccounts();
+        }
       } else {
         alert(response.message || 'Failed to disconnect account');
       }
@@ -764,7 +782,8 @@ const Settings = () => {
                 setShowSuccess(true);
                 setTimeout(() => setShowSuccess(false), 3000);
               }}
-              className={`relative p-5 rounded-xl border-2 transition-all text-left hover:scale-[1.02] ${
+              variant="ghost"
+              className={`relative p-5 rounded-xl border-2 transition-all text-left hover:scale-[1.02] h-auto ${
                 sidebarLayout === 'grouped'
                   ? `border-${themeColor}-600 bg-${themeColor}-50 shadow-md`
                   : 'border-gray-200 hover:border-gray-300 hover:shadow-sm'

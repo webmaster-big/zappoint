@@ -13,8 +13,8 @@ export interface PaymentsPagePayment {
   location_id: number;
   amount: number;
   currency: string;
-  method: 'card' | 'cash';
-  status: 'pending' | 'completed' | 'failed' | 'refunded';
+  method: 'card' | 'cash' | 'authorize.net' | 'in-store';
+  status: 'pending' | 'completed' | 'failed' | 'refunded' | 'voided';
   transaction_id: string;
   payment_id?: string;
   notes?: string;
@@ -42,8 +42,8 @@ export interface PaymentsPagePayment {
  * Filter options for the payments page
  */
 export interface PaymentsFilterOptions {
-  status: 'all' | 'pending' | 'completed' | 'failed' | 'refunded';
-  method: 'all' | 'card' | 'cash';
+  status: 'all' | 'pending' | 'completed' | 'failed' | 'refunded' | 'voided';
+  method: 'all' | 'card' | 'cash' | 'authorize.net' | 'in-store';
   payable_type: 'all' | 'booking' | 'attraction_purchase';
   search: string;
   dateRange: 'all' | 'today' | 'week' | 'month' | 'year';
@@ -63,4 +63,6 @@ export interface PaymentsMetrics {
   pendingRevenue: number;
   refundedPayments: number;
   refundedAmount: number;
+  voidedPayments: number;
+  voidedAmount: number;
 }

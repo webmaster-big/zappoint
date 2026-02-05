@@ -11,6 +11,9 @@ import type {
   PaymentOpaqueData,
   PaymentFilters,
   PaginatedPaymentsResponse,
+  RefundRequest,
+  RefundResponse,
+  VoidResponse,
 } from '../types/Payment.types';
 import { PAYMENT_TYPE } from '../types/Payment.types';
 
@@ -140,6 +143,86 @@ export const updatePayment = async (
 export const deletePayment = async (id: number): Promise<PaymentApiResponse> => {
   const response = await api.delete<PaymentApiResponse>(`/payments/${id}`);
   return response.data;
+};
+
+/**
+ * Refund & Void Functions
+ */
+
+/**
+ * Refund a payment (creates a new refund payment record)
+ * The original payment stays "completed" — a new record with status "refunded" is created.
+ * Supports partial refunds (specify amount < original).
+ * 
+ * @param paymentId - The ID of the original completed payment to refund
+ * @param data - Optional refund details (amount, notes, cancel)
+ * @returns Refund response with original and new refund payment records
+ */
+export const refundPayment = async (
+  paymentId: number,
+  data: RefundRequest = {}
+): Promise<RefundResponse> => {
+  const response = await api.patch<RefundResponse>(`/payments/${paymentId}/refund`, data);
+  return response.data;
+};
+
+/**
+ * Void a payment (cancels an unsettled transaction)
+ * The original payment becomes "voided" and a new audit record is created.
+ * Void is for unsettled transactions only (typically same day as charge).
+ * 
+ * @param paymentId - The ID of the original payment to void
+ * @returns Void response with original and new void payment records
+ */
+export const voidPayment = async (
+  paymentId: number
+): Promise<VoidResponse> => {
+  const response = await api.patch<VoidResponse>(`/payments/${paymentId}/void`);
+  return response.data;
+};
+
+/**
+ * Helper: Check if a payment can be refunded
+ * Only completed authorize.net payments can be refunded
+ */
+export const canRefund = (payment: { status: string; method: string }): boolean => {
+  return payment.status === 'completed' && 
+    (payment.method === 'authorize.net' || payment.method === 'card');
+};
+
+/**
+ * Helper: Check if a payment can be voided
+ * Void is for unsettled transactions — typically same day as charge
+ */
+export const canVoid = (payment: { status: string; method: string }): boolean => {
+  return (
+    (payment.status === 'completed' || payment.status === 'pending') &&
+    (payment.method === 'authorize.net' || payment.method === 'card')
+  );
+};
+
+/**
+ * Helper: Check if a payment is a refund record (created by refund action)
+ */
+export const isRefundRecord = (payment: { status: string; notes?: string | null }): boolean => {
+  return payment.status === 'refunded' && (payment.notes?.includes('Refund from Payment #') ?? false);
+};
+
+/**
+ * Helper: Check if a payment is a void record (created by void action)
+ */
+export const isVoidRecord = (payment: { status: string; notes?: string | null }): boolean => {
+  return payment.status === 'voided' && (payment.notes?.includes('Void of Payment #') ?? false);
+};
+
+/**
+ * Extract the original payment ID from refund/void notes
+ * Notes format: "Refund from Payment #123 ..." or "Void of Payment #123 ..."
+ */
+export const extractOriginalPaymentId = (notes: string | null | undefined): string | null => {
+  if (!notes) return null;
+  const match = notes.match(/(?:Refund from|Void of) Payment #(\d+)/);
+  return match ? match[1] : null;
 };
 
 /**
@@ -842,6 +925,13 @@ export default {
   getPaymentsForAttractionPurchase,
   updatePayment,
   deletePayment,
+  refundPayment,
+  voidPayment,
+  canRefund,
+  canVoid,
+  isRefundRecord,
+  isVoidRecord,
+  extractOriginalPaymentId,
   downloadInvoice,
   viewInvoice,
   generateInvoicesReport,

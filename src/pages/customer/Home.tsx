@@ -720,7 +720,7 @@ const EntertainmentLandingPage = () => {
                         <img 
                           src={getImageUrl(attraction.image)} 
                           alt={attraction.name}
-                          className="absolute inset-0 w-full h-full object-contain"
+                          className="absolute inset-0 w-full h-full object-cover"
                         />
                       ) : (
                         <div className="w-full h-full bg-gradient-to-br from-violet-500 to-blue-800 flex items-center justify-center text-white text-lg font-semibold">

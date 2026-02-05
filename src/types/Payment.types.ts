@@ -90,6 +90,9 @@ export interface PaymentAttractionPurchase {
   created_at?: string;
 }
 
+export type PaymentStatus = 'pending' | 'completed' | 'failed' | 'refunded' | 'voided';
+export type PaymentMethod = 'card' | 'cash' | 'authorize.net' | 'in-store';
+
 export interface Payment {
   id: number;
   // Polymorphic relationship fields
@@ -101,8 +104,8 @@ export interface Payment {
   location_id: number;
   amount: number;
   currency: string;
-  method: 'card' | 'cash';
-  status: 'pending' | 'completed' | 'failed' | 'refunded';
+  method: PaymentMethod;
+  status: PaymentStatus;
   transaction_id: string;
   payment_id?: string;
   notes?: string;
@@ -139,8 +142,8 @@ export interface CreatePaymentRequest {
   customer_id?: number | null;
   amount: number;
   currency?: string;
-  method: 'card' | 'cash';
-  status?: 'pending' | 'completed' | 'failed' | 'refunded';
+  method: PaymentMethod;
+  status?: PaymentStatus;
   notes?: string;
   payment_id?: string;
   location_id?: number;
@@ -156,12 +159,64 @@ export interface PaymentFilters {
   attraction_purchase_id?: number;
   customer_id?: number;
   location_id?: number;
-  status?: 'pending' | 'completed' | 'failed' | 'refunded';
-  method?: 'card' | 'cash';
+  status?: PaymentStatus;
+  method?: PaymentMethod;
   start_date?: string;
   end_date?: string;
   per_page?: number;
   page?: number;
+}
+
+/**
+ * Refund request payload
+ */
+export interface RefundRequest {
+  amount?: number;
+  notes?: string;
+  cancel?: boolean;
+}
+
+/**
+ * Refund response from the API
+ */
+export interface RefundResponse {
+  success: boolean;
+  message: string;
+  data: {
+    original_payment: Payment;
+    refund_payment: Payment;
+  };
+  refund_transaction_id: string;
+  refund_amount: number;
+  total_refunded: number;
+  remaining_balance: number;
+  is_full_refund: boolean;
+  payable_cancelled: boolean;
+  payable: PaymentBooking | PaymentAttractionPurchase | null;
+}
+
+/**
+ * Void response from the API
+ */
+export interface VoidResponse {
+  success: boolean;
+  message: string;
+  data: {
+    original_payment: Payment;
+    void_payment: Payment;
+  };
+  void_amount: number;
+  payable_cancelled: boolean;
+  payable: PaymentBooking | PaymentAttractionPurchase | null;
+}
+
+/**
+ * Error data returned when a refund exceeds available balance
+ */
+export interface RefundErrorData {
+  original_amount: number;
+  total_already_refunded: number;
+  max_refundable: number;
 }
 
 /**
