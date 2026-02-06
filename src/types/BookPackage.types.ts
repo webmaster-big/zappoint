@@ -109,6 +109,7 @@ export interface BookPackagePackage {
   invitation_download_link?: string;  // URL for downloadable invitation template
   invitation_file?: string;  // Base64 encoded invitation file
   booking_window_days?: number | null;  // Package-specific max days in advance for booking (1-365)
+  min_booking_notice_hours?: number | null;  // Min hours in advance customers must book (e.g., 48 = 2 days notice)
   location?: {
     id: number;
     company_id: number;

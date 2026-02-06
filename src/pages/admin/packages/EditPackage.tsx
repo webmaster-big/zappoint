@@ -1965,18 +1965,33 @@ const EditPackage: React.FC = () => {
                                 Advance Booking Time
                                 <span className="text-gray-400 font-normal text-sm ml-2">(optional)</span>
                             </label>
-                            <p className="text-sm text-gray-500 mb-3">Prevent last-minute bookings. Customers must book at least this many hours before the time slot. Useful to ensure staff has time to prepare or avoid bookings too close to closing time.</p>
+                            <p className="text-sm text-gray-500 mb-3">Set how far in advance customers must book. For example, setting 48 hours means if a customer visits on Monday at 2:00 PM, the earliest available time slot would be Wednesday at 2:00 PM. This only affects customer-facing bookings — staff can still book freely.</p>
                             
                             {/* Quick select buttons */}
                             <div className="flex flex-wrap gap-2 mb-3">
                                 {[
-                                    { hours: 2, label: '2 hours' },
-                                    { hours: 6, label: '6 hours' },
-                                    { hours: 12, label: '12 hours' },
+                                    { hours: 1, label: '1 h' },
+                                    { hours: 2, label: '2 h' },
+                                    { hours: 3, label: '3 h' },
+                                    { hours: 4, label: '4 h' },
+                                    { hours: 5, label: '5 h' },
+                                    { hours: 6, label: '6 h' },
+                                    { hours: 7, label: '7 h' },
+                                    { hours: 8, label: '8 h' },
+                                    { hours: 9, label: '9 h' },
+                                    { hours: 10, label: '10 h' },
+                                    { hours: 11, label: '11 h' },
+                                    { hours: 12, label: '12 h' },
                                     { hours: 24, label: '1 day' },
                                     { hours: 48, label: '2 days' },
                                     { hours: 72, label: '3 days' },
+                                    { hours: 96, label: '4 days' },
+                                    { hours: 120, label: '5 days' },
+                                    { hours: 144, label: '6 days' },
                                     { hours: 168, label: '1 week' },
+                                    { hours: 336, label: '2 weeks' },
+                                    { hours: 504, label: '3 weeks' },
+                                    { hours: 672, label: '4 weeks' },
                                 ].map(({ hours, label }) => {
                                     const isSelected = form.minBookingNoticeHours === String(hours);
                                     return (
@@ -2006,7 +2021,7 @@ const EditPackage: React.FC = () => {
                                     onChange={(e) => setForm(prev => ({ ...prev, minBookingNoticeHours: e.target.value }))}
                                     placeholder="Custom hours (e.g., 24)"
                                     className={`w-48 px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-${themeColor}-500 focus:border-${fullColor} ${
-                                        form.minBookingNoticeHours && ![2,6,12,24,48,72,168].includes(parseInt(form.minBookingNoticeHours))
+                                        form.minBookingNoticeHours && ![1,2,3,4,5,6,7,8,9,10,11,12,24,48,72,96,120,144,168,336,504,672].includes(parseInt(form.minBookingNoticeHours))
                                             ? `border-${fullColor} bg-${themeColor}-50`
                                             : 'border-gray-200'
                                     }`}
@@ -2027,7 +2042,7 @@ const EditPackage: React.FC = () => {
                             
                             {form.minBookingNoticeHours && parseInt(form.minBookingNoticeHours) > 0 && (
                                 <p className={`text-xs text-${themeColor}-600 mt-2`}>
-                                    Last-minute bookings blocked: Customers cannot book within {form.minBookingNoticeHours} hours ({(parseInt(form.minBookingNoticeHours) / 24).toFixed(1)} days) of the time slot
+                                    Customers must book at least {form.minBookingNoticeHours} hours ({(parseInt(form.minBookingNoticeHours) / 24).toFixed(1)} days) in advance. Any time slots within this window from the current time will be hidden.
                                 </p>
                             )}
                         </div>

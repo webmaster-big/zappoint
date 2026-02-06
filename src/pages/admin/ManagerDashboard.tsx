@@ -62,6 +62,10 @@ const LocationManagerDashboard: React.FC = () => {
   // New bookings tracking
   const [newBookings, setNewBookings] = useState<any[]>([]);
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
   // Data states
   const [allBookings, setAllBookings] = useState<any[]>([]); // All-time bookings for this location
   const [weeklyBookings, setWeeklyBookings] = useState<any[]>([]);
@@ -412,6 +416,11 @@ const LocationManagerDashboard: React.FC = () => {
     console.log('📅 [ManagerDashboard] Monthly bookings filtered:', monthly.length);
   }, [allBookings, currentMonth, calendarView]);
 
+  // Reset pagination when filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedStatus]);
+
   // Get bookings for a specific day
   const getBookingsForDay = (date: Date) => {
     return monthlyBookings.filter(booking => {
@@ -646,20 +655,27 @@ const LocationManagerDashboard: React.FC = () => {
   // Payment status colors
   const getPaymentColor = (payment: string) => {
     const colors: Record<string, string> = {
-      Paid: 'bg-emerald-100 text-emerald-800',
-      Partial: 'bg-amber-100 text-amber-800',
-      Refunded: 'bg-rose-100 text-rose-800',
-      'Credit Card': 'bg-blue-100 text-blue-800',
-      PayPal: 'bg-blue-100 text-blue-800',
-      Cash: 'bg-gray-100 text-gray-800',
+      paid: 'bg-emerald-100 text-emerald-800',
+      partial: 'bg-amber-100 text-amber-800',
+      refunded: 'bg-rose-100 text-rose-800',
+      pending: 'bg-amber-100 text-amber-800',
     };
-    return colors[payment] || 'bg-gray-100 text-gray-800';
+    return colors[payment?.toLowerCase()] || 'bg-gray-100 text-gray-800';
   };
 
   // Filter all bookings by status for the table (shows ALL bookings for this location, not just this week)
   const filteredBookings = selectedStatus === 'all' 
     ? allBookings 
     : allBookings.filter(booking => booking.status.toLowerCase() === selectedStatus.toLowerCase());
+
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredBookings.length / itemsPerPage);
+  const currentBookings = filteredBookings.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+  // Pagination functions
+  const nextPage = () => setCurrentPage(prev => Math.min(prev + 1, totalPages));
+  const prevPage = () => setCurrentPage(prev => Math.max(prev - 1, 1));
+  const paginate = (pageNumber: number) => setCurrentPage(pageNumber);
 
   return (
     <div className="min-h-screen p-4 md:p-8 space-y-8">
@@ -1304,7 +1320,7 @@ const LocationManagerDashboard: React.FC = () => {
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <Link to={`/admin/bookings/${booking.id}`} className={`text-sm text-${fullColor} hover:underline`}>
+                      <Link to={`/bookings/${booking.id}`} className={`text-sm text-${fullColor} hover:underline`}>
                         View
                       </Link>
                     </td>
@@ -1421,6 +1437,7 @@ const LocationManagerDashboard: React.FC = () => {
               <thead className="text-xs text-gray-500 uppercase bg-gray-50 border-b">
                 <tr>
                   <th className="px-4 py-3 font-medium w-32">Date & Time</th>
+                  <th className="px-4 py-3 font-medium w-48">Created At</th>
                   <th className="px-4 py-3 font-medium w-48">Customer</th>
                   <th className="px-4 py-3 font-medium w-40">Package</th>
                   <th className="px-4 py-3 font-medium w-20">Participants</th>
@@ -1431,13 +1448,35 @@ const LocationManagerDashboard: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {filteredBookings.map(booking => (
+                {currentBookings.map(booking => {
+                  // Calculate actual payment status based on amounts
+                  const totalAmount = parseFloat(String(booking.total_amount || 0));
+                  const amountPaid = parseFloat(String(booking.amount_paid || 0));
+                  let actualPaymentStatus = booking.payment_status || 'pending';
+                  
+                  // Override with calculated status if amounts suggest otherwise
+                  if (totalAmount > 0) {
+                    if (amountPaid >= totalAmount) {
+                      actualPaymentStatus = 'paid';
+                    } else if (amountPaid > 0) {
+                      actualPaymentStatus = 'partial';
+                    } else {
+                      actualPaymentStatus = 'pending';
+                    }
+                  }
+                  
+                  return (
                   <tr key={booking.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3">
                       <div className="font-medium text-gray-900">
                         {parseLocalDate(booking.booking_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                       </div>
                       <div className="text-xs text-gray-500">{convertTo12Hour(booking.booking_time)}</div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="font-medium text-gray-900">
+                        {new Date(booking.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       <div>
@@ -1457,20 +1496,72 @@ const LocationManagerDashboard: React.FC = () => {
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={getPaymentColor(booking.payment_status) + ' px-2 py-1 text-xs font-medium rounded-full'}>
-                        {booking.payment_status}
+                      <span className={getPaymentColor(actualPaymentStatus) + ' px-2 py-1 text-xs font-medium rounded-full capitalize'}>
+                        {actualPaymentStatus}
                       </span>
                     </td>
-                    <td className="px-4 py-3 font-medium">${parseFloat(String(booking.total_amount || 0)).toFixed(2)}</td>
-                    <td className="px-4 py-3 font-medium">${parseFloat(String(booking.amount_paid || 0)).toFixed(2)}</td>
+                    <td className="px-4 py-3 font-medium">${totalAmount.toFixed(2)}</td>
+                    <td className="px-4 py-3 font-medium">${amountPaid.toFixed(2)}</td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
         ) : (
           <div className="text-center py-8 text-gray-500">
             No bookings found for the selected criteria
+          </div>
+        )}
+
+        {/* Pagination */}
+        {filteredBookings.length > 0 && (
+          <div className="flex items-center justify-between mt-6">
+            <div className="text-sm text-gray-800">
+              Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, filteredBookings.length)} of {filteredBookings.length} results
+            </div>
+            <div className="flex space-x-2">
+              <StandardButton
+                variant="secondary"
+                size="sm"
+                onClick={prevPage}
+                disabled={currentPage === 1}
+              >
+                Previous
+              </StandardButton>
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                // Show pages around current page
+                let pageNum;
+                if (totalPages <= 5) {
+                  pageNum = i + 1;
+                } else if (currentPage <= 3) {
+                  pageNum = i + 1;
+                } else if (currentPage >= totalPages - 2) {
+                  pageNum = totalPages - 4 + i;
+                } else {
+                  pageNum = currentPage - 2 + i;
+                }
+                
+                return (
+                  <StandardButton
+                    key={pageNum}
+                    variant={currentPage === pageNum ? 'primary' : 'secondary'}
+                    size="sm"
+                    onClick={() => paginate(pageNum)}
+                  >
+                    {pageNum}
+                  </StandardButton>
+                );
+              })}
+              <StandardButton
+                variant="secondary"
+                size="sm"
+                onClick={nextPage}
+                disabled={currentPage === totalPages}
+              >
+                Next
+              </StandardButton>
+            </div>
           </div>
         )}
       </div>

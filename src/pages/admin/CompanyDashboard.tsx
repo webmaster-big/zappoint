@@ -1804,7 +1804,7 @@ const CompanyDashboard: React.FC = () => {
       {/* Bookings Table */}
       <div className="bg-white rounded-xl shadow-sm p-4 md:p-6 border border-gray-100">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 md:mb-6">
-          <h2 className="text-lg md:text-xl font-semibold text-gray-900">Weekly Bookings</h2>
+          <h2 className="text-lg md:text-xl font-semibold text-gray-900">All Bookings</h2>
           <div className="flex flex-wrap gap-2 mt-4 md:mt-0">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
@@ -1866,6 +1866,7 @@ const CompanyDashboard: React.FC = () => {
             <thead className="text-xs text-gray-500 uppercase bg-gray-50 border-b">
               <tr>
                 <th className="px-3 md:px-4 py-2 md:py-3 font-medium">Date & Time</th>
+                <th className="px-3 md:px-4 py-2 md:py-3 font-medium">Created At</th>
                 <th className="px-3 md:px-4 py-2 md:py-3 font-medium">Customer</th>
                 <th className="px-3 md:px-4 py-2 md:py-3 font-medium">Activity/Package</th>
                 <th className="px-3 md:px-4 py-2 md:py-3 font-medium">Location</th>
@@ -1882,9 +1883,24 @@ const CompanyDashboard: React.FC = () => {
                 const customerEmail = booking.customer?.email || booking.guest_email || '';
                 const activityName = booking.attraction?.name || booking.package?.name || '-';
                 const locationName = booking.location?.name || '-';
-                const paymentStatus = booking.payment_status === 'paid' ? 'Paid' : 
-                                    booking.payment_status === 'partial' ? 'Partial' : 
-                                    booking.payment_status === 'refunded' ? 'Refunded' : 'Pending';
+                
+                // Calculate actual payment status based on amounts
+                const totalAmount = parseFloat(String(booking.total_amount || 0));
+                const amountPaid = parseFloat(String(booking.amount_paid || 0));
+                let paymentStatus = booking.payment_status || 'pending';
+                
+                // Override with calculated status if amounts suggest otherwise
+                if (totalAmount > 0) {
+                  if (amountPaid >= totalAmount) {
+                    paymentStatus = 'paid';
+                  } else if (amountPaid > 0) {
+                    paymentStatus = 'partial';
+                  } else {
+                    paymentStatus = 'pending';
+                  }
+                }
+                
+                const displayPaymentStatus = paymentStatus.charAt(0).toUpperCase() + paymentStatus.slice(1);
                 const bookingStatus = booking.status.charAt(0).toUpperCase() + booking.status.slice(1);
                 
                 return (
@@ -1895,6 +1911,8 @@ const CompanyDashboard: React.FC = () => {
                       </div>
                       <div className="text-xs text-gray-500">{convertTo12Hour(booking.booking_time)}</div>
                     </td>
+                    <td className="px-3 md:px-4 py-2 md:py-3">
+                      <div className="text-sm text-gray-500">{new Date(booking.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div></td>
                     <td className="px-3 md:px-4 py-2 md:py-3">
                       <div>
                         <div className="font-medium text-gray-900 text-xs md:text-sm">{customerName}</div>
@@ -1918,8 +1936,8 @@ const CompanyDashboard: React.FC = () => {
                       </span>
                     </td>
                     <td className="px-3 md:px-4 py-2 md:py-3">
-                      <span className={`text-xs px-2 py-1 rounded-full ${paymentColors[paymentStatus as keyof typeof paymentColors]}`}>
-                        {paymentStatus}
+                      <span className={`text-xs px-2 py-1 rounded-full ${paymentColors[displayPaymentStatus as keyof typeof paymentColors]}`}>
+                        {displayPaymentStatus}
                       </span>
                     </td>
                     <td className="px-3 md:px-4 py-2 md:py-3">

@@ -496,10 +496,29 @@ const BookPackage: React.FC = () => {
     return dayOffsWithTime.filter(d => dayOffAppliesToPackage(d, pkg.id));
   }, [dayOffsWithTime, pkg]);
 
-  // Filter available time slots based on partial day offs
-  const filteredTimeSlots = availableTimeSlots.filter(slot => 
-    !isTimeSlotRestricted(slot.start_time, slot.end_time)
-  );
+  // Filter available time slots based on partial day offs and min booking notice hours
+  const filteredTimeSlots = availableTimeSlots.filter(slot => {
+    // First check partial day off restrictions
+    if (isTimeSlotRestricted(slot.start_time, slot.end_time)) return false;
+    
+    // Then check min_booking_notice_hours restriction
+    // e.g., if notice = 48 hours and now is Monday 2pm, slots before Wednesday 2pm are blocked
+    if (pkg && pkg.min_booking_notice_hours && selectedDate) {
+      const now = new Date();
+      const noticeMs = pkg.min_booking_notice_hours * 60 * 60 * 1000;
+      const earliestBookableTime = new Date(now.getTime() + noticeMs);
+      
+      // Build the full datetime of this slot's start
+      const [slotHours, slotMinutes] = slot.start_time.split(':').map(Number);
+      const slotDate = parseLocalDate(selectedDate);
+      slotDate.setHours(slotHours, slotMinutes, 0, 0);
+      
+      // If the slot's datetime is before the earliest bookable time, filter it out
+      if (slotDate < earliestBookableTime) return false;
+    }
+    
+    return true;
+  });
 
   // Helper function to get week of month (1-5, where 5 is last week)
   const getWeekOfMonth = (date: Date): number => {
@@ -533,10 +552,22 @@ const BookPackage: React.FC = () => {
     // If null, allow unlimited (730 days); otherwise use the configured value
     const maxDays = bookingWindowDays === null ? 730 : Math.max(1, bookingWindowDays);
     
+    // Calculate the earliest bookable time based on min_booking_notice_hours
+    // e.g., if notice = 48 hours and now is Monday 2pm, earliest = Wednesday 2pm
+    const noticeHours = pkg.min_booking_notice_hours || 0;
+    const earliestBookableTime = new Date(today.getTime() + noticeHours * 60 * 60 * 1000);
+    // The earliest date that could have any valid time slots
+    const earliestBookableDate = new Date(earliestBookableTime.getFullYear(), earliestBookableTime.getMonth(), earliestBookableTime.getDate());
+    
     // Generate available dates for the booking window
     for (let i = 0; i < maxDays; i++) {
       const date = new Date();
       date.setDate(today.getDate() + i);
+      
+      // Skip dates that are entirely before the earliest bookable date
+      // (the boundary date is included — time slot filtering handles the specific slots)
+      const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+      if (dateOnly < earliestBookableDate) continue;
       
       // Check if date matches any availability schedule
       let isAvailable = false;
