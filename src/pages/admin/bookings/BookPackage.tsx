@@ -503,9 +503,10 @@ const BookPackage: React.FC = () => {
     
     // Then check min_booking_notice_hours restriction
     // e.g., if notice = 48 hours and now is Monday 2pm, slots before Wednesday 2pm are blocked
-    if (pkg && pkg.min_booking_notice_hours && selectedDate) {
+    const noticeHoursValue = Number(pkg?.min_booking_notice_hours) || 0;
+    if (noticeHoursValue > 0 && selectedDate) {
       const now = new Date();
-      const noticeMs = pkg.min_booking_notice_hours * 60 * 60 * 1000;
+      const noticeMs = noticeHoursValue * 60 * 60 * 1000;
       const earliestBookableTime = new Date(now.getTime() + noticeMs);
       
       // Build the full datetime of this slot's start
@@ -554,7 +555,7 @@ const BookPackage: React.FC = () => {
     
     // Calculate the earliest bookable time based on min_booking_notice_hours
     // e.g., if notice = 48 hours and now is Monday 2pm, earliest = Wednesday 2pm
-    const noticeHours = pkg.min_booking_notice_hours || 0;
+    const noticeHours = Number(pkg.min_booking_notice_hours) || 0;
     const earliestBookableTime = new Date(today.getTime() + noticeHours * 60 * 60 * 1000);
     // The earliest date that could have any valid time slots
     const earliestBookableDate = new Date(earliestBookableTime.getFullYear(), earliestBookableTime.getMonth(), earliestBookableTime.getDate());
@@ -908,6 +909,22 @@ const BookPackage: React.FC = () => {
   // Handle booking submission with payment processing
   const handlePayNow = async () => {
     if (!pkg) return;
+    
+    // Validate min_booking_notice_hours - prevent bookings within the notice window
+    const noticeHoursCheck = Number(pkg.min_booking_notice_hours) || 0;
+    if (noticeHoursCheck > 0 && selectedDate && selectedTime) {
+      const now = new Date();
+      const earliestAllowed = new Date(now.getTime() + noticeHoursCheck * 60 * 60 * 1000);
+      const [bookHours, bookMinutes] = selectedTime.split(':').map(Number);
+      const bookingDateTime = parseLocalDate(selectedDate);
+      bookingDateTime.setHours(bookHours, bookMinutes, 0, 0);
+      
+      if (bookingDateTime < earliestAllowed) {
+        const daysNotice = Math.ceil(noticeHoursCheck / 24);
+        setPaymentError(`This package requires at least ${noticeHoursCheck} hours (${daysNotice} day${daysNotice > 1 ? 's' : ''}) advance booking notice. Please select a later date/time.`);
+        return;
+      }
+    }
     
     // Validate card information
     if (!cardNumber || !cardMonth || !cardYear || !cardCVV) {
