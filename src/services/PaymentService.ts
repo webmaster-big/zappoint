@@ -16,6 +16,8 @@ import type {
   VoidResponse,
   ManualRefundRequest,
   ManualRefundResponse,
+  LinkPayableRequest,
+  LinkPayableResponse,
 } from '../types/Payment.types';
 import { PAYMENT_TYPE } from '../types/Payment.types';
 
@@ -198,6 +200,55 @@ export const manualRefundPayment = async (
 ): Promise<ManualRefundResponse> => {
   const response = await api.patch<ManualRefundResponse>(`/payments/${paymentId}/manual-refund`, data);
   return response.data;
+};
+
+/**
+ * Link a payment to a booking or attraction purchase
+ * Used in the charge-then-link flow: charge first, create entity, then link
+ * 
+ * @param paymentId - The ID of the payment to link
+ * @param data - The payable_id and payable_type to link to
+ * @returns Response with updated payment and payable entity
+ */
+export const linkPaymentToPayable = async (
+  paymentId: number,
+  data: LinkPayableRequest
+): Promise<LinkPayableResponse> => {
+  const response = await api.patch<LinkPayableResponse>(`/payments/${paymentId}/payable`, data);
+  return response.data;
+};
+
+/**
+ * Link payment to payable with retry logic
+ * Safe to retry - the PATCH /payments/{id}/payable endpoint is idempotent
+ * 
+ * @param paymentId - The payment ID  
+ * @param payableId - The booking or purchase ID
+ * @param payableType - 'booking' or 'attraction_purchase'
+ * @param maxRetries - Maximum number of retry attempts (default: 3)
+ * @returns Link response
+ */
+export const linkPaymentWithRetry = async (
+  paymentId: number,
+  payableId: number,
+  payableType: 'booking' | 'attraction_purchase',
+  maxRetries: number = 3
+): Promise<LinkPayableResponse> => {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const response = await linkPaymentToPayable(paymentId, {
+        payable_id: payableId,
+        payable_type: payableType,
+      });
+      return response;
+    } catch (err) {
+      console.warn(`⚠️ Link payment attempt ${attempt}/${maxRetries} failed:`, err);
+      if (attempt === maxRetries) throw err;
+      // Exponential backoff: 1s, 2s, 3s
+      await new Promise((r) => setTimeout(r, 1000 * attempt));
+    }
+  }
+  throw new Error('Failed to link payment after maximum retries');
 };
 
 /** Common payment shape used by action helpers */
@@ -986,6 +1037,8 @@ export default {
   refundPayment,
   voidPayment,
   manualRefundPayment,
+  linkPaymentToPayable,
+  linkPaymentWithRetry,
   canRefund,
   canVoid,
   canManualRefund,

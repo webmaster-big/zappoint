@@ -8,7 +8,7 @@ export interface AttractionPurchasesPurchase {
   email: string;
   phone: string;
   quantity: number;
-  status: 'confirmed' | 'pending' | 'cancelled' | 'refunded';
+  status: 'confirmed' | 'pending' | 'checked-in' | 'cancelled' | 'refunded';
   totalAmount: number;
   amountPaid: number;
   createdAt: string;

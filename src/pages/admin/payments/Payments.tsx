@@ -25,7 +25,8 @@ import {
   Calendar,
   RotateCcw,
   Ban,
-  MoreVertical
+  MoreVertical,
+  PenLine
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { 
@@ -265,6 +266,9 @@ const Payments: React.FC = () => {
             bookingTime: booking?.booking_time,
             participants: booking?.participants,
             guestName: booking?.guest_name || attractionPurchase?.guest_name,
+            // Signature & Terms
+            signature_image: (payment as any).signature_image || null,
+            terms_accepted: (payment as any).terms_accepted ?? null,
           };
         });
 
@@ -652,6 +656,10 @@ const Payments: React.FC = () => {
   const [showVoidDialog, setShowVoidDialog] = useState(false);
   const [showManualRefundModal, setShowManualRefundModal] = useState(false);
   const [openActionsMenu, setOpenActionsMenu] = useState<number | null>(null);
+
+  // Signature & Terms modal state
+  const [showSignatureModal, setShowSignatureModal] = useState(false);
+  const [signatureModalPayment, setSignatureModalPayment] = useState<PaymentsPagePayment | null>(null);
 
   const handleRefundClick = (payment: PaymentsPagePayment) => {
     setSelectedPaymentForAction(payment);
@@ -1253,6 +1261,16 @@ const Payments: React.FC = () => {
                       <td className="px-4 py-4 text-right">
                         <div className="relative flex items-center justify-end gap-1">
                           <button
+                            onClick={() => {
+                              setSignatureModalPayment(payment);
+                              setShowSignatureModal(true);
+                            }}
+                            className={`p-2 text-gray-400 hover:text-${themeColor}-600 hover:bg-${themeColor}-50 rounded-lg transition-colors`}
+                            title="View Signature & Terms"
+                          >
+                            <PenLine className="w-4 h-4" />
+                          </button>
+                          <button
                             onClick={() => handleInvoice(payment.id, false)}
                             className={`p-2 text-gray-400 hover:text-${themeColor}-600 hover:bg-${themeColor}-50 rounded-lg transition-colors`}
                             title="Download Invoice"
@@ -1794,6 +1812,89 @@ const Payments: React.FC = () => {
         onRefundComplete={handleManualRefundComplete}
         onToast={(message, type) => setToast({ message, type })}
       />
+
+      {/* Signature & Terms Modal */}
+      {showSignatureModal && signatureModalPayment && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowSignatureModal(false)}>
+          <div
+            className="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <div className="flex items-center gap-3">
+                <div className={`p-2 rounded-lg bg-${themeColor}-100`}>
+                  <PenLine className={`w-5 h-5 text-${fullColor}`} />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900">Signature & Terms</h2>
+                  <p className="text-xs text-gray-500">Payment #{signatureModalPayment.id} &mdash; {signatureModalPayment.customerName}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowSignatureModal(false)}
+                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="px-6 py-5 space-y-5">
+              {/* Terms Accepted */}
+              <div>
+                <h3 className="text-sm font-medium text-gray-700 mb-2">Terms & Conditions</h3>
+                {signatureModalPayment.terms_accepted === true ? (
+                  <div className="flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-200 rounded-lg">
+                    <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0" />
+                    <span className="text-sm text-green-800 font-medium">Accepted</span>
+                  </div>
+                ) : signatureModalPayment.terms_accepted === false ? (
+                  <div className="flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-200 rounded-lg">
+                    <XCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
+                    <span className="text-sm text-red-800 font-medium">Not Accepted</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg">
+                    <Clock className="w-5 h-5 text-gray-400 flex-shrink-0" />
+                    <span className="text-sm text-gray-500">No data available</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Signature Image */}
+              <div>
+                <h3 className="text-sm font-medium text-gray-700 mb-2">Signature</h3>
+                {signatureModalPayment.signature_image ? (
+                  <div className="border-2 border-gray-200 rounded-lg p-4 bg-white">
+                    <img
+                      src={signatureModalPayment.signature_image}
+                      alt="Customer signature"
+                      className="max-h-[200px] w-full object-contain"
+                    />
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 px-3 py-6 bg-gray-50 border border-gray-200 rounded-lg justify-center">
+                    <PenLine className="w-5 h-5 text-gray-400" />
+                    <span className="text-sm text-gray-500">No signature provided</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-end px-6 py-4 border-t border-gray-100 bg-gray-50">
+              <StandardButton
+                variant="secondary"
+                size="md"
+                onClick={() => setShowSignatureModal(false)}
+              >
+                Close
+              </StandardButton>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

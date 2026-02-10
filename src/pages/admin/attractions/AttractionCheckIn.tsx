@@ -12,7 +12,8 @@ import {
   DollarSign,
   AlertCircle,
   Smartphone,
-  X
+  X,
+  Clock
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { attractionPurchaseService, type AttractionPurchase } from '../../../services/AttractionPurchaseService';
@@ -171,17 +172,17 @@ const AttractionCheckIn = () => {
 
       const purchase = verifyResponse.data;
 
-      // Check if already used (completed)
-      if (purchase.status === 'completed') {
+      // Check if already checked in
+      if (purchase.status === 'checked-in') {
         setScanResult({
           purchaseId,
           purchase,
           success: false,
-          message: 'This ticket has already been used'
+          message: 'This ticket has already been checked in'
         });
         setVerifiedPurchase(purchase);
         setShowModal(true);
-        setToast({ message: 'Ticket already used', type: 'error' });
+        setToast({ message: 'Ticket already checked in', type: 'error' });
         return;
       }
 
@@ -199,7 +200,35 @@ const AttractionCheckIn = () => {
         return;
       }
 
-      // Show modal for confirmation before check-in
+      // Check if refunded
+      if (purchase.status === 'refunded') {
+        setScanResult({
+          purchaseId,
+          purchase,
+          success: false,
+          message: 'This ticket has been refunded'
+        });
+        setVerifiedPurchase(purchase);
+        setShowModal(true);
+        setToast({ message: 'Ticket refunded', type: 'error' });
+        return;
+      }
+
+      // Check if pending (not fully paid)
+      if (purchase.status === 'pending') {
+        setScanResult({
+          purchaseId,
+          purchase,
+          success: false,
+          message: 'This ticket has not been fully paid yet. Payment must be completed before check-in.'
+        });
+        setVerifiedPurchase(purchase);
+        setShowModal(true);
+        setToast({ message: 'Ticket not fully paid - cannot check in', type: 'error' });
+        return;
+      }
+
+      // Only confirmed tickets can be checked in
       setVerifiedPurchase(purchase);
       setShowModal(true);
       setToast({ message: 'Ticket verified - Please confirm check-in', type: 'info' });
@@ -470,11 +499,11 @@ const AttractionCheckIn = () => {
               {/* Modal Body */}
               <div className="p-6">
                 {/* Status Alert */}
-                {verifiedPurchase.status === 'completed' && (
+                {verifiedPurchase.status === 'checked-in' && (
                   <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
                     <XCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
                     <div>
-                      <p className="font-semibold text-red-800">Already Used</p>
+                      <p className="font-semibold text-red-800">Already Checked In</p>
                       <p className="text-sm text-red-600">This ticket has already been checked in and cannot be used again.</p>
                     </div>
                   </div>
@@ -490,12 +519,32 @@ const AttractionCheckIn = () => {
                   </div>
                 )}
 
-                {verifiedPurchase.status === 'pending' && (
-                  <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg flex items-start gap-3">
-                    <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
+                {verifiedPurchase.status === 'refunded' && (
+                  <div className="mb-6 p-4 bg-purple-50 border border-purple-200 rounded-lg flex items-start gap-3">
+                    <XCircle className="h-5 w-5 text-purple-600 flex-shrink-0 mt-0.5" />
                     <div>
-                      <p className="font-semibold text-green-800">Valid Ticket</p>
-                      <p className="text-sm text-green-600">This ticket is ready to be checked in.</p>
+                      <p className="font-semibold text-purple-800">Ticket Refunded</p>
+                      <p className="text-sm text-purple-600">This ticket has been refunded and cannot be used.</p>
+                    </div>
+                  </div>
+                )}
+
+                {verifiedPurchase.status === 'pending' && (
+                  <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg flex items-start gap-3">
+                    <Clock className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-semibold text-yellow-800">Payment Incomplete</p>
+                      <p className="text-sm text-yellow-600">Paid: ${Number(verifiedPurchase.total_amount && verifiedPurchase.total_amount).toFixed(2)} outstanding. Cannot check in until fully paid.</p>
+                    </div>
+                  </div>
+                )}
+
+                {verifiedPurchase.status === 'confirmed' && (
+                  <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-start gap-3">
+                    <CheckCircle className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-semibold text-blue-800">Valid Ticket - Ready for Check-In</p>
+                      <p className="text-sm text-blue-600">This ticket is paid in full and ready to be checked in.</p>
                     </div>
                   </div>
                 )}
@@ -576,30 +625,42 @@ const AttractionCheckIn = () => {
 
                     <div className="flex items-center gap-3">
                       <div className={`p-2 rounded-lg ${
-                        verifiedPurchase.status === 'completed' 
+                        verifiedPurchase.status === 'checked-in' 
                           ? 'bg-green-100' 
+                          : verifiedPurchase.status === 'confirmed'
+                          ? 'bg-blue-100'
                           : verifiedPurchase.status === 'cancelled'
                           ? 'bg-red-100'
+                          : verifiedPurchase.status === 'refunded'
+                          ? 'bg-purple-100'
                           : 'bg-yellow-100'
                       }`}>
                         <CheckCircle className={`h-5 w-5 ${
-                          verifiedPurchase.status === 'completed' 
+                          verifiedPurchase.status === 'checked-in' 
                             ? 'text-green-600' 
+                            : verifiedPurchase.status === 'confirmed'
+                            ? 'text-blue-600'
                             : verifiedPurchase.status === 'cancelled'
                             ? 'text-red-600'
+                            : verifiedPurchase.status === 'refunded'
+                            ? 'text-purple-600'
                             : 'text-yellow-600'
                         }`} />
                       </div>
                       <div>
                         <p className="text-xs text-gray-500">Status</p>
-                        <p className={`font-semibold capitalize ${
-                          verifiedPurchase.status === 'completed' 
+                        <p className={`font-semibold ${
+                          verifiedPurchase.status === 'checked-in' 
                             ? 'text-green-600' 
+                            : verifiedPurchase.status === 'confirmed'
+                            ? 'text-blue-600'
                             : verifiedPurchase.status === 'cancelled'
                             ? 'text-red-600'
+                            : verifiedPurchase.status === 'refunded'
+                            ? 'text-purple-600'
                             : 'text-yellow-600'
                         }`}>
-                          {verifiedPurchase.status}
+                          {verifiedPurchase.status === 'checked-in' ? 'Checked In' : verifiedPurchase.status.charAt(0).toUpperCase() + verifiedPurchase.status.slice(1)}
                         </p>
                       </div>
                     </div>
@@ -642,7 +703,7 @@ const AttractionCheckIn = () => {
                   Cancel
                 </StandardButton>
                 
-                {verifiedPurchase.status === 'pending' && (
+                {verifiedPurchase.status === 'confirmed' && (
                   <StandardButton
                     variant="primary"
                     size="md"
@@ -656,7 +717,7 @@ const AttractionCheckIn = () => {
                   </StandardButton>
                 )}
                 
-                {verifiedPurchase.status !== 'pending' && (
+                {verifiedPurchase.status !== 'confirmed' && (
                   <StandardButton
                     variant="primary"
                     size="md"
@@ -760,22 +821,30 @@ const AttractionCheckIn = () => {
 
                   <div className="flex items-center gap-3 col-span-full">
                     <CheckCircle className={`h-5 w-5 ${
-                      scanResult.purchase.status === 'completed' 
-                        ? `text-${themeColor}-600` 
+                      scanResult.purchase.status === 'checked-in' 
+                        ? 'text-green-600' 
+                        : scanResult.purchase.status === 'confirmed'
+                        ? 'text-blue-600'
                         : scanResult.purchase.status === 'cancelled'
                         ? 'text-red-600'
+                        : scanResult.purchase.status === 'refunded'
+                        ? 'text-purple-600'
                         : 'text-yellow-600'
                     }`} />
                     <div>
                       <p className="text-xs text-gray-500">Status</p>
-                      <p className={`font-medium capitalize ${
-                        scanResult.purchase.status === 'completed' 
-                          ? `text-${fullColor}` 
+                      <p className={`font-medium ${
+                        scanResult.purchase.status === 'checked-in' 
+                          ? 'text-green-600' 
+                          : scanResult.purchase.status === 'confirmed'
+                          ? 'text-blue-600'
                           : scanResult.purchase.status === 'cancelled'
                           ? 'text-red-600'
+                          : scanResult.purchase.status === 'refunded'
+                          ? 'text-purple-600'
                           : 'text-yellow-600'
                       }`}>
-                        {scanResult.purchase.status}
+                        {scanResult.purchase.status === 'checked-in' ? 'Checked In' : scanResult.purchase.status.charAt(0).toUpperCase() + scanResult.purchase.status.slice(1)}
                       </p>
                     </div>
                   </div>

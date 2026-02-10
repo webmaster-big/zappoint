@@ -177,7 +177,7 @@ const RefundModal: React.FC<RefundModalProps> = ({
                 <div>
                   <span className="text-gray-500">Date:</span>
                   <span className="ml-2 text-gray-700">
-                    {new Date(payment.created_at).toLocaleDateString()}
+                    {new Date(payment.created_at).toLocaleDateString()} {new Date(payment.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
                   </span>
                 </div>
               </div>

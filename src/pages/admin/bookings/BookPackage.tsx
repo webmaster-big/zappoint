@@ -16,7 +16,7 @@ interface DayOffWithTime {
   package_ids?: number[] | null;  // If set, only applies to these packages
   room_ids?: number[] | null;     // If set, only blocks these rooms
 }
-import { loadAcceptJS, processCardPayment, validateCardNumber, formatCardNumber, getCardType, PAYMENT_TYPE } from '../../../services/PaymentService';
+import { loadAcceptJS, processCardPayment, validateCardNumber, formatCardNumber, getCardType, PAYMENT_TYPE, linkPaymentWithRetry } from '../../../services/PaymentService';
 import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
 import customerService from '../../../services/CustomerService';
 import DatePicker from '../../../components/ui/DatePicker';
@@ -24,6 +24,8 @@ import { extractIdFromSlug } from '../../../utils/slug';
 import { formatDurationDisplay } from '../../../utils/timeFormat';
 import StandardButton from '../../../components/ui/StandardButton';
 import { globalNoteService, type GlobalNote } from '../../../services/GlobalNoteService';
+import SignatureCapture from '../../../components/SignatureCapture';
+import TermsAndConditionsCheckbox from '../../../components/TermsAndConditionsCheckbox';
 
 // Helper function to parse ISO date string (YYYY-MM-DD) in local timezone
 // Avoids UTC offset issues that cause date to show as previous day
@@ -211,6 +213,12 @@ const BookPackage: React.FC = () => {
     price: number;
   } | null>(null);
   const [showAccountModal, setShowAccountModal] = useState(false);
+  const [showMobileOrderSummary, setShowMobileOrderSummary] = useState(false);
+
+  // Signature & Terms state
+  const [signatureImage, setSignatureImage] = useState<string | null>(null);
+  const [termsAccepted, setTermsAccepted] = useState<boolean>(false);
+  const [signatureTermsErrors, setSignatureTermsErrors] = useState<Record<string, string>>({});
 
   // Show account modal for non-logged-in users
   useEffect(() => {
@@ -773,6 +781,9 @@ const BookPackage: React.FC = () => {
     setCardYear("");
     setCardCVV("");
     setPaymentError("");
+    setSignatureImage(null);
+    setTermsAccepted(false);
+    setSignatureTermsErrors({});
   };
 
   // Helper function to get the correct add-on price based on package
@@ -909,6 +920,20 @@ const BookPackage: React.FC = () => {
   // Handle booking submission with payment processing
   const handlePayNow = async () => {
     if (!pkg) return;
+
+    // Validate signature and terms acceptance
+    const stErrors: Record<string, string> = {};
+    if (!signatureImage) {
+      stErrors.signature = 'Please provide your signature before proceeding.';
+    }
+    if (!termsAccepted) {
+      stErrors.terms = 'You must agree to the Terms & Conditions to proceed.';
+    }
+    if (Object.keys(stErrors).length > 0) {
+      setSignatureTermsErrors(stErrors);
+      return;
+    }
+    setSignatureTermsErrors({});
     
     // Validate min_booking_notice_hours - prevent bookings within the notice window
     const noticeHoursCheck = Number(pkg.min_booking_notice_hours) || 0;
@@ -971,7 +996,34 @@ const BookPackage: React.FC = () => {
         country: form.country,
       };
       
-      // Step 1: Prepare booking data FIRST
+      // ===== CHARGE-THEN-LINK FLOW =====
+      // Step 1: Charge the customer FIRST (no payable_id yet)
+      const paymentData = {
+        location_id: pkg.location_id || 1,
+        amount: amountToPay,
+        order_id: `P${pkg.id}-${Date.now().toString().slice(-8)}`,
+        description: `Package Booking: ${pkg.name}`,
+        customer_id: customerId || undefined,
+        signature_image: signatureImage || undefined,
+        terms_accepted: termsAccepted,
+      };
+      
+      const paymentResponse = await processCardPayment(
+        cardData,
+        paymentData,
+        authorizeApiLoginId,
+        authorizeClientKey,
+        customerData
+      );
+      
+      if (!paymentResponse.success) {
+        throw new Error(paymentResponse.message || 'Payment failed. Please try again.');
+      }
+      
+      const paymentId = paymentResponse.payment?.id;
+      console.log('✅ Payment charged successfully, payment ID:', paymentId);
+      
+      // Step 2: Prepare and create booking (customer already charged)
       const additionalAttractions = Object.entries(selectedAttractions)
         .filter(([, qty]) => qty > 0)
         .map(([id, qty]) => {
@@ -1036,55 +1088,32 @@ const BookPackage: React.FC = () => {
         guest_state: form.state || undefined,
         guest_zip: form.zip || undefined,
         guest_country: form.country || undefined,
+        transaction_id: paymentResponse.transaction_id,
       };
       
-      // Step 2: Create booking FIRST
       const response = await bookingService.createBooking(bookingData);
       
       if (!response.success || !response.data) {
-        throw new Error('Failed to create booking');
+        // Booking creation failed but customer was already charged
+        // The unlinked payment (payable_id = null) will be visible to staff for manual resolution
+        console.error('⚠️ Booking creation failed after successful charge. Payment ID:', paymentId);
+        throw new Error('Booking could not be created. Your payment has been processed — please contact support with your transaction details.');
       }
       
       const bookingId = response.data.id;
       const referenceNumber = response.data.reference_number;
+      console.log('✅ Booking created, ID:', bookingId, 'Ref:', referenceNumber);
       
-      // Step 3: Process payment with payable_id (now we have bookingId)
-      const paymentData = {
-        location_id: pkg.location_id || 1,
-        amount: amountToPay,
-        order_id: `P${pkg.id}-${Date.now().toString().slice(-8)}`,
-        description: `Package Booking: ${pkg.name}`,
-        customer_id: customerId || undefined,
-        payable_id: bookingId,
-        payable_type: PAYMENT_TYPE.BOOKING,
-      };
-      
-      const paymentResponse = await processCardPayment(
-        cardData,
-        paymentData,
-        authorizeApiLoginId,
-        authorizeClientKey,
-        customerData
-      );
-      
-      if (!paymentResponse.success) {
-        // Payment failed - delete the booking we just created
+      // Step 3: Link payment to booking (with retry for reliability)
+      if (paymentId) {
         try {
-          await bookingService.deleteBooking(bookingId);
-          console.log('🗑️ Booking deleted due to payment failure');
-        } catch (deleteErr) {
-          console.error('⚠️ Failed to delete booking after payment failure:', deleteErr);
+          await linkPaymentWithRetry(paymentId, bookingId, PAYMENT_TYPE.BOOKING);
+          console.log('✅ Payment linked to booking successfully');
+        } catch (linkErr) {
+          // Non-critical: payment and booking both exist, just not linked yet
+          // Staff can see unlinked payments and manually resolve
+          console.error('⚠️ Failed to link payment to booking:', linkErr);
         }
-        throw new Error(paymentResponse.message || 'Payment failed. Please try again.');
-      }
-      
-      // Update booking with transaction_id
-      try {
-        await bookingService.updateBooking(bookingId, {
-          transaction_id: paymentResponse.transaction_id
-        });
-      } catch (updateError) {
-        // Non-critical - booking and payment succeeded
       }
       
       // Generate and store QR code
@@ -1111,8 +1140,6 @@ const BookPackage: React.FC = () => {
       });
       setShowConfirmation(true);
     } catch (err: any) {
-      // If we have a bookingId and it's a payment error, try to delete the booking
-      // Note: bookingId might not be defined if booking creation failed
       const userFriendlyMessage = getPaymentErrorMessage(err);
       setPaymentError(userFriendlyMessage);
     } finally {
@@ -1498,11 +1525,25 @@ const BookPackage: React.FC = () => {
             transform: scale(1);
           }
         }
+        @keyframes mobile-summary-fade-in {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes mobile-summary-slide-in {
+          from { transform: translateX(-100%); }
+          to { transform: translateX(0); }
+        }
         .animate-fade-in {
           animation: fade-in 0.2s ease-out;
         }
         .animate-scale-in {
           animation: scale-in 0.3s ease-out;
+        }
+        .animate-mobile-summary-fade-in {
+          animation: mobile-summary-fade-in 0.25s ease-out both;
+        }
+        .animate-mobile-summary-slide-in {
+          animation: mobile-summary-slide-in 0.3s cubic-bezier(0.32, 0.72, 0, 1) both;
         }
       `}</style>
 
@@ -1510,7 +1551,7 @@ const BookPackage: React.FC = () => {
         <div className="w-full max-w-6xl flex flex-col md:flex-row gap-8">
         {/* Left: Booking Form */}
         <div className="flex-1 min-w-0">
-          <div className="mb-6 md:mb-8 bg-white rounded-xl p-4 md:p-6 shadow-sm border border-gray-100">
+          <div className={`mb-6 md:mb-8 bg-white rounded-xl p-4 md:p-6 shadow-sm border border-gray-100${currentStep >= 2 ? ' hidden md:block' : ''}`}>
             <h2 className="text-base md:text-xl font-semibold mb-2 text-gray-800">{pkg.name}</h2>
             <p className="text-gray-600 mb-3 md:mb-4 text-xs md:text-sm">{pkg.description}</p>
             {((pkg.features && Array.isArray(pkg.features) && pkg.features.length > 0) || 
@@ -2346,6 +2387,34 @@ const BookPackage: React.FC = () => {
                     </div>
                   )}
                 </div>
+
+                {/* Signature & Terms Section */}
+                <div className="space-y-4 mt-6 border-t pt-6">
+                  <h3 className="text-lg font-semibold">Signature & Agreement</h3>
+
+                  <SignatureCapture
+                    onSignatureChange={(base64) => {
+                      setSignatureImage(base64);
+                      if (base64) {
+                        setSignatureTermsErrors((prev) => ({ ...prev, signature: '' }));
+                      }
+                    }}
+                    required={true}
+                    error={signatureTermsErrors.signature}
+                  />
+
+                  <TermsAndConditionsCheckbox
+                    checked={termsAccepted}
+                    onChange={(checked) => {
+                      setTermsAccepted(checked);
+                      if (checked) {
+                        setSignatureTermsErrors((prev) => ({ ...prev, terms: '' }));
+                      }
+                    }}
+                    required={true}
+                    error={signatureTermsErrors.terms}
+                  />
+                </div>
                 
                 <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center pt-6 gap-3">
                   <StandardButton 
@@ -2388,8 +2457,8 @@ const BookPackage: React.FC = () => {
           </div>
         </div>
         
-        {/* Right: Order Summary */}
-        <div className="w-full md:w-80 flex-shrink-0">
+        {/* Right: Order Summary - Hidden on mobile */}
+        <div className="w-full md:w-80 flex-shrink-0 hidden md:block">
             <div className="bg-white rounded-xl shadow-sm p-4 md:p-6 sticky top-6 border border-gray-100">
               <h3 className="font-semibold text-base md:text-lg mb-4 md:mb-5 text-gray-800 border-b pb-3 md:pb-4">Order Summary</h3>
               {/* Package Image in Order Summary */}
@@ -2576,6 +2645,226 @@ const BookPackage: React.FC = () => {
         </div>
       </div>
     </div>
+
+      {/* Mobile Floating Order Summary Button - only visible on mobile */}
+      <button
+        onClick={() => setShowMobileOrderSummary(true)}
+        className="fixed top-4 left-4 z-40 md:hidden bg-blue-800 text-white px-3 py-2.5 rounded-full shadow-lg flex items-center gap-2 hover:bg-blue-900 active:scale-95 transition-all duration-200"
+        aria-label="View Order Summary"
+      >
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+        </svg>
+        <span className="text-sm font-medium">${total.toFixed(2)}</span>
+      </button>
+
+      {/* Mobile Order Summary Popup */}
+      {showMobileOrderSummary && (
+        <div className="fixed inset-0 z-50 md:hidden">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/50 animate-mobile-summary-fade-in"
+            onClick={() => setShowMobileOrderSummary(false)}
+          />
+          {/* Slide-in Panel */}
+          <div className="absolute top-0 left-0 h-full w-[85vw] max-w-sm bg-white shadow-2xl animate-mobile-summary-slide-in overflow-y-auto">
+            {/* Header */}
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between z-10">
+              <h3 className="font-semibold text-lg text-gray-800">Order Summary</h3>
+              <button
+                onClick={() => setShowMobileOrderSummary(false)}
+                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors"
+                aria-label="Close order summary"
+              >
+                <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Order Summary Content - same as sidebar */}
+            <div className="p-4">
+              {/* Package Image */}
+              {pkg.image && (
+                <div className="mb-4 w-full flex justify-center">
+                  <img src={getImageUrl(pkg.image)} alt={pkg.name} className="max-h-32 rounded-lg object-contain border border-gray-200" />
+                </div>
+              )}
+              <div className="mb-5">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-gray-600 text-sm">Package:</span>
+                  <span className="font-medium text-gray-800 text-sm">{pkg.name}</span>
+                </div>
+                <div className="text-xs text-gray-500 mb-4">{participants} participants</div>
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-gray-600 text-sm">Duration:</span>
+                  <span className="font-medium text-gray-800 text-sm">{formatDuration()}</span>
+                </div>
+                {selectedDate && (
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-gray-600 text-sm">Date:</span>
+                    <span className="font-medium text-gray-800 text-sm">
+                      {parseLocalDate(selectedDate).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                    </span>
+                  </div>
+                )}
+                {selectedTime && (
+                  <div className="flex justify-between items-center mb-4">
+                    <span className="text-gray-600 text-sm">Time:</span>
+                    <span className="font-medium text-gray-800 text-sm">{formatTimeTo12Hour(selectedTime)}</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-3 border-t pt-4 text-sm">
+                {/* Base Package */}
+                <div className="bg-blue-50 rounded-lg p-3">
+                  <div className="flex justify-between items-start mb-1">
+                    <span className="font-semibold text-gray-800">Base Package</span>
+                    <span className="font-bold text-gray-900">${Number(pkg.price).toFixed(2)}</span>
+                  </div>
+                  <p className="text-xs text-gray-600">{pkg.name}</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Includes up to {pkg.min_participants || 1} participant{(pkg.min_participants || 1) > 1 ? 's' : ''}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    Duration: {formatDuration()}
+                  </p>
+                </div>
+
+                {/* Additional Participants */}
+                {participants > (pkg.min_participants || 1) && pkg.price_per_additional && Number(pkg.price_per_additional) > 0 && (
+                  <div className="bg-gray-50 rounded-lg p-3">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <span className="font-medium text-gray-800">Additional Participants</span>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Base covers {pkg.min_participants || 1}, you have {participants} total
+                        </p>
+                        <p className="text-xs text-gray-600 mt-0.5">
+                          {participants - (pkg.min_participants || 1)} extra × ${Number(pkg.price_per_additional).toFixed(2)}/person
+                        </p>
+                      </div>
+                      <span className="font-semibold text-gray-900">
+                        +${((participants - (pkg.min_participants || 1)) * Number(pkg.price_per_additional)).toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Participant Count */}
+                <div className="flex justify-between items-center text-xs py-2 px-1 border-b border-gray-200">
+                  <span className="text-gray-600">Total Participants</span>
+                  <span className="font-semibold text-gray-800">{participants} people</span>
+                </div>
+
+                {/* Attractions */}
+                {Object.entries(selectedAttractions).some(([, qty]) => qty > 0) && (
+                  <div className="pt-2">
+                    <div className="font-semibold text-gray-800 mb-2 text-xs uppercase tracking-wide">Attractions</div>
+                    {Object.entries(selectedAttractions).filter(([, qty]) => qty > 0).map(([idStr, qty]) => {
+                      const id = Number(idStr);
+                      const attraction = pkg.attractions.find((a) => a.id === id);
+                      if (!attraction) return null;
+                      const price = Number(attraction.price);
+                      const isPerPerson = (attraction as any).pricing_type === 'per_person';
+                      const lineTotal = price * qty * (isPerPerson ? participants : 1);
+                      return (
+                        <div key={id} className="bg-gray-50 rounded p-2 mb-1">
+                          <div className="flex justify-between text-xs">
+                            <span className="font-medium text-gray-700">{attraction.name}</span>
+                            <span className="font-semibold text-gray-800">+${lineTotal.toFixed(2)}</span>
+                          </div>
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            {qty} × ${price.toFixed(2)}{isPerPerson ? ` × ${participants} people` : '/unit'}
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Room Info */}
+                <div className="flex justify-between text-xs text-gray-500 py-1 border-b border-gray-100">
+                  <span>Room Assignment</span>
+                  <span className="text-gray-600">Auto-assigned at booking</span>
+                </div>
+
+                {/* Add-ons */}
+                {Object.entries(selectedAddOns).some(([, qty]) => qty > 0) && (
+                  <div className="pt-2">
+                    <div className="font-semibold text-gray-800 mb-2 text-xs uppercase tracking-wide">Add-ons</div>
+                    {Object.entries(selectedAddOns).filter(([, qty]) => qty > 0).map(([idStr, qty]) => {
+                      const id = Number(idStr);
+                      const addOn = pkg.add_ons.find((a) => a.id === id);
+                      if (!addOn) return null;
+                      const price = Number(addOn.price);
+                      return (
+                        <div key={id} className="bg-gray-50 rounded p-2 mb-1">
+                          <div className="flex justify-between text-xs">
+                            <span className="font-medium text-gray-700">{addOn.name}</span>
+                            <span className="font-semibold text-gray-800">+${(price * qty).toFixed(2)}</span>
+                          </div>
+                          <p className="text-xs text-gray-500 mt-0.5">{qty} × ${price.toFixed(2)}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {appliedPromo && (
+                  <div className="flex justify-between text-blue-800">
+                    <span>Promo Discount</span>
+                    <span>-${promoDiscount.toFixed(2)}</span>
+                  </div>
+                )}
+
+                {appliedGiftCard && (
+                  <div className="flex justify-between text-blue-800">
+                    <span>Gift Card</span>
+                    <span>-${giftCardDiscount.toFixed(2)}</span>
+                  </div>
+                )}
+
+                {/* Fee breakdown */}
+                <div className="flex justify-between text-xs text-gray-500 pt-2">
+                  <span>Subtotal (before fee)</span>
+                  <span>${priceBeforeFee.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-xs text-gray-500">
+                  <span>Processing Fee (4.87%)</span>
+                  <span>${includedFee.toFixed(2)}</span>
+                </div>
+
+                <div className="flex justify-between pt-3 border-t font-semibold text-base">
+                  <span>Total</span>
+                  <span className="text-blue-800">${total.toFixed(2)}</span>
+                </div>
+
+                {/* Package Notes */}
+                {pkg.customer_notes && (
+                  <p className="mt-3 text-xs text-gray-500 whitespace-pre-wrap">{pkg.customer_notes}</p>
+                )}
+
+                {/* Global Notes */}
+                {globalNotes.length > 0 && (
+                  <div className="mt-2 space-y-1">
+                    {globalNotes.map((note) => (
+                      <p key={note.id} className="text-xs text-gray-500 whitespace-pre-wrap">
+                        {note.title ? `${note.title}: ` : ''}{note.content}
+                      </p>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-6 text-xs text-gray-500 text-center border-t pt-4">
+                Your booking will be confirmed immediately after payment
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };

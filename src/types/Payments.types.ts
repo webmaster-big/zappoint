@@ -36,6 +36,9 @@ export interface PaymentsPagePayment {
   bookingTime?: string;
   participants?: number;
   guestName?: string;
+  // Signature & Terms
+  signature_image?: string | null;
+  terms_accepted?: boolean | null;
 }
 
 /**

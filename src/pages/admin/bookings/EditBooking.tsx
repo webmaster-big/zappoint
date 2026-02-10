@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Calendar, Package, User, Home, AlertCircle, ArrowLeft, Bell, BellOff, Save } from 'lucide-react';
 import StandardButton from '../../../components/ui/StandardButton';
@@ -10,6 +10,26 @@ import type { Package as PackageType } from '../../../services/PackageService';
 import roomService from '../../../services/RoomService';
 import { roomCacheService } from '../../../services/RoomCacheService';
 import { packageCacheService } from '../../../services/PackageCacheService';
+import timeSlotService, { type TimeSlot } from '../../../services/timeSlotService';
+import { dayOffService, type DayOff } from '../../../services/DayOffService';
+import DatePicker from '../../../components/ui/DatePicker';
+import { formatTimeTo12Hour } from '../../../utils/storage';
+
+// Helper function to parse ISO date string (YYYY-MM-DD) in local timezone
+const parseLocalDate = (isoDateString: string): Date => {
+  const [year, month, day] = isoDateString.split('-').map(Number);
+  return new Date(year, month - 1, day);
+};
+
+// Interface for day offs with time info for partial closures
+interface DayOffWithTime {
+  date: Date;
+  time_start?: string | null;
+  time_end?: string | null;
+  reason?: string;
+  package_ids?: number[] | null;
+  room_ids?: number[] | null;
+}
 
 const EditBooking: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
@@ -42,6 +62,13 @@ const EditBooking: React.FC = () => {
     guestOfHonorAge: '',
     guestOfHonorGender: '',
   });
+
+  // Date/time slot selection state
+  const [availableDates, setAvailableDates] = useState<Date[]>([]);
+  const [availableTimeSlots, setAvailableTimeSlots] = useState<TimeSlot[]>([]);
+  const [loadingTimeSlots, setLoadingTimeSlots] = useState(false);
+  const [dayOffs, setDayOffs] = useState<Date[]>([]);
+  const [dayOffsWithTime, setDayOffsWithTime] = useState<DayOffWithTime[]>([]);
 
   // Load booking data and package details - try cache first for faster load
   useEffect(() => {
@@ -194,7 +221,8 @@ const EditBooking: React.FC = () => {
 
   // Handle package change
   const handlePackageChange = async (packageId: number) => {
-    setFormData(prev => ({ ...prev, packageId }));
+    setFormData(prev => ({ ...prev, packageId, date: '', time: '' }));
+    setAvailableTimeSlots([]);
     
     try {
       // Try to find in cached packages first (already loaded in availablePackages)
@@ -213,6 +241,264 @@ const EditBooking: React.FC = () => {
       console.error('Error loading package:', error);
     }
   };
+
+  // Fetch day offs for the package's location
+  useEffect(() => {
+    const fetchDayOffs = async () => {
+      if (!packageDetails?.location_id) return;
+
+      try {
+        const response = await dayOffService.getDayOffsByLocation(packageDetails.location_id);
+        if (response.success && response.data) {
+          const allDayOffs: DayOffWithTime[] = [];
+          const today = new Date();
+
+          response.data.forEach((dayOff: DayOff) => {
+            const offDate = new Date(dayOff.date);
+            const hasTimeRestriction = dayOff.time_start || dayOff.time_end;
+
+            const dayOffData = {
+              time_start: hasTimeRestriction ? dayOff.time_start : null,
+              time_end: hasTimeRestriction ? dayOff.time_end : null,
+              reason: dayOff.reason,
+              package_ids: dayOff.package_ids || null,
+              room_ids: dayOff.room_ids || null
+            };
+
+            if (dayOff.is_recurring) {
+              const currentYearDate = new Date(today.getFullYear(), offDate.getMonth(), offDate.getDate());
+              const nextYearDate = new Date(today.getFullYear() + 1, offDate.getMonth(), offDate.getDate());
+              if (currentYearDate >= today) {
+                allDayOffs.push({ ...dayOffData, date: currentYearDate });
+              }
+              allDayOffs.push({ ...dayOffData, date: nextYearDate });
+            } else {
+              if (offDate >= today) {
+                allDayOffs.push({ ...dayOffData, date: offDate });
+              }
+            }
+          });
+
+          const fullDayOffDates = allDayOffs
+            .filter(d => !d.time_start && !d.time_end && !d.package_ids && !d.room_ids)
+            .map(d => d.date);
+
+          const partialOrSpecificDayOffs = allDayOffs.filter(d =>
+            d.time_start || d.time_end || d.package_ids || d.room_ids
+          );
+
+          setDayOffs(fullDayOffDates);
+          setDayOffsWithTime(partialOrSpecificDayOffs);
+        }
+      } catch {
+        // Error fetching day offs - calendar will work without day off restrictions
+      }
+    };
+
+    fetchDayOffs();
+  }, [packageDetails?.location_id]);
+
+  // Helper: check if a time slot conflicts with a partial day off
+  const isTimeSlotRestricted = (slotStartTime: string, slotEndTime: string): boolean => {
+    if (!formData.date || dayOffsWithTime.length === 0 || !packageDetails) return false;
+
+    const selectedDateObj = parseLocalDate(formData.date);
+    const partialDayOff = dayOffsWithTime.find(dayOff => {
+      if (dayOff.date.getFullYear() !== selectedDateObj.getFullYear() ||
+          dayOff.date.getMonth() !== selectedDateObj.getMonth() ||
+          dayOff.date.getDate() !== selectedDateObj.getDate()) {
+        return false;
+      }
+      if (dayOff.package_ids && dayOff.package_ids.length > 0) {
+        if (!dayOff.package_ids.includes(packageDetails.id)) return false;
+      }
+      return true;
+    });
+
+    if (!partialDayOff) return false;
+
+    const toMinutes = (timeStr: string): number => {
+      const [hours, minutes] = timeStr.split(':').map(Number);
+      return hours * 60 + minutes;
+    };
+
+    const slotStart = toMinutes(slotStartTime);
+    const slotEnd = toMinutes(slotEndTime);
+
+    if (partialDayOff.time_start) {
+      const closesAt = toMinutes(partialDayOff.time_start);
+      if (slotStart >= closesAt) return true;
+      if (slotEnd > closesAt) return true;
+    }
+    if (partialDayOff.time_end) {
+      const opensAt = toMinutes(partialDayOff.time_end);
+      if (slotStart < opensAt) return true;
+    }
+    return false;
+  };
+
+  // Helper: check if a day off applies to the selected package
+  const dayOffAppliesToPackage = (dayOff: { package_ids?: number[] | null }, packageId: number): boolean => {
+    if (!dayOff.package_ids || dayOff.package_ids.length === 0) return true;
+    return dayOff.package_ids.includes(packageId);
+  };
+
+  // Filtered day offs for the current package
+  const filteredDayOffsWithTime = useMemo(() => {
+    if (!packageDetails) return dayOffsWithTime;
+    return dayOffsWithTime.filter(d => dayOffAppliesToPackage(d, packageDetails.id));
+  }, [dayOffsWithTime, packageDetails]);
+
+  // Filter available time slots based on partial day offs and min booking notice hours
+  const filteredTimeSlots = availableTimeSlots.filter(slot => {
+    if (isTimeSlotRestricted(slot.start_time, slot.end_time)) return false;
+
+    const noticeHoursValue = Number(packageDetails?.min_booking_notice_hours) || 0;
+    if (noticeHoursValue > 0 && formData.date) {
+      const now = new Date();
+      const noticeMs = noticeHoursValue * 60 * 60 * 1000;
+      const earliestBookableTime = new Date(now.getTime() + noticeMs);
+
+      const [slotHours, slotMinutes] = slot.start_time.split(':').map(Number);
+      const slotDate = parseLocalDate(formData.date);
+      slotDate.setHours(slotHours, slotMinutes, 0, 0);
+
+      if (slotDate < earliestBookableTime) return false;
+    }
+
+    return true;
+  });
+
+  // Helper: get week of month (1-5)
+  const getWeekOfMonth = (date: Date): number => {
+    const firstDayOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
+    const dayOfMonth = date.getDate();
+    const firstDayWeekday = firstDayOfMonth.getDay();
+    return Math.ceil((dayOfMonth + firstDayWeekday) / 7);
+  };
+
+  // Helper: check if date is in last week of month
+  const isLastWeekOfMonth = (date: Date): boolean => {
+    const lastDayOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+    const daysUntilEndOfMonth = lastDayOfMonth.getDate() - date.getDate();
+    return daysUntilEndOfMonth < 7;
+  };
+
+  // Calculate available dates based on package availability schedules
+  useEffect(() => {
+    if (!packageDetails) return;
+
+    const today = new Date();
+    const dates: Date[] = [];
+
+    const packageWindow = packageDetails.booking_window_days;
+    const locationWindow = packageDetails.location?.booking_window_days;
+    const bookingWindowDays = packageWindow ?? locationWindow ?? null;
+    const maxDays = bookingWindowDays === null ? 730 : Math.max(1, bookingWindowDays);
+
+    const noticeHours = Number(packageDetails.min_booking_notice_hours) || 0;
+    const earliestBookableTime = new Date(today.getTime() + noticeHours * 60 * 60 * 1000);
+    const earliestBookableDate = new Date(earliestBookableTime.getFullYear(), earliestBookableTime.getMonth(), earliestBookableTime.getDate());
+
+    for (let i = 0; i < maxDays; i++) {
+      const date = new Date();
+      date.setDate(today.getDate() + i);
+
+      const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+      if (dateOnly < earliestBookableDate) continue;
+
+      let isAvailable = false;
+
+      if (packageDetails.availability_schedules && packageDetails.availability_schedules.length > 0) {
+        for (const schedule of packageDetails.availability_schedules) {
+          if (!schedule.is_active) continue;
+
+          if (schedule.availability_type === "daily") {
+            isAvailable = true;
+            break;
+          } else if (schedule.availability_type === "weekly") {
+            const dayName = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][date.getDay()];
+            if (schedule.day_configuration && schedule.day_configuration.includes(dayName)) {
+              isAvailable = true;
+              break;
+            }
+          } else if (schedule.availability_type === "monthly") {
+            const dayName = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][date.getDay()];
+            const weekOfMonth = getWeekOfMonth(date);
+            const isInLastWeek = isLastWeekOfMonth(date);
+
+            if (schedule.day_configuration) {
+              for (const pattern of schedule.day_configuration) {
+                const [day, week] = pattern.split('-');
+                if (day === dayName) {
+                  if ((week === 'last' && isInLastWeek) ||
+                      (week === 'first' && weekOfMonth === 1) ||
+                      (week === 'second' && weekOfMonth === 2) ||
+                      (week === 'third' && weekOfMonth === 3) ||
+                      (week === 'fourth' && weekOfMonth === 4)) {
+                    isAvailable = true;
+                    break;
+                  }
+                }
+              }
+            }
+          }
+
+          if (isAvailable) break;
+        }
+      }
+
+      if (isAvailable) {
+        dates.push(date);
+      }
+    }
+
+    // Also include the booking's current date if it's not already in the list
+    // This ensures staff can keep the existing date even if it's in the past
+    if (formData.date) {
+      const currentDate = parseLocalDate(formData.date);
+      const alreadyIncluded = dates.some(d => d.toDateString() === currentDate.toDateString());
+      if (!alreadyIncluded) {
+        dates.unshift(currentDate);
+      }
+    }
+
+    setAvailableDates(dates);
+  }, [packageDetails, formData.date]);
+
+  // Fetch available time slots via SSE when date changes
+  useEffect(() => {
+    if (!packageDetails || !formData.date) {
+      setAvailableTimeSlots([]);
+      return;
+    }
+
+    setLoadingTimeSlots(true);
+
+    const eventSource = timeSlotService.getAvailableSlotsSSE({
+      package_id: packageDetails.id,
+      date: formData.date,
+    });
+
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        setAvailableTimeSlots(data.available_slots);
+        setLoadingTimeSlots(false);
+      } catch {
+        // SSE parsing error
+      }
+    };
+
+    eventSource.onerror = () => {
+      setLoadingTimeSlots(false);
+      eventSource.close();
+    };
+
+    return () => {
+      eventSource.close();
+    };
+  }, [formData.date, packageDetails]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -448,9 +734,21 @@ const EditBooking: React.FC = () => {
                 <Calendar className={`w-5 h-5 text-${themeColor}-600`} /> Booking Details
               </h3>
               <div className="space-y-5">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block font-semibold mb-2 text-base text-neutral-800">Date</label>
+                {/* Date Selection via DatePicker */}
+                <div>
+                  <label className="block font-semibold mb-2 text-base text-neutral-800">Date</label>
+                  {packageDetails?.availability_schedules && packageDetails.availability_schedules.length > 0 ? (
+                    <DatePicker
+                      selectedDate={formData.date}
+                      availableDates={availableDates}
+                      onChange={(date) => {
+                        setFormData(prev => ({ ...prev, date, time: '' }));
+                        setAvailableTimeSlots([]);
+                      }}
+                      dayOffs={dayOffs}
+                      dayOffsWithTime={filteredDayOffsWithTime}
+                    />
+                  ) : (
                     <input
                       type="date"
                       name="date"
@@ -459,20 +757,60 @@ const EditBooking: React.FC = () => {
                       onChange={handleInputChange}
                       className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all`}
                     />
-                  </div>
-                  <div>
-                    <label className="block font-semibold mb-2 text-base text-neutral-800">
-                      Time
-                    </label>
-                    <input
-                      type="time"
-                      name="time"
-                      required
-                      value={formData.time}
-                      onChange={handleInputChange}
-                      className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all`}
-                    />
-                  </div>
+                  )}
+                </div>
+
+                {/* Time Slot Selection */}
+                <div>
+                  <label className="block font-semibold mb-2 text-base text-neutral-800">Time</label>
+                  {!formData.date ? (
+                    <p className="text-sm text-gray-400 py-2">Select a date first to see available times.</p>
+                  ) : loadingTimeSlots ? (
+                    <div className="flex items-center justify-center p-4">
+                      <div className={`animate-spin rounded-full h-6 w-6 border-b-2 border-${fullColor}`}></div>
+                      <span className="ml-2 text-sm text-gray-600">Loading available times...</span>
+                    </div>
+                  ) : filteredTimeSlots.length > 0 ? (
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                      {filteredTimeSlots.map((slot) => (
+                        <label
+                          key={slot.start_time}
+                          className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition ${
+                            formData.time === slot.start_time
+                              ? `border-${themeColor}-600 bg-${themeColor}-50`
+                              : 'border-gray-300 bg-white hover:border-gray-400'
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="timeSelection"
+                            value={slot.start_time}
+                            checked={formData.time === slot.start_time}
+                            onChange={() => {
+                              setFormData(prev => ({
+                                ...prev,
+                                time: slot.start_time,
+                                roomId: slot.room_id || prev.roomId,
+                              }));
+                            }}
+                            className={`accent-${themeColor}-600`}
+                          />
+                          <div className="flex flex-col">
+                            <span className="text-sm text-gray-800">{formatTimeTo12Hour(slot.start_time)}</span>
+                            <span className="text-xs text-gray-500">{formatTimeTo12Hour(slot.end_time)}</span>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-400 py-2">No available times for the selected date.</p>
+                  )}
+                  {/* Show currently selected time for clarity */}
+                  {formData.time && (
+                    <p className="text-xs text-gray-500 mt-2">
+                      Selected: <span className="font-medium text-gray-700">{formatTimeTo12Hour(formData.time)}</span>
+                    </p>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

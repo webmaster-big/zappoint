@@ -232,7 +232,7 @@ const CustomerReservations = () => {
             </div>
             <div style="text-align: right;">
               <div style="font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;">Issue Date</div>
-              <div style="font-size: 14px; font-weight: 600; color: #1e293b; margin-top: 2px;">${new Date(booking.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
+              <div style="font-size: 14px; font-weight: 600; color: #1e293b; margin-top: 2px;">${new Date(booking.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })} at ${new Date(booking.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</div>
             </div>
           </div>
         </div>
@@ -590,7 +590,7 @@ const CustomerReservations = () => {
                               </div>
                               <div className="flex justify-between">
                                 <span className="text-gray-600">Booked On:</span>
-                                <span className="font-medium">{new Date(booking.created_at).toLocaleDateString()}</span>
+                                <span className="font-medium">{new Date(booking.created_at).toLocaleDateString()} {new Date(booking.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
                               </div>
                               <div className="flex justify-between">
                                 <span className="text-gray-600">Payment Status:</span>

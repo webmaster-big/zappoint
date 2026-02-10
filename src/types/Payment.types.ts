@@ -21,12 +21,6 @@ export interface PaymentChargeRequest {
   amount: number;
   order_id?: string;
   customer_id?: number;
-  // New polymorphic fields
-  payable_id?: number;
-  payable_type?: PaymentPayableType;
-  // Backward compatibility (will be converted to payable_id/payable_type on backend)
-  booking_id?: number;
-  attraction_purchase_id?: number;
   description?: string;
   customer?: {
     first_name?: string;
@@ -39,6 +33,33 @@ export interface PaymentChargeRequest {
     state?: string;
     zip?: string;
     country?: string;
+  };
+  // Signature & Terms fields
+  signature_image?: string; // base64 data URI of customer signature
+  terms_accepted?: boolean; // Whether customer accepted Terms & Conditions
+}
+
+/**
+ * Request to link a payment to a booking or attraction purchase
+ * Used after charge-then-link flow: charge first, create entity, then link
+ */
+export interface LinkPayableRequest {
+  payable_id: number;
+  payable_type: PaymentPayableType;
+}
+
+/**
+ * Response from linking a payment to a payable entity
+ */
+export interface LinkPayableResponse {
+  success: boolean;
+  message: string;
+  data: Payment;
+  payable?: {
+    id: number;
+    amount_paid: number;
+    total_amount: number;
+    status: string;
   };
 }
 
@@ -130,6 +151,9 @@ export interface Payment {
   } | null;
   // Computed payable details (when loaded)
   payable?: PaymentBooking | PaymentAttractionPurchase | null;
+  // Signature & Terms
+  signature_image?: string | null;
+  terms_accepted?: boolean | null;
 }
 
 export interface CreatePaymentRequest {
@@ -147,6 +171,9 @@ export interface CreatePaymentRequest {
   notes?: string;
   payment_id?: string;
   location_id?: number;
+  // Signature & Terms fields
+  signature_image?: string; // base64 data URI of customer signature
+  terms_accepted?: boolean; // Whether customer accepted Terms & Conditions
 }
 
 /**

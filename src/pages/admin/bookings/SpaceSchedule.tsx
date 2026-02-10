@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Calendar, ChevronLeft, ChevronRight, Clock, Users, Package as PackageIcon, X, Coffee, Info, Loader2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Calendar, ChevronLeft, ChevronRight, Clock, Users, Package as PackageIcon, X, Coffee, Info, Loader2, Eye, Edit, LogIn, CheckCircle, FileText, Save, DollarSign } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import bookingService from '../../../services/bookingService';
 import { bookingCacheService } from '../../../services/BookingCacheService';
+import { createPayment, PAYMENT_TYPE } from '../../../services/PaymentService';
 import { roomService, type BreakTime } from '../../../services/RoomService';
 import { roomCacheService } from '../../../services/RoomCacheService';
 import { getStoredUser } from '../../../utils/storage';
@@ -42,6 +44,20 @@ const SpaceSchedule = () => {
   const [showCalendar, setShowCalendar] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState(new Date());
   const spacesLoadedRef = useRef(false); // Track if spaces have been loaded
+
+  // Quick action states for booking detail modal
+  const [checkInLoading, setCheckInLoading] = useState(false);
+  const [showCheckInConfirm, setShowCheckInConfirm] = useState(false);
+  const [editingNotes, setEditingNotes] = useState(false);
+  const [tempNotes, setTempNotes] = useState('');
+  const [savingNotes, setSavingNotes] = useState(false);
+
+  // Payment modal states
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentAmount, setPaymentAmount] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<'card' | 'in-store'>('in-store');
+  const [paymentNotes, setPaymentNotes] = useState('');
+  const [processingPayment, setProcessingPayment] = useState(false);
 
   // Memoize time slots to avoid regenerating on every render
   const timeSlots = useMemo(() => {
@@ -468,6 +484,71 @@ const SpaceSchedule = () => {
       </div>
     );
   }
+
+  // Payment modal handlers
+  const handleOpenPaymentModal = () => {
+    if (!selectedBooking) return;
+    const remainingAmount = Math.max(0, Number(selectedBooking.total_amount || 0) - Number(selectedBooking.amount_paid || 0));
+    setPaymentAmount((Math.floor(remainingAmount * 100) / 100).toFixed(2));
+    setPaymentMethod('in-store');
+    setPaymentNotes('');
+    setShowPaymentModal(true);
+  };
+
+  const handleClosePaymentModal = () => {
+    setShowPaymentModal(false);
+    setPaymentAmount('');
+    setPaymentMethod('in-store');
+    setPaymentNotes('');
+  };
+
+  const handleSubmitPayment = async () => {
+    if (!selectedBooking) return;
+    const amount = parseFloat(paymentAmount);
+    if (isNaN(amount) || amount <= 0) return;
+
+    const remainingAmount = Math.round((Number(selectedBooking.total_amount || 0) - Number(selectedBooking.amount_paid || 0)) * 100) / 100;
+    if (Math.round(amount * 100) / 100 > remainingAmount + 0.01) return;
+
+    try {
+      setProcessingPayment(true);
+      const bookingResponse = await bookingService.getBookingById(selectedBooking.id);
+      if (!bookingResponse.success || !bookingResponse.data) throw new Error('Failed to get booking details');
+
+      const booking = bookingResponse.data;
+      await createPayment({
+        payable_id: selectedBooking.id,
+        payable_type: PAYMENT_TYPE.BOOKING,
+        customer_id: booking.customer_id || null,
+        location_id: booking.location_id,
+        amount,
+        currency: 'USD',
+        method: paymentMethod === 'in-store' ? 'cash' : paymentMethod,
+        status: 'completed',
+        notes: paymentNotes || `In-store payment for booking ${selectedBooking.reference_number}`,
+      });
+
+      const newAmountPaid = Number(selectedBooking.amount_paid || 0) + amount;
+      const newPaymentStatus = newAmountPaid >= Number(selectedBooking.total_amount) ? 'paid' : 'partial';
+      const updateResponse = await bookingService.updateBooking(selectedBooking.id, {
+        amount_paid: newAmountPaid,
+        payment_status: newPaymentStatus,
+        status: 'confirmed',
+      });
+
+      if (updateResponse.success && updateResponse.data) {
+        await bookingCacheService.updateBookingInCache(updateResponse.data);
+      }
+
+      setSelectedBooking({ ...selectedBooking, amount_paid: newAmountPaid, payment_status: newPaymentStatus } as Booking);
+      setBookings(prev => prev.map(b => b.id === selectedBooking.id ? { ...b, amount_paid: newAmountPaid, payment_status: newPaymentStatus } as Booking : b));
+      handleClosePaymentModal();
+    } catch (error) {
+      console.error('Error processing payment:', error);
+    } finally {
+      setProcessingPayment(false);
+    }
+  };
 
   return (
     <div className="p-6">
@@ -1067,16 +1148,219 @@ const SpaceSchedule = () => {
                 </div>
               </div>
 
-              {/* Footer Buttons */}
-              <div className="mt-6 pt-4 border-t border-gray-200">
+              {/* Internal Notes */}
+              <div className="mb-6">
+                <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3 flex items-center gap-2">
+                  <FileText size={14} /> Internal Notes
+                </h4>
+                <div className="bg-gray-50 rounded-lg p-4">
+                  {editingNotes ? (
+                    <div className="space-y-3">
+                      <textarea
+                        value={tempNotes}
+                        onChange={(e) => setTempNotes(e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                        rows={3}
+                        placeholder="Add internal notes..."
+                      />
+                      <div className="flex gap-2 justify-end">
+                        <StandardButton
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => { setEditingNotes(false); setTempNotes((selectedBooking as any).internal_notes || ''); }}
+                        >
+                          Cancel
+                        </StandardButton>
+                        <StandardButton
+                          variant="primary"
+                          size="sm"
+                          icon={savingNotes ? Loader2 : Save}
+                          disabled={savingNotes}
+                          onClick={async () => {
+                            setSavingNotes(true);
+                            try {
+                              await bookingService.updateInternalNotes(selectedBooking.id, tempNotes);
+                              setSelectedBooking({ ...selectedBooking, internal_notes: tempNotes } as any);
+                              setBookings(prev => prev.map(b => b.id === selectedBooking.id ? { ...b, internal_notes: tempNotes } as any : b));
+                              setEditingNotes(false);
+                            } catch (err) {
+                              console.error('Failed to save notes:', err);
+                            } finally {
+                              setSavingNotes(false);
+                            }
+                          }}
+                        >
+                          {savingNotes ? 'Saving...' : 'Save'}
+                        </StandardButton>
+                      </div>
+                    </div>
+                  ) : (
+                    <div
+                      className="cursor-pointer hover:bg-gray-100 rounded p-2 -m-2 transition-colors"
+                      onClick={() => { setTempNotes((selectedBooking as any).internal_notes || ''); setEditingNotes(true); }}
+                    >
+                      {(selectedBooking as any).internal_notes ? (
+                        <p className="text-sm text-gray-900 whitespace-pre-wrap">{(selectedBooking as any).internal_notes}</p>
+                      ) : (
+                        <p className="text-sm text-gray-400 italic">Click to add internal notes...</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="mt-6 pt-4 border-t border-gray-200 space-y-2">
+                <div className="flex gap-2">
+                  <Link
+                    to={`/bookings/${selectedBooking.id}`}
+                    className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                    onClick={() => { setSelectedBooking(null); setEditingNotes(false); }}
+                  >
+                    <Eye size={15} />
+                    View
+                  </Link>
+                  <Link
+                    to={`/bookings/edit/${selectedBooking.id}`}
+                    className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                    onClick={() => { setSelectedBooking(null); setEditingNotes(false); }}
+                  >
+                    <Edit size={15} />
+                    Edit
+                  </Link>
+                  {selectedBooking.status !== 'checked-in' && selectedBooking.status !== 'completed' && selectedBooking.status !== 'cancelled' && selectedBooking.payment_status === 'paid' && (
+                    !showCheckInConfirm ? (
+                      <button
+                        onClick={() => setShowCheckInConfirm(true)}
+                        className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-emerald-700 bg-white border border-emerald-300 rounded-lg hover:bg-emerald-50 transition-colors"
+                      >
+                        <LogIn size={15} />
+                        Check In
+                      </button>
+                    ) : null
+                  )}
+                  {selectedBooking.status !== 'checked-in' && selectedBooking.status !== 'completed' && selectedBooking.status !== 'cancelled' && selectedBooking.payment_status !== 'paid' && (
+                    <button
+                      onClick={handleOpenPaymentModal}
+                      className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-amber-700 bg-white border border-amber-300 rounded-lg hover:bg-amber-50 transition-colors"
+                    >
+                      <DollarSign size={15} />
+                      Process Payment
+                    </button>
+                  )}
+                  {selectedBooking.status === 'checked-in' && (
+                    <div className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg">
+                      <CheckCircle size={15} />
+                      Checked In
+                    </div>
+                  )}
+                </div>
+
+                {/* Check In Confirmation */}
+                {showCheckInConfirm && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                    <p className="text-sm text-amber-800 font-medium mb-2">Confirm check-in for this party?</p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setShowCheckInConfirm(false)}
+                        className="flex-1 px-3 py-2 text-sm font-medium rounded-lg bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        disabled={checkInLoading}
+                        onClick={async () => {
+                          setCheckInLoading(true);
+                          try {
+                            await bookingService.checkInBooking(selectedBooking.reference_number);
+                            setSelectedBooking({ ...selectedBooking, status: 'checked-in' } as any);
+                            setBookings(prev => prev.map(b => b.id === selectedBooking.id ? { ...b, status: 'checked-in' } as any : b));
+                            setShowCheckInConfirm(false);
+                          } catch (err) {
+                            console.error('Check-in failed:', err);
+                          } finally {
+                            setCheckInLoading(false);
+                          }
+                        }}
+                        className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium rounded-lg bg-emerald-600 text-white hover:bg-emerald-700"
+                      >
+                        {checkInLoading ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
+                        {checkInLoading ? 'Checking in...' : 'Confirm'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 <StandardButton
+                  onClick={() => { setSelectedBooking(null); setEditingNotes(false); setShowCheckInConfirm(false); }}
                   variant="secondary"
-                  onClick={() => setSelectedBooking(null)}
-                  fullWidth
+                  size="md"
+                  className="w-full"
                 >
                   Close
                 </StandardButton>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Payment Modal */}
+      {showPaymentModal && selectedBooking && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={handleClosePaymentModal}>
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
+            <div className={`p-6 border-b border-gray-100 bg-${themeColor}-50`}>
+              <h2 className="text-xl font-bold text-gray-900">Process Payment</h2>
+              <p className="text-sm text-gray-600 mt-1">Booking: {selectedBooking.reference_number}</p>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="bg-gray-50 p-4 rounded-lg space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Total Amount:</span>
+                  <span className="font-semibold">${Number(selectedBooking.total_amount || 0).toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Already Paid:</span>
+                  <span className="font-semibold text-green-600">${Number(selectedBooking.amount_paid || 0).toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-sm pt-2 border-t border-gray-200">
+                  <span className="text-gray-900 font-medium">Remaining Balance:</span>
+                  <span className="font-bold text-red-600">${(Number(selectedBooking.total_amount || 0) - Number(selectedBooking.amount_paid || 0)).toFixed(2)}</span>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Payment Amount *</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+                  <input type="number" step="0.01" min="0.01"
+                    max={(Number(selectedBooking.total_amount || 0) - Number(selectedBooking.amount_paid || 0)).toFixed(2)}
+                    value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)}
+                    className={`w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
+                    placeholder="0.00" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Payment Method *</label>
+                <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as 'card' | 'in-store')}
+                  className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}>
+                  <option value="in-store">In-Store</option>
+                  <option value="card">Card</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Notes (Optional)</label>
+                <textarea value={paymentNotes} onChange={(e) => setPaymentNotes(e.target.value)} rows={3}
+                  className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
+                  placeholder="Add any notes about this payment..." />
+              </div>
+            </div>
+            <div className="p-6 border-t border-gray-100 flex gap-3 justify-end">
+              <StandardButton variant="secondary" onClick={handleClosePaymentModal} disabled={processingPayment}>Cancel</StandardButton>
+              <StandardButton variant="primary" onClick={handleSubmitPayment}
+                disabled={processingPayment || !paymentAmount || parseFloat(paymentAmount) <= 0}
+                loading={processingPayment}>
+                {processingPayment ? 'Processing...' : 'Process Payment'}
+              </StandardButton>
             </div>
           </div>
         </div>

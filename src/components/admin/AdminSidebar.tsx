@@ -47,6 +47,7 @@ import { roomCacheService } from '../../services/RoomCacheService';
 import { packageCacheService } from '../../services/PackageCacheService';
 import { addOnCacheService } from '../../services/AddOnCacheService';
 import { attractionCacheService } from '../../services/AttractionCacheService';
+import { attractionPurchaseCacheService } from '../../services/AttractionPurchaseCacheService';
 
 // Helper function to add descriptions to navigation items
 const addDescriptions = (navItems: NavItem[]): NavItem[] => {
@@ -529,7 +530,8 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
       roomCacheService.clearCache(),
       packageCacheService.clearCache(),
       addOnCacheService.clearCache(),
-      attractionCacheService.clearCache()
+      attractionCacheService.clearCache(),
+      attractionPurchaseCacheService.clearCache()
     ]);
     
     // Clear all possible user data
@@ -641,6 +643,10 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
       
       // Only show toast if count increased
       if (countIncreased) {
+        // Refresh purchase cache in background so management pages get fresh data
+        attractionPurchaseCacheService.syncInBackground();
+        bookingCacheService.syncInBackground();
+
         // Show toast for this new notification
         if (toastTimeoutRef.current) {
           clearTimeout(toastTimeoutRef.current);

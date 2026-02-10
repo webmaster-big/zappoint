@@ -511,7 +511,7 @@ const ViewBooking: React.FC = () => {
                           <p className="text-sm text-gray-600">
                             {payment.method ? payment.method.replace('_', ' ').charAt(0).toUpperCase() + payment.method.slice(1).replace('_', ' ') : 'N/A'}
                             {' • '}
-                            {new Date(payment.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                            {new Date(payment.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} {new Date(payment.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
                           </p>
                           {payment.notes && (
                             <p className="text-xs text-gray-500 mt-1">{payment.notes}</p>

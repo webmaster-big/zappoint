@@ -23,7 +23,11 @@ import {
   Clock,
   Home,
   FileDown,
-  Columns
+  Columns,
+  ArrowUpDown,
+  ChevronUp,
+  ChevronDown,
+  AlertTriangle
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import StandardButton from '../../../components/ui/StandardButton';
@@ -189,6 +193,13 @@ const Bookings: React.FC = () => {
   const [columnOrder, setColumnOrder] = useState<BookingsColumnKey[]>(getDefaultColumnOrder);
   const [draggedColumn, setDraggedColumn] = useState<BookingsColumnKey | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<BookingsColumnKey | null>(null);
+
+  // Column sorting state
+  const [sortColumn, setSortColumn] = useState<BookingsColumnKey | null>(null);
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+
+  // Check-in confirmation state
+  const [showCheckInConfirm, setShowCheckInConfirm] = useState<string | null>(null);
   
   // Drag and drop handlers for column reordering
   const handleDragStart = (e: React.DragEvent, columnKey: BookingsColumnKey) => {
@@ -371,8 +382,8 @@ const Bookings: React.FC = () => {
     },
     {
       title: 'Revenue',
-      value: `$${Number(bookings.reduce((sum, booking) => sum + booking.amountPaid, 0)).toFixed(2)}`,
-      change: 'All bookings',
+      value: `$${Number(bookings.filter(b => b.status !== 'cancelled').reduce((sum, booking) => sum + booking.amountPaid, 0)).toFixed(2)}`,
+      change: `Excludes ${bookings.filter(b => b.status === 'cancelled').length} cancelled`,
       icon: DollarSign,
       accent: `bg-${themeColor}-100 text-${fullColor}`,
     },
@@ -518,6 +529,7 @@ const Bookings: React.FC = () => {
               guestState: booking.guest_state || booking.customer?.state,
               guestZip: booking.guest_zip || booking.customer?.zip,
               guestCountry: booking.guest_country || booking.customer?.country,
+              internal_notes: booking.internal_notes,
             };
           });
           
@@ -604,6 +616,7 @@ const Bookings: React.FC = () => {
             guestState: booking.guest_state || booking.customer?.state,
             guestZip: booking.guest_zip || booking.customer?.zip,
             guestCountry: booking.guest_country || booking.customer?.country,
+              internal_notes: booking.internal_notes,
           };
         });
         console.log('[Bookings] Fetched from API:', transformedBookings.length, 'bookings');
@@ -697,6 +710,7 @@ const Bookings: React.FC = () => {
               referenceNumber: booking.reference_number,
               location: booking.location?.name || 'N/A',
               locationId: booking.location_id,
+              internal_notes: booking.internal_notes,
             };
           });
           
@@ -719,13 +733,23 @@ const Bookings: React.FC = () => {
             result = result.filter(booking => booking.customerId?.toString() === filters.customerId);
           }
           if (filters.dateRange.start) {
-            result = result.filter(booking => booking.date >= filters.dateRange.start);
+            result = result.filter(booking => {
+              const bookingDate = booking.date?.split('T')[0];
+              return bookingDate >= filters.dateRange.start;
+            });
           }
           if (filters.dateRange.end) {
-            result = result.filter(booking => booking.date <= filters.dateRange.end);
+            result = result.filter(booking => {
+              const bookingDate = booking.date?.split('T')[0];
+              return bookingDate <= filters.dateRange.end;
+            });
           }
           
+          // Apply default sort: booking date/time asc, checked-in last
+          result = applyDefaultSort(result);
+          
           setFilteredBookings(result);
+          setCurrentPage(1);
           return;
         }
       } catch (error) {
@@ -776,13 +800,113 @@ const Bookings: React.FC = () => {
 
     // Apply date range filter
     if (filters.dateRange.start) {
-      result = result.filter(booking => booking.date >= filters.dateRange.start);
+      result = result.filter(booking => {
+        const bookingDate = booking.date?.split('T')[0];
+        return bookingDate >= filters.dateRange.start;
+      });
     }
     if (filters.dateRange.end) {
-      result = result.filter(booking => booking.date <= filters.dateRange.end);
+      result = result.filter(booking => {
+        const bookingDate = booking.date?.split('T')[0];
+        return bookingDate <= filters.dateRange.end;
+      });
     }
 
+    // Apply default sort: booking date/time asc, checked-in last
+    result = applyDefaultSort(result);
+
     setFilteredBookings(result);
+    setCurrentPage(1);
+  };
+
+  // Default sort: by booking date/time ascending, with checked-in bookings pushed to the end
+  const applyDefaultSort = (list: BookingsPageBooking[]): BookingsPageBooking[] => {
+    return [...list].sort((a, b) => {
+      // Checked-in bookings always go last regardless of date
+      const isCheckedInA = a.status === 'checked-in';
+      const isCheckedInB = b.status === 'checked-in';
+      if (isCheckedInA && !isCheckedInB) return 1;
+      if (!isCheckedInA && isCheckedInB) return -1;
+
+      // Sort by booking date ascending
+      const dateA = parseLocalDate(a.date);
+      const dateB = parseLocalDate(b.date);
+      dateA.setHours(0, 0, 0, 0);
+      dateB.setHours(0, 0, 0, 0);
+      const dateComparison = dateA.getTime() - dateB.getTime();
+      if (dateComparison !== 0) return dateComparison;
+
+      // If dates equal, sort by time ascending
+      const timeA = (a.time || '00:00').split(':').map(Number);
+      const timeB = (b.time || '00:00').split(':').map(Number);
+      return (timeA[0] * 60 + (timeA[1] || 0)) - (timeB[0] * 60 + (timeB[1] || 0));
+    });
+  };
+
+  // Column sorting handler
+  const handleColumnSort = (columnKey: BookingsColumnKey) => {
+    if (sortColumn === columnKey) {
+      if (sortDirection === 'asc') {
+        setSortDirection('desc');
+      } else {
+        // Third click: reset to default sort
+        setSortColumn(null);
+        setSortDirection('asc');
+      }
+    } else {
+      setSortColumn(columnKey);
+      setSortDirection('asc');
+    }
+  };
+
+  // Apply column sort to filtered bookings (returns sorted copy for display)
+  const getSortedBookings = (list: BookingsPageBooking[]): BookingsPageBooking[] => {
+    if (!sortColumn) return list;
+
+    return [...list].sort((a, b) => {
+      let valA: any;
+      let valB: any;
+      const dir = sortDirection === 'asc' ? 1 : -1;
+
+      switch (sortColumn) {
+        case 'id':
+          return (Number(a.id) - Number(b.id)) * dir;
+        case 'referenceNumber':
+          return (a.referenceNumber || '').localeCompare(b.referenceNumber || '') * dir;
+        case 'dateTime':
+          valA = parseLocalDate(a.date).getTime();
+          valB = parseLocalDate(b.date).getTime();
+          if (valA !== valB) return (valA - valB) * dir;
+          // Same date — sort by time
+          const tA = (a.time || '00:00').split(':').map(Number);
+          const tB = (b.time || '00:00').split(':').map(Number);
+          return ((tA[0] * 60 + (tA[1] || 0)) - (tB[0] * 60 + (tB[1] || 0))) * dir;
+        case 'customer':
+          return (a.customerName || '').localeCompare(b.customerName || '') * dir;
+        case 'packageRoom':
+          return (a.packageName || '').localeCompare(b.packageName || '') * dir;
+        case 'location':
+          return (a.location || '').localeCompare(b.location || '') * dir;
+        case 'participants':
+          return (a.participants - b.participants) * dir;
+        case 'status':
+          return (a.status || '').localeCompare(b.status || '') * dir;
+        case 'paymentMethod':
+          return (a.paymentMethod || '').localeCompare(b.paymentMethod || '') * dir;
+        case 'paymentStatus':
+          return (a.paymentStatus || '').localeCompare(b.paymentStatus || '') * dir;
+        case 'amountPaid':
+          return (a.amountPaid - b.amountPaid) * dir;
+        case 'totalAmount':
+          return (a.totalAmount - b.totalAmount) * dir;
+        case 'createdAt':
+          return (new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime()) * dir;
+        case 'updatedAt':
+          return (new Date(a.updatedAt || 0).getTime() - new Date(b.updatedAt || 0).getTime()) * dir;
+        default:
+          return 0;
+      }
+    });
   };
 
   const handleFilterChange = (key: keyof BookingsPageFilterOptions, value: string) => {
@@ -1951,13 +2075,23 @@ const Bookings: React.FC = () => {
       case 'createdAt':
         return (
           <td key={columnKey} className="px-4 py-3 whitespace-nowrap text-xs text-gray-500">
-            {booking.createdAt ? new Date(booking.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' }) : '-'}
+            {booking.createdAt ? (
+              <>
+                <div>{new Date(booking.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })}</div>
+                <div className="text-gray-400">{new Date(booking.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</div>
+              </>
+            ) : '-'}
           </td>
         );
       case 'updatedAt':
         return (
           <td key={columnKey} className="px-4 py-3 whitespace-nowrap text-xs text-gray-500">
-            {booking.updatedAt ? new Date(booking.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' }) : <span className="text-gray-400">-</span>}
+            {booking.updatedAt ? (
+              <>
+                <div>{new Date(booking.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })}</div>
+                <div className="text-gray-400">{new Date(booking.updatedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</div>
+              </>
+            ) : <span className="text-gray-400">-</span>}
           </td>
         );
       default:
@@ -2099,7 +2233,7 @@ const Bookings: React.FC = () => {
       );
       
       if (response.success) {
-        // Update local state
+        // Update local state immediately
         const updatedBookings = bookings.map(booking =>
           booking.id === selectedBookingForNotes.id 
             ? { ...booking, internal_notes: internalNotesText } 
@@ -2107,9 +2241,22 @@ const Bookings: React.FC = () => {
         );
         setBookings(updatedBookings);
         
-        // Update cache with new internal notes
+        // Update cache: if API returned the full booking, use it; otherwise patch the cache manually
         if (response.data) {
           await bookingCacheService.updateBookingInCache(response.data);
+        } else {
+          // Patch the cache with the new internal notes directly
+          try {
+            const cachedBooking = await bookingCacheService.getBookingFromCache(Number(selectedBookingForNotes.id));
+            if (cachedBooking) {
+              await bookingCacheService.updateBookingInCache({
+                ...cachedBooking,
+                internal_notes: internalNotesText
+              });
+            }
+          } catch (cacheErr) {
+            console.error('[Bookings] Failed to patch cache for internal notes:', cacheErr);
+          }
         }
         
         alert('Internal notes saved successfully!');
@@ -2437,11 +2584,12 @@ const Bookings: React.FC = () => {
     }
   };
 
-  // Pagination
+  // Pagination — apply column sort before slicing
+  const sortedBookings = getSortedBookings(filteredBookings);
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentBookings = filteredBookings.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(filteredBookings.length / itemsPerPage);
+  const currentBookings = sortedBookings.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(sortedBookings.length / itemsPerPage);
 
   const paginate = (pageNumber: number) => setCurrentPage(pageNumber);
 
@@ -2849,6 +2997,15 @@ const Bookings: React.FC = () => {
                     const config = columnConfig[columnKey];
                     if (!config || !config.isVisible()) return null;
                     
+                    // Sortable columns
+                    const sortableColumns: BookingsColumnKey[] = [
+                      'id', 'referenceNumber', 'dateTime', 'customer', 'packageRoom',
+                      'location', 'participants', 'status', 'paymentMethod', 'paymentStatus',
+                      'amountPaid', 'totalAmount', 'createdAt', 'updatedAt'
+                    ];
+                    const isSortable = sortableColumns.includes(columnKey);
+                    const isActivelySorted = sortColumn === columnKey;
+
                     return (
                       <th
                         key={columnKey}
@@ -2859,17 +3016,34 @@ const Bookings: React.FC = () => {
                         onDragOver={(e) => handleDragOver(e, columnKey)}
                         onDragLeave={handleDragLeave}
                         onDrop={(e) => handleDrop(e, columnKey)}
-                        className={`px-4 py-3 font-medium cursor-grab active:cursor-grabbing select-none transition-all duration-150 ${
+                        onClick={() => isSortable && handleColumnSort(columnKey)}
+                        className={`px-4 py-3 font-medium select-none transition-all duration-150 ${
+                          isSortable ? 'cursor-pointer hover:bg-gray-100' : 'cursor-grab active:cursor-grabbing'
+                        } ${
                           draggedColumn === columnKey ? 'opacity-50' : ''
                         } ${
                           dragOverColumn === columnKey ? `bg-${themeColor}-100 border-l-2 border-${themeColor}-400` : ''
+                        } ${
+                          isActivelySorted ? `bg-${themeColor}-50 text-${fullColor}` : ''
                         }`}
                       >
                         <div className="flex items-center gap-1">
                           <span>{config.label}</span>
-                          <svg className="w-3 h-3 text-gray-300" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M7 2a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 2zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 8zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 14zm6-8a2 2 0 1 0-.001-4.001A2 2 0 0 0 13 6zm0 2a2 2 0 1 0 .001 4.001A2 2 0 0 0 13 8zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 13 14z"/>
-                          </svg>
+                          {isSortable ? (
+                            isActivelySorted ? (
+                              sortDirection === 'asc' ? (
+                                <ChevronUp className={`w-3.5 h-3.5 text-${fullColor}`} />
+                              ) : (
+                                <ChevronDown className={`w-3.5 h-3.5 text-${fullColor}`} />
+                              )
+                            ) : (
+                              <ArrowUpDown className="w-3 h-3 text-gray-300" />
+                            )
+                          ) : (
+                            <svg className="w-3 h-3 text-gray-300" fill="currentColor" viewBox="0 0 20 20">
+                              <path d="M7 2a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 2zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 8zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 14zm6-8a2 2 0 1 0-.001-4.001A2 2 0 0 0 13 6zm0 2a2 2 0 1 0 .001 4.001A2 2 0 0 0 13 8zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 13 14z"/>
+                            </svg>
+                          )}
                         </div>
                       </th>
                     );
@@ -2885,50 +3059,7 @@ const Bookings: React.FC = () => {
                     </td>
                   </tr>
                 ) : (
-                  currentBookings.sort((a, b) => {
-                    const now = new Date();
-                    now.setHours(0, 0, 0, 0); // Reset to start of today
-                    
-                    // Use parseLocalDate to avoid timezone issues with ISO date strings
-                    const dateA = parseLocalDate(a.date);
-                    const dateB = parseLocalDate(b.date);
-                    dateA.setHours(0, 0, 0, 0);
-                    dateB.setHours(0, 0, 0, 0);
-                    
-                    const isPastA = dateA < now;
-                    const isPastB = dateB < now;
-                    
-                    // Push past dates to the end
-                    if (isPastA && !isPastB) return 1;
-                    if (!isPastA && isPastB) return -1;
-                    
-                    // Define priority order: pending/confirmed first, then checked-in/cancelled last
-                    const statusPriority: Record<string, number> = {
-                      'pending': 1,
-                      'confirmed': 2,
-                      'checked-in': 3,
-                      'cancelled': 4
-                    };
-                    
-                    const priorityA = statusPriority[a.status] || 999;
-                    const priorityB = statusPriority[b.status] || 999;
-                    
-                    // Then sort by status priority
-                    if (priorityA !== priorityB) {
-                      return priorityA - priorityB;
-                    }
-                    
-                    // Then sort by date
-                    const dateComparison = dateA.getTime() - dateB.getTime();
-                    if (dateComparison !== 0) return dateComparison;
-                    
-                    // If dates are equal, sort by time
-                    const timeA = a.time.split(':').map(Number);
-                    const timeB = b.time.split(':').map(Number);
-                    const minutesA = timeA[0] * 60 + timeA[1];
-                    const minutesB = timeB[0] * 60 + timeB[1];
-                    return minutesA - minutesB;
-                  }).map((booking) => (
+                  currentBookings.map((booking) => (
                     <tr key={booking.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-4 py-3 whitespace-nowrap">
                         <input
@@ -2946,7 +3077,7 @@ const Bookings: React.FC = () => {
                       })}
                       {/* Actions - always last */}
                       <td className="px-4 py-3 whitespace-nowrap text-sm font-medium">
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-1 relative">
                           {booking.paymentStatus !== 'paid' && (
                             <StandardButton
                               variant="ghost"
@@ -2958,14 +3089,43 @@ const Bookings: React.FC = () => {
                             </StandardButton>
                           )}
                           {booking.status !== 'checked-in' && booking.paymentStatus === 'paid' && (
-                            <StandardButton
-                              variant="success"
-                              size="sm"
-                              icon={CheckCircle2}
-                              onClick={() => handleCheckIn(booking.referenceNumber, 'checked-in')}
-                            >
-                              {''}
-                            </StandardButton>
+                            <div className="relative">
+                              <button
+                                onClick={() => setShowCheckInConfirm(
+                                  showCheckInConfirm === booking.referenceNumber ? null : booking.referenceNumber
+                                )}
+                                className="p-1.5 rounded text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+                                title="Check In"
+                              >
+                                <CheckCircle2 className="h-4 w-4" />
+                              </button>
+                              {showCheckInConfirm === booking.referenceNumber && (
+                                <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 p-3 w-52">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                                    <p className="text-xs text-gray-700 font-medium">Check in this booking?</p>
+                                  </div>
+                                  <p className="text-xs text-gray-500 mb-3">This marks the party as arrived.</p>
+                                  <div className="flex gap-2">
+                                    <button
+                                      onClick={() => setShowCheckInConfirm(null)}
+                                      className="flex-1 px-2 py-1 text-xs border border-gray-200 rounded hover:bg-gray-50"
+                                    >
+                                      Cancel
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        handleCheckIn(booking.referenceNumber, 'checked-in');
+                                        setShowCheckInConfirm(null);
+                                      }}
+                                      className="flex-1 px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700"
+                                    >
+                                      Confirm
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
                           )}
                           <button
                             onClick={() => handleOpenInternalNotesModal(booking)}
@@ -3012,9 +3172,9 @@ const Bookings: React.FC = () => {
                 <div className="text-sm text-gray-800">
                   Showing <span className="font-medium">{indexOfFirstItem + 1}</span> to{' '}
                   <span className="font-medium">
-                    {Math.min(indexOfLastItem, filteredBookings.length)}
+                    {Math.min(indexOfLastItem, sortedBookings.length)}
                   </span>{' '}
-                  of <span className="font-medium">{filteredBookings.length}</span> results
+                  of <span className="font-medium">{sortedBookings.length}</span> results
                 </div>
                 <div className="flex gap-2">
                   <StandardButton

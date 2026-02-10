@@ -31,7 +31,7 @@ interface DayOffWithTime {
   room_ids?: number[] | null;     // If set, only blocks these rooms
 }
 import { formatDurationDisplay } from '../../../utils/timeFormat';
-import { loadAcceptJS, processCardPayment, validateCardNumber, formatCardNumber, getCardType, createPayment } from '../../../services/PaymentService';
+import { loadAcceptJS, processCardPayment, validateCardNumber, formatCardNumber, getCardType, createPayment, linkPaymentWithRetry } from '../../../services/PaymentService';
 import { PAYMENT_TYPE } from '../../../types/Payment.types';
 import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
 import { globalNoteService, type GlobalNote } from '../../../services/GlobalNoteService';
@@ -1458,24 +1458,13 @@ const OnsiteBooking: React.FC = () => {
       // Determine if using card payment via Authorize.Net
       const isCardPayment = bookingData.paymentMethod === 'authorize.net' || (bookingData.paymentMethod === 'card' && useAuthorizeNet);
       
-      // Step 1: Create booking FIRST via API (backend handles time slot creation)
-      const response = await bookingService.createBooking(bookingData_request);
-      
-      if (!response.success || !response.data) {
-        throw new Error('Failed to create booking');
-      }
-      
-      const bookingId = response.data.id;
-      const referenceNumber = response.data.reference_number;
-      const customerId = response.data.customer_id;
-      
-      console.log('✅ Booking created:', { bookingId, referenceNumber });
-      
-      // Add the new booking to cache
-      await bookingCacheService.addBookingToCache(response.data);
-      
-      // Step 2: Process card payment if using Authorize.Net (now we have bookingId)
+      let bookingId: number;
+      let referenceNumber: string;
+      let customerId: number | undefined;
+
+      // ===== CHARGE-THEN-LINK FLOW FOR CARD PAYMENTS =====
       if (isCardPayment && amountPaid > 0) {
+        // Step 1: Charge customer FIRST (no booking yet, no payable_id)
         try {
           setIsProcessingPayment(true);
           setPaymentError('');
@@ -1503,10 +1492,7 @@ const OnsiteBooking: React.FC = () => {
             {
               location_id: bookingData_request.location_id,
               amount: amountPaid,
-              // Include payable_id and payable_type from the start
-              payable_id: bookingId,
-              payable_type: PAYMENT_TYPE.BOOKING,
-              customer_id: customerId || undefined,
+              customer_id: bookingData_request.customer_id || undefined,
             },
             authorizeApiLoginId,
             undefined, // clientKey
@@ -1514,29 +1500,54 @@ const OnsiteBooking: React.FC = () => {
           );
           
           if (!paymentResult.success) {
-            // Payment failed - delete the booking we just created
-            try {
-              await bookingService.deleteBooking(bookingId);
-              console.log('🗑️ Booking deleted due to payment failure');
-            } catch (deleteErr) {
-              console.error('⚠️ Failed to delete booking after payment failure:', deleteErr);
-            }
+            // Payment failed - no booking was created, so nothing to clean up
             setPaymentError(paymentResult.message || 'Payment processing failed. Please try again.');
             setIsProcessingPayment(false);
             return;
           }
           
+          const paymentId = paymentResult.payment?.id;
+          console.log('✅ Payment charged successfully, payment ID:', paymentId);
+          
+          // Step 2: Create booking (customer already charged)
+          const response = await bookingService.createBooking(bookingData_request);
+          
+          if (!response.success || !response.data) {
+            // Booking creation failed AFTER charge - this is a critical situation
+            // Payment was collected but booking couldn't be created
+            console.error('❌ Booking creation failed after successful charge. Payment ID:', paymentId);
+            setPaymentError(
+              'Your payment was processed successfully, but we encountered an issue creating your booking. ' +
+              'Please contact our staff with your payment confirmation. Your payment is safe and will be resolved.'
+            );
+            setIsProcessingPayment(false);
+            return;
+          }
+          
+          bookingId = response.data.id;
+          referenceNumber = response.data.reference_number;
+          customerId = response.data.customer_id;
+          
+          console.log('✅ Booking created:', { bookingId, referenceNumber });
+          
+          // Add the new booking to cache
+          await bookingCacheService.addBookingToCache(response.data);
+          
+          // Step 3: Link payment to booking (with retry for reliability)
+          if (paymentId) {
+            try {
+              await linkPaymentWithRetry(paymentId, bookingId, PAYMENT_TYPE.BOOKING);
+              console.log('✅ Payment linked to booking successfully');
+            } catch (linkErr) {
+              // Non-critical: payment and booking both exist, just not linked yet
+              // Staff can see unlinked payments and manually resolve
+              console.error('⚠️ Failed to link payment to booking:', linkErr);
+            }
+          }
+          
           console.log('✅ Payment processed successfully:', paymentResult.transaction_id);
         } catch (paymentErr: any) {
           console.error('❌ Payment processing error:', paymentErr);
-          
-          // Payment failed - delete the booking we just created
-          try {
-            await bookingService.deleteBooking(bookingId);
-            console.log('🗑️ Booking deleted due to payment failure');
-          } catch (deleteErr) {
-            console.error('⚠️ Failed to delete booking after payment failure:', deleteErr);
-          }
           
           // Check for HTTPS requirement error
           if (paymentErr?.message?.includes('HTTPS') || paymentErr?.message?.includes('https')) {
@@ -1548,28 +1559,46 @@ const OnsiteBooking: React.FC = () => {
           setIsProcessingPayment(false);
           return;
         }
-      } else if (amountPaid > 0) {
-        // Step 2b: For non-card payments (in-store, pay later), create payment record
-        try {
-          const paymentData = {
-            payable_id: bookingId,
-            payable_type: PAYMENT_TYPE.BOOKING,
-            customer_id: customerId || null,
-            amount: amountPaid,
-            currency: 'USD',
-            method: (bookingData.paymentMethod === 'in-store' ? 'cash' : bookingData.paymentMethod) as 'card' | 'cash',
-            status: 'completed' as const,
-            location_id: bookingData_request.location_id,
-            notes: bookingData.paymentMethod === 'in-store' 
-              ? `In-store payment for booking ${referenceNumber}` 
-              : `Payment for booking ${referenceNumber}`,
-          };
-          
-          await createPayment(paymentData);
-          console.log('✅ Payment record created for booking:', bookingId);
-        } catch (paymentError) {
-          console.error('⚠️ Failed to create payment record:', paymentError);
-          // Don't fail - booking was created successfully
+      } else {
+        // Non-card payment path: Create booking first, then record payment
+        const response = await bookingService.createBooking(bookingData_request);
+        
+        if (!response.success || !response.data) {
+          throw new Error('Failed to create booking');
+        }
+        
+        bookingId = response.data.id;
+        referenceNumber = response.data.reference_number;
+        customerId = response.data.customer_id;
+        
+        console.log('✅ Booking created:', { bookingId, referenceNumber });
+        
+        // Add the new booking to cache
+        await bookingCacheService.addBookingToCache(response.data);
+
+        if (amountPaid > 0) {
+          // For non-card payments (in-store, pay later), create payment record
+          try {
+            const paymentData = {
+              payable_id: bookingId,
+              payable_type: PAYMENT_TYPE.BOOKING,
+              customer_id: customerId || null,
+              amount: amountPaid,
+              currency: 'USD',
+              method: (bookingData.paymentMethod === 'in-store' ? 'cash' : bookingData.paymentMethod) as 'card' | 'cash',
+              status: 'completed' as const,
+              location_id: bookingData_request.location_id,
+              notes: bookingData.paymentMethod === 'in-store' 
+                ? `In-store payment for booking ${referenceNumber}` 
+                : `Payment for booking ${referenceNumber}`,
+            };
+            
+            await createPayment(paymentData);
+            console.log('✅ Payment record created for booking:', bookingId);
+          } catch (paymentError) {
+            console.error('⚠️ Failed to create payment record:', paymentError);
+            // Don't fail - booking was created successfully
+          }
         }
       }
       

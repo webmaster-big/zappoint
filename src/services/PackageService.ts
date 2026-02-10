@@ -54,6 +54,7 @@ export interface Package {
   invitation_file?: string;
   booking_window_days?: number | null;
   min_booking_notice_hours?: number | null;
+  availability_schedules?: AvailabilitySchedule[];
   created_at: string;
   updated_at: string;
   deleted_at?: string | null;
@@ -63,6 +64,7 @@ export interface Package {
     address: string;
     city: string;
     state: string;
+    booking_window_days?: number | null;
   };
   attractions?: Array<{
     id: number;

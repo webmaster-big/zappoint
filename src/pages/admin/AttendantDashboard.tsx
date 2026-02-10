@@ -20,18 +20,28 @@ import {
   Sparkles,
   Clock,
   CalendarDays,
+  Eye,
+  Edit,
+  FileText,
+  LogIn,
+  Save,
+  Loader2,
+  PackageIcon,
+  House,
 } from 'lucide-react';
 import CounterAnimation from '../../components/ui/CounterAnimation';
 import StandardButton from '../../components/ui/StandardButton';
 import { getStoredUser } from '../../utils/storage';
 import bookingService from '../../services/bookingService';
 import { bookingCacheService } from '../../services/BookingCacheService';
+import { createPayment, PAYMENT_TYPE } from '../../services/PaymentService';
 import MetricsService, { type TimeframeType } from '../../services/MetricsService';
 import { metricsCacheService } from '../../services/MetricsCacheService';
 import { useThemeColor } from '../../hooks/useThemeColor';
-import { parseLocalDate } from '../../utils/timeFormat';
+import { parseLocalDate, convertTo12Hour, formatDurationDisplay } from '../../utils/timeFormat';
 import { roomService, type Room } from '../../services/RoomService';
 import { roomCacheService } from '../../services/RoomCacheService';
+import { attractionPurchaseCacheService } from '../../services/AttractionPurchaseCacheService';
 
 const AttendantDashboard: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
@@ -43,6 +53,7 @@ const AttendantDashboard: React.FC = () => {
    const [metricsLoading, setMetricsLoading] = useState(false);
    const [locationId, setLocationId] = useState<number>(1);
    const [selectedDayBookings, setSelectedDayBookings] = useState<{ date: Date; bookings: any[] } | null>(null);
+   const [selectedBooking, setSelectedBooking] = useState<any | null>(null);
    
    // Timeframe selector for metrics
    const [metricsTimeframe, setMetricsTimeframe] = useState<TimeframeType>('last_24h');
@@ -61,6 +72,20 @@ const AttendantDashboard: React.FC = () => {
    const [ticketPurchases, setTicketPurchases] = useState<any[]>([]);
    const [recentBookings, setRecentBookings] = useState<any[]>([]);
    const [newBookings, setNewBookings] = useState<any[]>([]);
+
+   // Quick action states for booking detail modal
+   const [checkInLoading, setCheckInLoading] = useState(false);
+   const [showCheckInConfirm, setShowCheckInConfirm] = useState(false);
+   const [editingNotes, setEditingNotes] = useState(false);
+   const [tempNotes, setTempNotes] = useState('');
+   const [savingNotes, setSavingNotes] = useState(false);
+
+   // Payment modal states
+   const [showPaymentModal, setShowPaymentModal] = useState(false);
+   const [paymentAmount, setPaymentAmount] = useState('');
+   const [paymentMethod, setPaymentMethod] = useState<'card' | 'in-store'>('in-store');
+   const [paymentNotes, setPaymentNotes] = useState('');
+   const [processingPayment, setProcessingPayment] = useState(false);
    const [metrics, setMetrics] = useState({
      totalBookings: 0,
      totalRevenue: 0,
@@ -159,22 +184,59 @@ const AttendantDashboard: React.FC = () => {
      fetchRooms();
    }, [locationId]);
 
-   // Derive new bookings (created in last 48 hours) from allBookings - no separate API call
-   useEffect(() => {
-     if (allBookings.length === 0) return;
-     
+   // Helper: get cutoff date based on current metrics timeframe
+   const getTimeframeCutoffDate = (): Date | null => {
      const now = new Date();
-     const twoDaysAgo = new Date(now);
-     twoDaysAgo.setDate(now.getDate() - 2);
+     switch (metricsTimeframe) {
+       case 'last_24h': {
+         const d = new Date(now);
+         d.setDate(now.getDate() - 1);
+         return d;
+       }
+       case 'last_7d': {
+         const d = new Date(now);
+         d.setDate(now.getDate() - 7);
+         return d;
+       }
+       case 'last_30d': {
+         const d = new Date(now);
+         d.setDate(now.getDate() - 30);
+         return d;
+       }
+       case 'custom': {
+         if (customDateFrom) return new Date(customDateFrom);
+         return null;
+       }
+       case 'all_time':
+       default:
+         return null;
+     }
+   };
+
+   // Derive new bookings from allBookings based on selected timeframe
+   useEffect(() => {
+     if (allBookings.length === 0) {
+       setNewBookings([]);
+       return;
+     }
+     
+     const cutoff = getTimeframeCutoffDate();
+     
+     if (!cutoff) {
+       setNewBookings(allBookings);
+       console.log('📅 [AttendantDashboard] New bookings (all time):', allBookings.length);
+       return;
+     }
      
      const recentlyCreated = allBookings.filter((booking: any) => {
        const createdAt = new Date(booking.created_at);
-       return createdAt >= twoDaysAgo;
+       return createdAt >= cutoff;
      });
      
      setNewBookings(recentlyCreated);
-     console.log('📅 [AttendantDashboard] New bookings (last 48h) derived:', recentlyCreated.length);
-   }, [allBookings]);
+     console.log(`📅 [AttendantDashboard] New bookings (${timeframeDescription}) derived:`, recentlyCreated.length);
+     // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [allBookings, metricsTimeframe, customDateFrom, customDateTo]);
 
    // Fetch metrics data (when location or timeframe changes)
    // Uses cache-first approach: display cached data instantly, then refresh in background
@@ -194,6 +256,14 @@ const AttendantDashboard: React.FC = () => {
            setTicketPurchases(cachedData.recentPurchases || []);
            setRecentBookings(cachedData.recentBookings || []);
            setLoading(false);
+         }
+
+         // Also try purchase cache for instant ticket purchases display
+         if (!cachedData?.recentPurchases?.length) {
+           const cachedPurchases = await attractionPurchaseCacheService.getCachedPurchases();
+           if (cachedPurchases && cachedPurchases.length > 0) {
+             setTicketPurchases(cachedPurchases as any);
+           }
          }
          
          // Step 2: Fetch fresh data from API in background with timeframe
@@ -222,6 +292,11 @@ const AttendantDashboard: React.FC = () => {
          setMetrics(metricsResponse.metrics);
          setTicketPurchases(metricsResponse.recentPurchases || []);
          setRecentBookings(metricsResponse.recentBookings || []);
+
+         // Also update the purchase cache
+         if (metricsResponse.recentPurchases?.length) {
+           await attractionPurchaseCacheService.cachePurchases(metricsResponse.recentPurchases as any);
+         }
          
          // Step 4: Cache the fresh data for next time (with timeframe)
          await metricsCacheService.cacheMetrics('attendant', {
@@ -403,7 +478,7 @@ const AttendantDashboard: React.FC = () => {
      {
        title: 'New Bookings',
        value: newBookings.length.toString(),
-       change: 'Created in last 48h',
+       change: `Created • ${timeframeDescription}`,
        icon: Sparkles,
        accent: 'bg-blue-100 text-blue-600',
      },
@@ -635,6 +710,71 @@ const AttendantDashboard: React.FC = () => {
      hour = hour % 24;
      
      return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+   };
+
+   // Payment modal handlers
+   const handleOpenPaymentModal = () => {
+     if (!selectedBooking) return;
+     const remainingAmount = Math.max(0, Number(selectedBooking.total_amount || 0) - Number(selectedBooking.amount_paid || 0));
+     setPaymentAmount((Math.floor(remainingAmount * 100) / 100).toFixed(2));
+     setPaymentMethod('in-store');
+     setPaymentNotes('');
+     setShowPaymentModal(true);
+   };
+
+   const handleClosePaymentModal = () => {
+     setShowPaymentModal(false);
+     setPaymentAmount('');
+     setPaymentMethod('in-store');
+     setPaymentNotes('');
+   };
+
+   const handleSubmitPayment = async () => {
+     if (!selectedBooking) return;
+     const amount = parseFloat(paymentAmount);
+     if (isNaN(amount) || amount <= 0) return;
+
+     const remainingAmount = Math.round((Number(selectedBooking.total_amount || 0) - Number(selectedBooking.amount_paid || 0)) * 100) / 100;
+     if (Math.round(amount * 100) / 100 > remainingAmount + 0.01) return;
+
+     try {
+       setProcessingPayment(true);
+       const bookingResponse = await bookingService.getBookingById(selectedBooking.id);
+       if (!bookingResponse.success || !bookingResponse.data) throw new Error('Failed to get booking details');
+
+       const booking = bookingResponse.data;
+       await createPayment({
+         payable_id: selectedBooking.id,
+         payable_type: PAYMENT_TYPE.BOOKING,
+         customer_id: booking.customer_id || null,
+         location_id: booking.location_id,
+         amount,
+         currency: 'USD',
+         method: paymentMethod === 'in-store' ? 'cash' : paymentMethod,
+         status: 'completed',
+         notes: paymentNotes || `In-store payment for booking ${selectedBooking.reference_number}`,
+       });
+
+       const newAmountPaid = Number(selectedBooking.amount_paid || 0) + amount;
+       const newPaymentStatus = newAmountPaid >= Number(selectedBooking.total_amount) ? 'paid' : 'partial';
+       const updateResponse = await bookingService.updateBooking(selectedBooking.id, {
+         amount_paid: newAmountPaid,
+         payment_status: newPaymentStatus,
+         status: 'confirmed',
+       });
+
+       if (updateResponse.success && updateResponse.data) {
+         await bookingCacheService.updateBookingInCache(updateResponse.data);
+       }
+
+       setSelectedBooking({ ...selectedBooking, amount_paid: newAmountPaid, payment_status: newPaymentStatus });
+       setAllBookings(prev => prev.map(b => b.id === selectedBooking.id ? { ...b, amount_paid: newAmountPaid, payment_status: newPaymentStatus } : b));
+       handleClosePaymentModal();
+     } catch (error) {
+       console.error('Error processing payment:', error);
+     } finally {
+       setProcessingPayment(false);
+     }
    };
 
    return (
@@ -1221,7 +1361,7 @@ const AttendantDashboard: React.FC = () => {
                <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
                  <Sparkles className={`w-5 h-5 text-${fullColor}`} /> New Bookings
                  <span className="ml-2 text-xs font-medium bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
-                   {newBookings.length} in last 48 hours
+                   {newBookings.length} • {timeframeDescription}
                  </span>
                </h2>
                <Link to="/bookings" className={`px-4 py-2 text-sm bg-${themeColor}-100 text-${fullColor} rounded-lg hover:bg-${themeColor}-200 transition`}>
@@ -1280,7 +1420,7 @@ const AttendantDashboard: React.FC = () => {
                    {newBookings.length === 0 && (
                      <tr>
                        <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
-                         No new bookings in the last 48 hours.
+                         No new bookings for {timeframeDescription.toLowerCase()}.
                        </td>
                      </tr>
                    )}
@@ -1331,13 +1471,16 @@ const AttendantDashboard: React.FC = () => {
                        return (
                          <div 
                            key={index}
-                           className={`p-4 rounded-lg border transition-all ${
+                           className={`p-4 rounded-lg border transition-all cursor-pointer hover:shadow-md ${
                              booking.status === 'confirmed' || booking.status === 'Confirmed'
-                               ? 'bg-emerald-50 border-emerald-200'
+                               ? 'bg-emerald-50 border-emerald-200 hover:border-emerald-300'
                                : booking.status === 'pending' || booking.status === 'Pending'
-                               ? 'bg-amber-50 border-amber-200'
-                               : 'bg-rose-50 border-rose-200'
+                               ? 'bg-amber-50 border-amber-200 hover:border-amber-300'
+                               : booking.status === 'checked-in'
+                               ? 'bg-blue-50 border-blue-200 hover:border-blue-300'
+                               : 'bg-rose-50 border-rose-200 hover:border-rose-300'
                            }`}
+                           onClick={() => { setSelectedBooking(booking); setEditingNotes(false); setShowCheckInConfirm(false); }}
                          >
                            <div className="flex justify-between items-start">
                              <div>
@@ -1395,6 +1538,355 @@ const AttendantDashboard: React.FC = () => {
                      Close
                    </StandardButton>
                  </div>
+               </div>
+             </div>
+           </div>
+         )}
+
+         {/* Booking Detail Modal with Quick Actions */}
+         {selectedBooking && (
+           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4 animate-in fade-in duration-200" onClick={() => { setSelectedBooking(null); setEditingNotes(false); setShowCheckInConfirm(false); }}>
+             <div className="bg-white rounded-xl shadow-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto transform transition-all duration-300 scale-100 animate-in zoom-in-95" onClick={(e) => e.stopPropagation()}>
+               <div className="p-6">
+                 <div className="flex justify-between items-center mb-6">
+                   <h3 className="text-xl font-semibold text-gray-900">Booking Details</h3>
+                   <StandardButton variant="ghost" size="sm" icon={X} onClick={() => { setSelectedBooking(null); setEditingNotes(false); setShowCheckInConfirm(false); }} />
+                 </div>
+
+                 {/* Customer Information */}
+                 <div className="mb-6">
+                   <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Customer Information</h4>
+                   <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+                     <div className="flex items-center">
+                       <Users className="h-4 w-4 text-gray-400 mr-3" />
+                       <span className="font-medium text-gray-900">
+                         {selectedBooking.customer ? `${selectedBooking.customer.first_name} ${selectedBooking.customer.last_name}` : selectedBooking.guest_name || 'Guest'}
+                       </span>
+                     </div>
+                     <div className="text-sm text-gray-600 ml-7">{selectedBooking.guest_email || selectedBooking.customer?.email || 'No email'}</div>
+                     <div className="text-sm text-gray-600 ml-7">{selectedBooking.guest_phone || selectedBooking.customer?.phone || 'No phone'}</div>
+                   </div>
+                 </div>
+
+                 {/* Booking Information */}
+                 <div className="mb-6">
+                   <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Booking Information</h4>
+                   <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+                     <div className="flex justify-between items-center">
+                       <span className="text-sm text-gray-600">Reference</span>
+                       <span className="font-mono font-medium text-gray-900">#{selectedBooking.reference_number}</span>
+                     </div>
+                     <div className="flex justify-between items-center">
+                       <span className="text-sm text-gray-600">Status</span>
+                       <span className={`px-3 py-1 text-xs font-medium rounded-full ${
+                         selectedBooking.status === 'confirmed' ? 'bg-emerald-100 text-emerald-800'
+                           : selectedBooking.status === 'pending' ? 'bg-amber-100 text-amber-800'
+                           : selectedBooking.status === 'checked-in' ? 'bg-blue-100 text-blue-800'
+                           : selectedBooking.status === 'completed' ? 'bg-emerald-100 text-emerald-800'
+                           : 'bg-rose-100 text-rose-800'
+                       }`}>
+                         {selectedBooking.status?.charAt(0).toUpperCase() + selectedBooking.status?.slice(1)}
+                       </span>
+                     </div>
+                   </div>
+                 </div>
+
+                 {/* Date & Time */}
+                 <div className="mb-6">
+                   <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Date & Time</h4>
+                   <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+                     <div className="flex items-center">
+                       <Calendar className="h-4 w-4 text-gray-400 mr-3" />
+                       <span className="text-sm text-gray-900">
+                         {parseLocalDate(selectedBooking.booking_date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                       </span>
+                     </div>
+                     <div className="flex items-center">
+                       <Clock className="h-4 w-4 text-gray-400 mr-3" />
+                       <span className="text-sm text-gray-900">{convertTo12Hour(selectedBooking.booking_time)}</span>
+                     </div>
+                     {selectedBooking.duration && (
+                       <div className="flex justify-between items-center pt-2 border-t border-gray-200">
+                         <span className="text-sm text-gray-600">Duration</span>
+                         <span className="text-sm font-medium text-gray-900">{formatDurationDisplay(selectedBooking.duration, selectedBooking.duration_unit)}</span>
+                       </div>
+                     )}
+                     <div className="flex justify-between items-center">
+                       <span className="text-sm text-gray-600">Participants</span>
+                       <span className="text-sm font-medium text-gray-900">{selectedBooking.participants}</span>
+                     </div>
+                   </div>
+                 </div>
+
+                 {/* Package */}
+                 <div className="mb-6">
+                   <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Package</h4>
+                   <div className="bg-gray-50 rounded-lg p-4">
+                     <div className="flex items-center justify-between">
+                       <div className="flex items-center">
+                         <PackageIcon className="h-4 w-4 text-gray-400 mr-3" />
+                         <span className="font-medium text-gray-900">{selectedBooking.package?.name || 'N/A'}</span>
+                       </div>
+                       {selectedBooking.package?.price && (
+                         <span className="text-sm font-medium text-gray-900">${Number(selectedBooking.package.price).toFixed(2)}</span>
+                       )}
+                     </div>
+                   </div>
+                 </div>
+
+                 {/* Room */}
+                 {selectedBooking.room && (
+                   <div className="mb-6">
+                     <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Space</h4>
+                     <div className="bg-gray-50 rounded-lg p-4">
+                       <div className="flex items-center">
+                         <House className="h-4 w-4 text-gray-400 mr-3" />
+                         <span className="font-medium text-gray-900">{selectedBooking.room.name || 'N/A'}</span>
+                       </div>
+                     </div>
+                   </div>
+                 )}
+
+                 {/* Payment */}
+                 <div className="mb-6">
+                   <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Payment</h4>
+                   <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+                     <div className="flex justify-between items-center">
+                       <span className="text-sm text-gray-600">Total Amount</span>
+                       <span className="text-lg font-bold text-gray-900">${parseFloat(String(selectedBooking.total_amount || 0)).toFixed(2)}</span>
+                     </div>
+                     <div className="flex justify-between items-center">
+                       <span className="text-sm text-gray-600">Payment Status</span>
+                       <span className={`px-3 py-1 text-xs font-medium rounded-full ${
+                         selectedBooking.payment_status === 'paid' ? 'bg-emerald-100 text-emerald-800'
+                           : selectedBooking.payment_status === 'partial' ? 'bg-amber-100 text-amber-800'
+                           : 'bg-rose-100 text-rose-800'
+                       }`}>
+                         {selectedBooking.payment_status ? selectedBooking.payment_status.charAt(0).toUpperCase() + selectedBooking.payment_status.slice(1) : 'Pending'}
+                       </span>
+                     </div>
+                   </div>
+                 </div>
+
+                 {/* Special Requests */}
+                 {selectedBooking.special_requests && (
+                   <div className="mb-6">
+                     <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Special Requests</h4>
+                     <div className="bg-gray-50 rounded-lg p-4">
+                       <p className="text-sm text-gray-900">{selectedBooking.special_requests}</p>
+                     </div>
+                   </div>
+                 )}
+
+                 {/* Internal Notes */}
+                 <div className="mb-6">
+                   <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3 flex items-center gap-2">
+                     <FileText size={14} /> Internal Notes
+                   </h4>
+                   <div className="bg-gray-50 rounded-lg p-4">
+                     {editingNotes ? (
+                       <div className="space-y-3">
+                         <textarea
+                           value={tempNotes}
+                           onChange={(e) => setTempNotes(e.target.value)}
+                           className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                           rows={3}
+                           placeholder="Add internal notes..."
+                         />
+                         <div className="flex gap-2 justify-end">
+                           <StandardButton variant="ghost" size="sm" onClick={() => { setEditingNotes(false); setTempNotes(selectedBooking.internal_notes || ''); }}>
+                             Cancel
+                           </StandardButton>
+                           <StandardButton
+                             variant="primary"
+                             size="sm"
+                             icon={savingNotes ? Loader2 : Save}
+                             disabled={savingNotes}
+                             onClick={async () => {
+                               setSavingNotes(true);
+                               try {
+                                 await bookingService.updateInternalNotes(selectedBooking.id, tempNotes);
+                                 setSelectedBooking({ ...selectedBooking, internal_notes: tempNotes });
+                                 setAllBookings(prev => prev.map(b => b.id === selectedBooking.id ? { ...b, internal_notes: tempNotes } : b));
+                                 setEditingNotes(false);
+                               } catch (err) {
+                                 console.error('Failed to save notes:', err);
+                               } finally {
+                                 setSavingNotes(false);
+                               }
+                             }}
+                           >
+                             {savingNotes ? 'Saving...' : 'Save'}
+                           </StandardButton>
+                         </div>
+                       </div>
+                     ) : (
+                       <div
+                         className="cursor-pointer hover:bg-gray-100 rounded p-2 -m-2 transition-colors"
+                         onClick={() => { setTempNotes(selectedBooking.internal_notes || ''); setEditingNotes(true); }}
+                       >
+                         {selectedBooking.internal_notes ? (
+                           <p className="text-sm text-gray-900 whitespace-pre-wrap">{selectedBooking.internal_notes}</p>
+                         ) : (
+                           <p className="text-sm text-gray-400 italic">Click to add internal notes...</p>
+                         )}
+                       </div>
+                     )}
+                   </div>
+                 </div>
+
+                 {/* Action Buttons */}
+                 <div className="mt-6 pt-4 border-t border-gray-200 space-y-2">
+                   <div className="flex gap-2">
+                     <Link
+                       to={`/bookings/${selectedBooking.id}`}
+                       className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                       onClick={() => { setSelectedBooking(null); setEditingNotes(false); }}
+                     >
+                       <Eye size={15} />
+                       View
+                     </Link>
+                     <Link
+                       to={`/bookings/edit/${selectedBooking.id}`}
+                       className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                       onClick={() => { setSelectedBooking(null); setEditingNotes(false); }}
+                     >
+                       <Edit size={15} />
+                       Edit
+                     </Link>
+                     {selectedBooking.status?.toLowerCase() !== 'checked-in' && selectedBooking.status?.toLowerCase() !== 'completed' && selectedBooking.status?.toLowerCase() !== 'cancelled' && selectedBooking.payment_status?.toLowerCase() === 'paid' && (
+                       !showCheckInConfirm ? (
+                         <button
+                           onClick={() => setShowCheckInConfirm(true)}
+                           className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-emerald-700 bg-white border border-emerald-300 rounded-lg hover:bg-emerald-50 transition-colors"
+                         >
+                           <LogIn size={15} />
+                           Check In
+                         </button>
+                       ) : null
+                     )}
+                     {selectedBooking.status?.toLowerCase() !== 'checked-in' && selectedBooking.status?.toLowerCase() !== 'completed' && selectedBooking.status?.toLowerCase() !== 'cancelled' && selectedBooking.payment_status?.toLowerCase() !== 'paid' && (
+                       <button
+                         onClick={handleOpenPaymentModal}
+                         className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-amber-700 bg-white border border-amber-300 rounded-lg hover:bg-amber-50 transition-colors"
+                       >
+                         <DollarSign size={15} />
+                         Process Payment
+                       </button>
+                     )}
+                     {selectedBooking.status?.toLowerCase() === 'checked-in' && (
+                       <div className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg">
+                         <CheckCircle size={15} />
+                         Checked In
+                       </div>
+                     )}
+                   </div>
+
+                   {/* Check In Confirmation */}
+                   {showCheckInConfirm && (
+                     <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                       <p className="text-sm text-amber-800 font-medium mb-2">Confirm check-in for this party?</p>
+                       <div className="flex gap-2">
+                         <button
+                           onClick={() => setShowCheckInConfirm(false)}
+                           className="flex-1 px-3 py-2 text-sm font-medium rounded-lg bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"
+                         >
+                           Cancel
+                         </button>
+                         <button
+                           disabled={checkInLoading}
+                           onClick={async () => {
+                             setCheckInLoading(true);
+                             try {
+                               await bookingService.checkInBooking(selectedBooking.reference_number);
+                               setSelectedBooking({ ...selectedBooking, status: 'checked-in' });
+                               setAllBookings(prev => prev.map(b => b.id === selectedBooking.id ? { ...b, status: 'checked-in' } : b));
+                               setShowCheckInConfirm(false);
+                             } catch (err) {
+                               console.error('Check-in failed:', err);
+                             } finally {
+                               setCheckInLoading(false);
+                             }
+                           }}
+                           className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium rounded-lg bg-emerald-600 text-white hover:bg-emerald-700"
+                         >
+                           {checkInLoading ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
+                           {checkInLoading ? 'Checking in...' : 'Confirm'}
+                         </button>
+                       </div>
+                     </div>
+                   )}
+
+                   <StandardButton
+                     onClick={() => { setSelectedBooking(null); setEditingNotes(false); setShowCheckInConfirm(false); }}
+                     variant="secondary"
+                     size="md"
+                     className="w-full"
+                   >
+                     Close
+                   </StandardButton>
+                 </div>
+               </div>
+             </div>
+           </div>
+         )}
+
+         {/* Payment Modal */}
+         {showPaymentModal && selectedBooking && (
+           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={handleClosePaymentModal}>
+             <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
+               <div className={`p-6 border-b border-gray-100 bg-${themeColor}-50`}>
+                 <h2 className="text-xl font-bold text-gray-900">Process Payment</h2>
+                 <p className="text-sm text-gray-600 mt-1">Booking: {selectedBooking.reference_number}</p>
+               </div>
+               <div className="p-6 space-y-4">
+                 <div className="bg-gray-50 p-4 rounded-lg space-y-2">
+                   <div className="flex justify-between text-sm">
+                     <span className="text-gray-600">Total Amount:</span>
+                     <span className="font-semibold">${Number(selectedBooking.total_amount || 0).toFixed(2)}</span>
+                   </div>
+                   <div className="flex justify-between text-sm">
+                     <span className="text-gray-600">Already Paid:</span>
+                     <span className="font-semibold text-green-600">${Number(selectedBooking.amount_paid || 0).toFixed(2)}</span>
+                   </div>
+                   <div className="flex justify-between text-sm pt-2 border-t border-gray-200">
+                     <span className="text-gray-900 font-medium">Remaining Balance:</span>
+                     <span className="font-bold text-red-600">${(Number(selectedBooking.total_amount || 0) - Number(selectedBooking.amount_paid || 0)).toFixed(2)}</span>
+                   </div>
+                 </div>
+                 <div>
+                   <label className="block text-sm font-medium text-gray-700 mb-2">Payment Amount *</label>
+                   <div className="relative">
+                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+                     <input type="number" step="0.01" min="0.01"
+                       max={(Number(selectedBooking.total_amount || 0) - Number(selectedBooking.amount_paid || 0)).toFixed(2)}
+                       value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)}
+                       className={`w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
+                       placeholder="0.00" />
+                   </div>
+                 </div>
+                 <div>
+                   <label className="block text-sm font-medium text-gray-700 mb-2">Payment Method *</label>
+                   <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as 'card' | 'in-store')}
+                     className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}>
+                     <option value="in-store">In-Store</option>
+                     <option value="card">Card</option>
+                   </select>
+                 </div>
+                 <div>
+                   <label className="block text-sm font-medium text-gray-700 mb-2">Notes (Optional)</label>
+                   <textarea value={paymentNotes} onChange={(e) => setPaymentNotes(e.target.value)} rows={3}
+                     className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
+                     placeholder="Add any notes about this payment..." />
+                 </div>
+               </div>
+               <div className="p-6 border-t border-gray-100 flex gap-3 justify-end">
+                 <StandardButton variant="secondary" onClick={handleClosePaymentModal} disabled={processingPayment}>Cancel</StandardButton>
+                 <StandardButton variant="primary" onClick={handleSubmitPayment}
+                   disabled={processingPayment || !paymentAmount || parseFloat(paymentAmount) <= 0}
+                   loading={processingPayment}>
+                   {processingPayment ? 'Processing...' : 'Process Payment'}
+                 </StandardButton>
                </div>
              </div>
            </div>

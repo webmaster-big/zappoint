@@ -22,10 +22,12 @@ import { customerService, type Customer } from '../../../services/CustomerServic
 import { generatePurchaseQRCode } from '../../../utils/qrcode';
 import Toast from '../../../components/ui/Toast';
 import { ASSET_URL } from '../../../utils/storage';
-import { loadAcceptJS, processCardPayment, validateCardNumber, formatCardNumber, getCardType, PAYMENT_TYPE } from '../../../services/PaymentService';
+import { loadAcceptJS, processCardPayment, validateCardNumber, formatCardNumber, getCardType, PAYMENT_TYPE, linkPaymentWithRetry } from '../../../services/PaymentService';
 import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
 import { extractIdFromSlug } from '../../../utils/slug';
 import StandardButton from '../../../components/ui/StandardButton';
+import SignatureCapture from '../../../components/SignatureCapture';
+import TermsAndConditionsCheckbox from '../../../components/TermsAndConditionsCheckbox';
 
 // Helper function to parse payment errors into user-friendly messages
 const getPaymentErrorMessage = (error: any): string => {
@@ -174,6 +176,11 @@ const PurchaseAttraction = () => {
   const [showCountrySuggestions, setShowCountrySuggestions] = useState(false);
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
+  // Signature & Terms state
+  const [signatureImage, setSignatureImage] = useState<string | null>(null);
+  const [termsAccepted, setTermsAccepted] = useState<boolean>(false);
+  const [signatureTermsErrors, setSignatureTermsErrors] = useState<Record<string, string>>({});
 
   // Show account modal for non-logged-in users (optional, doesn't block access)
   useEffect(() => {
@@ -408,6 +415,20 @@ const PurchaseAttraction = () => {
   const handlePurchase = async () => {
     if (!attraction) return;
 
+    // Validate signature and terms acceptance
+    const stErrors: Record<string, string> = {};
+    if (!signatureImage) {
+      stErrors.signature = 'Please provide your signature before proceeding.';
+    }
+    if (!termsAccepted) {
+      stErrors.terms = 'You must agree to the Terms & Conditions to proceed.';
+    }
+    if (Object.keys(stErrors).length > 0) {
+      setSignatureTermsErrors(stErrors);
+      return;
+    }
+    setSignatureTermsErrors({});
+
     // Validate card information
     if (!cardNumber || !cardMonth || !cardYear || !cardCVV) {
       setPaymentError('Please fill in all card details');
@@ -428,9 +449,8 @@ const PurchaseAttraction = () => {
       setPaymentError('');
 
       const totalAmount = calculateTotal();
-      let transactionId: string | undefined;
 
-      // Process card payment
+      // Prepare card data
       const cardData = {
         cardNumber: cardNumber.replace(/\s/g, ''),
         month: cardMonth,
@@ -452,15 +472,35 @@ const PurchaseAttraction = () => {
         country: customerInfo.country,
       };
       
+      // ===== CHARGE-THEN-LINK FLOW =====
+      // Step 1: Charge the customer FIRST (no payable_id yet)
       const paymentData = {
-        location_id: attraction.locationId || 1, // Use attraction's location_id or default to 1
-        amount: totalAmount, // Full payment amount
-        order_id: `A${attraction.id}-${Date.now().toString().slice(-8)}`, // Max 20 chars for Authorize.Net
+        location_id: attraction.locationId || 1,
+        amount: totalAmount,
+        order_id: `A${attraction.id}-${Date.now().toString().slice(-8)}`,
         description: `Attraction Purchase: ${attraction.name}`,
         customer_id: selectedCustomerId || undefined,
+        signature_image: signatureImage || undefined,
+        terms_accepted: termsAccepted,
       };
 
-      // Step 1: Create purchase FIRST (so we have the purchase ID for payment)
+      const paymentResponse = await processCardPayment(
+        cardData,
+        paymentData,
+        authorizeApiLoginId,
+        authorizeClientKey,
+        customerData
+      );
+      
+      if (!paymentResponse.success) {
+        throw new Error(paymentResponse.message || 'Payment failed. Please try again.');
+      }
+      
+      const paymentId = paymentResponse.payment?.id;
+      const transactionId = paymentResponse.transaction_id;
+      console.log('✅ Payment charged successfully, payment ID:', paymentId);
+
+      // Step 2: Create attraction purchase (customer already charged)
       const purchaseData = {
         attraction_id: Number(attraction.id),
         customer_id: selectedCustomerId || undefined,
@@ -469,11 +509,10 @@ const PurchaseAttraction = () => {
         guest_phone: customerInfo.phone || undefined,
         quantity: quantity,
         amount: totalAmount,
-        amount_paid: totalAmount, // Full payment
+        amount_paid: totalAmount,
         currency: 'USD',
         method: 'card',
         payment_method: 'authorize.net' as 'card' | 'in-store' | 'paylater' | 'authorize.net',
-        status: 'completed' as 'pending' | 'completed' | 'cancelled',
         location_id: attraction.locationId || 1,
         purchase_date: new Date().toISOString().split('T')[0],
         notes: `Attraction Purchase: ${attraction.name} (${quantity} ticket${quantity > 1 ? 's' : ''})`,
@@ -481,40 +520,27 @@ const PurchaseAttraction = () => {
 
       const response = await attractionPurchaseService.createPurchase(purchaseData);
       const createdPurchase = response.data;
+      console.log('✅ Purchase created, ID:', createdPurchase.id);
 
-      // Step 2: Process payment with payable_id (now we have purchase ID)
-      const paymentResponse = await processCardPayment(
-        cardData,
-        {
-          ...paymentData,
-          payable_id: createdPurchase.id,
-          payable_type: PAYMENT_TYPE.ATTRACTION_PURCHASE,
-        },
-        authorizeApiLoginId,
-        authorizeClientKey, // Pass the client key
-        customerData // Pass customer billing data
-      );
-      
-      if (!paymentResponse.success) {
-        // Payment failed - delete the purchase we just created
-        try {
-          await attractionPurchaseService.deletePurchase(createdPurchase.id);
-          console.log('🗑️ Purchase deleted due to payment failure');
-        } catch (deleteErr) {
-          console.error('⚠️ Failed to delete purchase after payment failure:', deleteErr);
-        }
-        throw new Error(paymentResponse.message || 'Payment failed. Please try again.');
-      }
-      
-      transactionId = paymentResponse.transaction_id;
-
-      // Update purchase with payment_id (transaction_id)
+      // Update purchase with transaction_id
       try {
         await attractionPurchaseService.updatePurchase(createdPurchase.id, {
-          payment_id: transactionId
+          payment_id: transactionId,
         });
       } catch (updateError) {
         // Non-critical - purchase and payment succeeded
+      }
+
+      // Step 3: Link payment to purchase (with retry for reliability)
+      if (paymentId) {
+        try {
+          await linkPaymentWithRetry(paymentId, createdPurchase.id, PAYMENT_TYPE.ATTRACTION_PURCHASE);
+          console.log('✅ Payment linked to purchase successfully');
+        } catch (linkErr) {
+          // Non-critical: payment and purchase both exist, just not linked yet
+          // Staff can see unlinked payments and manually resolve
+          console.error('⚠️ Failed to link payment to purchase:', linkErr);
+        }
       }
 
       // Generate QR code
@@ -524,9 +550,9 @@ const PurchaseAttraction = () => {
       // Send receipt email with QR code
       try {
         await attractionPurchaseService.sendReceipt(createdPurchase.id, qrData);
-        setToast({ message: 'Purchase completed! Receipt sent to your email.', type: 'success' });
+        setToast({ message: 'Purchase confirmed! Receipt sent to your email.', type: 'success' });
       } catch {
-        setToast({ message: 'Purchase completed! (Email failed to send)', type: 'info' });
+        setToast({ message: 'Purchase confirmed! (Email failed to send)', type: 'info' });
       }
 
       setPurchaseComplete(true);
@@ -1130,6 +1156,34 @@ const PurchaseAttraction = () => {
                     </div>
                   </div>
                   
+                  {/* Signature & Terms Section */}
+                  <div className="space-y-4 mt-6 border-t pt-6">
+                    <h3 className="text-lg font-semibold">Signature & Agreement</h3>
+
+                    <SignatureCapture
+                      onSignatureChange={(base64) => {
+                        setSignatureImage(base64);
+                        if (base64) {
+                          setSignatureTermsErrors((prev) => ({ ...prev, signature: '' }));
+                        }
+                      }}
+                      required={true}
+                      error={signatureTermsErrors.signature}
+                    />
+
+                    <TermsAndConditionsCheckbox
+                      checked={termsAccepted}
+                      onChange={(checked) => {
+                        setTermsAccepted(checked);
+                        if (checked) {
+                          setSignatureTermsErrors((prev) => ({ ...prev, terms: '' }));
+                        }
+                      }}
+                      required={true}
+                      error={signatureTermsErrors.terms}
+                    />
+                  </div>
+
                   <div className="flex justify-between gap-2 pt-2">
                     <StandardButton
                       variant="secondary"
@@ -1481,7 +1535,7 @@ const PurchaseAttraction = () => {
           <div className="bg-white rounded-xl max-w-2xl w-full p-4 sm:p-6 max-h-[calc(100vh-2rem)] overflow-y-auto">
             <div className="text-center mb-4">
               <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-3" />
-              <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">Purchase Complete!</h3>
+              <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">Purchase Confirmed!</h3>
               <p className="text-sm text-gray-600">Your tickets have been confirmed</p>
             </div>
             

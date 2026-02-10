@@ -19,6 +19,7 @@ import { useThemeColor } from '../../../hooks/useThemeColor';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
 import type { AttractionPurchasesPurchase, AttractionPurchasesFilterOptions } from '../../../types/AttractionPurchases.types';
 import { attractionPurchaseService } from '../../../services/AttractionPurchaseService';
+import { attractionPurchaseCacheService } from '../../../services/AttractionPurchaseCacheService';
 import { createPayment, PAYMENT_TYPE } from '../../../services/PaymentService';
 import Toast from '../../../components/ui/Toast';
 import { getStoredUser } from '../../../utils/storage';
@@ -31,21 +32,6 @@ const ManagePurchases = () => {
   const { themeColor, fullColor } = useThemeColor();
   const currentUser = getStoredUser();
   const isCompanyAdmin = currentUser?.role === 'company_admin';
-
-  // Get auth token from localStorage
-  const getAuthToken = () => {
-    const userData = localStorage.getItem('zapzone_user');
-    if (userData) {
-      try {
-        const user = JSON.parse(userData);
-        return user.token;
-      } catch (error) {
-        console.error('Error parsing user data:', error);
-        return null;
-      }
-    }
-    return null;
-  };
 
   const [purchases, setPurchases] = useState<AttractionPurchasesPurchase[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
@@ -71,11 +57,12 @@ const ManagePurchases = () => {
   const [processingPayment, setProcessingPayment] = useState(false);
 
   // Status colors and icons
-  const statusConfig = {
-    confirmed: { color: `bg-${themeColor}-100 text-${fullColor}`, icon: CheckCircle },
+  const statusConfig: Record<string, { color: string; icon: typeof CheckCircle }> = {
+    confirmed: { color: `bg-blue-100 text-blue-800`, icon: CheckCircle },
+    'checked-in': { color: 'bg-green-100 text-green-800', icon: CheckCircle },
     pending: { color: 'bg-yellow-100 text-yellow-800', icon: Clock },
-    cancelled: { color: 'bg-red-100 text-red-800', icon: XCircle },
-    refunded: { color: `bg-${themeColor}-100 text-${fullColor}`, icon: CheckCircle }
+    cancelled: { color: 'bg-gray-100 text-gray-800', icon: XCircle },
+    refunded: { color: 'bg-red-100 text-red-800', icon: CheckCircle }
   };
 
   // Calculate metrics data
@@ -112,44 +99,72 @@ const ManagePurchases = () => {
     }
   ];
 
-  const loadPurchases = async () => {
+  // Helper to convert raw API purchases to component format
+  const convertPurchases = (rawPurchases: any[]): AttractionPurchasesPurchase[] => {
+    return rawPurchases.map((purchase: any) => ({
+      id: purchase.id.toString(),
+      type: 'attraction',
+      attractionName: purchase.attraction?.name || 'Unknown Attraction',
+      customerName: purchase.customer 
+        ? `${purchase.customer.first_name} ${purchase.customer.last_name}`
+        : purchase.guest_name || 'Walk-in Customer',
+      email: purchase.customer?.email || purchase.guest_email || '',
+      phone: purchase.customer?.phone || purchase.guest_phone || '',
+      quantity: purchase.quantity,
+      status: purchase.status === 'completed' ? 'confirmed' : purchase.status as 'confirmed' | 'pending' | 'checked-in' | 'cancelled' | 'refunded',
+      totalAmount: Number(purchase.total_amount),
+      amountPaid: Number(purchase.amount_paid || 0),
+      createdAt: purchase.created_at,
+      paymentMethod: purchase.payment_method === 'e-wallet' ? 'paypal' : 
+                    purchase.payment_method === 'credit' ? 'credit_card' : 
+                    purchase.payment_method as 'credit_card' | 'paypal',
+      duration: purchase.attraction?.duration ? formatDurationDisplay(purchase.attraction.duration, purchase.attraction.duration_unit) : '',
+      activity: purchase.attraction?.category || '',
+      locationId: purchase.location_id,
+    }));
+  };
+
+  const loadPurchases = async (skipCache: boolean = false) => {
+    const filters: any = {
+      per_page: 100,
+      user_id: getStoredUser()?.id,
+      ...(selectedLocation && { location_id: Number(selectedLocation) })
+    };
+
     try {
       setLoading(true);
-      const authToken = getAuthToken();
-      console.log('🔐 Loading purchases - Auth Token:', authToken ? 'Present' : 'Missing');
-      const response = await attractionPurchaseService.getPurchases({
-        per_page: 100,
-        user_id: getStoredUser()?.id,
-        ...(selectedLocation && { location_id: Number(selectedLocation) })
+
+      // 1. Try cache first for instant rendering
+      if (!skipCache) {
+        const cached = await attractionPurchaseCacheService.getCachedPurchases();
+        if (cached && cached.length > 0) {
+          setPurchases(convertPurchases(cached));
+          setLoading(false);
+          // Continue to fetch fresh data in background
+        }
+      }
+
+      // 2. Fetch from API
+      const response = await attractionPurchaseService.getPurchases(filters);
+      const rawPurchases = response.data.purchases || [];
+
+      // 3. Update cache
+      await attractionPurchaseCacheService.cachePurchases(rawPurchases, {
+        locationId: selectedLocation ? Number(selectedLocation) : undefined,
+        userId: getStoredUser()?.id,
       });
 
-      // Convert API format to component format
-      const convertedPurchases: AttractionPurchasesPurchase[] = response.data.purchases.map((purchase: any) => ({
-        id: purchase.id.toString(),
-        type: 'attraction',
-        attractionName: purchase.attraction?.name || 'Unknown Attraction',
-        customerName: purchase.customer 
-          ? `${purchase.customer.first_name} ${purchase.customer.last_name}`
-          : purchase.guest_name || 'Walk-in Customer',
-        email: purchase.customer?.email || purchase.guest_email || '',
-        phone: purchase.customer?.phone || purchase.guest_phone || '',
-        quantity: purchase.quantity,
-        status: purchase.status === 'completed' ? 'confirmed' : purchase.status as 'confirmed' | 'pending' | 'cancelled' | 'refunded',
-        totalAmount: Number(purchase.total_amount),
-        amountPaid: Number(purchase.amount_paid || 0),
-        createdAt: purchase.created_at,
-        paymentMethod: purchase.payment_method === 'e-wallet' ? 'paypal' : 
-                      purchase.payment_method === 'credit' ? 'credit_card' : 
-                      purchase.payment_method as 'credit_card' | 'paypal',
-        duration: purchase.attraction?.duration ? formatDurationDisplay(purchase.attraction.duration, purchase.attraction.duration_unit) : '',
-        activity: purchase.attraction?.category || '',
-        locationId: purchase.location_id,
-      }));
-
-      setPurchases(convertedPurchases);
+      // 4. Update state
+      setPurchases(convertPurchases(rawPurchases));
     } catch (error) {
       console.error('Error loading purchases:', error);
-      setToast({ message: 'Failed to load purchases', type: 'error' });
+      // Fallback to cache on error
+      const cached = await attractionPurchaseCacheService.getCachedPurchases();
+      if (cached && cached.length > 0) {
+        setPurchases(convertPurchases(cached));
+      } else {
+        setToast({ message: 'Failed to load purchases', type: 'error' });
+      }
     } finally {
       setLoading(false);
     }
@@ -220,7 +235,7 @@ const ManagePurchases = () => {
     setFilteredPurchases(result);
   }, [purchases, filters]);
 
-  // Load purchases from backend
+  // Load purchases from backend (cache-first)
   useEffect(() => {
     loadPurchases();
   }, [selectedLocation]);
@@ -228,6 +243,17 @@ const ManagePurchases = () => {
   // Fetch locations on mount
   useEffect(() => {
     fetchLocations();
+  }, []);
+
+  // Listen for cache updates from other parts of the app (e.g. AdminSidebar notification refresh)
+  useEffect(() => {
+    const unsubscribe = attractionPurchaseCacheService.onCacheUpdate(async () => {
+      const cached = await attractionPurchaseCacheService.getCachedPurchases();
+      if (cached) {
+        setPurchases(convertPurchases(cached));
+      }
+    });
+    return unsubscribe;
   }, []);
 
   // Apply filters when purchases or filters change
@@ -269,22 +295,18 @@ const ManagePurchases = () => {
 
   const handleStatusChange = async (id: string, newStatus: AttractionPurchasesPurchase['status']) => {
     try {
-      // Map frontend status to backend status
-      let backendStatus: 'pending' | 'completed' | 'cancelled';
-      if (newStatus === 'confirmed') {
-        backendStatus = 'completed';
-      } else if (newStatus === 'refunded') {
-        backendStatus = 'cancelled'; // Map refunded to cancelled in backend
-      } else {
-        backendStatus = newStatus as 'pending' | 'cancelled';
-      }
-
-      await attractionPurchaseService.updatePurchase(Number(id), {
-        status: backendStatus,
+      // Send status directly — backend now accepts: pending, confirmed, checked-in, cancelled, refunded
+      const updateResponse = await attractionPurchaseService.updatePurchase(Number(id), {
+        status: newStatus as any,
       });
 
+      // Update cache
+      if (updateResponse.data) {
+        await attractionPurchaseCacheService.updatePurchaseInCache(updateResponse.data);
+      }
+
       setToast({ message: 'Status updated successfully', type: 'success' });
-      loadPurchases(); // Reload the list
+      loadPurchases(true); // Reload the list (skip cache since we just updated)
     } catch (error) {
       console.error('Error updating status:', error);
       setToast({ message: 'Failed to update status', type: 'error' });
@@ -295,8 +317,9 @@ const ManagePurchases = () => {
     if (window.confirm('Are you sure you want to delete this purchase record?')) {
       try {
         await attractionPurchaseService.deletePurchase(Number(id));
+        await attractionPurchaseCacheService.removePurchaseFromCache(Number(id));
         setToast({ message: 'Purchase deleted successfully', type: 'success' });
-        loadPurchases(); // Reload the list
+        loadPurchases(true); // Reload the list
       } catch (error) {
         console.error('Error deleting purchase:', error);
         setToast({ message: 'Failed to delete purchase', type: 'error' });
@@ -313,9 +336,13 @@ const ManagePurchases = () => {
         await Promise.all(
           selectedPurchases.map(id => attractionPurchaseService.deletePurchase(Number(id)))
         );
+        // Remove from cache
+        await Promise.all(
+          selectedPurchases.map(id => attractionPurchaseCacheService.removePurchaseFromCache(Number(id)))
+        );
         setToast({ message: `${selectedPurchases.length} purchase(s) deleted successfully`, type: 'success' });
         setSelectedPurchases([]);
-        loadPurchases(); // Reload the list
+        loadPurchases(true); // Reload the list
       } catch (error) {
         console.error('Error deleting purchases:', error);
         setToast({ message: 'Failed to delete some purchases', type: 'error' });
@@ -327,27 +354,19 @@ const ManagePurchases = () => {
     if (selectedPurchases.length === 0) return;
     
     try {
-      // Map frontend status to backend status
-      let backendStatus: 'pending' | 'completed' | 'cancelled';
-      if (newStatus === 'confirmed') {
-        backendStatus = 'completed';
-      } else if (newStatus === 'refunded') {
-        backendStatus = 'cancelled';
-      } else {
-        backendStatus = newStatus as 'pending' | 'cancelled';
-      }
+      // Send status directly — backend now accepts: pending, confirmed, checked-in, cancelled, refunded
 
       // Update each purchase's status
       await Promise.all(
         selectedPurchases.map(id => 
           attractionPurchaseService.updatePurchase(Number(id), {
-            status: backendStatus,
+            status: newStatus as any,
           })
         )
       );
       setToast({ message: `${selectedPurchases.length} purchase(s) updated successfully`, type: 'success' });
       setSelectedPurchases([]);
-      loadPurchases(); // Reload the list
+      loadPurchases(true); // Reload the list and refresh cache
     } catch (error) {
       console.error('Error updating purchases:', error);
       setToast({ message: 'Failed to update some purchases', type: 'error' });
@@ -366,7 +385,7 @@ const ManagePurchases = () => {
       purchase.totalAmount,
       purchase.status,
       purchase.paymentMethod,
-      new Date(purchase.createdAt).toLocaleDateString()
+      new Date(purchase.createdAt).toLocaleString()
     ]);
 
     const csvContent = [
@@ -452,16 +471,15 @@ const ManagePurchases = () => {
         throw new Error(paymentResponse.message || 'Failed to create payment');
       }
 
-      // Update purchase status, amount paid, and payment method
+      // Update purchase amount paid and payment method — backend auto-determines status
       await attractionPurchaseService.updatePurchase(Number(selectedPurchaseForPayment.id), {
-        status: 'completed',
         amount_paid: amount,
         payment_method: paymentMethod,
       });
 
       setToast({ message: 'Payment processed successfully!', type: 'success' });
       handleClosePaymentModal();
-      loadPurchases(); // Reload to get fresh data
+      loadPurchases(true); // Reload to get fresh data and update cache
     } catch (error) {
       console.error('Error processing payment:', error);
       setToast({ message: 'Failed to process payment. Please try again.', type: 'error' });
@@ -584,7 +602,7 @@ const ManagePurchases = () => {
             <StandardButton
               variant="secondary"
               size="sm"
-              onClick={loadPurchases}
+              onClick={() => loadPurchases(true)}
               icon={RefreshCcw}
             >
               {''}
@@ -606,6 +624,7 @@ const ManagePurchases = () => {
                   <option value="all">All Statuses</option>
                   <option value="confirmed">Confirmed</option>
                   <option value="pending">Pending</option>
+                  <option value="checked-in">Checked In</option>
                   <option value="cancelled">Cancelled</option>
                   <option value="refunded">Refunded</option>
                 </select>
@@ -662,6 +681,7 @@ const ManagePurchases = () => {
             >
               <option value="">Change Status</option>
               <option value="confirmed">Confirm</option>
+              <option value="checked-in">Check In</option>
               <option value="cancelled">Cancel</option>
               <option value="refunded">Refund</option>
             </select>
@@ -752,17 +772,19 @@ const ManagePurchases = () => {
                         <select
                           value={purchase.status}
                           onChange={(e) => handleStatusChange(purchase.id, e.target.value as AttractionPurchasesPurchase['status'])}
-                          className={`text-xs font-medium px-3 py-1 rounded-full ${statusConfig[purchase.status].color} border-none focus:ring-2 focus:ring-${themeColor}-600`}
+                          className={`text-xs font-medium px-3 py-1 rounded-full ${statusConfig[purchase.status]?.color || 'bg-gray-100 text-gray-800'} border-none focus:ring-2 focus:ring-${themeColor}-600`}
+                          disabled={purchase.status === 'checked-in'}
                         >
                           <option value="confirmed">Confirmed</option>
                           <option value="pending">Pending</option>
+                          <option value="checked-in">Checked In</option>
                           <option value="cancelled">Cancelled</option>
                           <option value="refunded">Refunded</option>
                         </select>
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-1">
-                          {purchase.status === 'pending' && (
+                          {purchase.status === 'pending' && purchase.amountPaid < purchase.totalAmount && (
                             <button
                               onClick={() => handleOpenPaymentModal(purchase)}
                               className="p-2 text-green-600 hover:text-green-700 hover:bg-green-50 rounded-lg transition-colors"

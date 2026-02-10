@@ -43,7 +43,8 @@ const PurchaseDetails = () => {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
   const statusConfig = {
-    completed: { color: `bg-green-100 text-green-800`, icon: CheckCircle, label: 'Confirmed' },
+    confirmed: { color: 'bg-blue-100 text-blue-800', icon: CheckCircle, label: 'Confirmed' },
+    'checked-in': { color: 'bg-green-100 text-green-800', icon: CheckCircle, label: 'Checked In' },
     pending: { color: 'bg-yellow-100 text-yellow-800', icon: Clock, label: 'Pending' },
     cancelled: { color: 'bg-red-100 text-red-800', icon: XCircle, label: 'Cancelled' },
     refunded: { color: 'bg-purple-100 text-purple-800', icon: CheckCircle, label: 'Refunded' }
@@ -105,7 +106,7 @@ const PurchaseDetails = () => {
     );
   }
 
-  const status = purchase.status === 'completed' ? 'completed' : purchase.status;
+  const status = purchase.status === 'completed' ? 'confirmed' : purchase.status;
 
   return (
     <div className="min-h-screen px-6 py-8 animate-fade-in-up">

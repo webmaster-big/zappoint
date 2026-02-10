@@ -371,7 +371,6 @@ const CreatePurchase = () => {
         currency: 'USD',
         method: paymentMethod === 'in-store' ? 'cash' : paymentMethod as 'card' | 'paylater' | 'authorize.net',
         payment_method: paymentMethod as 'card' | 'in-store' | 'paylater' | 'authorize.net',
-        status: (paymentMethod === 'paylater' || paymentMethod === 'in-store' ? 'pending' : 'completed') as 'pending' | 'completed' | 'cancelled',
         location_id: selectedAttraction.locationId || 1,
         purchase_date: new Date().toISOString().split('T')[0],
         notes: notes || `Attraction Purchase: ${selectedAttraction.name} (${quantity} ticket${quantity > 1 ? 's' : ''})`,
@@ -475,15 +474,15 @@ const CreatePurchase = () => {
             sendEmail
           );
           if (sendEmail) {
-            setToast({ message: 'Purchase completed! Receipt sent to email.', type: 'success' });
+            setToast({ message: 'Purchase confirmed! Receipt sent to email.', type: 'success' });
           } else {
-            setToast({ message: 'Purchase completed! (Email not sent per request)', type: 'info' });
+            setToast({ message: 'Purchase confirmed! (Email not sent per request)', type: 'info' });
           }
         } catch (emailError) {
-          setToast({ message: 'Purchase completed! (Email failed to send)', type: 'info' });
+          setToast({ message: 'Purchase confirmed! (Email failed to send)', type: 'info' });
         }
       } else {
-        setToast({ message: 'Purchase completed! (Email not sent - QR code generation failed)', type: 'info' });
+        setToast({ message: 'Purchase confirmed! (Email not sent - QR code generation failed)', type: 'info' });
       }
 
       // Reset form immediately

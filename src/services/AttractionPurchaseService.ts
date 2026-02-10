@@ -36,7 +36,7 @@ export interface AttractionPurchase {
   quantity: number;
   total_amount: number;
   payment_method: 'card' | 'in-store' | 'paylater' | 'authorize.net';
-  status: 'pending' | 'completed' | 'cancelled';
+  status: 'pending' | 'confirmed' | 'checked-in' | 'cancelled' | 'refunded';
   purchase_date: string;
   notes?: string;
   created_by?: number;
@@ -71,13 +71,13 @@ export interface CreatePurchaseData {
   amount_paid?: number;
   currency?: string;
   method?: string;
-  status?: 'pending' | 'completed' | 'cancelled';
+  status?: 'pending' | 'confirmed' | 'checked-in' | 'cancelled' | 'refunded';
   payment_id?: string;
   location_id?: number;
 }
 
 export interface UpdatePurchaseData extends Partial<CreatePurchaseData> {
-  status?: 'pending' | 'completed' | 'cancelled';
+  status?: 'pending' | 'confirmed' | 'checked-in' | 'cancelled' | 'refunded';
 }
 
 export interface PurchaseFilters {
@@ -121,8 +121,10 @@ export interface PurchaseStatistics {
   total_purchases: number;
   total_revenue: number;
   pending_purchases: number;
-  completed_purchases: number;
+  confirmed_purchases: number;
+  checked_in_purchases: number;
   cancelled_purchases: number;
+  refunded_purchases: number;
   total_quantity_sold: number;
   by_payment_method: Array<{
     payment_method: string;
@@ -190,10 +192,10 @@ class AttractionPurchaseService {
   }
 
   /**
-   * Mark purchase as completed
+   * Mark purchase as confirmed
    */
-  async markAsCompleted(id: number): Promise<ApiResponse<AttractionPurchase>> {
-    const response = await api.patch(`/attraction-purchases/${id}/complete`);
+  async markAsConfirmed(id: number): Promise<ApiResponse<AttractionPurchase>> {
+    const response = await api.patch(`/attraction-purchases/${id}/confirm`);
     return response.data;
   }
 
