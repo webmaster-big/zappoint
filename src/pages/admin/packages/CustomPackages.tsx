@@ -116,8 +116,8 @@ const CustomPackages: React.FC = () => {
 
   // Listen for cache updates from background sync
   useEffect(() => {
-    const unsubscribe = packageCacheService.onCacheUpdate(async (event: { source: string }) => {
-      if (event.source === 'api') {
+    const unsubscribe = packageCacheService.onCacheUpdate(async (event: CustomEvent) => {
+      if (event.detail?.source === 'api') {
         const cached = await packageCacheService.getCachedPackages();
         if (cached) {
           const customPackages = cached.filter(

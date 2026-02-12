@@ -204,8 +204,8 @@ const Rooms: React.FC = () => {
 
     // Listen for cache updates from background sync
     useEffect(() => {
-        const unsubscribe = roomCacheService.onCacheUpdate(async (event: { source: string }) => {
-            if (event.source === 'api') {
+        const unsubscribe = roomCacheService.onCacheUpdate(async (event: CustomEvent) => {
+            if (event.detail?.source === 'api') {
                 const cacheFilters = isCompanyAdmin && selectedLocationId ? { location_id: selectedLocationId } : {};
                 const cached = await roomCacheService.getFilteredRoomsFromCache(cacheFilters);
                 if (cached) {

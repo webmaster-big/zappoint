@@ -137,8 +137,8 @@ const ManageAddons = () => {
 
   // Listen for cache updates from background sync
   useEffect(() => {
-    const unsubscribe = addOnCacheService.onCacheUpdate(async (event: { source: string }) => {
-      if (event.source === 'api') {
+    const unsubscribe = addOnCacheService.onCacheUpdate(async (event: CustomEvent) => {
+      if (event.detail?.source === 'api') {
         const params: { user_id?: number; location_id?: number } = {
           user_id: getStoredUser()?.id,
         };

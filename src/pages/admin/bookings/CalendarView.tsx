@@ -232,8 +232,8 @@ const CalendarView: React.FC = () => {
 
   // Listen for cache updates from background sync
   useEffect(() => {
-    const unsubscribe = bookingCacheService.onCacheUpdate(async (event: { source: string }) => {
-      if (event.source === 'api') {
+    const unsubscribe = bookingCacheService.onCacheUpdate(async (event: CustomEvent) => {
+      if (event.detail?.source === 'api') {
         loadBookings();
       }
     });

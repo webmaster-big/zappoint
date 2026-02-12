@@ -274,8 +274,8 @@ const SpaceSchedule = () => {
 
   // Listen for cache updates from background sync
   useEffect(() => {
-    const unsubRoom = roomCacheService.onCacheUpdate(async (event: { source: string }) => {
-      if (event.source === 'api') {
+    const unsubRoom = roomCacheService.onCacheUpdate(async (event: CustomEvent) => {
+      if (event.detail?.source === 'api') {
         const cachedRooms = await roomCacheService.getCachedRooms();
         if (cachedRooms) {
           const sortedSpaces = [...cachedRooms].sort(naturalSort);
@@ -283,8 +283,8 @@ const SpaceSchedule = () => {
         }
       }
     });
-    const unsubBooking = bookingCacheService.onCacheUpdate(async (event: { source: string }) => {
-      if (event.source === 'api') {
+    const unsubBooking = bookingCacheService.onCacheUpdate(async (event: CustomEvent) => {
+      if (event.detail?.source === 'api') {
         loadBookings();
       }
     });
