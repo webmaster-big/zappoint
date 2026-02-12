@@ -13,7 +13,7 @@ import {
   DollarSign,
   FileText
 } from 'lucide-react';
-import { formatDurationDisplay } from '../../../utils/timeFormat';
+import { formatDurationDisplay, formatLocalDateTime } from '../../../utils/timeFormat';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { attractionPurchaseService } from '../../../services/AttractionPurchaseService';
 import Toast from '../../../components/ui/Toast';
@@ -89,15 +89,7 @@ const PurchaseDetails = () => {
   };
 
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
+  const formatDate = (dateString: string) => formatLocalDateTime(dateString);
 
   if (loading) {
     return (

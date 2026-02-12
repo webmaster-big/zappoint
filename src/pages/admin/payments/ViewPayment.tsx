@@ -22,6 +22,7 @@ import type { PaymentsPagePayment } from '../../../types/Payments.types';
 import StandardButton from '../../../components/ui/StandardButton';
 import Toast from '../../../components/ui/Toast';
 import { getImageUrl } from '../../../utils/storage';
+import { formatLocalDateTime, parseLocalDate } from '../../../utils/timeFormat';
 import RefundModal from '../../../components/admin/payments/RefundModal';
 import VoidDialog from '../../../components/admin/payments/VoidDialog';
 import ManualRefundModal from '../../../components/admin/payments/ManualRefundModal';
@@ -184,17 +185,14 @@ const ViewPayment: React.FC = () => {
     'in-store': 'In-Store'
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
+  const formatDate = (dateString: string) => formatLocalDateTime(dateString, {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
 
   // Determine payable type and details
   const payableType = payment.payable_type || (payment.booking_id ? 'App\\Models\\Booking' : null);
@@ -470,7 +468,7 @@ const ViewPayment: React.FC = () => {
                         <div>
                           <p className="text-sm text-gray-500">Booking Date</p>
                           <p className="font-medium text-gray-900">
-                            {new Date(payment.booking.booking_date).toLocaleDateString()}
+                            {parseLocalDate(payment.booking.booking_date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
                           </p>
                         </div>
                       </div>

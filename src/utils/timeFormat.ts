@@ -13,6 +13,49 @@ export function parseLocalDate(isoDateString: string): Date {
 }
 
 /**
+ * Parses a datetime string from the database WITHOUT timezone conversion.
+ * Accepts formats like "2026-02-13T15:30:00.000000Z", "2026-02-13 15:30:00", or "2026-02-13".
+ * Returns a Date that represents the exact date/time stored in the DB regardless of browser timezone.
+ */
+export function parseLocalDateTime(dateTimeString: string): Date {
+  if (!dateTimeString) return new Date();
+  // Replace 'T' with space and strip trailing 'Z' / timezone offset / microseconds
+  const cleaned = dateTimeString.replace('T', ' ').replace(/[Z]$/, '');
+  // Split into date and time portions
+  const [datePart, timePart] = cleaned.split(' ');
+  const [year, month, day] = datePart.split('-').map(Number);
+  if (!timePart) return new Date(year, month - 1, day);
+  const timeParts = timePart.split(':');
+  const hour = parseInt(timeParts[0], 10) || 0;
+  const minute = parseInt(timeParts[1], 10) || 0;
+  const second = parseInt(timeParts[2], 10) || 0;
+  return new Date(year, month - 1, day, hour, minute, second);
+}
+
+/**
+ * Formats a database datetime string for display WITHOUT timezone conversion.
+ * The date/time shown will match exactly what's in the database.
+ * @param dateTimeString - DateTime from DB (e.g., "2026-02-13T15:30:00.000000Z")
+ * @param options - Intl.DateTimeFormat options (defaults to long format with time)
+ * @returns Formatted date string (e.g., "February 13, 2026, 3:30 PM")
+ */
+export function formatLocalDateTime(
+  dateTimeString: string,
+  options?: Intl.DateTimeFormatOptions
+): string {
+  if (!dateTimeString) return 'N/A';
+  const date = parseLocalDateTime(dateTimeString);
+  const defaultOptions: Intl.DateTimeFormatOptions = options || {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  };
+  return date.toLocaleDateString('en-US', defaultOptions);
+}
+
+/**
  * Converts 24-hour time format to 12-hour format with AM/PM
  * @param time24 - Time in 24-hour format (e.g., "17:00" or "17:00:00")
  * @returns Time in 12-hour format (e.g., "5:00 PM")

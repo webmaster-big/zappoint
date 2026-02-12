@@ -38,7 +38,7 @@ import { createPayment, PAYMENT_TYPE } from '../../services/PaymentService';
 import { locationService } from '../../services/LocationService';
 import { metricsService, type TimeframeType } from '../../services/MetricsService';
 import { metricsCacheService } from '../../services/MetricsCacheService';
-import { formatDurationDisplay, convertTo12Hour, parseLocalDate } from '../../utils/timeFormat';
+import { formatDurationDisplay, convertTo12Hour, parseLocalDate, formatLocalDateTime } from '../../utils/timeFormat';
 import { roomService, type Room } from '../../services/RoomService';
 import { roomCacheService } from '../../services/RoomCacheService';
 import { attractionPurchaseCacheService } from '../../services/AttractionPurchaseCacheService';
@@ -1494,14 +1494,14 @@ const LocationManagerDashboard: React.FC = () => {
                   <tr key={purchase.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3">
                       <div className="font-medium text-gray-900">
-                        {new Date(purchase.purchase_date || purchase.created_at).toLocaleDateString('en-US', { 
+                        {formatLocalDateTime(purchase.purchase_date || purchase.created_at, { 
                           month: 'short', 
                           day: 'numeric',
                           year: 'numeric'
                         })}
                       </div>
                       <div className="text-xs text-gray-500">
-                        {new Date(purchase.purchase_date || purchase.created_at).toLocaleTimeString('en-US', { 
+                        {formatLocalDateTime(purchase.purchase_date || purchase.created_at, { 
                           hour: '2-digit',
                           minute: '2-digit'
                         })}
@@ -1610,10 +1610,10 @@ const LocationManagerDashboard: React.FC = () => {
                     </td>
                     <td className="px-4 py-3">
                       <div className="font-medium text-gray-900">
-                        {new Date(booking.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        {formatLocalDateTime(booking.created_at, { month: 'short', day: 'numeric', year: 'numeric' })}
                       </div>
                       <div className="text-xs text-gray-500">
-                        {new Date(booking.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                        {formatLocalDateTime(booking.created_at, { hour: '2-digit', minute: '2-digit' })}
                       </div>
                     </td>
                     <td className="px-4 py-3">

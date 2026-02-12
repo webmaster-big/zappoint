@@ -38,7 +38,7 @@ import { createPayment, PAYMENT_TYPE } from '../../services/PaymentService';
 import MetricsService, { type TimeframeType } from '../../services/MetricsService';
 import { metricsCacheService } from '../../services/MetricsCacheService';
 import { useThemeColor } from '../../hooks/useThemeColor';
-import { parseLocalDate, convertTo12Hour, formatDurationDisplay } from '../../utils/timeFormat';
+import { parseLocalDate, convertTo12Hour, formatDurationDisplay, formatLocalDateTime } from '../../utils/timeFormat';
 import { roomService, type Room } from '../../services/RoomService';
 import { roomCacheService } from '../../services/RoomCacheService';
 import { attractionPurchaseCacheService } from '../../services/AttractionPurchaseCacheService';
@@ -1943,7 +1943,7 @@ const AttendantDashboard: React.FC = () => {
                    <tr key={index} className="hover:bg-gray-50">
                      <td className="px-4 py-3">
                        <span className="text-sm text-gray-900">
-                         {purchase.purchase_date ? new Date(purchase.purchase_date).toLocaleDateString('en-US', { 
+                         {purchase.purchase_date ? formatLocalDateTime(purchase.purchase_date, { 
                            year: 'numeric', 
                            month: 'short', 
                            day: 'numeric'
@@ -2018,6 +2018,7 @@ const AttendantDashboard: React.FC = () => {
                    <th className="px-4 py-3 font-medium">Customer</th>
                    <th className="px-4 py-3 font-medium">Package</th>
                    <th className="px-4 py-3 font-medium">Date & Time</th>
+                   <th className="px-4 py-3 font-medium">Created</th>
                    <th className="px-4 py-3 font-medium">Participants</th>
                    <th className="px-4 py-3 font-medium">Amount</th>
                    <th className="px-4 py-3 font-medium">Payment</th>
@@ -2056,10 +2057,17 @@ const AttendantDashboard: React.FC = () => {
                            }) : 'N/A'}
                          </span>
                          <span className="text-xs text-gray-500">
-                           {booking.booking_time ? new Date(booking.booking_time).toLocaleTimeString('en-US', {
-                             hour: '2-digit',
-                             minute: '2-digit'
-                           }) : 'N/A'}
+                           {booking.booking_time ? convertTo12Hour(booking.booking_time) : 'N/A'}
+                         </span>
+                       </div>
+                     </td>
+                     <td className="px-4 py-3">
+                       <div className="flex flex-col">
+                         <span className="text-sm text-gray-900">
+                           {booking.created_at ? formatLocalDateTime(booking.created_at, { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A'}
+                         </span>
+                         <span className="text-xs text-gray-500">
+                           {booking.created_at ? formatLocalDateTime(booking.created_at, { hour: '2-digit', minute: '2-digit' }) : ''}
                          </span>
                        </div>
                      </td>

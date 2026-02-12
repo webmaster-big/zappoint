@@ -43,7 +43,7 @@ import { createPayment, PAYMENT_TYPE } from '../../services/PaymentService';
 import { locationService, type Location } from '../../services/LocationService';
 import { metricsService, type TimeframeType } from '../../services/MetricsService';
 import { metricsCacheService } from '../../services/MetricsCacheService';
-import { formatDurationDisplay, convertTo12Hour, parseLocalDate } from '../../utils/timeFormat';
+import { formatDurationDisplay, convertTo12Hour, parseLocalDate, formatLocalDateTime } from '../../utils/timeFormat';
 import { roomService, type Room } from '../../services/RoomService';
 import { roomCacheService } from '../../services/RoomCacheService';
 import { attractionPurchaseCacheService } from '../../services/AttractionPurchaseCacheService';
@@ -2056,7 +2056,7 @@ const CompanyDashboard: React.FC = () => {
                       <div className="text-xs text-gray-500">{convertTo12Hour(booking.booking_time)}</div>
                     </td>
                     <td className="px-3 md:px-4 py-2 md:py-3">
-                      <div className="text-sm text-gray-500">{new Date(booking.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div></td>
+                      <div className="text-sm text-gray-500">{formatLocalDateTime(booking.created_at, { month: 'short', day: 'numeric', year: 'numeric' })}</div></td>
                     <td className="px-3 md:px-4 py-2 md:py-3">
                       <div>
                         <div className="font-medium text-gray-900 text-xs md:text-sm">{customerName}</div>

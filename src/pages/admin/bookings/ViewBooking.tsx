@@ -20,16 +20,8 @@ import {
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import bookingService, { type Booking } from '../../../services/bookingService';
 import { bookingCacheService } from '../../../services/BookingCacheService';
-import { formatDurationDisplay, convertTo12Hour } from '../../../utils/timeFormat';
+import { formatDurationDisplay, convertTo12Hour, parseLocalDate, formatLocalDateTime } from '../../../utils/timeFormat';
 import StandardButton from '../../../components/ui/StandardButton';
-
-// Helper function to parse ISO date string (YYYY-MM-DD) in local timezone
-// Avoids UTC offset issues that cause date to show as previous day
-const parseLocalDate = (isoDateString: string): Date => {
-  if (!isoDateString) return new Date();
-  const [year, month, day] = isoDateString.split('T')[0].split('-').map(Number);
-  return new Date(year, month - 1, day);
-};
 
 const ViewBooking: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
@@ -532,7 +524,7 @@ const ViewBooking: React.FC = () => {
                           <p className="text-sm text-gray-600">
                             {payment.method ? payment.method.replace('_', ' ').charAt(0).toUpperCase() + payment.method.slice(1).replace('_', ' ') : 'N/A'}
                             {' • '}
-                            {new Date(payment.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} {new Date(payment.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                            {formatLocalDateTime(payment.created_at, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                           </p>
                           {payment.notes && (
                             <p className="text-xs text-gray-500 mt-1">{payment.notes}</p>
@@ -675,6 +667,16 @@ const ViewBooking: React.FC = () => {
               <p className="text-gray-700">{booking.internal_notes}</p>
             </div>
           )}
+
+          {/* Timestamps */}
+          <div className="p-6 bg-gray-100 border-t border-gray-200">
+            <div className="flex items-center gap-6 text-sm text-gray-500">
+              <div className="flex items-center gap-2">
+                <Clock className="h-4 w-4" />
+                <span>Created: {formatLocalDateTime(booking.created_at, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* QR Code Modal */}
