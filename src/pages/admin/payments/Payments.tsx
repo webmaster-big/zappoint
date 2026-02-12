@@ -56,9 +56,23 @@ import CounterAnimation from '../../../components/ui/CounterAnimation';
 import RefundModal from '../../../components/admin/payments/RefundModal';
 import VoidDialog from '../../../components/admin/payments/VoidDialog';
 import ManualRefundModal from '../../../components/admin/payments/ManualRefundModal';
-import { getStoredUser } from '../../../utils/storage';
+import { getStoredUser, getImageUrl } from '../../../utils/storage';
 import type { PaymentsPagePayment, PaymentsFilterOptions, PaymentsMetrics } from '../../../types/Payments.types';
 import type { Payment, PaymentFilters, RefundResponse, VoidResponse, ManualRefundResponse } from '../../../types/Payment.types';
+import type { PaymentPayableType } from '../../../types/Payment.types';
+
+/**
+ * Normalize payable_type from API response.
+ * The backend may return the full Laravel class name (e.g. "App\Models\Booking")
+ * or the short morph alias ("booking"). This ensures we always use the short form.
+ */
+const normalizePayableType = (type?: string | null): PaymentPayableType | undefined => {
+  if (!type) return undefined;
+  const lower = type.toLowerCase();
+  if (lower === PAYMENT_TYPE.BOOKING || lower.includes('booking')) return PAYMENT_TYPE.BOOKING;
+  if (lower === PAYMENT_TYPE.ATTRACTION_PURCHASE || lower.includes('attractionpurchase') || lower.includes('attraction_purchase')) return PAYMENT_TYPE.ATTRACTION_PURCHASE;
+  return type as PaymentPayableType;
+};
 
 const Payments: React.FC = () => {
   const navigate = useNavigate();
@@ -198,6 +212,9 @@ const Payments: React.FC = () => {
       
       if (response.success && response.data) {
         const transformedPayments: PaymentsPagePayment[] = response.data.payments.map((payment: Payment) => {
+          // Normalize payable_type (handles full Laravel class names like "App\Models\Booking")
+          const payableType = normalizePayableType(payment.payable_type as string);
+          
           // Get booking or attraction purchase details
           const booking = payment.booking;
           const attractionPurchase = payment.attractionPurchase || payment.attraction_purchase;
@@ -209,10 +226,10 @@ const Payments: React.FC = () => {
           if (payment.customer) {
             customerName = `${payment.customer.first_name} ${payment.customer.last_name}`;
             customerEmail = payment.customer.email || 'N/A';
-          } else if (payment.payable_type === PAYMENT_TYPE.BOOKING && booking) {
+          } else if (payableType === PAYMENT_TYPE.BOOKING && booking) {
             customerName = booking.guest_name || 'Guest';
             customerEmail = booking.guest_email || 'N/A';
-          } else if (payment.payable_type === PAYMENT_TYPE.ATTRACTION_PURCHASE && attractionPurchase) {
+          } else if (payableType === PAYMENT_TYPE.ATTRACTION_PURCHASE && attractionPurchase) {
             customerName = attractionPurchase.guest_name || 'Guest';
             customerEmail = attractionPurchase.guest_email || 'N/A';
           }
@@ -221,16 +238,16 @@ const Payments: React.FC = () => {
           let payableReference = 'N/A';
           let payableDescription = 'Unknown';
           
-          if (payment.payable_type === PAYMENT_TYPE.BOOKING && booking) {
+          if (payableType === PAYMENT_TYPE.BOOKING && booking) {
             payableReference = booking.reference_number || `Booking #${payment.payable_id}`;
             payableDescription = `Package Booking • ${booking.participants || 0} guests`;
-          } else if (payment.payable_type === PAYMENT_TYPE.BOOKING) {
+          } else if (payableType === PAYMENT_TYPE.BOOKING) {
             payableReference = `Booking #${payment.payable_id}`;
             payableDescription = 'Package Booking';
-          } else if (payment.payable_type === PAYMENT_TYPE.ATTRACTION_PURCHASE && attractionPurchase) {
+          } else if (payableType === PAYMENT_TYPE.ATTRACTION_PURCHASE && attractionPurchase) {
             payableReference = attractionPurchase.transaction_id || `Purchase #${payment.payable_id}`;
             payableDescription = `Attraction • Qty: ${attractionPurchase.quantity || 1}`;
-          } else if (payment.payable_type === PAYMENT_TYPE.ATTRACTION_PURCHASE) {
+          } else if (payableType === PAYMENT_TYPE.ATTRACTION_PURCHASE) {
             payableReference = `Purchase #${payment.payable_id}`;
             payableDescription = 'Attraction Purchase';
           }
@@ -238,7 +255,7 @@ const Payments: React.FC = () => {
           return {
             id: payment.id,
             payable_id: payment.payable_id,
-            payable_type: payment.payable_type,
+            payable_type: payableType,
             customer_id: payment.customer_id,
             location_id: payment.location_id,
             amount: Number(payment.amount),
@@ -267,8 +284,8 @@ const Payments: React.FC = () => {
             participants: booking?.participants,
             guestName: booking?.guest_name || attractionPurchase?.guest_name,
             // Signature & Terms
-            signature_image: (payment as any).signature_image || null,
-            terms_accepted: (payment as any).terms_accepted ?? null,
+            signature_image: payment.signature_image || null,
+            terms_accepted: payment.terms_accepted ?? null,
           };
         });
 
@@ -1868,7 +1885,7 @@ const Payments: React.FC = () => {
                 {signatureModalPayment.signature_image ? (
                   <div className="border-2 border-gray-200 rounded-lg p-4 bg-white">
                     <img
-                      src={signatureModalPayment.signature_image}
+                      src={getImageUrl(signatureModalPayment.signature_image)}
                       alt="Customer signature"
                       className="max-h-[200px] w-full object-contain"
                     />
