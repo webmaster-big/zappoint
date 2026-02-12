@@ -498,7 +498,7 @@ const PurchaseAttraction = () => {
       
       const paymentId = paymentResponse.payment?.id;
       const transactionId = paymentResponse.transaction_id;
-      console.log('✅ Payment charged successfully, payment ID:', paymentId);
+      console.log('✅ Payment charged successfully, payment ID:', paymentId, 'txn:', transactionId);
 
       // Step 2: Create attraction purchase (customer already charged)
       const purchaseData = {
@@ -534,7 +534,7 @@ const PurchaseAttraction = () => {
       // Step 3: Link payment to purchase (with retry for reliability)
       if (paymentId) {
         try {
-          await linkPaymentWithRetry(paymentId, createdPurchase.id, PAYMENT_TYPE.ATTRACTION_PURCHASE);
+          await linkPaymentWithRetry(paymentId, createdPurchase.id, PAYMENT_TYPE.ATTRACTION_PURCHASE, 3, transactionId);
           console.log('✅ Payment linked to purchase successfully');
         } catch (linkErr) {
           // Non-critical: payment and purchase both exist, just not linked yet

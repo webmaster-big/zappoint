@@ -20,7 +20,7 @@ import LocationSelector from '../../../components/admin/LocationSelector';
 import Toast from '../../../components/ui/Toast';
 import EmptyStateModal from '../../../components/ui/EmptyStateModal';
 import { ASSET_URL, getStoredUser } from '../../../utils/storage';
-import { loadAcceptJS, processCardPayment, validateCardNumber, formatCardNumber, getCardType, createPayment, PAYMENT_TYPE } from '../../../services/PaymentService';
+import { loadAcceptJS, processCardPayment, validateCardNumber, formatCardNumber, getCardType, createPayment, PAYMENT_TYPE, linkPaymentWithRetry } from '../../../services/PaymentService';
 import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
 import { generatePurchaseQRCode } from '../../../utils/qrcode';
 import StandardButton from '../../../components/ui/StandardButton';
@@ -397,13 +397,12 @@ const CreatePurchase = () => {
           phone: customerInfo.phone || '',
         };
         
+        // Charge-then-link: charge without payable_id, then link after
         const paymentData = {
           location_id: selectedAttraction.locationId || 1,
           amount: totalAmount,
           order_id: `A${selectedAttraction.id}-${Date.now().toString().slice(-8)}`,
           description: `Attraction Purchase: ${selectedAttraction.name}`,
-          payable_id: createdPurchase.id,
-          payable_type: PAYMENT_TYPE.ATTRACTION_PURCHASE,
           customer_id: selectedCustomerId || undefined,
         };
         
@@ -426,15 +425,27 @@ const CreatePurchase = () => {
           throw new Error(paymentResponse.message || 'Payment failed. Please try again.');
         }
         
+        const paymentId = paymentResponse.payment?.id;
         transactionId = paymentResponse.transaction_id;
+        console.log('✅ Payment charged successfully, payment ID:', paymentId, 'txn:', transactionId);
 
-        // Update purchase with payment_id (transaction_id)
+        // Update purchase with transaction_id
         try {
           await attractionPurchaseService.updatePurchase(createdPurchase.id, {
             payment_id: transactionId
           });
         } catch (updateError) {
           // Non-critical - purchase and payment succeeded
+        }
+
+        // Link payment to purchase (with retry for reliability)
+        if (paymentId) {
+          try {
+            await linkPaymentWithRetry(paymentId, createdPurchase.id, PAYMENT_TYPE.ATTRACTION_PURCHASE, 3, transactionId);
+            console.log('✅ Payment linked to purchase successfully');
+          } catch (linkErr) {
+            console.error('⚠️ Failed to link payment to purchase:', linkErr);
+          }
         }
       } else if (cashAmountPaid > 0 && paymentMethod !== 'paylater') {
         // Step 2b: For non-card payments (in-store/cash), create payment record

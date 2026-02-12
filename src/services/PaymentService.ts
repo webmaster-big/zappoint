@@ -36,6 +36,19 @@ api.interceptors.request.use(
     const token = getStoredUser()?.token;
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+    } else {
+      // Fallback: check customer auth token for customer-facing pages
+      try {
+        const customerData = localStorage.getItem('zapzone_customer');
+        if (customerData) {
+          const customer = JSON.parse(customerData);
+          if (customer?.token) {
+            config.headers.Authorization = `Bearer ${customer.token}`;
+          }
+        }
+      } catch {
+        // Silent fail - no customer token available
+      }
     }
     return config;
   },
@@ -212,9 +225,11 @@ export const manualRefundPayment = async (
  */
 export const linkPaymentToPayable = async (
   paymentId: number,
-  data: LinkPayableRequest
+  data: LinkPayableRequest,
+  transactionId?: string
 ): Promise<LinkPayableResponse> => {
-  const response = await api.patch<LinkPayableResponse>(`/payments/${paymentId}/payable`, data);
+  const params = transactionId ? `?transaction_id=${encodeURIComponent(transactionId)}` : '';
+  const response = await api.put<LinkPayableResponse>(`/payments/${paymentId}/payable${params}`, data);
   return response.data;
 };
 
@@ -232,14 +247,15 @@ export const linkPaymentWithRetry = async (
   paymentId: number,
   payableId: number,
   payableType: 'booking' | 'attraction_purchase',
-  maxRetries: number = 3
+  maxRetries: number = 3,
+  transactionId?: string
 ): Promise<LinkPayableResponse> => {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       const response = await linkPaymentToPayable(paymentId, {
         payable_id: payableId,
         payable_type: payableType,
-      });
+      }, transactionId);
       return response;
     } catch (err) {
       console.warn(`⚠️ Link payment attempt ${attempt}/${maxRetries} failed:`, err);

@@ -1507,7 +1507,8 @@ const OnsiteBooking: React.FC = () => {
           }
           
           const paymentId = paymentResult.payment?.id;
-          console.log('✅ Payment charged successfully, payment ID:', paymentId);
+          const chargeTransactionId = paymentResult.transaction_id;
+          console.log('✅ Payment charged successfully, payment ID:', paymentId, 'txn:', chargeTransactionId);
           
           // Step 2: Create booking (customer already charged)
           const response = await bookingService.createBooking(bookingData_request);
@@ -1536,7 +1537,7 @@ const OnsiteBooking: React.FC = () => {
           // Step 3: Link payment to booking (with retry for reliability)
           if (paymentId) {
             try {
-              await linkPaymentWithRetry(paymentId, bookingId, PAYMENT_TYPE.BOOKING);
+              await linkPaymentWithRetry(paymentId, bookingId, PAYMENT_TYPE.BOOKING, 3, chargeTransactionId);
               console.log('✅ Payment linked to booking successfully');
             } catch (linkErr) {
               // Non-critical: payment and booking both exist, just not linked yet

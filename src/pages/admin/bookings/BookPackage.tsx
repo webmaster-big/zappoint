@@ -1021,7 +1021,8 @@ const BookPackage: React.FC = () => {
       }
       
       const paymentId = paymentResponse.payment?.id;
-      console.log('✅ Payment charged successfully, payment ID:', paymentId);
+      const chargeTransactionId = paymentResponse.transaction_id;
+      console.log('✅ Payment charged successfully, payment ID:', paymentId, 'txn:', chargeTransactionId);
       
       // Step 2: Prepare and create booking (customer already charged)
       const additionalAttractions = Object.entries(selectedAttractions)
@@ -1107,7 +1108,7 @@ const BookPackage: React.FC = () => {
       // Step 3: Link payment to booking (with retry for reliability)
       if (paymentId) {
         try {
-          await linkPaymentWithRetry(paymentId, bookingId, PAYMENT_TYPE.BOOKING);
+          await linkPaymentWithRetry(paymentId, bookingId, PAYMENT_TYPE.BOOKING, 3, chargeTransactionId);
           console.log('✅ Payment linked to booking successfully');
         } catch (linkErr) {
           // Non-critical: payment and booking both exist, just not linked yet
