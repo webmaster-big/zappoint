@@ -17,7 +17,8 @@ import {
   X,
   CheckSquare,
   Square,
-  Link2
+  Link2,
+  Copy
 } from 'lucide-react';
 import { formatDurationDisplay } from '../../../utils/timeFormat';
 import { useThemeColor } from '../../../hooks/useThemeColor';
@@ -29,7 +30,7 @@ import type {
 } from '../../../types/manageAttractions.types';
 import { attractionService } from '../../../services/AttractionService';
 import { attractionCacheService } from '../../../services/AttractionCacheService';
-import type { Attraction } from '../../../services/AttractionService';
+import type { Attraction, CreateAttractionData } from '../../../services/AttractionService';
 import { locationService } from '../../../services/LocationService';
 import LocationSelector from '../../../components/admin/LocationSelector';
 import Toast from '../../../components/ui/Toast';
@@ -75,6 +76,7 @@ const ManageAttractions = () => {
   const [selectedForExport, setSelectedForExport] = useState<string[]>([]);
   const [importData, setImportData] = useState<string>("");
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
 
   // Export/Import handlers
   const handleOpenExportModal = () => {
@@ -261,6 +263,42 @@ const ManageAttractions = () => {
     loadAttractions();
   }, [selectedLocation]);
 
+  // Listen for cache updates (from background sync) and refresh UI silently
+  useEffect(() => {
+    const unsubscribe = attractionCacheService.onCacheUpdate(async (event) => {
+      if (event.detail?.source === 'api') {
+        // Background sync completed — silently refresh from the now-fresh cache
+        const fresh = await attractionCacheService.getCachedAttractions();
+        if (fresh && fresh.length > 0) {
+          const converted: ManageAttractionsAttraction[] = fresh
+            .filter((attr: Attraction & { location?: { id: number; name: string } }) =>
+              selectedLocation === null || attr.location_id === selectedLocation
+            )
+            .map((attr: Attraction & { location?: { id: number; name: string } }) => ({
+              id: attr.id.toString(),
+              name: attr.name,
+              description: attr.description,
+              category: attr.category,
+              price: attr.price,
+              pricingType: attr.pricing_type,
+              maxCapacity: attr.max_capacity,
+              duration: attr.duration?.toString() || '',
+              durationUnit: attr.duration_unit || 'minutes',
+              location: attr.location?.name || '',
+              locationId: attr.location_id,
+              locationName: attr.location?.name || '',
+              images: attr.image ? (Array.isArray(attr.image) ? attr.image : [attr.image]) : [],
+              status: attr.is_active ? 'active' : 'inactive',
+              createdAt: attr.created_at,
+              availability: typeof attr.availability === 'object' ? attr.availability as Record<string, boolean> : {},
+            }));
+          setAttractions(converted);
+        }
+      }
+    });
+    return unsubscribe;
+  }, [selectedLocation]);
+
   // Apply filters when attractions or filters change
   useEffect(() => {
     applyFilters();
@@ -268,7 +306,8 @@ const ManageAttractions = () => {
 
   const loadAttractions = async () => {
     try {
-      setLoading(true);
+      // Only show full-page spinner on initial load (no data yet)
+      if (attractions.length === 0) setLoading(true);
       const authToken = getAuthToken();
       console.log('🔐 Loading attractions - Auth Token:', authToken ? 'Present' : 'Missing');
       
@@ -313,6 +352,9 @@ const ManageAttractions = () => {
           }));
         setAttractions(convertedAttractions);
         setLoading(false);
+
+        // Always background-sync with API to catch deletions/updates from other tabs/users
+        attractionCacheService.syncInBackground({ user_id: getStoredUser()?.id });
         return;
       }
       
@@ -545,6 +587,67 @@ const ManageAttractions = () => {
     } catch (error) {
       console.error('Error updating attractions:', error);
       setToast({ message: 'Failed to update some attractions', type: 'error' });
+    }
+  };
+
+  const handleDuplicateAttraction = async (attraction: ManageAttractionsAttraction) => {
+    try {
+      setDuplicatingId(attraction.id);
+
+      // Fetch the full attraction data from API to get all fields
+      const response = await attractionService.getAttraction(Number(attraction.id));
+      const original = response.data;
+
+      // Build create payload, stripping server-generated fields
+      const duplicateData: CreateAttractionData = {
+        location_id: original.location_id,
+        name: `${original.name} (Copy)`,
+        description: original.description,
+        price: original.price,
+        pricing_type: original.pricing_type,
+        max_capacity: original.max_capacity,
+        category: original.category,
+        duration: original.duration ?? undefined,
+        duration_unit: original.duration_unit,
+        availability: Array.isArray(original.availability) ? original.availability : undefined,
+        image: original.image ?? undefined,
+        is_active: false, // Duplicates start inactive
+      };
+
+      const createResponse = await attractionService.createAttraction(duplicateData);
+
+      if (createResponse.success && createResponse.data) {
+        // Add to cache
+        await attractionCacheService.addAttractionToCache(createResponse.data);
+
+        // Add to local state
+        const newAttraction: ManageAttractionsAttraction = {
+          id: createResponse.data.id.toString(),
+          name: createResponse.data.name,
+          description: createResponse.data.description,
+          category: createResponse.data.category,
+          price: createResponse.data.price,
+          pricingType: createResponse.data.pricing_type,
+          maxCapacity: createResponse.data.max_capacity,
+          duration: createResponse.data.duration?.toString() || '',
+          durationUnit: createResponse.data.duration_unit || 'minutes',
+          location: attraction.location,
+          locationId: createResponse.data.location_id,
+          locationName: attraction.locationName,
+          images: createResponse.data.image ? (Array.isArray(createResponse.data.image) ? createResponse.data.image : [createResponse.data.image]) : [],
+          status: createResponse.data.is_active ? 'active' : 'inactive',
+          createdAt: createResponse.data.created_at,
+          availability: typeof createResponse.data.availability === 'object' ? createResponse.data.availability as Record<string, boolean> : {},
+        };
+        setAttractions(prev => [newAttraction, ...prev]);
+
+        setToast({ message: `"${original.name}" duplicated successfully!`, type: 'success' });
+      }
+    } catch (error) {
+      console.error('Error duplicating attraction:', error);
+      setToast({ message: 'Failed to duplicate attraction', type: 'error' });
+    } finally {
+      setDuplicatingId(null);
     }
   };
 
@@ -872,6 +975,18 @@ const ManageAttractions = () => {
                         >
                           <Pencil className="h-4 w-4" />
                         </Link>
+                        <button
+                          onClick={() => handleDuplicateAttraction(attraction)}
+                          className={`text-${themeColor}-600 hover:text-${fullColor} disabled:opacity-50`}
+                          title="Duplicate"
+                          disabled={duplicatingId === attraction.id}
+                        >
+                          {duplicatingId === attraction.id ? (
+                            <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                          ) : (
+                            <Copy className="h-4 w-4" />
+                          )}
+                        </button>
                         <StandardButton
                           onClick={() => handleDeleteAttraction(attraction.id)}
                           variant="danger"

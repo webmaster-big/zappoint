@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Users, Tag, Search, Download, Upload, X, CheckSquare, Square, Pencil, Trash2, MapPin, Eye, Power, Plus, FileText, Clock } from "lucide-react";
+import { Users, Tag, Search, Download, Upload, X, CheckSquare, Square, Pencil, Trash2, MapPin, Eye, Power, Plus, FileText, Clock, Copy } from "lucide-react";
 import StandardButton from '../../../components/ui/StandardButton';
 import { useThemeColor } from '../../../hooks/useThemeColor';
-import { packageService, type Package } from '../../../services';
+import { packageService, type Package, type CreatePackageData } from '../../../services';
 import { packageCacheService } from '../../../services/PackageCacheService';
 import { getStoredUser } from "../../../utils/storage";
 import { createSlugWithId } from '../../../utils/slug';
@@ -38,6 +38,7 @@ const Packages: React.FC = () => {
   const [showBulkMinNoticeModal, setShowBulkMinNoticeModal] = useState(false);
   const [bulkMinNoticeHours, setBulkMinNoticeHours] = useState<string>("");
   const [bulkUpdating, setBulkUpdating] = useState(false);
+  const [duplicatingId, setDuplicatingId] = useState<number | null>(null);
 
   // Load user data from localStorage
   useEffect(() => {
@@ -70,6 +71,9 @@ const Packages: React.FC = () => {
             console.log('[Packages] Loaded from cache:', regularPackages.length, 'packages');
             setPackages(regularPackages);
             setLoading(false);
+
+            // Always background-sync with API to catch deletions/updates from other tabs/users
+            packageCacheService.syncInBackground({ user_id: getStoredUser()?.id });
             return;
           }
         }
@@ -147,6 +151,26 @@ const Packages: React.FC = () => {
     };
     
     fetchPackages();
+  }, []);
+
+  // Listen for cache updates (from background sync) and refresh UI
+  useEffect(() => {
+    const unsubscribe = packageCacheService.onCacheUpdate((event: CustomEvent) => {
+      if (event.detail?.source === 'api') {
+        // Background sync completed — reload packages from the now-fresh cache
+        const refreshFromCache = async () => {
+          const cachedPackages = await packageCacheService.getCachedPackages();
+          if (cachedPackages && cachedPackages.length > 0) {
+            const regularPackages = cachedPackages.filter(
+              (pkg: Package) => (!pkg.package_type || pkg.package_type === 'regular') && !pkg.deleted_at
+            );
+            setPackages(regularPackages);
+          }
+        };
+        refreshFromCache();
+      }
+    });
+    return unsubscribe;
   }, []);
 
   // Search and filter effect
@@ -391,6 +415,67 @@ const Packages: React.FC = () => {
     } catch (err) {
       console.error('Error toggling package status:', err);
       alert('Failed to update package status. Please try again.');
+    }
+  };
+
+  const handleDuplicatePackage = async (pkg: Package) => {
+    try {
+      setDuplicatingId(pkg.id);
+
+      // Fetch full package data from API
+      const response = await packageService.getPackage(pkg.id);
+      const original = response.data;
+
+      // Build create payload, stripping server-generated fields
+      const duplicateData: CreatePackageData = {
+        location_id: original.location_id,
+        name: `${original.name} (Copy)`,
+        description: original.description,
+        category: original.category,
+        package_type: original.package_type || 'regular',
+        features: original.features,
+        price: original.price,
+        price_per_additional: original.price_per_additional,
+        max_participants: original.max_participants,
+        duration: original.duration,
+        duration_unit: original.duration_unit,
+        price_per_additional_30min: original.price_per_additional_30min,
+        price_per_additional_1hr: original.price_per_additional_1hr,
+        availability_type: original.availability_type,
+        available_days: original.available_days,
+        available_week_days: original.available_week_days,
+        available_month_days: original.available_month_days,
+        availability_schedules: original.availability_schedules,
+        image: original.image,
+        is_active: false, // Duplicates start inactive
+        partial_payment_percentage: original.partial_payment_percentage,
+        partial_payment_fixed: original.partial_payment_fixed,
+        has_guest_of_honor: original.has_guest_of_honor,
+        customer_notes: original.customer_notes,
+        invitation_download_link: original.invitation_download_link,
+        booking_window_days: original.booking_window_days,
+        min_booking_notice_hours: original.min_booking_notice_hours,
+        attraction_ids: original.attractions?.map(a => a.id),
+        room_ids: original.rooms?.map(r => r.id),
+        addon_ids: original.add_ons?.map(a => a.id),
+      };
+
+      const createResponse = await packageService.createPackage(duplicateData);
+
+      if (createResponse.success && createResponse.data) {
+        // Add to cache
+        await packageCacheService.addPackageToCache(createResponse.data);
+
+        // Add to local state
+        setPackages(prev => [createResponse.data, ...prev]);
+
+        alert(`"${original.name}" duplicated successfully!`);
+      }
+    } catch (error) {
+      console.error('Error duplicating package:', error);
+      alert('Failed to duplicate package. Please try again.');
+    } finally {
+      setDuplicatingId(null);
     }
   };
 
@@ -768,6 +853,18 @@ const Packages: React.FC = () => {
                       >
                         <Pencil className="w-4 h-4" />
                       </Link>
+                      <button
+                        onClick={() => handleDuplicatePackage(pkg)}
+                        className={`flex-1 p-1.5 text-${fullColor} hover:bg-${themeColor}-100 rounded transition-colors flex items-center justify-center disabled:opacity-50`}
+                        title="Duplicate package"
+                        disabled={duplicatingId === pkg.id}
+                      >
+                        {duplicatingId === pkg.id ? (
+                          <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <Copy className="w-4 h-4" />
+                        )}
+                      </button>
                       <StandardButton
                         onClick={() => handleDelete(pkg.id)}
                         variant="danger"

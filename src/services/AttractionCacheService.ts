@@ -173,10 +173,21 @@ class AttractionCacheService {
     filters?: AttractionFilters,
     forceRefresh: boolean = false
   ): Promise<Attraction[]> {
-    // If we have cached data and not forcing refresh, return it immediately
+    // If already syncing, return the existing promise
+    if (this.isSyncing && this.syncPromise) {
+      return this.syncPromise;
+    }
+
+    // Check cache first (unless force refresh)
     if (!forceRefresh) {
       const cachedAttractions = await this.getCachedAttractions();
+      const isStale = await this.isCacheStale();
+
       if (cachedAttractions && cachedAttractions.length > 0) {
+        // If cache is stale, sync in background
+        if (isStale) {
+          this.syncInBackground(filters);
+        }
         return cachedAttractions;
       }
     }

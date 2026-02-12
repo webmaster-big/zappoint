@@ -402,6 +402,8 @@ const OnsiteBooking: React.FC = () => {
           if (transformedPackages.length === 0) {
             setShowEmptyModal(true);
           }
+          // Trigger background sync for freshness
+          packageCacheService.syncInBackground({ user_id: getStoredUser()?.id });
           return;
         }
         

@@ -173,10 +173,21 @@ class PackageCacheService {
     filters?: PackageFilters,
     forceRefresh: boolean = false
   ): Promise<Package[]> {
-    // If we have cached data and not forcing refresh, return it immediately
+    // If already syncing, return the existing promise
+    if (this.isSyncing && this.syncPromise) {
+      return this.syncPromise;
+    }
+
+    // Check cache first (unless force refresh)
     if (!forceRefresh) {
       const cachedPackages = await this.getCachedPackages();
+      const isStale = await this.isCacheStale();
+
       if (cachedPackages && cachedPackages.length > 0) {
+        // If cache is stale, sync in background
+        if (isStale) {
+          this.syncInBackground(filters);
+        }
         return cachedPackages;
       }
     }

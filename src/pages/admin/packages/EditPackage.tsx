@@ -122,6 +122,11 @@ const EditPackage: React.FC = () => {
                 const cachedAddOns = await addOnCacheService.getCachedAddOns();
                 const cachedAttractions = await attractionCacheService.getCachedAttractions();
                 
+                // Trigger background sync for stale caches (updates for next visit)
+                if (cachedRooms && cachedRooms.length > 0) roomCacheService.syncInBackground();
+                if (cachedAttractions && cachedAttractions.length > 0) attractionCacheService.syncInBackground();
+                if (cachedAddOns && cachedAddOns.length > 0) addOnCacheService.syncInBackground();
+                
                 // Only fetch from API if cache is empty
                 const roomsPromise = (cachedRooms && cachedRooms.length > 0) 
                     ? Promise.resolve({ data: { rooms: cachedRooms } })

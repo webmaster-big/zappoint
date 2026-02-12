@@ -107,6 +107,11 @@ const CreatePackage: React.FC = () => {
                     addOnCacheService.getFilteredAddOnsFromCache({ ...cacheFilters, is_active: true })
                 ]);
                 
+                // Trigger background sync for stale caches (updates for next visit)
+                if (cachedRooms && cachedRooms.length > 0) roomCacheService.syncInBackground(params);
+                if (cachedAttractions && cachedAttractions.length > 0) attractionCacheService.syncInBackground(params);
+                if (cachedAddOns && cachedAddOns.length > 0) addOnCacheService.syncInBackground(params);
+                
                 // Only fetch from API if cache is empty
                 const roomsPromise = (cachedRooms && cachedRooms.length > 0) 
                     ? Promise.resolve({ data: { rooms: cachedRooms } })

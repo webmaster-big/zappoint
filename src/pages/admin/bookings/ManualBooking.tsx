@@ -261,10 +261,10 @@ const ManualBooking: React.FC = () => {
         
         // Filter only active packages from cache
         const activeCachedPackages = cachedPackages.filter((pkg: any) => pkg.is_active === true || pkg.is_active === 1);
-        console.log('Active cached packages:', activeCachedPackages.length, 'of', cachedPackages.length);
-        
         setPackages(activeCachedPackages);
         setLoadingPackages(false);
+        // Trigger background sync for freshness
+        packageCacheService.syncInBackground({ user_id: getStoredUser()?.id });
         return;
       }
 

@@ -65,6 +65,8 @@ const CustomPackages: React.FC = () => {
           );
           setPackages(customPackages);
           setLoading(false);
+          // Trigger background sync for freshness
+          packageCacheService.syncInBackground({ user_id: getStoredUser()?.id });
           return;
         }
         
@@ -110,6 +112,22 @@ const CustomPackages: React.FC = () => {
     };
     
     fetchPackages();
+  }, []);
+
+  // Listen for cache updates from background sync
+  useEffect(() => {
+    const unsubscribe = packageCacheService.onCacheUpdate(async (event: { source: string }) => {
+      if (event.source === 'api') {
+        const cached = await packageCacheService.getCachedPackages();
+        if (cached) {
+          const customPackages = cached.filter(
+            (pkg: Package) => pkg.package_type && pkg.package_type !== 'regular' && !pkg.deleted_at
+          );
+          setPackages(customPackages);
+        }
+      }
+    });
+    return () => unsubscribe();
   }, []);
 
   // Search and filter effect

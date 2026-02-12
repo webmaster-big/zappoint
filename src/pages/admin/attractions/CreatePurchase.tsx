@@ -130,6 +130,8 @@ const CreatePurchase = () => {
             setShowEmptyModal(true);
           }
           setLoading(false);
+          // Trigger background sync for freshness
+          attractionCacheService.syncInBackground({ user_id: getStoredUser()?.id });
           return;
         }
         

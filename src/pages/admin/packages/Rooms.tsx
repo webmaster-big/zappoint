@@ -171,6 +171,8 @@ const Rooms: React.FC = () => {
                     setRooms(cachedRooms);
                     setTotalPages(1); // Cache doesn't have pagination info
                     setLoading(false);
+                    // Trigger background sync for freshness
+                    roomCacheService.syncInBackground({ user_id: getStoredUser()?.id });
                     return;
                 }
             }
@@ -199,6 +201,20 @@ const Rooms: React.FC = () => {
     useEffect(() => {
         fetchRooms();
     }, [fetchRooms]);
+
+    // Listen for cache updates from background sync
+    useEffect(() => {
+        const unsubscribe = roomCacheService.onCacheUpdate(async (event: { source: string }) => {
+            if (event.source === 'api') {
+                const cacheFilters = isCompanyAdmin && selectedLocationId ? { location_id: selectedLocationId } : {};
+                const cached = await roomCacheService.getFilteredRoomsFromCache(cacheFilters);
+                if (cached) {
+                    setRooms(cached);
+                }
+            }
+        });
+        return () => unsubscribe();
+    }, [selectedLocationId, isCompanyAdmin]);
 
     // Handle form input changes
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {

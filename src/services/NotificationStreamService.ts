@@ -54,7 +54,6 @@ class NotificationStreamService {
     onError?: ErrorCallback
   ): void {
     if (this.eventSource) {
-      console.log('[NotificationStream] Closing existing connection before reconnecting');
       this.disconnect();
     }
 
@@ -62,18 +61,14 @@ class NotificationStreamService {
     this.onErrorCallback = onError || null;
 
     const url = `${API_BASE_URL}/stream/notifications?location_id=${locationId}`;
-    console.log('[NotificationStream] Connecting to SSE:', url);
 
     this.eventSource = new EventSource(url);
 
     // Listen for 'notification' events
     this.eventSource.addEventListener('notification', (event: MessageEvent) => {
       try {
-        console.log('[NotificationStream] 📨 Raw SSE event received:', event.data);
         const data: StreamNotificationData = JSON.parse(event.data);
-
         const notification = this.transformToNotification(data);
-        console.log('[NotificationStream] 🔄 Transformed notification:', notification.id, notification.title);
 
         if (this.onNotificationCallback) {
           this.onNotificationCallback(notification);
@@ -85,7 +80,6 @@ class NotificationStreamService {
 
     // Listen for connection open
     this.eventSource.addEventListener('open', () => {
-      console.log('[NotificationStream] Connection established successfully');
     });
 
     // Listen for errors
@@ -93,9 +87,7 @@ class NotificationStreamService {
       console.error('[NotificationStream] Connection error:', event);
       
       if (this.eventSource?.readyState === EventSource.CLOSED) {
-        console.log('[NotificationStream] Connection closed by server');
       } else if (this.eventSource?.readyState === EventSource.CONNECTING) {
-        console.log('[NotificationStream] Attempting to reconnect...');
       }
 
       if (this.onErrorCallback) {
@@ -103,11 +95,9 @@ class NotificationStreamService {
       }
     });
 
-    // Listen for heartbeat (optional, for debugging)
-    this.eventSource.addEventListener('message', (event: MessageEvent) => {
-      if (event.data === 'heartbeat' || event.data.includes('heartbeat')) {
-        console.log('[NotificationStream] Heartbeat received');
-      }
+    // Listen for heartbeat
+    this.eventSource.addEventListener('message', (_event: MessageEvent) => {
+      // Heartbeat received - no action needed
     });
   }
 
@@ -156,7 +146,6 @@ class NotificationStreamService {
    */
   disconnect(): void {
     if (this.eventSource) {
-      console.log('[NotificationStream] Disconnecting from SSE');
       this.eventSource.close();
       this.eventSource = null;
       this.onNotificationCallback = null;

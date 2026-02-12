@@ -135,6 +135,49 @@ const ManageAddons = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedLocationId]);
 
+  // Listen for cache updates from background sync
+  useEffect(() => {
+    const unsubscribe = addOnCacheService.onCacheUpdate(async (event: { source: string }) => {
+      if (event.source === 'api') {
+        const params: { user_id?: number; location_id?: number } = {
+          user_id: getStoredUser()?.id,
+        };
+        if (isCompanyAdmin && selectedLocationId) {
+          params.location_id = selectedLocationId;
+        }
+        const cachedAddOns = await addOnCacheService.getFilteredAddOnsFromCache(params);
+        if (cachedAddOns && cachedAddOns.length > 0) {
+          const formattedAddons: AddOnsAddon[] = cachedAddOns.map(addon => {
+            let imageFull = '';
+            if (addon.image) {
+              const imgStr = String(addon.image);
+              if (imgStr.startsWith('http') || imgStr.startsWith(ASSET_URL)) {
+                imageFull = imgStr;
+              } else {
+                imageFull = `${ASSET_URL}${imgStr}`;
+              }
+            }
+            return {
+              id: addon.id.toString(),
+              name: addon.name,
+              price: addon.price,
+              image: imageFull,
+              description: addon.description,
+              location: addon.location && typeof addon.location === 'object' ? addon.location : null,
+              min_quantity: addon.min_quantity,
+              max_quantity: addon.max_quantity,
+              is_force_add_on: addon.is_force_add_on,
+              price_each_packages: addon.price_each_packages,
+            };
+          });
+          setAddons(formattedAddons);
+        }
+      }
+    });
+    return () => unsubscribe();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedLocationId]);
+
   // Filter addons based on search - separate effects to avoid resetting page on addon updates
   useEffect(() => {
     if (searchTerm) {
@@ -211,6 +254,8 @@ const ManageAddons = () => {
           console.log('[AddOns] Loaded from cache:', formattedAddons.length, 'add-ons');
           setAddons(formattedAddons);
           setLoading(false);
+          // Trigger background sync for freshness
+          addOnCacheService.syncInBackground({ user_id: getStoredUser()?.id });
           return;
         }
       }

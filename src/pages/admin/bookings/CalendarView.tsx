@@ -163,6 +163,8 @@ const CalendarView: React.FC = () => {
             date_to: filters.dateRange.end,
           });
           setBookings((cachedBookings || []) as Booking[]);
+          // Trigger background sync for freshness
+          bookingCacheService.syncInBackground({ user_id: getStoredUser()?.id });
           return;
         }
         
@@ -192,6 +194,8 @@ const CalendarView: React.FC = () => {
         const cachedBookings = await bookingCacheService.getFilteredBookingsFromCache(dateParams);
         console.log('Using cached bookings:', (cachedBookings || []).length);
         setBookings((cachedBookings || []) as Booking[]);
+        // Trigger background sync for freshness
+        bookingCacheService.syncInBackground({ user_id: getStoredUser()?.id });
       } else {
         // No cache, fetch from API
         const response = await bookingService.getBookings({
@@ -224,6 +228,16 @@ const CalendarView: React.FC = () => {
 
   useEffect(() => {
     loadBookings();
+  }, [loadBookings]);
+
+  // Listen for cache updates from background sync
+  useEffect(() => {
+    const unsubscribe = bookingCacheService.onCacheUpdate(async (event: { source: string }) => {
+      if (event.source === 'api') {
+        loadBookings();
+      }
+    });
+    return () => unsubscribe();
   }, [loadBookings]);
 
   // Apply filters when bookings or filters change

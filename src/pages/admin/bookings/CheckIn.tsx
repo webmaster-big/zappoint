@@ -75,6 +75,8 @@ const CheckIn: React.FC = () => {
       if (cachedBookings && cachedBookings.length > 0) {
         setBookings(cachedBookings);
         setLoading(false);
+        // Trigger background sync for freshness
+        bookingCacheService.syncInBackground({ user_id: getStoredUser()?.id });
         return;
       }
       
@@ -102,6 +104,22 @@ const CheckIn: React.FC = () => {
   useEffect(() => {
     loadBookings();
   }, [loadBookings]);
+
+  // Listen for cache updates from background sync
+  useEffect(() => {
+    const unsubscribe = bookingCacheService.onCacheUpdate(async (event: { source: string }) => {
+      if (event.source === 'api') {
+        const cached = await bookingCacheService.getFilteredBookingsFromCache({
+          booking_date: selectedDate,
+          user_id: getStoredUser()?.id,
+        });
+        if (cached && cached.length > 0) {
+          setBookings(cached);
+        }
+      }
+    });
+    return () => unsubscribe();
+  }, [selectedDate]);
 
   // Filter bookings based on search term
   useEffect(() => {

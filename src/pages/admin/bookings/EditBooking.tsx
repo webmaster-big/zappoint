@@ -184,6 +184,7 @@ const EditBooking: React.FC = () => {
             const cachedPackages = await packageCacheService.getCachedPackages();
             if (cachedPackages && cachedPackages.length > 0) {
               // Filter by location
+              packageCacheService.syncInBackground();
               return cachedPackages.filter((pkg: PackageType) => pkg.location_id === locationId);
             }
             // Fallback to API
@@ -195,6 +196,7 @@ const EditBooking: React.FC = () => {
           (async () => {
             const cachedRooms = await roomCacheService.getFilteredRoomsFromCache({ location_id: locationId });
             if (cachedRooms && cachedRooms.length > 0) {
+              roomCacheService.syncInBackground();
               return cachedRooms.map(room => ({ id: room.id, name: room.name }));
             }
             // Fallback to API

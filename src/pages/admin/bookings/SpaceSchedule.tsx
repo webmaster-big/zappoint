@@ -180,6 +180,8 @@ const SpaceSchedule = () => {
           const sortedSpaces = [...cachedRooms].sort(naturalSort);
           setSpaces(sortedSpaces);
           spacesLoadedRef.current = true;
+          // Trigger background sync for freshness
+          roomCacheService.syncInBackground({ user_id: user?.id });
           return;
         }
       }
@@ -225,6 +227,8 @@ const SpaceSchedule = () => {
         console.log('[SpaceSchedule] Filtered bookings from cache:', cachedBookings?.length || 0);
         fetchedBookings = (cachedBookings || []) as Booking[];
         setBookings(fetchedBookings);
+        // Trigger background sync for freshness
+        bookingCacheService.syncInBackground();
       } else {
         // No cache available, fetch from API
         const bookingsResponse = await bookingService.getBookings({
@@ -267,6 +271,25 @@ const SpaceSchedule = () => {
       loadBookings();
     }
   }, [selectedDate]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Listen for cache updates from background sync
+  useEffect(() => {
+    const unsubRoom = roomCacheService.onCacheUpdate(async (event: { source: string }) => {
+      if (event.source === 'api') {
+        const cachedRooms = await roomCacheService.getCachedRooms();
+        if (cachedRooms) {
+          const sortedSpaces = [...cachedRooms].sort(naturalSort);
+          setSpaces(sortedSpaces);
+        }
+      }
+    });
+    const unsubBooking = bookingCacheService.onCacheUpdate(async (event: { source: string }) => {
+      if (event.source === 'api') {
+        loadBookings();
+      }
+    });
+    return () => { unsubRoom(); unsubBooking(); };
+  }, [loadBookings]);
 
   // Navigate dates
   const goToPreviousDay = () => {

@@ -68,6 +68,63 @@ const parseLocalDate = (isoDateString: string): Date => {
 const Bookings: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
   const navigate = useNavigate();
+
+  // Helper: transform raw API/cache booking data to BookingsPageBooking format
+  const transformRawBooking = (booking: any): BookingsPageBooking => {
+    const totalAmount = Number(booking.total_amount);
+    const amountPaid = Number(booking.amount_paid || 0);
+    return {
+      id: booking.id.toString(),
+      type: 'package',
+      packageName: booking.package?.name || 'N/A',
+      packageId: booking.package_id,
+      room: booking.room?.name || 'N/A',
+      roomId: booking.room_id,
+      customerName: booking.customer
+        ? `${booking.customer.first_name} ${booking.customer.last_name}`
+        : booking.guest_name || 'Guest',
+      customerId: booking.customer_id,
+      email: booking.customer?.email || booking.guest_email || '',
+      phone: booking.customer?.phone || booking.guest_phone || '',
+      date: booking.booking_date,
+      time: booking.booking_time,
+      participants: booking.participants,
+      status: booking.status as BookingsPageBooking['status'],
+      totalAmount,
+      amountPaid,
+      paymentStatus: derivePaymentStatus(amountPaid, totalAmount),
+      createdAt: booking.created_at,
+      paymentMethod: booking.payment_method as BookingsPageBooking['paymentMethod'],
+      attractions: booking.attractions?.map((attr: any) => ({
+        name: attr.name,
+        quantity: attr.pivot?.quantity || 1
+      })) || [],
+      addOns: booking.add_ons?.map((addon: any) => ({
+        name: addon.name,
+        quantity: addon.pivot?.quantity || 1
+      })) || [],
+      duration: booking.duration && booking.duration_unit
+        ? formatDurationDisplay(booking.duration, booking.duration_unit)
+        : '2 hours',
+      activity: booking.package?.category || 'Package Booking',
+      notes: booking.notes,
+      specialRequests: booking.special_requests,
+      referenceNumber: booking.reference_number,
+      location: booking.location?.name || 'N/A',
+      locationId: booking.location_id,
+      updatedAt: booking.updated_at,
+      transactionId: booking.transaction_id,
+      guestOfHonorName: booking.guest_of_honor_name,
+      guestOfHonorAge: booking.guest_of_honor_age,
+      guestOfHonorGender: booking.guest_of_honor_gender,
+      guestAddress: booking.guest_address || booking.customer?.address,
+      guestCity: booking.guest_city || booking.customer?.city,
+      guestState: booking.guest_state || booking.customer?.state,
+      guestZip: booking.guest_zip || booking.customer?.zip,
+      guestCountry: booking.guest_country || booking.customer?.country,
+      internal_notes: booking.internal_notes,
+    };
+  };
   const [bookings, setBookings] = useState<BookingsPageBooking[]>([]);
   const [filteredBookings, setFilteredBookings] = useState<BookingsPageBooking[]>([]);
   const [loading, setLoading] = useState(true);
@@ -436,6 +493,25 @@ const Bookings: React.FC = () => {
     loadBookings();
   }, [selectedLocation]);
 
+  // Listen for cache updates from background sync
+  useEffect(() => {
+    const unsubscribe = bookingCacheService.onCacheUpdate(async (event: { source: string }) => {
+      if (event.source === 'api') {
+        const cacheFilters: Record<string, number> = {};
+        if (selectedLocation !== null) {
+          cacheFilters.location_id = selectedLocation;
+        }
+        const cachedBookings = await bookingCacheService.getFilteredBookingsFromCache(cacheFilters);
+        if (cachedBookings && cachedBookings.length > 0) {
+          const transformedBookings: BookingsPageBooking[] = cachedBookings.map(transformRawBooking);
+          extractFilterOptions(transformedBookings);
+          setBookings(transformedBookings);
+        }
+      }
+    });
+    return () => unsubscribe();
+  }, [selectedLocation]);
+
   const loadLocations = async () => {
     try {
       if (isCompanyAdmin) {
@@ -479,67 +555,7 @@ const Bookings: React.FC = () => {
         const cachedBookings = await bookingCacheService.getFilteredBookingsFromCache(cacheFilters);
         
         if (cachedBookings && cachedBookings.length > 0) {
-          // Transform cached booking data to match BookingsPageBooking interface
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const transformedBookings: BookingsPageBooking[] = cachedBookings.map((booking: any) => {
-            const totalAmount = Number(booking.total_amount);
-            const amountPaid = Number(booking.amount_paid || 0);
-            return {
-              id: booking.id.toString(),
-              type: 'package',
-              packageName: booking.package?.name || 'N/A',
-              packageId: booking.package_id,
-              room: booking.room?.name || 'N/A',
-              roomId: booking.room_id,
-              customerName: booking.customer 
-                ? `${booking.customer.first_name} ${booking.customer.last_name}`
-                : booking.guest_name || 'Guest',
-              customerId: booking.customer_id,
-              email: booking.customer?.email || booking.guest_email || '',
-              phone: booking.customer?.phone || booking.guest_phone || '',
-              date: booking.booking_date,
-              time: booking.booking_time,
-              participants: booking.participants,
-              status: booking.status as BookingsPageBooking['status'],
-              totalAmount,
-              amountPaid,
-              paymentStatus: derivePaymentStatus(amountPaid, totalAmount),
-              createdAt: booking.created_at,
-              paymentMethod: booking.payment_method as BookingsPageBooking['paymentMethod'],
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              attractions: booking.attractions?.map((attr: any) => ({
-                name: attr.name,
-                quantity: attr.pivot?.quantity || 1
-              })) || [],
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              addOns: booking.add_ons?.map((addon: any) => ({
-                name: addon.name,
-                quantity: addon.pivot?.quantity || 1
-              })) || [],
-              duration: booking.duration && booking.duration_unit 
-                ? formatDurationDisplay(booking.duration, booking.duration_unit)
-                : '2 hours',
-              activity: booking.package?.category || 'Package Booking',
-              notes: booking.notes,
-              specialRequests: booking.special_requests,
-              referenceNumber: booking.reference_number,
-              location: booking.location?.name || 'N/A',
-              locationId: booking.location_id,
-              updatedAt: booking.updated_at,
-              transactionId: booking.transaction_id,
-              // Guest of Honor
-              guestOfHonorName: booking.guest_of_honor_name,
-              guestOfHonorAge: booking.guest_of_honor_age,
-              guestOfHonorGender: booking.guest_of_honor_gender,
-              // Address
-              guestAddress: booking.guest_address || booking.customer?.address,
-              guestCity: booking.guest_city || booking.customer?.city,
-              guestState: booking.guest_state || booking.customer?.state,
-              guestZip: booking.guest_zip || booking.customer?.zip,
-              guestCountry: booking.guest_country || booking.customer?.country,
-              internal_notes: booking.internal_notes,
-            };
-          });
+          const transformedBookings: BookingsPageBooking[] = cachedBookings.map(transformRawBooking);
           
           // Extract unique packages, rooms, customers for filter dropdowns
           extractFilterOptions(transformedBookings);
@@ -547,6 +563,8 @@ const Bookings: React.FC = () => {
           console.log('[Bookings] Loaded from cache:', transformedBookings.length, 'bookings');
           setBookings(transformedBookings);
           setLoading(false);
+          // Trigger background sync for freshness
+          bookingCacheService.syncInBackground({ user_id: getStoredUser()?.id });
           return;
         }
       }
@@ -566,67 +584,7 @@ const Bookings: React.FC = () => {
       const response = await bookingService.getBookings(params);
       
       if (response.success && response.data) {
-        // Transform backend booking data to match BookingsPageBooking interface
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const transformedBookings: BookingsPageBooking[] = response.data.bookings.map((booking: any) => {
-          const totalAmount = Number(booking.total_amount);
-          const amountPaid = Number(booking.amount_paid || 0);
-          return {
-            id: booking.id.toString(),
-            type: 'package',
-            packageName: booking.package?.name || 'N/A',
-            packageId: booking.package_id,
-            room: booking.room?.name || 'N/A',
-            roomId: booking.room_id,
-            customerName: booking.customer 
-              ? `${booking.customer.first_name} ${booking.customer.last_name}`
-              : booking.guest_name || 'Guest',
-            customerId: booking.customer_id,
-            email: booking.customer?.email || booking.guest_email || '',
-            phone: booking.customer?.phone || booking.guest_phone || '',
-            date: booking.booking_date,
-            time: booking.booking_time,
-            participants: booking.participants,
-            status: booking.status as BookingsPageBooking['status'],
-            totalAmount,
-            amountPaid,
-            paymentStatus: derivePaymentStatus(amountPaid, totalAmount),
-            createdAt: booking.created_at,
-            paymentMethod: booking.payment_method as BookingsPageBooking['paymentMethod'],
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            attractions: booking.attractions?.map((attr: any) => ({
-              name: attr.name,
-              quantity: attr.pivot?.quantity || 1
-            })) || [],
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            addOns: booking.add_ons?.map((addon: any) => ({
-              name: addon.name,
-              quantity: addon.pivot?.quantity || 1
-            })) || [],
-            duration: booking.duration && booking.duration_unit 
-              ? formatDurationDisplay(booking.duration, booking.duration_unit)
-              : '2 hours',
-            activity: booking.package?.category || 'Package Booking',
-            notes: booking.notes,
-            specialRequests: booking.special_requests,
-            referenceNumber: booking.reference_number,
-            location: booking.location?.name || 'N/A',
-            locationId: booking.location_id,
-            updatedAt: booking.updated_at,
-            transactionId: booking.transaction_id,
-            // Guest of Honor
-            guestOfHonorName: booking.guest_of_honor_name,
-            guestOfHonorAge: booking.guest_of_honor_age,
-            guestOfHonorGender: booking.guest_of_honor_gender,
-            // Address
-            guestAddress: booking.guest_address || booking.customer?.address,
-            guestCity: booking.guest_city || booking.customer?.city,
-            guestState: booking.guest_state || booking.customer?.state,
-            guestZip: booking.guest_zip || booking.customer?.zip,
-            guestCountry: booking.guest_country || booking.customer?.country,
-              internal_notes: booking.internal_notes,
-          };
-        });
+        const transformedBookings: BookingsPageBooking[] = response.data.bookings.map(transformRawBooking);
         console.log('[Bookings] Fetched from API:', transformedBookings.length, 'bookings');
         
         // Extract unique packages, rooms, customers for filter dropdowns

@@ -166,6 +166,8 @@ const AttendantDashboard: React.FC = () => {
            if (filteredRooms.length > 0) {
              setRooms(filteredRooms);
              console.log('📦 [AttendantDashboard] Loaded', filteredRooms.length, 'spaces from cache');
+             // Trigger background sync for freshness
+             roomCacheService.syncInBackground({ location_id: locationId });
              return;
            }
          }

@@ -42,6 +42,22 @@ const TrashedPackages: React.FC = () => {
     fetchTrashedPackages();
   }, []);
 
+  // Listen for cache updates from background sync
+  useEffect(() => {
+    const unsubscribe = packageCacheService.onCacheUpdate(async (event: { source: string }) => {
+      if (event.source === 'api') {
+        const cached = await packageCacheService.getCachedPackages();
+        if (cached) {
+          const deletedFromCache = cached.filter(
+            (pkg: Package) => pkg.deleted_at !== null && pkg.deleted_at !== undefined
+          );
+          setTrashedPackages(deletedFromCache);
+        }
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
   const fetchTrashedPackages = async () => {
     try {
       setLoading(true);
@@ -64,6 +80,8 @@ const TrashedPackages: React.FC = () => {
             console.log('[TrashedPackages] Found', deletedFromCache.length, 'deleted packages in cache');
             setTrashedPackages(deletedFromCache);
             setLoading(false);
+            // Trigger background sync for freshness
+            packageCacheService.syncInBackground({ user_id: getStoredUser()?.id });
             return;
           }
         }

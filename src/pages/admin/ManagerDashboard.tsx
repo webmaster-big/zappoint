@@ -191,6 +191,8 @@ const LocationManagerDashboard: React.FC = () => {
           if (filteredRooms.length > 0) {
             setRooms(filteredRooms);
             console.log('📦 [ManagerDashboard] Loaded', filteredRooms.length, 'spaces from cache');
+            // Trigger background sync for freshness
+            roomCacheService.syncInBackground({ location_id: locationId });
             return;
           }
         }

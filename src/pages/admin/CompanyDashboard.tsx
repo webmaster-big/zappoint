@@ -392,7 +392,8 @@ const CompanyDashboard: React.FC = () => {
         const cachedRooms = await roomCacheService.getCachedRooms();
         if (cachedRooms && cachedRooms.length > 0) {
           setRooms(cachedRooms);
-          console.log('📦 [CompanyDashboard] Loaded', cachedRooms.length, 'spaces from cache');
+          // Trigger background sync for freshness
+          roomCacheService.syncInBackground();
           return;
         }
         // Fallback to API if cache empty
