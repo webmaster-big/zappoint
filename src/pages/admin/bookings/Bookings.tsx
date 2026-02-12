@@ -71,6 +71,8 @@ const Bookings: React.FC = () => {
   const [bookings, setBookings] = useState<BookingsPageBooking[]>([]);
   const [filteredBookings, setFilteredBookings] = useState<BookingsPageBooking[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingStatus, setLoadingStatus] = useState('Initializing...');
+  const [savingStatusBookingId, setSavingStatusBookingId] = useState<string | null>(null);
   const [selectedBookings, setSelectedBookings] = useState<string[]>([]);
   const [filters, setFilters] = useState<BookingsPageFilterOptions>({
     status: 'all',
@@ -387,6 +389,13 @@ const Bookings: React.FC = () => {
       icon: DollarSign,
       accent: `bg-${themeColor}-100 text-${fullColor}`,
     },
+    {
+      title: 'Possible Revenue',
+      value: `$${Number(bookings.filter(b => b.status !== 'cancelled').reduce((sum, booking) => sum + booking.totalAmount, 0)).toFixed(2)}`,
+      change: `Total if all bookings fully paid`,
+      icon: DollarSign,
+      accent: `bg-${themeColor}-100 text-${fullColor}`,
+    },
   ];
 
   // Column configuration for drag-and-drop table
@@ -454,11 +463,13 @@ const Bookings: React.FC = () => {
   const loadBookings = async () => {
     try {
       setLoading(true);
+      setLoadingStatus('Checking cache...');
       
       // Check if cache has data first for instant loading
       const hasCachedData = await bookingCacheService.hasCachedData();
       
       if (hasCachedData) {
+        setLoadingStatus('Loading from cache...');
         console.log('[Bookings] Loading from cache...');
         
         // Build filter for cache
@@ -544,6 +555,7 @@ const Bookings: React.FC = () => {
       }
       
       // No cache or cache is empty - fetch from API
+      setLoadingStatus('Fetching bookings from server...');
       console.log('[Bookings] Fetching from API...');
       const params: any = {
         page: 1,
@@ -558,6 +570,7 @@ const Bookings: React.FC = () => {
       const response = await bookingService.getBookings(params);
       
       if (response.success && response.data) {
+        setLoadingStatus(`Processing ${response.data.bookings.length} bookings...`);
         // Transform backend booking data to match BookingsPageBooking interface
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const transformedBookings: BookingsPageBooking[] = response.data.bookings.map((booking: any) => {
@@ -626,8 +639,10 @@ const Bookings: React.FC = () => {
         
         setBookings(transformedBookings);
         
-        // Cache the raw API data for next time
-        await bookingCacheService.cacheBookings(response.data.bookings);
+        // Cache the raw API data in background - don't block UI
+        bookingCacheService.cacheBookings(response.data.bookings).catch(err => 
+          console.warn('[Bookings] Background cache write failed:', err)
+        );
       }
     } catch (error) {
       console.error('Error loading bookings:', error);
@@ -981,6 +996,8 @@ const Bookings: React.FC = () => {
 
   const handleStatusChange = async (id: string, newStatus: BookingsPageBooking['status']) => {
     try {
+      setSavingStatusBookingId(id);
+      
       // Find the booking
       const booking = bookings.find(b => b.id === id);
       if (!booking) return;
@@ -992,17 +1009,19 @@ const Bookings: React.FC = () => {
         await bookingCacheService.updateBookingInCache(response.data);
       }
       
-      // Log activity
-      await logBookingActivity(booking, 'update', `Status changed to ${newStatus}`);
-      
-      // Update local state
+      // Update local state immediately for fast UI
       const updatedBookings = bookings.map(b =>
         b.id === id ? { ...b, status: newStatus } : b
       );
       setBookings(updatedBookings);
+      
+      // Log activity in background - don't block UI
+      logBookingActivity(booking, 'Booking Status Update', `Status changed to ${newStatus}`);
     } catch (error) {
       console.error('Error updating booking status:', error);
       alert('Failed to update booking status. Please try again.');
+    } finally {
+      setSavingStatusBookingId(null);
     }
   };
 
@@ -1089,12 +1108,16 @@ const Bookings: React.FC = () => {
           action: action,
           entity_type: 'booking',
           entity_id: Number(booking.id),
-          category: 'booking',
+          category: ['create', 'update', 'delete', 'view', 'export', 'import'].includes(action) ? action : 'other',
           description: description,
           metadata: {
             resource_name: `Booking #${booking.referenceNumber}`,
+            reference_number: booking.referenceNumber,
             customer_name: booking.customerName,
-            package_name: booking.packageName
+            package_name: booking.packageName,
+            booking_date: booking.date,
+            status: booking.status,
+            performed_by: user.name || user.email || `User #${user.id}`,
           }
         })
       });
@@ -1181,8 +1204,8 @@ const Bookings: React.FC = () => {
           await bookingCacheService.updateBookingInCache(response.data);
         }
         
-        // Log activity
-        await logBookingActivity(
+        // Log activity in background
+        logBookingActivity(
           selectedBookingForEdit, 
           'update', 
           `Package changed to ${pkg.name}`
@@ -1284,8 +1307,8 @@ const Bookings: React.FC = () => {
           await bookingCacheService.updateBookingInCache(response.data);
         }
         
-        // Log activity
-        await logBookingActivity(
+        // Log activity in background
+        logBookingActivity(
           selectedBookingForEdit, 
           'update', 
           `Room changed to ${room.name}`
@@ -1347,8 +1370,8 @@ const Bookings: React.FC = () => {
           await bookingCacheService.updateBookingInCache(response.data);
         }
         
-        // Log activity
-        await logBookingActivity(
+        // Log activity in background
+        logBookingActivity(
           selectedBookingForEdit, 
           'update', 
           `Duration changed to ${durationValue} ${durationUnit}`
@@ -1401,8 +1424,8 @@ const Bookings: React.FC = () => {
           await bookingCacheService.updateBookingInCache(response.data);
         }
         
-        // Log activity
-        await logBookingActivity(
+        // Log activity in background
+        logBookingActivity(
           selectedBookingForEdit, 
           'update', 
           `Date changed to ${dateValue}`
@@ -1454,8 +1477,8 @@ const Bookings: React.FC = () => {
           await bookingCacheService.updateBookingInCache(response.data);
         }
         
-        // Log activity
-        await logBookingActivity(
+        // Log activity in background
+        logBookingActivity(
           selectedBookingForEdit, 
           'update', 
           `Time changed to ${formatTime12Hour(timeValue)}`
@@ -1756,8 +1779,8 @@ const Bookings: React.FC = () => {
           await bookingCacheService.updateBookingInCache(response.data);
         }
 
-        // Log activity
-        await logBookingActivity(
+        // Log activity in background
+        logBookingActivity(
           booking, 
           'update', 
           `${fieldConfig.label} updated from "${oldValueStr}" to "${editValue}"`
@@ -2006,21 +2029,31 @@ const Bookings: React.FC = () => {
             {renderEditableCell(booking, 'participants', booking.participants)}
           </td>
         );
-      case 'status':
+      case 'status': {
+        const isStatusSaving = savingStatusBookingId === booking.id;
         return (
           <td key={columnKey} className="px-4 py-3 whitespace-nowrap">
-            <select
-              value={booking.status}
-              onChange={(e) => handleStatusChange(booking.id, e.target.value as BookingsPageBooking['status'])}
-              className={`text-xs font-medium px-2 py-1 rounded-full ${statusColors[booking.status as keyof typeof statusColors] || 'bg-gray-100 text-gray-800'} border-none focus:ring-2 focus:ring-${themeColor}-600`}
-            >
-              <option value="pending">Pending</option>
-              <option value="confirmed">Confirmed</option>
-              <option value="checked-in">Checked In</option>
-              <option value="cancelled">Cancelled</option>
-            </select>
+            <div className="relative inline-flex items-center">
+              <select
+                value={booking.status}
+                onChange={(e) => handleStatusChange(booking.id, e.target.value as BookingsPageBooking['status'])}
+                disabled={isStatusSaving}
+                className={`text-xs font-medium px-2 py-1 rounded-full ${statusColors[booking.status as keyof typeof statusColors] || 'bg-gray-100 text-gray-800'} border-none focus:ring-2 focus:ring-${themeColor}-600 ${isStatusSaving ? 'opacity-50 cursor-wait' : ''}`}
+              >
+                <option value="pending">Pending</option>
+                <option value="confirmed">Confirmed</option>
+                <option value="checked-in">Checked In</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
+              {isStatusSaving && (
+                <div className="absolute -right-5 top-1/2 -translate-y-1/2">
+                  <div className={`animate-spin rounded-full h-3.5 w-3.5 border-2 border-gray-200 border-t-${fullColor}`}></div>
+                </div>
+              )}
+            </div>
           </td>
         );
+      }
       case 'paymentMethod':
         return (
           <td key={columnKey} className="px-4 py-3 whitespace-nowrap">
@@ -2557,8 +2590,8 @@ const Bookings: React.FC = () => {
         await bookingCacheService.updateBookingInCache(updateResponse.data);
       }
 
-      // Log activity
-      await logBookingActivity(
+      // Log activity in background
+      logBookingActivity(
         selectedBookingForPayment, 
         'payment', 
         `Payment of $${amount.toFixed(2)} processed via ${paymentMethod}. New total paid: $${newAmountPaid.toFixed(2)}`,
@@ -2595,8 +2628,13 @@ const Bookings: React.FC = () => {
 
   if (loading) {
     return (
-        <div className="flex justify-center items-center h-64">
-          <div className={`animate-spin rounded-full h-12 w-12 border-b-2 border-${fullColor}`}></div>
+        <div className="flex flex-col justify-center items-center h-64 gap-4">
+          <div className="relative">
+            <div className={`animate-spin rounded-full h-12 w-12 border-4 border-gray-200 border-t-${fullColor}`}></div>
+          </div>
+          <div className="flex flex-col items-center gap-1">
+            <p className="text-sm font-medium text-gray-700 animate-pulse">{loadingStatus}</p>
+          </div>
         </div>
     );
   }
@@ -2649,7 +2687,7 @@ const Bookings: React.FC = () => {
         </div>
 
         {/* Metrics Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 mb-6">
           {metrics.map((metric, index) => {
             const Icon = metric.icon;
             return (
