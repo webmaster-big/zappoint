@@ -228,8 +228,12 @@ export const linkPaymentToPayable = async (
   data: LinkPayableRequest,
   transactionId?: string
 ): Promise<LinkPayableResponse> => {
-  const params = transactionId ? `?transaction_id=${encodeURIComponent(transactionId)}` : '';
-  const response = await api.put<LinkPayableResponse>(`/payments/${paymentId}/payable${params}`, data);
+  const params = new URLSearchParams();
+  if (transactionId) params.append('transaction_id', transactionId);
+  if (data.payable_id) params.append('payable_id', data.payable_id.toString());
+  if (data.payable_type) params.append('payable_type', data.payable_type);
+  const queryString = params.toString() ? `?${params.toString()}` : '';
+  const response = await api.put<LinkPayableResponse>(`/payments/${paymentId}/payable${queryString}`, data);
   return response.data;
 };
 
