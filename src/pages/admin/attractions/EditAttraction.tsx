@@ -61,7 +61,7 @@ const EditAttraction = () => {
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [isActive, setIsActive] = useState<boolean>(true);
+  const [isActive, setIsActive] = useState<boolean>(false);
 
   // Load attraction data
   useEffect(() => {

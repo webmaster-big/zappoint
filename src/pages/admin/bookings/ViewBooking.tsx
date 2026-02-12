@@ -37,6 +37,27 @@ const ViewBooking: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
   const referenceNumber = searchParams.get('ref');
+  const from = searchParams.get('from');
+  const getBackPath = () => {
+    switch (from) {
+      case 'notifications': return '/notifications';
+      case 'dashboard': return -1 as any;
+      case 'payments': return '/payments';
+      case 'calendar': return '/bookings/calendar';
+      case 'space-schedule': return '/bookings/space-schedule';
+      default: return '/bookings';
+    }
+  };
+  const getBackLabel = () => {
+    switch (from) {
+      case 'notifications': return 'Notifications';
+      case 'dashboard': return 'Dashboard';
+      case 'payments': return 'Payments';
+      case 'calendar': return 'Calendar';
+      case 'space-schedule': return 'Space Schedule';
+      default: return 'Bookings';
+    }
+  };
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [booking, setBooking] = useState<Booking | null>(null);
@@ -123,9 +144,9 @@ const ViewBooking: React.FC = () => {
             <p className="text-red-600 mb-4">The booking you're looking for doesn't exist.</p>
             <StandardButton
               variant="primary"
-              onClick={() => navigate('/bookings')}
+              onClick={() => navigate(getBackPath())}
             >
-              Back to Bookings
+              Back to {getBackLabel()}
             </StandardButton>
           </div>
         </div>
@@ -181,7 +202,7 @@ const ViewBooking: React.FC = () => {
               variant="ghost"
               size="sm"
               icon={ArrowLeft}
-              onClick={() => navigate('/bookings')}
+              onClick={() => navigate(getBackPath())}
             >
               {''}
             </StandardButton>

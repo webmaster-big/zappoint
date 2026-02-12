@@ -794,7 +794,7 @@ const ManagePurchases = () => {
                             </button>
                           )}
                           <Link
-                            to={`/attractions/purchases/${purchase.id}`}
+                            to={`/attractions/purchases/${purchase.id}?from=purchases`}
                             className={`p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors`}
                             title="View Details"
                           >

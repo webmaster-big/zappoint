@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   ArrowLeft, 
   User, 
@@ -22,6 +22,24 @@ import StandardButton from '../../../components/ui/StandardButton';
 const PurchaseDetails = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const from = searchParams.get('from');
+  const getBackPath = () => {
+    switch (from) {
+      case 'notifications': return '/notifications';
+      case 'dashboard': return -1 as any;
+      case 'payments': return '/payments';
+      default: return '/attractions/purchases';
+    }
+  };
+  const getBackLabel = () => {
+    switch (from) {
+      case 'notifications': return 'Notifications';
+      case 'dashboard': return 'Dashboard';
+      case 'payments': return 'Payments';
+      default: return 'Purchases';
+    }
+  };
 
   // Get auth token from localStorage
   const getAuthToken = () => {
@@ -97,9 +115,9 @@ const PurchaseDetails = () => {
           <StandardButton
             variant="ghost"
             size="md"
-            onClick={() => navigate('/attractions/purchases')}
+            onClick={() => navigate(getBackPath())}
           >
-            Back to Purchases
+            Back to {getBackLabel()}
           </StandardButton>
         </div>
       </div>
@@ -132,7 +150,7 @@ const PurchaseDetails = () => {
             <StandardButton
               variant="ghost"
               size="sm"
-              onClick={() => navigate('/attractions/purchases')}
+              onClick={() => navigate(getBackPath())}
               icon={ArrowLeft}
             >
               {''}

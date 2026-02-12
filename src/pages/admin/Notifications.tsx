@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Bell,
   Ticket,
@@ -10,7 +11,9 @@ import {
   CheckCircle,
   Clock,
   Filter,
-  Trash2
+  Trash2,
+  CreditCard,
+  ExternalLink
 } from 'lucide-react';
 import StandardButton from '../../components/ui/StandardButton';
 import { useThemeColor } from '../../hooks/useThemeColor';
@@ -19,14 +22,16 @@ import { API_BASE_URL } from '../../utils/storage';
 
 const Notifications = () => {
   const { themeColor, fullColor } = useThemeColor();
+  const navigate = useNavigate();
   const [notifications, setNotifications] = useState<NotificationsNotification[]>([]);
   const [filter, setFilter] = useState<'all' | 'unread' | 'bookings' | 'purchases'>('all');
   const [showFilters, setShowFilters] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalNotifications, setTotalNotifications] = useState(0);
+  const [itemsPerPage] = useState(15);
+  const [markingAllRead, setMarkingAllRead] = useState(false);
+  const [clearingAll, setClearingAll] = useState(false);
+  const [markingReadId, setMarkingReadId] = useState<string | null>(null);
 
   // Helper function to get user auth data
   const getUserAuth = () => {
@@ -59,6 +64,12 @@ const Notifications = () => {
         bgColor: 'bg-purple-50',
         borderColor: 'border-purple-200'
       },
+      payment: {
+        icon: CreditCard,
+        color: 'text-emerald-600',
+        bgColor: 'bg-emerald-50',
+        borderColor: 'border-emerald-200'
+      },
       attendant: {
         icon: Users,
         color: 'text-orange-600',
@@ -87,45 +98,39 @@ const Notifications = () => {
     high: 'text-red-500'
   };
 
-  // Load notifications from localStorage
+  // Load notifications
   useEffect(() => {
     loadNotifications();
-  }, [filter, currentPage]);
+  }, []);
+
+  // Reset to page 1 when filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filter]);
 
   const loadNotifications = async () => {
-    // Only show loading spinner on initial load, not on pagination
+    // Only show loading spinner on initial load
     if (notifications.length === 0) {
       setInitialLoading(true);
     }
-    setLoading(true);
     try {
       const { token, isCompanyAdmin, locationId } = getUserAuth();
 
       if (!token) {
         console.error('No auth token found');
-        setLoading(false);
         setInitialLoading(false);
         return;
       }
 
-      // Build query parameters
+      // Build query parameters - fetch all for client-side pagination
       const params = new URLSearchParams({
-        per_page: '15',
-        page: currentPage.toString(),
+        per_page: '500',
+        page: '1',
       });
 
       // Only add location_id if not company_admin
       if (!isCompanyAdmin && locationId) {
         params.append('location_id', locationId.toString());
-      }
-
-      // Add filter parameters
-      if (filter === 'unread') {
-        params.append('unread', 'true');
-      } else if (filter === 'bookings') {
-        params.append('type', 'booking');
-      } else if (filter === 'purchases') {
-        params.append('type', 'purchase');
       }
 
       const response = await fetch(`${API_BASE_URL}/notifications?${params.toString()}`, {
@@ -147,23 +152,23 @@ const Notifications = () => {
           timestamp: notif.created_at,
           read: notif.status === 'read',
           priority: notif.priority || 'medium',
+          action_url: notif.action_url || null,
+          action_text: notif.action_text || null,
           metadata: notif.metadata || {},
         }));
 
         setNotifications(transformedNotifications);
-        setTotalPages(data.data.pagination.last_page);
-        setTotalNotifications(data.data.pagination.total);
       }
     } catch (error) {
       console.error('Error loading notifications:', error);
     } finally {
-      setLoading(false);
       setInitialLoading(false);
     }
   };
 
   const markAsRead = async (id: string) => {
     try {
+      setMarkingReadId(id);
       const { token } = getUserAuth();
 
       const response = await fetch(`${API_BASE_URL}/notifications/${id}/mark-as-read`, {
@@ -186,29 +191,26 @@ const Notifications = () => {
       }
     } catch (error) {
       console.error('Error marking notification as read:', error);
+    } finally {
+      setMarkingReadId(null);
     }
   };
 
   const markAllAsRead = async () => {
     try {
-      const { token, isCompanyAdmin, locationId } = getUserAuth();
+      setMarkingAllRead(true);
+      const { token, locationId } = getUserAuth();
 
-      // Build query parameters
-      const params = new URLSearchParams();
-      
-      // Only add location_id if not company_admin
-      if (!isCompanyAdmin && locationId) {
-        params.append('location_id', locationId.toString());
-      }
-
-      const url = `${API_BASE_URL}/notifications/mark-all-as-read${params.toString() ? `?${params.toString()}` : ''}`;
-
-      const response = await fetch(url, {
+      const response = await fetch(`${API_BASE_URL}/notifications/mark-all-as-read`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
         },
+        body: JSON.stringify({
+          location_id: locationId,
+        }),
       });
 
       const data = await response.json();
@@ -220,6 +222,8 @@ const Notifications = () => {
       }
     } catch (error) {
       console.error('Error marking all notifications as read:', error);
+    } finally {
+      setMarkingAllRead(false);
     }
   };
 
@@ -249,32 +253,43 @@ const Notifications = () => {
   };
 
   const clearAllNotifications = async () => {
-    if (window.confirm('Are you sure you want to clear all notifications?')) {
+    if (window.confirm('Are you sure you want to clear all notifications? This cannot be undone.')) {
       try {
-        const { token } = getUserAuth();
+        setClearingAll(true);
+        const { token, locationId } = getUserAuth();
 
-        // Delete all notifications one by one (or implement a bulk delete endpoint)
-        const deletePromises = notifications.map(notification =>
-          fetch(`${API_BASE_URL}/notifications/${notification.id}`, {
-            method: 'DELETE',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
-          })
-        );
+        const response = await fetch(`${API_BASE_URL}/notifications/clear-all`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: JSON.stringify({
+            location_id: locationId,
+          }),
+        });
 
-        await Promise.all(deletePromises);
-        setNotifications([]);
-        window.dispatchEvent(new Event('zapzone_notifications_updated'));
+        const data = await response.json();
+
+        if (data.success) {
+          setNotifications([]);
+          setCurrentPage(1);
+          window.dispatchEvent(new Event('zapzone_notifications_updated'));
+        }
       } catch (error) {
         console.error('Error clearing all notifications:', error);
+      } finally {
+        setClearingAll(false);
       }
     }
   };
 
   const getFilteredNotifications = () => {
-    // Filtering is now handled by the API
+    // Client-side filtering
+    if (filter === 'unread') return notifications.filter(n => !n.read);
+    if (filter === 'bookings') return notifications.filter(n => n.type === 'booking');
+    if (filter === 'purchases') return notifications.filter(n => n.type === 'purchase');
     return notifications;
   };
 
@@ -297,6 +312,13 @@ const Notifications = () => {
 
   const unreadCount = notifications.filter(n => !n.read).length;
   const filteredNotifications = getFilteredNotifications();
+
+  // Client-side pagination
+  const totalPages = Math.ceil(filteredNotifications.length / itemsPerPage);
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentNotifications = filteredNotifications.slice(indexOfFirstItem, indexOfLastItem);
+  const paginate = (page: number) => setCurrentPage(page);
 
   if (initialLoading) {
     return (
@@ -350,9 +372,15 @@ const Notifications = () => {
                 variant="primary"
                 size="sm"
                 onClick={markAllAsRead}
-                icon={CheckCircle}
+                icon={markingAllRead ? undefined : CheckCircle}
+                disabled={markingAllRead}
               >
-                Mark all read
+                {markingAllRead ? (
+                  <span className="flex items-center gap-2">
+                    <span className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-white border-t-transparent"></span>
+                    Marking...
+                  </span>
+                ) : 'Mark all read'}
               </StandardButton>
             )}
           </div>
@@ -362,9 +390,15 @@ const Notifications = () => {
               variant="ghost"
               size="sm"
               onClick={clearAllNotifications}
-              icon={Trash2}
+              icon={clearingAll ? undefined : Trash2}
+              disabled={clearingAll}
             >
-              Clear all
+              {clearingAll ? (
+                <span className="flex items-center gap-2">
+                  <span className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-gray-400 border-t-transparent"></span>
+                  Clearing...
+                </span>
+              ) : 'Clear all'}
             </StandardButton>
           )}
         </div>
@@ -419,15 +453,40 @@ const Notifications = () => {
             </p>
           </div>
         ) : (
-          filteredNotifications.map((notification) => {
+          currentNotifications.map((notification) => {
             // Fallback config if notification type is not found
             const config = getNotificationConfig(notification.type);
             const Icon = config.icon;
+            
+            // Handle notification click - navigate and mark as read
+            const handleNotificationClick = () => {
+              if (notification.action_url) {
+                // Mark as read if not already
+                if (!notification.read) {
+                  markAsRead(notification.id);
+                }
+                // Navigate to the action URL with from=notifications so back button returns here
+                const separator = notification.action_url.includes('?') ? '&' : '?';
+                navigate(`${notification.action_url}${separator}from=notifications`);
+              }
+            };
+            
+            // Format display: Put customer name first for quick scanning
+            const customerName = notification.metadata?.customerName;
+            const displayTitle = customerName 
+              ? `${customerName}` 
+              : notification.title;
+            const displaySubtitle = customerName 
+              ? notification.title 
+              : null;
 
             return (
               <div
                 key={notification.id}
-                className={` rounded-xl shadow-sm border transition-all duration-200 ${
+                onClick={notification.action_url ? handleNotificationClick : undefined}
+                className={`rounded-xl shadow-sm border transition-all duration-200 ${
+                  notification.action_url ? 'cursor-pointer hover:shadow-md' : ''
+                } ${
                   notification.read 
                     ? 'border-gray-100 bg-gray-100' 
                     : 'border-gray-100 bg-white'
@@ -448,12 +507,21 @@ const Notifications = () => {
                             <h3 className={`font-semibold text-sm ${
                               notification.read ? 'text-gray-800' : 'text-gray-900'
                             }`}>
-                              {notification.title}
+                              {displayTitle}
                             </h3>
                             {!notification.read && (
                               <div className={`w-2 h-2 bg-${fullColor} rounded-full`}></div>
                             )}
+                            {notification.action_url && (
+                              <ExternalLink className="h-3 w-3 text-gray-400" />
+                            )}
                           </div>
+                          
+                          {displaySubtitle && (
+                            <p className="text-gray-500 text-xs mb-1">
+                              {displaySubtitle}
+                            </p>
+                          )}
                           
                           <p className="text-gray-600 text-sm mb-2">
                             {notification.message}
@@ -462,8 +530,11 @@ const Notifications = () => {
                           {/* Metadata */}
                           {notification.metadata && (
                             <div className="flex items-center gap-4 text-xs text-gray-500 mb-2">
-                              {notification.metadata.customerName && (
-                                <span>Customer: {notification.metadata.customerName}</span>
+                              {notification.metadata.packageName && (
+                                <span>Package: {notification.metadata.packageName}</span>
+                              )}
+                              {notification.metadata.attractionName && (
+                                <span>Attraction: {notification.metadata.attractionName}</span>
                               )}
                               {notification.metadata.amount && (
                                 <span className="flex items-center gap-1">
@@ -489,13 +560,20 @@ const Notifications = () => {
                         {/* Actions */}
                         <div className="flex items-center gap-1 flex-shrink-0">
                           {!notification.read && (
-                            <StandardButton
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => markAsRead(notification.id)}
-                              icon={Check}
-                              title="Mark as read"
-                            />
+                            markingReadId === notification.id ? (
+                              <div className="p-2">
+                                <span className="animate-spin inline-block rounded-full h-3.5 w-3.5 border-2 border-gray-400 border-t-transparent"></span>
+                              </div>
+                            ) : (
+                              <StandardButton
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => markAsRead(notification.id)}
+                                icon={Check}
+                                title="Mark as read"
+                                disabled={markingReadId !== null}
+                              />
+                            )
                           )}
                           <StandardButton
                             variant="ghost"
@@ -519,30 +597,54 @@ const Notifications = () => {
       {totalPages > 1 && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mt-4">
           <div className="flex items-center justify-between">
-            <div className="text-sm text-gray-600">
-              {loading ? (
-                <span className="flex items-center gap-2">
-                  <div className="animate-spin rounded-full h-3 w-3 border-2 border-gray-400 border-t-transparent"></div>
-                  Loading...
-                </span>
-              ) : (
-                `Showing page ${currentPage} of ${totalPages} (${totalNotifications} total)`
-              )}
+            <div className="text-sm text-gray-800">
+              Showing <span className="font-medium">{indexOfFirstItem + 1}</span> to{' '}
+              <span className="font-medium">
+                {Math.min(indexOfLastItem, filteredNotifications.length)}
+              </span>{' '}
+              of <span className="font-medium">{filteredNotifications.length}</span> results
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-1">
               <StandardButton
                 variant="secondary"
                 size="sm"
-                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                disabled={currentPage === 1 || loading}
+                onClick={() => paginate(Math.max(1, currentPage - 1))}
+                disabled={currentPage === 1}
               >
                 Previous
               </StandardButton>
+              
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                const showPage = page === 1 || 
+                                page === totalPages || 
+                                (page >= currentPage - 1 && page <= currentPage + 1);
+                
+                const showEllipsisBefore = page === currentPage - 2 && currentPage > 3;
+                const showEllipsisAfter = page === currentPage + 2 && currentPage < totalPages - 2;
+                
+                if (!showPage && !showEllipsisBefore && !showEllipsisAfter) return null;
+                
+                if (showEllipsisBefore || showEllipsisAfter) {
+                  return <span key={page} className="px-3 py-2 text-gray-400">...</span>;
+                }
+                
+                return (
+                  <StandardButton
+                    key={page}
+                    variant={currentPage === page ? 'primary' : 'secondary'}
+                    size="sm"
+                    onClick={() => paginate(page)}
+                  >
+                    {page}
+                  </StandardButton>
+                );
+              })}
+              
               <StandardButton
                 variant="secondary"
                 size="sm"
-                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                disabled={currentPage === totalPages || loading}
+                onClick={() => paginate(Math.min(totalPages, currentPage + 1))}
+                disabled={currentPage === totalPages}
               >
                 Next
               </StandardButton>

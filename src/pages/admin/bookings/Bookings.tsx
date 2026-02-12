@@ -71,7 +71,6 @@ const Bookings: React.FC = () => {
   const [bookings, setBookings] = useState<BookingsPageBooking[]>([]);
   const [filteredBookings, setFilteredBookings] = useState<BookingsPageBooking[]>([]);
   const [loading, setLoading] = useState(true);
-  const [loadingStatus, setLoadingStatus] = useState('Initializing...');
   const [savingStatusBookingId, setSavingStatusBookingId] = useState<string | null>(null);
   const [selectedBookings, setSelectedBookings] = useState<string[]>([]);
   const [filters, setFilters] = useState<BookingsPageFilterOptions>({
@@ -463,13 +462,11 @@ const Bookings: React.FC = () => {
   const loadBookings = async () => {
     try {
       setLoading(true);
-      setLoadingStatus('Checking cache...');
       
       // Check if cache has data first for instant loading
       const hasCachedData = await bookingCacheService.hasCachedData();
       
       if (hasCachedData) {
-        setLoadingStatus('Loading from cache...');
         console.log('[Bookings] Loading from cache...');
         
         // Build filter for cache
@@ -555,7 +552,6 @@ const Bookings: React.FC = () => {
       }
       
       // No cache or cache is empty - fetch from API
-      setLoadingStatus('Fetching bookings from server...');
       console.log('[Bookings] Fetching from API...');
       const params: any = {
         page: 1,
@@ -570,7 +566,6 @@ const Bookings: React.FC = () => {
       const response = await bookingService.getBookings(params);
       
       if (response.success && response.data) {
-        setLoadingStatus(`Processing ${response.data.bookings.length} bookings...`);
         // Transform backend booking data to match BookingsPageBooking interface
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const transformedBookings: BookingsPageBooking[] = response.data.bookings.map((booking: any) => {
@@ -1931,7 +1926,7 @@ const Bookings: React.FC = () => {
             <div className="relative group/customer">
               {/* Edit Booking Button - Top Right */}
               <Link
-                to={`/bookings/edit/${booking.id}`}
+                to={`/bookings/edit/${booking.id}?from=bookings`}
                 className="absolute -top-1 -right-1 p-1 rounded bg-white border border-gray-200 shadow-sm opacity-0 group-hover/customer:opacity-100 transition-opacity hover:bg-gray-50 hover:border-gray-300 z-10"
                 title="Edit Booking"
                 onClick={(e) => e.stopPropagation()}
@@ -2628,14 +2623,9 @@ const Bookings: React.FC = () => {
 
   if (loading) {
     return (
-        <div className="flex flex-col justify-center items-center h-64 gap-4">
-          <div className="relative">
-            <div className={`animate-spin rounded-full h-12 w-12 border-4 border-gray-200 border-t-${fullColor}`}></div>
-          </div>
-          <div className="flex flex-col items-center gap-1">
-            <p className="text-sm font-medium text-gray-700 animate-pulse">{loadingStatus}</p>
-          </div>
-        </div>
+      <div className="flex items-center justify-center h-64">
+        <div className={`animate-spin rounded-full h-12 w-12 border-b-2 border-${fullColor}`}></div>
+      </div>
     );
   }
 
@@ -3173,14 +3163,14 @@ const Bookings: React.FC = () => {
                             <FileText className="h-4 w-4" />
                           </button>
                           <Link
-                            to={`/bookings/${booking.id}?ref=${booking.referenceNumber}`}
+                            to={`/bookings/${booking.id}?ref=${booking.referenceNumber}&from=bookings`}
                             className="p-1 text-gray-800 hover:text-gray-800"
                             title="View Details"
                           >
                             <Eye className="h-4 w-4" />
                           </Link>
                           <Link
-                            to={`/bookings/edit/${booking.id}?ref=${booking.referenceNumber}`}
+                            to={`/bookings/edit/${booking.id}?ref=${booking.referenceNumber}&from=bookings`}
                             className={`p-1 text-${themeColor}-600 hover:text-${fullColor}`}
                             title="Edit"
                           >

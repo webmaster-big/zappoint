@@ -1339,9 +1339,9 @@ const Payments: React.FC = () => {
                                       <button
                                         onClick={() => {
                                           if (payment.payable_type === PAYMENT_TYPE.BOOKING) {
-                                            navigate(`/bookings/${payment.payable_id}`);
+                                            navigate(`/bookings/${payment.payable_id}?from=payments`);
                                           } else if (payment.payable_type === PAYMENT_TYPE.ATTRACTION_PURCHASE) {
-                                            navigate(`/attractions/purchases/${payment.payable_id}`);
+                                            navigate(`/attractions/purchases/${payment.payable_id}?from=payments`);
                                           }
                                           setOpenActionsMenu(null);
                                         }}
@@ -1361,9 +1361,9 @@ const Payments: React.FC = () => {
                             <button
                               onClick={() => {
                                 if (payment.payable_type === PAYMENT_TYPE.BOOKING) {
-                                  navigate(`/bookings/${payment.payable_id}`);
+                                  navigate(`/bookings/${payment.payable_id}?from=payments`);
                                 } else if (payment.payable_type === PAYMENT_TYPE.ATTRACTION_PURCHASE) {
-                                  navigate(`/attractions/purchases/${payment.payable_id}`);
+                                  navigate(`/attractions/purchases/${payment.payable_id}?from=payments`);
                                 }
                               }}
                               className={`p-2 text-gray-400 hover:text-${themeColor}-600 hover:bg-${themeColor}-50 rounded-lg transition-colors`}

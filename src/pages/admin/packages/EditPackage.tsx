@@ -101,6 +101,7 @@ const EditPackage: React.FC = () => {
         invitationType: "link" as "link" | "file", // Tab selection for invitation
         bookingWindowDays: "", // Max days in advance for booking (1-365)
         minBookingNoticeHours: "", // Min hours in advance for booking (0-8760)
+        isActive: false, // Preserve active/inactive status on edit
     });
 
     // Image preview state
@@ -336,6 +337,7 @@ const EditPackage: React.FC = () => {
                     invitationType: pkg.invitation_file ? "file" : "link",
                     bookingWindowDays: String(pkg.booking_window_days || ""),
                     minBookingNoticeHours: String(pkg.min_booking_notice_hours || ""),
+                    isActive: pkg.is_active ?? false,
                 });
 
                 if (pkg.image) {
@@ -770,6 +772,7 @@ const EditPackage: React.FC = () => {
                 gift_card_ids,
                 // Store add-ons order for display (uses add-on names)
                 add_ons_order: form.addOns,
+                is_active: form.isActive,
             };
 
             console.log("Updating package with data:", updateData);

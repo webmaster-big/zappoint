@@ -32,6 +32,7 @@ import ManagePurchases from "./pages/admin/attractions/AttractionPurchases";
 import CreatePurchase from "./pages/admin/attractions/CreatePurchase";
 import AttractionCheckIn from "./pages/admin/attractions/AttractionCheckIn";
 import Payments from "./pages/admin/payments/Payments";
+import ViewPayment from "./pages/admin/payments/ViewPayment";
 import CustomerAnalytics from "./pages/admin/customer/CustomerAnalytics";
 import CustomerListing from "./pages/admin/customer/Customers";
 import CompanyAdminRegistration from "./pages/auth/Register";
@@ -142,6 +143,9 @@ function App() {
           <Route path="/bookings/manual" element={<ManualBooking />} />
           <Route path="/bookings/check-in" element={<CheckIn />} />
           
+          {/* Payments Routes - All authenticated users */}
+          <Route path="/payments/:id" element={<ViewPayment />} />
+          
           {/* Customers Routes - All authenticated users */}
           <Route path="/customers/analytics" element={<CustomerAnalytics />} />
           <Route path="/customers" element={<CustomerListing />} />
@@ -172,6 +176,7 @@ function App() {
           <Route path="/manager/day-offs" element={<ProtectedRoute allowedRoles={['location_manager']}><DayOffs /></ProtectedRoute>} />
           <Route path="/manager/analytics" element={<ProtectedRoute allowedRoles={['location_manager']}><LocationAnalytics /></ProtectedRoute>} />
           <Route path="/manager/payments" element={<ProtectedRoute allowedRoles={['location_manager']}><Payments /></ProtectedRoute>} />
+          <Route path="/manager/payments/:id" element={<ProtectedRoute allowedRoles={['location_manager']}><ViewPayment /></ProtectedRoute>} />
           
           {/* Company Admin-only Routes */}
           <Route path="/admin/analytics" element={<ProtectedRoute allowedRoles={['company_admin']}><CompanyAnalytics /></ProtectedRoute>} />
@@ -179,6 +184,7 @@ function App() {
           <Route path="/admin/day-offs" element={<ProtectedRoute allowedRoles={['company_admin']}><DayOffs /></ProtectedRoute>} />
           <Route path="/admin/users" element={<ProtectedRoute allowedRoles={['company_admin']}><ManageAccounts /></ProtectedRoute>} />
           <Route path="/admin/payments" element={<ProtectedRoute allowedRoles={['company_admin']}><Payments /></ProtectedRoute>} />
+          <Route path="/admin/payments/:id" element={<ProtectedRoute allowedRoles={['company_admin']}><ViewPayment /></ProtectedRoute>} />
           {/* <Route path="/admin/users/create" element={<ProtectedRoute allowedRoles={['company_admin']}><CreateAccount /></ProtectedRoute>} /> */}
           
           {/* Shared Routes - All authenticated users */}

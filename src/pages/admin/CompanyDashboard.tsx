@@ -1732,7 +1732,7 @@ const CompanyDashboard: React.FC = () => {
                                 className="px-2 py-1 border-r border-gray-200 align-top"
                               >
                                 <Link
-                                  to={`/admin/bookings/${booking.id}`}
+                                  to={`/admin/bookings/${booking.id}?from=dashboard`}
                                   className={`block h-full p-2 rounded-lg text-xs cursor-pointer transition-all hover:shadow-md ${
                                     booking.status === 'confirmed' 
                                       ? 'bg-green-100 border border-green-300 text-green-800'
@@ -1801,7 +1801,7 @@ const CompanyDashboard: React.FC = () => {
                                 className="px-2 py-1 border-r border-gray-200 align-top bg-amber-50"
                               >
                                 <Link
-                                  to={`/admin/bookings/${booking.id}`}
+                                  to={`/admin/bookings/${booking.id}?from=dashboard`}
                                   className="block h-full p-2 rounded-lg text-xs cursor-pointer transition-all hover:shadow-md bg-amber-100 border border-amber-300 text-amber-800"
                                 >
                                   <div className="flex items-center justify-between mb-1">
@@ -2683,7 +2683,7 @@ const CompanyDashboard: React.FC = () => {
               <div className="mt-6 pt-4 border-t border-gray-200 space-y-2">
                 <div className="flex gap-2">
                   <Link
-                    to={`/bookings/${selectedBooking.id}`}
+                    to={`/bookings/${selectedBooking.id}?from=dashboard`}
                     className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
                     onClick={() => { setSelectedBooking(null); setEditingNotes(false); }}
                   >
@@ -2691,7 +2691,7 @@ const CompanyDashboard: React.FC = () => {
                     View
                   </Link>
                   <Link
-                    to={`/bookings/edit/${selectedBooking.id}`}
+                    to={`/bookings/edit/${selectedBooking.id}?from=dashboard`}
                     className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
                     onClick={() => { setSelectedBooking(null); setEditingNotes(false); }}
                   >

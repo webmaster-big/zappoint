@@ -37,6 +37,27 @@ const EditBooking: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
   const referenceNumber = searchParams.get('ref');
+  const from = searchParams.get('from');
+  const getBackPath = () => {
+    switch (from) {
+      case 'notifications': return '/notifications';
+      case 'dashboard': return -1 as any;
+      case 'payments': return '/payments';
+      case 'calendar': return '/bookings/calendar';
+      case 'space-schedule': return '/bookings/space-schedule';
+      default: return '/bookings';
+    }
+  };
+  const getBackLabel = () => {
+    switch (from) {
+      case 'notifications': return 'Notifications';
+      case 'dashboard': return 'Dashboard';
+      case 'payments': return 'Payments';
+      case 'calendar': return 'Calendar';
+      case 'space-schedule': return 'Space Schedule';
+      default: return 'Bookings';
+    }
+  };
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [notFound, setNotFound] = useState(false);
@@ -550,7 +571,7 @@ const EditBooking: React.FC = () => {
         }
         
         alert('Booking updated successfully!');
-        navigate('/bookings');
+        navigate(getBackPath());
       } else {
         alert('Failed to update booking. Please try again.');
         setSubmitting(false);
@@ -589,8 +610,8 @@ const EditBooking: React.FC = () => {
           <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-3" />
           <h1 className="text-xl font-bold text-gray-800 mb-2">Booking Not Found</h1>
           <p className="text-gray-500 text-sm mb-4">The booking you're looking for doesn't exist.</p>
-          <StandardButton variant="primary" size="sm" onClick={() => navigate('/bookings')}>
-            Back to Bookings
+          <StandardButton variant="primary" size="sm" onClick={() => navigate(getBackPath())}>
+            Back to {getBackLabel()}
           </StandardButton>
         </div>
       </div>
@@ -604,7 +625,7 @@ const EditBooking: React.FC = () => {
         <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6 md:p-8">
           <div className="flex items-center gap-3 mb-6">
             <button
-              onClick={() => navigate('/bookings')}
+              onClick={() => navigate(getBackPath())}
               className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
             >
               <ArrowLeft size={24} />
@@ -977,7 +998,7 @@ const EditBooking: React.FC = () => {
               <StandardButton
                 variant="secondary"
                 size="lg"
-                onClick={() => navigate('/bookings')}
+                onClick={() => navigate(getBackPath())}
                 disabled={submitting}
               >
                 Cancel
