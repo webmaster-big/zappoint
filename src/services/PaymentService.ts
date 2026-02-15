@@ -233,7 +233,7 @@ export const linkPaymentToPayable = async (
   if (data.payable_id) params.append('payable_id', data.payable_id.toString());
   if (data.payable_type) params.append('payable_type', data.payable_type);
   const queryString = params.toString() ? `?${params.toString()}` : '';
-  const response = await api.put<LinkPayableResponse>(`/payments/${paymentId}/payable${queryString}`, data);
+  const response = await api.patch<LinkPayableResponse>(`/payments/${paymentId}/payable${queryString}`, data);
   return response.data;
 };
 
