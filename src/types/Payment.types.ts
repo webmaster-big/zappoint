@@ -37,6 +37,12 @@ export interface PaymentChargeRequest {
   // Signature & Terms fields
   signature_image?: string; // base64 data URI of customer signature
   terms_accepted?: boolean; // Whether customer accepted Terms & Conditions
+  // Payable linking fields — charge endpoint links payment to entity automatically
+  payable_id?: number; // ID of booking or attraction purchase
+  payable_type?: PaymentPayableType; // 'booking' | 'attraction_purchase'
+  // Email & QR fields — charge endpoint sends confirmation email on success
+  send_email?: boolean; // Whether to send confirmation email after successful charge
+  qr_code?: string; // base64 data URI of QR code to include in email
 }
 
 /**

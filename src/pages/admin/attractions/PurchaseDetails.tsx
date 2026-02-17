@@ -18,17 +18,24 @@ import { useThemeColor } from '../../../hooks/useThemeColor';
 import { attractionPurchaseService } from '../../../services/AttractionPurchaseService';
 import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
+import { getStoredUser } from '../../../utils/storage';
 
 const PurchaseDetails = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const from = searchParams.get('from');
+  const getPaymentsPath = () => {
+    const user = getStoredUser();
+    if (user?.role === 'location_manager') return '/manager/payments';
+    if (user?.role === 'company_admin') return '/admin/payments';
+    return '/payments';
+  };
   const getBackPath = () => {
     switch (from) {
       case 'notifications': return '/notifications';
       case 'dashboard': return -1 as any;
-      case 'payments': return '/payments';
+      case 'payments': return getPaymentsPath();
       default: return '/attractions/purchases';
     }
   };

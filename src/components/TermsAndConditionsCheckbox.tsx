@@ -19,15 +19,15 @@ const TermsAndConditionsCheckbox: React.FC<TermsAndConditionsCheckboxProps> = ({
   return (
     <>
       {/* Checkbox */}
-      <div className="flex items-start gap-2">
+      <div className="flex items-center gap-3">
         <input
           type="checkbox"
           id="terms_accepted"
           checked={checked}
           onChange={(e) => onChange(e.target.checked)}
-          className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+          className="h-4 w-4 shrink-0 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
         />
-        <label htmlFor="terms_accepted" className="text-sm text-gray-700">
+        <label htmlFor="terms_accepted" className="text-sm text-gray-700 leading-5 select-none">
           I agree to the{" "}
           <button
             type="button"
@@ -42,14 +42,14 @@ const TermsAndConditionsCheckbox: React.FC<TermsAndConditionsCheckboxProps> = ({
           {required && <span className="text-red-500 ml-0.5">*</span>}
         </label>
       </div>
-      {error && <p className="text-sm text-red-500 mt-1">{error}</p>}
+      {error && <p className="text-sm text-red-500 mt-1 ml-7">{error}</p>}
 
       {/* Terms & Conditions Modal (read-only) */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col">
             {/* Modal Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+            <div className="flex items-center justify-between px-6 py-4">
               <h2 className="text-xl font-bold text-gray-900">
                 Terms &amp; Conditions
               </h2>
@@ -68,7 +68,7 @@ const TermsAndConditionsCheckbox: React.FC<TermsAndConditionsCheckboxProps> = ({
             </div>
 
             {/* Modal Footer */}
-            <div className="px-6 py-4 border-t border-gray-200 flex justify-end">
+            <div className="px-6 py-4 flex justify-end">
               <button
                 type="button"
                 onClick={() => setIsModalOpen(false)}

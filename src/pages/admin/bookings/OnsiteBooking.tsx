@@ -31,10 +31,15 @@ interface DayOffWithTime {
   room_ids?: number[] | null;     // If set, only blocks these rooms
 }
 import { formatDurationDisplay } from '../../../utils/timeFormat';
-import { loadAcceptJS, processCardPayment, validateCardNumber, formatCardNumber, getCardType, createPayment, linkPaymentWithRetry } from '../../../services/PaymentService';
+import { loadAcceptJS, processCardPayment, validateCardNumber, formatCardNumber, getCardType, createPayment } from '../../../services/PaymentService';
 import { PAYMENT_TYPE } from '../../../types/Payment.types';
 import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
 import { globalNoteService, type GlobalNote } from '../../../services/GlobalNoteService';
+import { feeSupportService } from '../../../services/FeeSupportService';
+import type { FeeBreakdown } from '../../../types/FeeSupport.types';
+import { specialPricingService } from '../../../services/SpecialPricingService';
+import type { SpecialPricingBreakdown } from '../../../types/SpecialPricing.types';
+import PriceBreakdownDisplay from '../../../components/ui/PriceBreakdownDisplay';
 
 // Helper function to parse ISO date string (YYYY-MM-DD) in local timezone
 // Avoids UTC offset issues that cause date to show as previous day
@@ -144,6 +149,8 @@ const OnsiteBooking: React.FC = () => {
   const [showEmptyModal, setShowEmptyModal] = useState(false);
   const [sendEmail, setSendEmail] = useState(true);
   const [sendEmailToStaff, setSendEmailToStaff] = useState(true);
+  const [feeBreakdown, setFeeBreakdown] = useState<FeeBreakdown | null>(null);
+  const [specialPricingBreakdown, setSpecialPricingBreakdown] = useState<SpecialPricingBreakdown | null>(null);
   const [bookingData, setBookingData] = useState<BookingData>({
     packageId: null,
     selectedAttractions: [],
@@ -298,6 +305,62 @@ const OnsiteBooking: React.FC = () => {
       fetchLocations();
     }
   }, [isCompanyAdmin]);
+
+  // Fetch fee breakdown when package or pricing inputs change
+  useEffect(() => {
+    const fetchFeeBreakdown = async () => {
+      if (!selectedPackage) {
+        setFeeBreakdown(null);
+        return;
+      }
+      try {
+        const basePrice = calculateTotal();
+        const response = await feeSupportService.getForEntity({
+          entity_type: 'package',
+          entity_id: selectedPackage.id,
+          base_price: basePrice,
+          location_id: selectedLocation || undefined,
+        });
+        if (response.success && response.data) {
+          setFeeBreakdown(response.data);
+        }
+      } catch (error) {
+        console.error('Error fetching fee breakdown:', error);
+        setFeeBreakdown(null);
+      }
+    };
+    fetchFeeBreakdown();
+  }, [selectedPackage, bookingData.participants, bookingData.selectedAttractions, bookingData.selectedAddOns, bookingData.giftCardCode, bookingData.promoCode, selectedLocation]);
+
+  // Fetch special pricing when package and date are selected
+  useEffect(() => {
+    const fetchSpecialPricing = async () => {
+      if (!selectedPackage || !bookingData.date) {
+        setSpecialPricingBreakdown(null);
+        return;
+      }
+      try {
+        const basePrice = selectedPackage.price;
+        const breakdown = await specialPricingService.getPriceBreakdown({
+          entity_type: 'package',
+          entity_id: selectedPackage.id,
+          base_price: basePrice,
+          date: bookingData.date,
+          time: bookingData.time || undefined,
+          location_id: selectedLocation || undefined,
+        });
+        if (breakdown.has_special_pricing) {
+          setSpecialPricingBreakdown(breakdown);
+        } else {
+          setSpecialPricingBreakdown(null);
+        }
+      } catch (error) {
+        console.error('Error fetching special pricing:', error);
+        setSpecialPricingBreakdown(null);
+      }
+    };
+    fetchSpecialPricing();
+  }, [selectedPackage, bookingData.date, bookingData.time, selectedLocation]);
 
   // Load packages from backend
   useEffect(() => {
@@ -1370,7 +1433,7 @@ const OnsiteBooking: React.FC = () => {
         .filter((item): item is { addon_id: number; quantity: number; price_at_booking: number } => item !== null);
       
       // Calculate amount paid based on payment type and method
-      const totalAmount = calculateTotal();
+      const totalAmount = feeBreakdown ? feeBreakdown.total : calculateTotal();
       const partialAmount = calculatePartialAmount();
       let amountPaid = totalAmount;
       
@@ -1464,9 +1527,8 @@ const OnsiteBooking: React.FC = () => {
       let referenceNumber: string;
       let customerId: number | undefined;
 
-      // ===== CHARGE-THEN-LINK FLOW FOR CARD PAYMENTS =====
+      // ===== CREATE-FIRST FLOW FOR CARD PAYMENTS =====
       if (isCardPayment && amountPaid > 0) {
-        // Step 1: Charge customer FIRST (no booking yet, no payable_id)
         try {
           setIsProcessingPayment(true);
           setPaymentError('');
@@ -1476,55 +1538,11 @@ const OnsiteBooking: React.FC = () => {
             await loadAcceptJS(authorizeEnvironment);
           }
           
-          // Customer billing data for Authorize.Net
-          const customerData = {
-            first_name: bookingData.customer.firstName || '',
-            last_name: bookingData.customer.lastName || '',
-            email: bookingData.customer.email || '',
-            phone: bookingData.customer.phone || '',
-          };
-          
-          const paymentResult = await processCardPayment(
-            {
-              cardNumber: cardNumber.replace(/\s/g, ''),
-              month: cardMonth,
-              year: cardYear,
-              cardCode: cardCVV
-            },
-            {
-              location_id: bookingData_request.location_id,
-              amount: amountPaid,
-              customer_id: bookingData_request.customer_id || undefined,
-            },
-            authorizeApiLoginId,
-            undefined, // clientKey
-            customerData // Pass customer billing data
-          );
-          
-          if (!paymentResult.success) {
-            // Payment failed - no booking was created, so nothing to clean up
-            setPaymentError(paymentResult.message || 'Payment processing failed. Please try again.');
-            setIsProcessingPayment(false);
-            return;
-          }
-          
-          const paymentId = paymentResult.payment?.id;
-          const chargeTransactionId = paymentResult.transaction_id;
-          console.log('✅ Payment charged successfully, payment ID:', paymentId, 'txn:', chargeTransactionId);
-          
-          // Step 2: Create booking (customer already charged)
+          // Step 1: Create booking FIRST (no charge yet)
           const response = await bookingService.createBooking(bookingData_request);
           
           if (!response.success || !response.data) {
-            // Booking creation failed AFTER charge - this is a critical situation
-            // Payment was collected but booking couldn't be created
-            console.error('❌ Booking creation failed after successful charge. Payment ID:', paymentId);
-            setPaymentError(
-              'Your payment was processed successfully, but we encountered an issue creating your booking. ' +
-              'Please contact our staff with your payment confirmation. Your payment is safe and will be resolved.'
-            );
-            setIsProcessingPayment(false);
-            return;
+            throw new Error('Failed to create booking');
           }
           
           bookingId = response.data.id;
@@ -1536,19 +1554,71 @@ const OnsiteBooking: React.FC = () => {
           // Add the new booking to cache
           await bookingCacheService.addBookingToCache(response.data);
           
-          // Step 3: Link payment to booking (with retry for reliability)
-          if (paymentId) {
+          // Step 2: Generate QR code
+          const qrCodeBase64 = await QRCode.toDataURL(referenceNumber, {
+            width: 300,
+            margin: 2,
+            color: { dark: '#000000', light: '#FFFFFF' }
+          });
+          
+          // Customer billing data for Authorize.Net
+          const customerData = {
+            first_name: bookingData.customer.firstName || '',
+            last_name: bookingData.customer.lastName || '',
+            email: bookingData.customer.email || '',
+            phone: bookingData.customer.phone || '',
+          };
+          
+          // Step 3: Charge payment WITH payable_id — backend links payment + sends email + stores QR
+          const paymentResult = await processCardPayment(
+            {
+              cardNumber: cardNumber.replace(/\s/g, ''),
+              month: cardMonth,
+              year: cardYear,
+              cardCode: cardCVV
+            },
+            {
+              location_id: bookingData_request.location_id,
+              amount: amountPaid,
+              customer_id: bookingData_request.customer_id || undefined,
+              payable_id: bookingId,
+              payable_type: PAYMENT_TYPE.BOOKING,
+              send_email: sendEmail,
+              qr_code: qrCodeBase64,
+            },
+            authorizeApiLoginId,
+            undefined, // clientKey
+            customerData // Pass customer billing data
+          );
+          
+          if (!paymentResult.success) {
+            // Payment failed — clean up the booking we created
+            console.error('❌ Payment failed, deleting booking:', bookingId);
             try {
-              await linkPaymentWithRetry(paymentId, bookingId, PAYMENT_TYPE.BOOKING, 3, chargeTransactionId);
-              console.log('✅ Payment linked to booking successfully');
-            } catch (linkErr) {
-              // Non-critical: payment and booking both exist, just not linked yet
-              // Staff can see unlinked payments and manually resolve
-              console.error('⚠️ Failed to link payment to booking:', linkErr);
+              await bookingService.deleteBooking(bookingId);
+              await bookingCacheService.removeBookingFromCache(bookingId);
+              console.log('🗑️ Booking deleted due to payment failure');
+            } catch (deleteErr) {
+              console.error('⚠️ Failed to delete booking after payment failure:', deleteErr);
             }
+            // Show customer-friendly error message
+            const rawMsg = (paymentResult.message || '').toLowerCase();
+            let friendlyMsg = 'Payment could not be processed. The booking has been cancelled and no charges were made. Please check your card details and try again.';
+            if (rawMsg.includes('declined') || rawMsg.includes('decline')) {
+              friendlyMsg = 'Your card was declined. The booking has been cancelled and no charges were made. Please check your card details or try a different card.';
+            } else if (rawMsg.includes('insufficient')) {
+              friendlyMsg = 'Insufficient funds on your card. The booking has been cancelled. Please try a different card or payment method.';
+            } else if (rawMsg.includes('expired') || rawMsg.includes('expiration')) {
+              friendlyMsg = 'Your card appears to be expired. The booking has been cancelled and no charges were made. Please use a different card.';
+            } else if (rawMsg.includes('cvv') || rawMsg.includes('security code')) {
+              friendlyMsg = 'Invalid security code (CVV). The booking has been cancelled. Please check the code on your card and try again.';
+            }
+            setPaymentError(friendlyMsg);
+            setIsProcessingPayment(false);
+            return;
           }
           
-          console.log('✅ Payment processed successfully:', paymentResult.transaction_id);
+          console.log('✅ Payment charged and linked successfully:', paymentResult.transaction_id);
         } catch (paymentErr: any) {
           console.error('❌ Payment processing error:', paymentErr);
           
@@ -1605,22 +1675,23 @@ const OnsiteBooking: React.FC = () => {
         }
       }
       
-      // Step 3: Generate QR code with the actual reference number
-      const qrCodeBase64 = await QRCode.toDataURL(referenceNumber, {
-        width: 300,
-        margin: 2,
-        color: { dark: '#000000', light: '#FFFFFF' }
-      });
-      
-      console.log('📱 QR Code generated for reference:', referenceNumber);
-      
-      // Step 4: Store QR code with email preference
-      try {
-        await bookingService.storeQrCode(bookingId, qrCodeBase64, sendEmail);
-        console.log('✅ QR code stored with email preference:', sendEmail);
-      } catch (qrError) {
-        console.error('⚠️ Failed to store QR code, but booking was created:', qrError);
-        // Don't fail the entire process if QR storage fails
+      // For non-card payments: Generate QR code and store with email preference
+      // (Card payments already handled QR + email via charge endpoint)
+      if (!(isCardPayment && amountPaid > 0)) {
+        const qrCodeBase64 = await QRCode.toDataURL(referenceNumber, {
+          width: 300,
+          margin: 2,
+          color: { dark: '#000000', light: '#FFFFFF' }
+        });
+        
+        console.log('📱 QR Code generated for reference:', referenceNumber);
+        
+        try {
+          await bookingService.storeQrCode(bookingId, qrCodeBase64, sendEmail);
+          console.log('✅ QR code stored with email preference:', sendEmail);
+        } catch (qrError) {
+          console.error('⚠️ Failed to store QR code, but booking was created:', qrError);
+        }
       }
       
       // Show success toast
@@ -1642,13 +1713,12 @@ const OnsiteBooking: React.FC = () => {
 
   // Live Summary Component - visible on all steps
   const renderLiveSummary = () => {
-    const total = calculateTotal();
+    let total = feeBreakdown ? feeBreakdown.total : calculateTotal();
+    // Apply special pricing discount if available
+    if (specialPricingBreakdown && specialPricingBreakdown.has_special_pricing) {
+      total = total - specialPricingBreakdown.total_discount;
+    }
     const partialAmount = calculatePartialAmount();
-    
-    // Calculate the 4.87% fee that's already included in prices (for display purposes)
-    const FEE_RATE = 0.0487;
-    const priceBeforeFee = total / (1 + FEE_RATE);
-    const includedFee = total - priceBeforeFee;
     
     return (
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 sticky top-6">
@@ -1884,17 +1954,26 @@ const OnsiteBooking: React.FC = () => {
                 )}
               </div>
               
-              {/* Subtotal */}
-              <div className="flex justify-between items-center pt-3 mt-2 border-t border-gray-200 text-sm">
-                <span className="text-gray-600">Subtotal (before fee)</span>
-                <span className="font-medium text-gray-800">${priceBeforeFee.toFixed(2)}</span>
-              </div>
+              {/* Special Pricing Discount - auto-applied based on date */}
+              {specialPricingBreakdown && specialPricingBreakdown.has_special_pricing && (
+                <div className="pt-3 mt-2 border-t border-gray-200">
+                  <p className="text-xs font-semibold text-green-600 uppercase mb-1">🏷️ Special Pricing Applied</p>
+                  {specialPricingBreakdown.discounts_applied.map((discount, idx) => (
+                    <div key={idx} className="flex justify-between text-xs mb-1">
+                      <div>
+                        <span className="text-green-700 font-medium">{discount.name}</span>
+                        <span className="text-gray-400 block text-[10px]">{discount.recurrence_display}</span>
+                      </div>
+                      <span className="font-medium text-green-600">-${discount.discount_amount.toFixed(2)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
               
-              {/* Processing Fee */}
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-gray-600">Processing Fee (4.87%)</span>
-                <span className="font-medium text-gray-800">${includedFee.toFixed(2)}</span>
-              </div>
+              {/* Fee Breakdown - only if fee supports exist */}
+              {feeBreakdown && feeBreakdown.fees.length > 0 && (
+                <PriceBreakdownDisplay breakdown={feeBreakdown} compact className="pt-3 mt-2 border-t border-gray-200" />
+              )}
               
               {/* Total */}
               <div className="flex justify-between items-center pt-2 mt-1 border-t-2 border-gray-300">
@@ -3292,9 +3371,14 @@ const OnsiteBooking: React.FC = () => {
           )}
         </div>
         
+        {/* Fee Breakdown */}
+        {feeBreakdown && feeBreakdown.fees.length > 0 && (
+          <PriceBreakdownDisplay breakdown={feeBreakdown} compact className="mt-3 pt-3 border-t border-gray-200" />
+        )}
+        
         <div className="flex justify-between font-bold text-lg mt-4 pt-4 border-t border-gray-200">
           <span>Total</span>
-          <span>${calculateTotal().toFixed(2)}</span>
+          <span>${(feeBreakdown ? feeBreakdown.total : calculateTotal()).toFixed(2)}</span>
         </div>
         
         {bookingData.paymentMethod === 'paylater' ? (

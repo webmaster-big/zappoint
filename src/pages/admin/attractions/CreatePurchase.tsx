@@ -20,10 +20,15 @@ import LocationSelector from '../../../components/admin/LocationSelector';
 import Toast from '../../../components/ui/Toast';
 import EmptyStateModal from '../../../components/ui/EmptyStateModal';
 import { ASSET_URL, getStoredUser } from '../../../utils/storage';
-import { loadAcceptJS, processCardPayment, validateCardNumber, formatCardNumber, getCardType, createPayment, PAYMENT_TYPE, linkPaymentWithRetry } from '../../../services/PaymentService';
+import { loadAcceptJS, processCardPayment, validateCardNumber, formatCardNumber, getCardType, createPayment, PAYMENT_TYPE } from '../../../services/PaymentService';
 import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
 import { generatePurchaseQRCode } from '../../../utils/qrcode';
 import StandardButton from '../../../components/ui/StandardButton';
+import { feeSupportService } from '../../../services/FeeSupportService';
+import type { FeeBreakdown } from '../../../types/FeeSupport.types';
+import PriceBreakdownDisplay from '../../../components/ui/PriceBreakdownDisplay';
+import { specialPricingService } from '../../../services/SpecialPricingService';
+import type { SpecialPricingBreakdown } from '../../../types/SpecialPricing.types';
 
 const CreatePurchase = () => {
   const { themeColor, fullColor } = useThemeColor();
@@ -64,6 +69,8 @@ const CreatePurchase = () => {
   const [showNoAuthAccountModal, setShowNoAuthAccountModal] = useState(false);
   const [showEmptyModal, setShowEmptyModal] = useState(false);
   const [sendEmail, setSendEmail] = useState(true);
+  const [feeBreakdown, setFeeBreakdown] = useState<FeeBreakdown | null>(null);
+  const [specialPricingBreakdown, setSpecialPricingBreakdown] = useState<SpecialPricingBreakdown | null>(null);
   
   const currentUser = getStoredUser();
   const isCompanyAdmin = currentUser?.role === 'company_admin';
@@ -245,8 +252,8 @@ const CreatePurchase = () => {
 
   // Initialize Authorize.Net only when needed
   useEffect(() => {
-    // Only initialize if card payment and Authorize.Net is selected
-    if (paymentMethod !== 'card' || !useAuthorizeNet) {
+    // Only initialize if Authorize.Net payment is selected
+    if (paymentMethod !== 'authorize.net') {
       return;
     }
 
@@ -315,11 +322,68 @@ const CreatePurchase = () => {
     return Math.max(0, subtotal - discount);
   };
   
-  // Calculate the 4.87% fee that's already included in prices (for display purposes)
-  const FEE_RATE = 0.0487;
+  // Use dynamic fee breakdown if available - no fallback to hardcoded rate
   const currentTotal = calculateTotal();
-  const priceBeforeFee = currentTotal / (1 + FEE_RATE);
-  const includedFee = currentTotal - priceBeforeFee;
+  const specialPricingDiscount = specialPricingBreakdown?.has_special_pricing ? specialPricingBreakdown.total_discount : 0;
+  const totalAfterSpecialPricing = Math.max(0, currentTotal - specialPricingDiscount);
+  const finalTotal = feeBreakdown ? feeBreakdown.total - specialPricingDiscount : totalAfterSpecialPricing;
+
+  // Fetch fee breakdown when attraction or pricing changes
+  useEffect(() => {
+    const fetchFeeBreakdown = async () => {
+      if (!selectedAttraction) {
+        setFeeBreakdown(null);
+        return;
+      }
+      try {
+        const subtotal = selectedAttraction.price * quantity;
+        const basePrice = Math.max(0, subtotal - discount);
+        const response = await feeSupportService.getForEntity({
+          entity_type: 'attraction',
+          entity_id: Number(selectedAttraction.id),
+          base_price: basePrice,
+          location_id: selectedAttraction.locationId || selectedLocation || undefined,
+        });
+        if (response.success && response.data) {
+          setFeeBreakdown(response.data);
+        }
+      } catch (error) {
+        console.error('Error fetching fee breakdown:', error);
+        setFeeBreakdown(null);
+      }
+    };
+    fetchFeeBreakdown();
+  }, [selectedAttraction, quantity, discount, selectedLocation]);
+
+  // Fetch special pricing breakdown for attraction (use today's date for immediate purchases)
+  useEffect(() => {
+    const fetchSpecialPricing = async () => {
+      if (!selectedAttraction) {
+        setSpecialPricingBreakdown(null);
+        return;
+      }
+      try {
+        // Use today's date for immediate attraction purchases
+        const today = new Date().toISOString().split('T')[0];
+        const basePrice = selectedAttraction.price * quantity;
+        const breakdown = await specialPricingService.getPriceBreakdown({
+          entity_type: 'attraction',
+          entity_id: Number(selectedAttraction.id),
+          base_price: basePrice,
+          date: today,
+        });
+        if (breakdown.has_special_pricing) {
+          setSpecialPricingBreakdown(breakdown);
+        } else {
+          setSpecialPricingBreakdown(null);
+        }
+      } catch (error) {
+        console.error('Error fetching special pricing breakdown:', error);
+        setSpecialPricingBreakdown(null);
+      }
+    };
+    fetchSpecialPricing();
+  }, [selectedAttraction, quantity]);
 
   const handleAddToCart = (attraction: CreatePurchaseAttraction) => {
     setSelectedAttraction(attraction);
@@ -330,8 +394,8 @@ const CreatePurchase = () => {
   const handleCompletePurchase = async () => {
     if (!selectedAttraction) return;
 
-    // Validate card information if payment method is authorize.net OR (card AND using Authorize.Net)
-    if (paymentMethod === 'authorize.net' || (paymentMethod === 'card' && useAuthorizeNet)) {
+    // Validate card information if payment method is authorize.net
+    if (paymentMethod === 'authorize.net') {
       if (!cardNumber || !cardMonth || !cardYear || !cardCVV) {
         setPaymentError('Please fill in all card details');
         return;
@@ -351,11 +415,11 @@ const CreatePurchase = () => {
       setIsProcessingPayment(true);
       setPaymentError('');
 
-      const totalAmount = calculateTotal();
+      const totalAmount = finalTotal;
       let transactionId: string | undefined;
       
       // Determine if this is a card payment
-      const isCardPayment = paymentMethod === 'authorize.net' || (paymentMethod === 'card' && useAuthorizeNet);
+      const isCardPayment = paymentMethod === 'authorize.net';
 
       // For cash payments, use amountPaid if explicitly set, otherwise default to full payment
       const cashAmountPaid = amountPaid > 0 ? amountPaid : totalAmount;
@@ -399,13 +463,25 @@ const CreatePurchase = () => {
           phone: customerInfo.phone || '',
         };
         
-        // Charge-then-link: charge without payable_id, then link after
+        // Generate QR code BEFORE charge so it can be sent with the charge request
+        let qrCodeData = '';
+        try {
+          qrCodeData = await generatePurchaseQRCode(createdPurchase.id);
+        } catch (qrError) {
+          console.error('⚠️ QR code generation failed:', qrError);
+        }
+        
+        // Charge WITH payable_id — backend links payment + sends email + stores QR
         const paymentData = {
           location_id: selectedAttraction.locationId || 1,
           amount: totalAmount,
           order_id: `A${selectedAttraction.id}-${Date.now().toString().slice(-8)}`,
           description: `Attraction Purchase: ${selectedAttraction.name}`,
           customer_id: selectedCustomerId || undefined,
+          payable_id: createdPurchase.id,
+          payable_type: PAYMENT_TYPE.ATTRACTION_PURCHASE,
+          send_email: sendEmail,
+          qr_code: qrCodeData || undefined,
         };
         
         const paymentResponse = await processCardPayment(
@@ -424,30 +500,28 @@ const CreatePurchase = () => {
           } catch (deleteErr) {
             console.error('⚠️ Failed to delete purchase after payment failure:', deleteErr);
           }
-          throw new Error(paymentResponse.message || 'Payment failed. Please try again.');
+          // Show customer-friendly error message
+          const rawMsg = (paymentResponse.message || '').toLowerCase();
+          let friendlyMsg = 'Payment could not be processed. The purchase has been cancelled and no charges were made. Please check your card details and try again.';
+          if (rawMsg.includes('declined') || rawMsg.includes('decline')) {
+            friendlyMsg = 'Your card was declined. The purchase has been cancelled and no charges were made. Please check your card details or try a different card.';
+          } else if (rawMsg.includes('insufficient')) {
+            friendlyMsg = 'Insufficient funds on your card. The purchase has been cancelled. Please try a different card or payment method.';
+          } else if (rawMsg.includes('expired') || rawMsg.includes('expiration')) {
+            friendlyMsg = 'Your card appears to be expired. The purchase has been cancelled and no charges were made. Please use a different card.';
+          } else if (rawMsg.includes('cvv') || rawMsg.includes('security code')) {
+            friendlyMsg = 'Invalid security code (CVV). The purchase has been cancelled. Please check the code on your card and try again.';
+          }
+          throw new Error(friendlyMsg);
         }
         
-        const paymentId = paymentResponse.payment?.id;
         transactionId = paymentResponse.transaction_id;
-        console.log('✅ Payment charged successfully, payment ID:', paymentId, 'txn:', transactionId);
-
-        // Update purchase with transaction_id
-        try {
-          await attractionPurchaseService.updatePurchase(createdPurchase.id, {
-            payment_id: transactionId
-          });
-        } catch (updateError) {
-          // Non-critical - purchase and payment succeeded
-        }
-
-        // Link payment to purchase (with retry for reliability)
-        if (paymentId) {
-          try {
-            await linkPaymentWithRetry(paymentId, createdPurchase.id, PAYMENT_TYPE.ATTRACTION_PURCHASE, 3, transactionId);
-            console.log('✅ Payment linked to purchase successfully');
-          } catch (linkErr) {
-            console.error('⚠️ Failed to link payment to purchase:', linkErr);
-          }
+        console.log('✅ Payment charged and linked successfully, txn:', transactionId);
+        
+        if (sendEmail) {
+          setToast({ message: 'Purchase confirmed! Receipt sent to email.', type: 'success' });
+        } else {
+          setToast({ message: 'Purchase confirmed! (Email not sent per request)', type: 'info' });
         }
       } else if (cashAmountPaid > 0 && paymentMethod !== 'paylater') {
         // Step 2b: For non-card payments (in-store/cash), create payment record
@@ -470,32 +544,34 @@ const CreatePurchase = () => {
         }
       }
 
-      // Generate QR code for email (not displayed in UI)
-      let qrCodeData = '';
-      try {
-        qrCodeData = await generatePurchaseQRCode(createdPurchase.id);
-      } catch (qrError) {
-        // QR code generation failed - handled silently
-      }
-
-      // Send receipt email with QR code only if QR code was generated
-      if (qrCodeData) {
+      // For non-card payments: Generate QR code and send email via qrcode endpoint
+      // (Card payments already handled QR + email via charge endpoint)
+      if (!isCardPayment) {
+        let qrCodeData = '';
         try {
-          await attractionPurchaseService.sendReceipt(
-            createdPurchase.id,
-            qrCodeData,
-            sendEmail
-          );
-          if (sendEmail) {
-            setToast({ message: 'Purchase confirmed! Receipt sent to email.', type: 'success' });
-          } else {
-            setToast({ message: 'Purchase confirmed! (Email not sent per request)', type: 'info' });
-          }
-        } catch (emailError) {
-          setToast({ message: 'Purchase confirmed! (Email failed to send)', type: 'info' });
+          qrCodeData = await generatePurchaseQRCode(createdPurchase.id);
+        } catch (qrError) {
+          console.error('⚠️ QR code generation failed:', qrError);
         }
-      } else {
-        setToast({ message: 'Purchase confirmed! (Email not sent - QR code generation failed)', type: 'info' });
+
+        if (qrCodeData) {
+          try {
+            await attractionPurchaseService.sendReceipt(
+              createdPurchase.id,
+              qrCodeData,
+              sendEmail
+            );
+            if (sendEmail) {
+              setToast({ message: 'Purchase confirmed! Receipt sent to email.', type: 'success' });
+            } else {
+              setToast({ message: 'Purchase confirmed! (Email not sent per request)', type: 'info' });
+            }
+          } catch {
+            setToast({ message: 'Purchase confirmed! (Email failed to send)', type: 'info' });
+          }
+        } else {
+          setToast({ message: 'Purchase confirmed! (Email not sent - QR code generation failed)', type: 'info' });
+        }
       }
 
       // Reset form immediately
@@ -808,14 +884,14 @@ const CreatePurchase = () => {
                   {/* Payment Method */}
                   <div className="mb-6">
                     <h3 className="text-sm font-medium text-gray-700 mb-3">Payment Method</h3>
-                    <div className="grid grid-cols-4 gap-2">
+                    <div className="grid grid-cols-3 gap-2">
                       <StandardButton
                         variant={paymentMethod === 'authorize.net' ? 'primary' : 'secondary'}
                         size="md"
                         onClick={() => setPaymentMethod('authorize.net')}
                         icon={CreditCard}
                       >
-                        Online
+                        Authorize.Net
                       </StandardButton>
                       
                       <StandardButton
@@ -828,15 +904,6 @@ const CreatePurchase = () => {
                         icon={DollarSign}
                       >
                         In-Store
-                      </StandardButton>
-                   
-                      <StandardButton
-                        variant={paymentMethod === 'card' ? 'primary' : 'secondary'}
-                        size="md"
-                        onClick={() => setPaymentMethod('card')}
-                        icon={CreditCard}
-                      >
-                        Card
                       </StandardButton>
                       
                       <button
@@ -870,8 +937,8 @@ const CreatePurchase = () => {
                     </div>
                   )}
 
-                  {/* Card Payment Form - Show when card or authorize.net is selected */}
-                  {(paymentMethod === 'card' || paymentMethod === 'authorize.net') && (
+                  {/* Card Payment Form - Show when authorize.net is selected */}
+                  {paymentMethod === 'authorize.net' && (
                     <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
                       <h3 className="text-sm font-medium text-gray-700 mb-3">Card Details</h3>
                       
@@ -988,19 +1055,26 @@ const CreatePurchase = () => {
                       </div>
                     )}
                     
-                    {/* Fee breakdown */}
-                    <div className="flex justify-between mb-2 text-gray-500 text-sm">
-                      <span>Before Fee</span>
-                      <span>${priceBeforeFee.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between mb-2 text-gray-500 text-sm">
-                      <span>Processing Fee (4.87%)</span>
-                      <span>${includedFee.toFixed(2)}</span>
-                    </div>
+                    {/* Special pricing discount - automatic discounts based on date */}
+                    {specialPricingBreakdown && specialPricingBreakdown.has_special_pricing && (
+                      <div className="pt-2 border-t border-dashed border-gray-200 mb-2">
+                        {specialPricingBreakdown.discounts_applied.map((spDiscount, index) => (
+                          <div key={index} className="flex justify-between text-green-700 text-sm">
+                            <span>{spDiscount.name}</span>
+                            <span>-${spDiscount.discount_amount.toFixed(2)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {/* Fee breakdown - only if fee supports exist */}
+                    {feeBreakdown && feeBreakdown.fees.length > 0 && (
+                      <PriceBreakdownDisplay breakdown={feeBreakdown} compact className="mb-2" />
+                    )}
                     
                     <div className="flex justify-between font-bold text-lg mt-3 pt-3 border-t border-gray-200">
                       <span>Total</span>
-                      <span className="transition-all duration-300">${calculateTotal().toFixed(2)}</span>
+                      <span className="transition-all duration-300">${finalTotal.toFixed(2)}</span>
                     </div>
                     
                     {paymentMethod === 'paylater' && (

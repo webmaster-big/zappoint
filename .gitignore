@@ -25,3 +25,4 @@ dist-ssr
 
 # Documentation files
 *.md
+build_output.txt

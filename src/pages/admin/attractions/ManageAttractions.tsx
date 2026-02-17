@@ -18,7 +18,8 @@ import {
   CheckSquare,
   Square,
   Link2,
-  Copy
+  Copy,
+  Percent
 } from 'lucide-react';
 import { formatDurationDisplay } from '../../../utils/timeFormat';
 import { useThemeColor } from '../../../hooks/useThemeColor';
@@ -705,6 +706,24 @@ const ManageAttractions = () => {
               showAllOption={true}
             />
           )}
+          <Link to="/fee-supports?entity_type=attraction">
+            <StandardButton
+              variant="secondary"
+              size="md"
+              icon={DollarSign}
+            >
+              Fee Supports
+            </StandardButton>
+          </Link>
+          <Link to="/special-pricings?entity_type=attraction">
+            <StandardButton
+              variant="secondary"
+              size="md"
+              icon={Percent}
+            >
+              Special Pricing
+            </StandardButton>
+          </Link>
           <StandardButton
             onClick={() => setShowImportModal(true)}
             variant="secondary"

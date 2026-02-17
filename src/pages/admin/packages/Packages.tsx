@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Users, Tag, Search, Download, Upload, X, CheckSquare, Square, Pencil, Trash2, MapPin, Eye, Power, Plus, FileText, Clock, Copy } from "lucide-react";
+import { Users, Tag, Search, Download, Upload, X, CheckSquare, Square, Pencil, Trash2, MapPin, Eye, Power, Plus, FileText, Clock, Copy, DollarSign, Percent } from "lucide-react";
 import StandardButton from '../../../components/ui/StandardButton';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { packageService, type Package, type CreatePackageData } from '../../../services';
@@ -601,6 +601,24 @@ const Packages: React.FC = () => {
               Set Advance Time ({selectedForBulkUpdate.length})
             </StandardButton>
           )}
+          <Link to="/fee-supports?entity_type=package">
+            <StandardButton
+              variant="secondary"
+              size="md"
+              icon={DollarSign}
+            >
+              Fee Supports
+            </StandardButton>
+          </Link>
+          <Link to="/special-pricings?entity_type=package">
+            <StandardButton
+              variant="secondary"
+              size="md"
+              icon={Percent}
+            >
+              Special Pricing
+            </StandardButton>
+          </Link>
           <Link to="/packages/global-notes">
             <StandardButton
               variant="secondary"

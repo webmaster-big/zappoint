@@ -1,4 +1,5 @@
 import { useState, useEffect, useLayoutEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Home,
   Calendar,
@@ -34,7 +35,9 @@ import {
   Sparkles,
   CreditCard,
   Mail,
-  Send
+  Send,
+  Percent,
+  Coins
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -155,6 +158,10 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
           { label: 'Promos', href: '/packages/promos', icon: Tag },
           { label: 'Gift Cards', href: '/packages/gift-cards', icon: Gift }
         ]},
+        { label: 'Pricing', icon: Percent, section: 'Pricing', items: [
+          { label: 'Special Pricing', href: '/special-pricings', icon: Percent },
+          { label: 'Fee Supports', href: '/fee-supports', icon: Coins }
+        ]},
         { label: 'Email Campaigns', icon: Mail, section: 'Communication', items: [
           { label: 'Email Templates', href: '/admin/email/templates', icon: FileText },
           { label: 'Create Template', href: '/admin/email/templates/create', icon: Plus },
@@ -192,6 +199,10 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
           { label: 'Add-ons', href: '/packages/add-ons', icon: UtensilsCrossed },
           { label: 'Promos', href: '/packages/promos', icon: Tag },
           { label: 'Gift Cards', href: '/packages/gift-cards', icon: Gift }
+        ]},
+        { label: 'Pricing', icon: Percent, section: 'Pricing', items: [
+          { label: 'Special Pricing', href: '/special-pricings', icon: Percent },
+          { label: 'Fee Supports', href: '/fee-supports', icon: Coins }
         ]},
         { label: 'Customers', icon: Users, section: 'Customers', items: [
           { label: 'Customer Analytics', href: '/customers/analytics', icon: PieChart },
@@ -241,6 +252,10 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
           { label: 'Add-ons', href: '/packages/add-ons', icon: UtensilsCrossed },
           { label: 'Promos', href: '/packages/promos', icon: Tag },
           { label: 'Gift Cards', href: '/packages/gift-cards', icon: Gift }
+        ]},
+        { label: 'Pricing', icon: Percent, section: 'Pricing', items: [
+          { label: 'Special Pricing', href: '/special-pricings', icon: Percent },
+          { label: 'Fee Supports', href: '/fee-supports', icon: Coins }
         ]},
         { label: 'Customers', icon: Users, section: 'Customers', items: [
           { label: 'Customer Analytics', href: '/customers/analytics', icon: PieChart },
@@ -955,12 +970,13 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
           </Link>
         ) : null}
         
-        {/* Tooltip for minimized state - render using fixed positioning */}
-        {isMinimized && depth === 0 && showTooltip && !showDropdownMenu && (
+        {/* Tooltip for minimized state - portaled to body to escape sidebar transforms & overflow */}
+        {isMinimized && depth === 0 && showTooltip && !showDropdownMenu && createPortal(
           <div 
-            className="fixed px-3 py-2 bg-gray-900 text-white text-sm rounded-lg whitespace-nowrap pointer-events-none" 
+            className="px-3 py-2 bg-gray-900 text-white text-sm rounded-lg whitespace-nowrap pointer-events-none" 
             style={{ 
-              zIndex: 9999,
+              position: 'fixed',
+              zIndex: 99999,
               top: `${tooltipPosition.top}px`,
               left: `${tooltipPosition.left}px`,
               transform: 'translateY(-50%)'
@@ -968,15 +984,17 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
           >
             {item.label}
             <div className="absolute left-0 top-1/2 -translate-x-1 -translate-y-1/2 w-2 h-2 bg-gray-900 rotate-45"></div>
-          </div>
+          </div>,
+          document.body
         )}
 
-        {/* Dropdown menu for minimized state - render using fixed positioning */}
-        {isMinimized && depth === 0 && hasItems && showDropdownMenu && (
+        {/* Dropdown menu for minimized state - portaled to body to escape sidebar transforms & overflow */}
+        {isMinimized && depth === 0 && hasItems && showDropdownMenu && createPortal(
           <div 
-            className="fixed bg-white border border-gray-200 rounded-lg shadow-lg py-2 min-w-[200px]"
+            className="bg-white border border-gray-200 rounded-lg shadow-lg py-2 min-w-[200px]"
             style={{ 
-              zIndex: 9999,
+              position: 'fixed',
+              zIndex: 99999,
               top: `${tooltipPosition.top}px`,
               left: `${tooltipPosition.left}px`,
               transform: 'translateY(-50%)'
@@ -1005,7 +1023,8 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
                 <span>{subItem.label}</span>
               </Link>
             ))}
-          </div>
+          </div>,
+          document.body
         )}
         
         {hasItems && isDropdownOpen && !isMinimized && (
@@ -1293,10 +1312,9 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
             className="flex-1 px-4 py-4 space-y-2 hidden-scrollbar" 
             style={{ 
               overflowY: 'auto', 
-              overflowX: 'visible', 
+              overflowX: 'hidden', 
               overflowAnchor: 'none',
-              scrollBehavior: 'auto',
-              contain: 'layout style'
+              scrollBehavior: 'auto'
             }}
           >
             {navigation.map((item, idx) => (

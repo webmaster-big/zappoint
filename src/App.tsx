@@ -76,6 +76,8 @@ import EmailNotifications from "./pages/admin/email/EmailNotifications";
 import CreateEmailNotification from "./pages/admin/email/CreateEmailNotification";
 import EditEmailNotification from "./pages/admin/email/EditEmailNotification";
 import EmailNotificationDetails from "./pages/admin/email/EmailNotificationDetails";
+import FeeSupports from "./pages/admin/fee-supports/FeeSupports";
+import SpecialPricings from "./pages/admin/special-pricing/SpecialPricings";
 
 
 function App() {
@@ -133,6 +135,12 @@ function App() {
           <Route path="/packages/add-ons" element={<ManageAddOns />} />
           <Route path="/packages/gift-cards" element={<GiftCard />} />
           
+          {/* Fee Support Routes - All authenticated users */}
+          <Route path="/fee-supports" element={<FeeSupports />} />
+
+          {/* Special Pricing Routes - All authenticated users */}
+          <Route path="/special-pricings" element={<SpecialPricings />} />
+
           {/* Bookings Routes - All authenticated users */}
           <Route path="/bookings" element={<Bookings />} />
           <Route path="/bookings/edit/:id" element={<EditBooking />} />

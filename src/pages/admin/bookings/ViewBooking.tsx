@@ -20,6 +20,7 @@ import {
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import bookingService, { type Booking } from '../../../services/bookingService';
 import { bookingCacheService } from '../../../services/BookingCacheService';
+import { getStoredUser } from '../../../utils/storage';
 import { formatDurationDisplay, convertTo12Hour, parseLocalDate, formatLocalDateTime } from '../../../utils/timeFormat';
 import StandardButton from '../../../components/ui/StandardButton';
 
@@ -30,11 +31,17 @@ const ViewBooking: React.FC = () => {
   const [searchParams] = useSearchParams();
   const referenceNumber = searchParams.get('ref');
   const from = searchParams.get('from');
+  const getPaymentsPath = () => {
+    const user = getStoredUser();
+    if (user?.role === 'location_manager') return '/manager/payments';
+    if (user?.role === 'company_admin') return '/admin/payments';
+    return '/payments';
+  };
   const getBackPath = () => {
     switch (from) {
       case 'notifications': return '/notifications';
       case 'dashboard': return -1 as any;
-      case 'payments': return '/payments';
+      case 'payments': return getPaymentsPath();
       case 'calendar': return '/bookings/calendar';
       case 'space-schedule': return '/bookings/space-schedule';
       default: return '/bookings';

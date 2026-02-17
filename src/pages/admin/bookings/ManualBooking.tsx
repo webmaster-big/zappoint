@@ -18,6 +18,11 @@ import LocationSelector from '../../../components/admin/LocationSelector';
 import { getStoredUser, getImageUrl, formatTimeTo12Hour } from '../../../utils/storage';
 import { formatDurationDisplay } from '../../../utils/timeFormat';
 import { derivePaymentStatus } from '../../../types/Bookings.types';
+import { feeSupportService } from '../../../services/FeeSupportService';
+import type { FeeBreakdown } from '../../../types/FeeSupport.types';
+import PriceBreakdownDisplay from '../../../components/ui/PriceBreakdownDisplay';
+import { specialPricingService } from '../../../services/SpecialPricingService';
+import type { SpecialPricingBreakdown } from '../../../types/SpecialPricing.types';
 
 // Helper function to parse ISO date string (YYYY-MM-DD) in local timezone
 const parseLocalDate = (isoDateString: string): Date => {
@@ -86,6 +91,8 @@ const ManualBooking: React.FC = () => {
   const [sendEmail, setSendEmail] = useState(true);
   const [sendEmailToStaff, setSendEmailToStaff] = useState(true);
   const [calculatedTotal, setCalculatedTotal] = useState(0);
+  const [feeBreakdown, setFeeBreakdown] = useState<FeeBreakdown | null>(null);
+  const [specialPricingBreakdown, setSpecialPricingBreakdown] = useState<SpecialPricingBreakdown | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   
   // Standard mode specific state (like OnsiteBooking)
@@ -719,6 +726,60 @@ const ManualBooking: React.FC = () => {
     }
   }, [pkg, form.participants, selectedAddOns, selectedAttractions]);
 
+  // Fetch fee breakdown when package or total changes
+  useEffect(() => {
+    const fetchFeeBreakdown = async () => {
+      if (!pkg) {
+        setFeeBreakdown(null);
+        return;
+      }
+      try {
+        const basePrice = calculateTotal();
+        const response = await feeSupportService.getForEntity({
+          entity_type: 'package',
+          entity_id: pkg.id,
+          base_price: basePrice,
+          location_id: pkg.location_id || selectedLocation || undefined,
+        });
+        if (response.success && response.data) {
+          setFeeBreakdown(response.data);
+        }
+      } catch (error) {
+        console.error('Error fetching fee breakdown:', error);
+        setFeeBreakdown(null);
+      }
+    };
+    fetchFeeBreakdown();
+  }, [pkg, form.participants, selectedAddOns, selectedAttractions, selectedLocation]);
+
+  // Fetch special pricing breakdown when package and date are selected
+  useEffect(() => {
+    const fetchSpecialPricing = async () => {
+      if (!pkg || !form.bookingDate) {
+        setSpecialPricingBreakdown(null);
+        return;
+      }
+      try {
+        const basePrice = calculateTotal();
+        const breakdown = await specialPricingService.getPriceBreakdown({
+          entity_type: 'package',
+          entity_id: pkg.id,
+          base_price: basePrice,
+          date: form.bookingDate,
+        });
+        if (breakdown.has_special_pricing) {
+          setSpecialPricingBreakdown(breakdown);
+        } else {
+          setSpecialPricingBreakdown(null);
+        }
+      } catch (error) {
+        console.error('Error fetching special pricing breakdown:', error);
+        setSpecialPricingBreakdown(null);
+      }
+    };
+    fetchSpecialPricing();
+  }, [pkg, form.bookingDate]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -743,7 +804,8 @@ const ManualBooking: React.FC = () => {
       
       const user = getStoredUser();
       const calculatedTotal = calculateTotal();
-      const finalTotalAmount = form.totalAmount ? Number(form.totalAmount) : calculatedTotal;
+      const feeTotal = feeBreakdown ? feeBreakdown.total : calculatedTotal;
+      const finalTotalAmount = form.totalAmount ? Number(form.totalAmount) : feeTotal;
       const finalAmountPaid = form.paymentMethod === 'paylater' ? 0 : (form.amountPaid ? Number(form.amountPaid) : finalTotalAmount);
       
       // Auto-derive payment status from amounts
@@ -1810,11 +1872,32 @@ const ManualBooking: React.FC = () => {
                       })}
                     </div>
 
+                    {/* Special Pricing Discount - automatic discounts based on date */}
+                    {specialPricingBreakdown && specialPricingBreakdown.has_special_pricing && (
+                      <div className="pt-2 border-t border-dashed border-gray-200 mb-2">
+                        {specialPricingBreakdown.discounts_applied.map((discount, index) => (
+                          <div key={index} className="flex justify-between text-green-700 text-sm">
+                            <span>{discount.name}</span>
+                            <span>-${discount.discount_amount.toFixed(2)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Fee Breakdown */}
+                    {feeBreakdown && feeBreakdown.fees.length > 0 && (
+                      <PriceBreakdownDisplay breakdown={feeBreakdown} compact className="mb-2" />
+                    )}
+
                     {/* Calculated Total */}
                     <div className={`bg-${themeColor}-50 border border-${themeColor}-200 rounded-lg p-3`}>
                       <div className="flex justify-between items-center">
                         <span className="text-sm font-medium text-gray-700">Total</span>
-                        <span className={`text-xl font-bold text-${fullColor}`}>${Number(calculatedTotal || 0).toFixed(2)}</span>
+                        <span className={`text-xl font-bold text-${fullColor}`}>${Number(
+                          feeBreakdown 
+                            ? feeBreakdown.total - (specialPricingBreakdown?.total_discount || 0)
+                            : (calculatedTotal || 0) - (specialPricingBreakdown?.total_discount || 0)
+                        ).toFixed(2)}</span>
                       </div>
                     </div>
 

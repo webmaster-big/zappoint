@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Calendar, Package, User, Home, AlertCircle, ArrowLeft, Bell, BellOff, Save } from 'lucide-react';
+import QRCode from 'qrcode';
 import StandardButton from '../../../components/ui/StandardButton';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import bookingService, { type Booking } from '../../../services/bookingService';
@@ -570,6 +571,22 @@ const EditBooking: React.FC = () => {
         // Sync the updated booking to cache
         if (response.data) {
           await bookingCacheService.updateBookingInCache(response.data);
+        }
+        
+        // If send notification is enabled, generate QR and send via qrcode endpoint
+        if (formData.sendNotification) {
+          try {
+            const refNumber = response.data?.reference_number || originalBooking.reference_number;
+            const qrCodeBase64 = await QRCode.toDataURL(refNumber, {
+              width: 300,
+              margin: 2,
+              color: { dark: '#000000', light: '#FFFFFF' }
+            });
+            await bookingService.storeQrCode(Number(originalBooking.id), qrCodeBase64, true);
+            console.log('✅ QR code stored and email sent for updated booking');
+          } catch (qrError) {
+            console.error('⚠️ Failed to generate/store QR code for email:', qrError);
+          }
         }
         
         alert('Booking updated successfully!');

@@ -16,7 +16,7 @@ interface DayOffWithTime {
   package_ids?: number[] | null;  // If set, only applies to these packages
   room_ids?: number[] | null;     // If set, only blocks these rooms
 }
-import { loadAcceptJS, processCardPayment, validateCardNumber, formatCardNumber, getCardType, PAYMENT_TYPE, linkPaymentWithRetry } from '../../../services/PaymentService';
+import { loadAcceptJS, processCardPayment, validateCardNumber, formatCardNumber, getCardType, PAYMENT_TYPE } from '../../../services/PaymentService';
 import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
 import customerService from '../../../services/CustomerService';
 import DatePicker from '../../../components/ui/DatePicker';
@@ -26,6 +26,11 @@ import StandardButton from '../../../components/ui/StandardButton';
 import { globalNoteService, type GlobalNote } from '../../../services/GlobalNoteService';
 import SignatureCapture from '../../../components/SignatureCapture';
 import TermsAndConditionsCheckbox from '../../../components/TermsAndConditionsCheckbox';
+import { feeSupportService } from '../../../services/FeeSupportService';
+import type { FeeBreakdown } from '../../../types/FeeSupport.types';
+import PriceBreakdownDisplay from '../../../components/ui/PriceBreakdownDisplay';
+import { specialPricingService } from '../../../services/SpecialPricingService';
+import type { SpecialPricingBreakdown } from '../../../types/SpecialPricing.types';
 
 // Helper function to parse ISO date string (YYYY-MM-DD) in local timezone
 // Avoids UTC offset issues that cause date to show as previous day
@@ -219,6 +224,8 @@ const BookPackage: React.FC = () => {
   const [signatureImage, setSignatureImage] = useState<string | null>(null);
   const [termsAccepted, setTermsAccepted] = useState<boolean>(false);
   const [signatureTermsErrors, setSignatureTermsErrors] = useState<Record<string, string>>({});
+  const [feeBreakdown, setFeeBreakdown] = useState<FeeBreakdown | null>(null);
+  const [specialPricingBreakdown, setSpecialPricingBreakdown] = useState<SpecialPricingBreakdown | null>(null);
 
   // Show account modal for non-logged-in users
   useEffect(() => {
@@ -275,6 +282,80 @@ const BookPackage: React.FC = () => {
     
     fetchPackage();
   }, [packageId]);
+
+  // Fetch fee breakdown when package or pricing inputs change
+  useEffect(() => {
+    const fetchFeeBreakdown = async () => {
+      if (!pkg) {
+        setFeeBreakdown(null);
+        return;
+      }
+      try {
+        // Calculate base price with proper min_participants / price_per_additional logic
+        const pkgPrice = Number(pkg.price ?? 0);
+        const minPart = Number(pkg.min_participants || 1);
+        const perAdditional = Number(pkg.price_per_additional || 0);
+        const pkgBasePrice = participants <= minPart
+          ? pkgPrice
+          : pkgPrice + (participants - minPart) * perAdditional;
+        const addOns = Object.entries(selectedAddOns).reduce((sum, [idStr, qty]) => {
+          const id = Number(idStr);
+          const found = pkg.add_ons?.find((a) => a.id === id);
+          if (!found) return sum;
+          return sum + getAddOnPrice(found, pkg.id) * qty;
+        }, 0);
+        const attrs = Object.entries(selectedAttractions).reduce((sum, [idStr, qty]) => {
+          const id = Number(idStr);
+          const found = pkg.attractions?.find((a) => a.id === id);
+          if (!found) return sum;
+          const isPerPerson = (found as { pricing_type?: string }).pricing_type === 'per_person';
+          return sum + Number(found.price ?? 0) * qty * (isPerPerson ? participants : 1);
+        }, 0);
+        const basePrice = pkgBasePrice + addOns + attrs;
+        const response = await feeSupportService.getForEntity({
+          entity_type: 'package',
+          entity_id: pkg.id,
+          base_price: basePrice,
+          location_id: pkg.location_id || undefined,
+        });
+        if (response.success && response.data) {
+          setFeeBreakdown(response.data);
+        }
+      } catch (error) {
+        console.error('Error fetching fee breakdown:', error);
+        setFeeBreakdown(null);
+      }
+    };
+    fetchFeeBreakdown();
+  }, [pkg, participants, selectedAddOns, selectedAttractions]);
+
+  // Fetch special pricing breakdown when package and date are selected
+  useEffect(() => {
+    const fetchSpecialPricing = async () => {
+      if (!pkg || !selectedDate) {
+        setSpecialPricingBreakdown(null);
+        return;
+      }
+      try {
+        const basePrice = Number(pkg.price ?? 0);
+        const breakdown = await specialPricingService.getPriceBreakdown({
+          entity_type: 'package',
+          entity_id: pkg.id,
+          base_price: basePrice,
+          date: selectedDate,
+        });
+        if (breakdown.has_special_pricing) {
+          setSpecialPricingBreakdown(breakdown);
+        } else {
+          setSpecialPricingBreakdown(null);
+        }
+      } catch (error) {
+        console.error('Error fetching special pricing breakdown:', error);
+        setSpecialPricingBreakdown(null);
+      }
+    };
+    fetchSpecialPricing();
+  }, [pkg, selectedDate]);
   
   // Auto-fill form if customer is logged in
   useEffect(() => {
@@ -885,11 +966,12 @@ const BookPackage: React.FC = () => {
   const discountedSubtotal = Math.max(0, subtotal - promoDiscount - giftCardDiscount);
   const total = discountedSubtotal;
   
-  // Calculate the 4.87% fee that's already included in prices (for display purposes)
-  // Fee is included in prices, so we extract it: priceBeforeFee = total / 1.0487
-  const FEE_RATE = 0.0487;
-  const priceBeforeFee = total / (1 + FEE_RATE);
-  const includedFee = total - priceBeforeFee;
+  // Apply special pricing discount if available
+  const specialPricingDiscount = specialPricingBreakdown?.has_special_pricing ? specialPricingBreakdown.total_discount : 0;
+  const totalAfterSpecialPricing = Math.max(0, total - specialPricingDiscount);
+  
+  // Use dynamic fee breakdown if available - no fallback to hardcoded rate
+  const finalTotal = feeBreakdown ? feeBreakdown.total : totalAfterSpecialPricing;
 
   // Calculate partial payment amount based on package settings
   const calculatePartialAmount = () => {
@@ -972,7 +1054,7 @@ const BookPackage: React.FC = () => {
     
     try {
       // Calculate payment amount - customers pay deposit if available, otherwise full
-      const amountToPay = partialAmount > 0 ? partialAmount : total;
+      const amountToPay = partialAmount > 0 ? partialAmount : finalTotal;
       
       // Prepare card data
       const cardData = {
@@ -996,35 +1078,8 @@ const BookPackage: React.FC = () => {
         country: form.country,
       };
       
-      // ===== CHARGE-THEN-LINK FLOW =====
-      // Step 1: Charge the customer FIRST (no payable_id yet)
-      const paymentData = {
-        location_id: pkg.location_id || 1,
-        amount: amountToPay,
-        order_id: `P${pkg.id}-${Date.now().toString().slice(-8)}`,
-        description: `Package Booking: ${pkg.name}`,
-        customer_id: customerId || undefined,
-        signature_image: signatureImage || undefined,
-        terms_accepted: termsAccepted,
-      };
-      
-      const paymentResponse = await processCardPayment(
-        cardData,
-        paymentData,
-        authorizeApiLoginId,
-        authorizeClientKey,
-        customerData
-      );
-      
-      if (!paymentResponse.success) {
-        throw new Error(paymentResponse.message || 'Payment failed. Please try again.');
-      }
-      
-      const paymentId = paymentResponse.payment?.id;
-      const chargeTransactionId = paymentResponse.transaction_id;
-      console.log('✅ Payment charged successfully, payment ID:', paymentId, 'txn:', chargeTransactionId);
-      
-      // Step 2: Prepare and create booking (customer already charged)
+      // ===== CREATE-FIRST FLOW =====
+      // Step 1: Prepare and create booking FIRST (no charge yet)
       const additionalAttractions = Object.entries(selectedAttractions)
         .filter(([, qty]) => qty > 0)
         .map(([id, qty]) => {
@@ -1071,7 +1126,7 @@ const BookPackage: React.FC = () => {
         participants,
         duration: pkg.duration,
         duration_unit: pkg.duration_unit,
-        total_amount: total,
+        total_amount: finalTotal,
         amount_paid: amountToPay,
         payment_method: 'authorize.net' as const,
         payment_status: (partialAmount > 0 ? 'partial' : 'paid') as 'paid' | 'partial',
@@ -1089,35 +1144,19 @@ const BookPackage: React.FC = () => {
         guest_state: form.state || undefined,
         guest_zip: form.zip || undefined,
         guest_country: form.country || undefined,
-        transaction_id: paymentResponse.transaction_id,
       };
       
       const response = await bookingService.createBooking(bookingData);
       
       if (!response.success || !response.data) {
-        // Booking creation failed but customer was already charged
-        // The unlinked payment (payable_id = null) will be visible to staff for manual resolution
-        console.error('⚠️ Booking creation failed after successful charge. Payment ID:', paymentId);
-        throw new Error('Booking could not be created. Your payment has been processed — please contact support with your transaction details.');
+        throw new Error('We couldn\'t reserve your spot right now. No charges were made. Please try again or contact us for help.');
       }
       
       const bookingId = response.data.id;
       const referenceNumber = response.data.reference_number;
       console.log('✅ Booking created, ID:', bookingId, 'Ref:', referenceNumber);
       
-      // Step 3: Link payment to booking (with retry for reliability)
-      if (paymentId) {
-        try {
-          await linkPaymentWithRetry(paymentId, bookingId, PAYMENT_TYPE.BOOKING, 3, chargeTransactionId);
-          console.log('✅ Payment linked to booking successfully');
-        } catch (linkErr) {
-          // Non-critical: payment and booking both exist, just not linked yet
-          // Staff can see unlinked payments and manually resolve
-          console.error('⚠️ Failed to link payment to booking:', linkErr);
-        }
-      }
-      
-      // Generate and store QR code
+      // Step 2: Generate QR code
       const qrCodeBase64 = await QRCode.toDataURL(referenceNumber, {
         width: 300,
         margin: 2,
@@ -1127,11 +1166,44 @@ const BookPackage: React.FC = () => {
         }
       });
       
-      try {
-        await bookingService.storeQrCode(bookingId, qrCodeBase64);
-      } catch (qrError) {
-        // QR code storage error - handled silently
+      // Step 3: Charge payment WITH payable_id — backend links payment + sends email + stores QR
+      const paymentData = {
+        location_id: pkg.location_id || 1,
+        amount: amountToPay,
+        order_id: `P${pkg.id}-${Date.now().toString().slice(-8)}`,
+        description: `Package Booking: ${pkg.name}`,
+        customer_id: customerId || undefined,
+        signature_image: signatureImage || undefined,
+        terms_accepted: termsAccepted,
+        payable_id: bookingId,
+        payable_type: PAYMENT_TYPE.BOOKING,
+        send_email: true,
+        qr_code: qrCodeBase64,
+      };
+      
+      const paymentResponse = await processCardPayment(
+        cardData,
+        paymentData,
+        authorizeApiLoginId,
+        authorizeClientKey,
+        customerData
+      );
+      
+      if (!paymentResponse.success) {
+        // Payment failed — clean up the booking we created
+        console.error('❌ Payment failed, deleting booking:', bookingId);
+        try {
+          await bookingService.deleteBooking(bookingId);
+          console.log('🗑️ Booking deleted due to payment failure');
+        } catch (deleteErr) {
+          console.error('⚠️ Failed to delete booking after payment failure:', deleteErr);
+        }
+        // Throw with the raw message — getPaymentErrorMessage in catch will make it friendly
+        const rawMsg = paymentResponse.message || '';
+        throw new Error(rawMsg || 'Your payment could not be processed. No charges were made to your card. Please check your card details and try again.');
       }
+      
+      console.log('✅ Payment charged successfully, txn:', paymentResponse.transaction_id);
       
       // Show confirmation modal
       setConfirmationData({
@@ -1156,7 +1228,7 @@ const BookPackage: React.FC = () => {
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-backdrop-fade" onClick={() => setShowAddOnDetailsModal(false)}>
         <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
           {/* Close button */}
-          <div className="sticky top-0 bg-white p-4 border-b border-gray-100 flex justify-between items-center">
+          <div className="sticky top-0 bg-white p-4 flex justify-between items-center">
             <h3 className="text-lg font-semibold text-gray-800">{selectedAddOnForDetails.name}</h3>
             <button
               onClick={() => setShowAddOnDetailsModal(false)}
@@ -1175,7 +1247,7 @@ const BookPackage: React.FC = () => {
                 <img 
                   src={getImageUrl(selectedAddOnForDetails.image)} 
                   alt={selectedAddOnForDetails.name}
-                  className="max-w-full max-h-64 object-contain rounded-lg border border-gray-200"
+                  className="max-w-full max-h-64 object-contain rounded-lg shadow-sm"
                 />
               ) : (
                 <div className="w-full h-48 bg-gray-100 rounded-lg flex items-center justify-center">
@@ -1191,7 +1263,7 @@ const BookPackage: React.FC = () => {
             </div>
             
             {/* Description */}
-            <div className="border-t border-gray-100 pt-4">
+            <div className="pt-4">
               <h4 className="text-sm font-medium text-gray-700 mb-2">Description</h4>
               {selectedAddOnForDetails.description ? (
                 <p className="text-sm text-gray-600 whitespace-pre-wrap">{selectedAddOnForDetails.description}</p>
@@ -1215,13 +1287,13 @@ const BookPackage: React.FC = () => {
           <div className="p-4 sm:p-8">
             {/* Success Header */}
             <div className="text-center mb-4 sm:mb-6">
-              <div className="mx-auto w-12 h-12 sm:w-16 sm:h-16 bg-green-100 rounded-full flex items-center justify-center mb-3 sm:mb-4">
-                <svg className="w-7 h-7 sm:w-10 sm:h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+              <div className="mx-auto w-14 h-14 sm:w-16 sm:h-16 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-2xl flex items-center justify-center mb-3 sm:mb-4 shadow-lg">
+                <svg className="w-8 h-8 sm:w-10 sm:h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7"></path>
                 </svg>
               </div>
-              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Booking Confirmed!</h2>
-              <p className="text-sm sm:text-base text-gray-600">Your booking has been successfully created</p>
+              <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 mb-2">Booking Confirmed!</h2>
+              <p className="text-sm sm:text-base text-gray-500">Your booking has been successfully created</p>
             </div>
             
             {/* QR Code Display */}
@@ -1353,19 +1425,19 @@ const BookPackage: React.FC = () => {
                     <span className="font-medium text-green-600">-${giftCardDiscount.toFixed(2)}</span>
                   </div>
                 )}
-                <div className="flex justify-between border-t pt-2 sm:pt-3 mt-2 sm:mt-3 text-sm sm:text-base">
+                <div className="flex justify-between pt-3 mt-3 text-sm sm:text-base">
                   <span className="text-gray-600 font-semibold">Total Amount:</span>
-                  <span className="font-bold text-blue-800 text-lg sm:text-xl">${total.toFixed(2)}</span>
+                  <span className="font-bold text-blue-800 text-lg sm:text-xl">${finalTotal.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-sm sm:text-base">
                   <span className="text-gray-600">Amount Paid:</span>
                   <span className="font-medium text-green-600">${(
-                    paymentType === 'full' ? total : 
-                    paymentType === 'custom' ? Math.min(customPaymentAmount, total) : 
+                    paymentType === 'full' ? finalTotal : 
+                    paymentType === 'custom' ? Math.min(customPaymentAmount, finalTotal) : 
                     partialAmount
                   ).toFixed(2)}</span>
                 </div>
-                {(paymentType === 'partial' || (paymentType === 'custom' && customPaymentAmount < total)) && (
+                {(paymentType === 'partial' || (paymentType === 'custom' && customPaymentAmount < finalTotal)) && (
                   <div className="flex justify-between text-sm sm:text-base">
                     <span className="text-gray-600">Remaining Balance:</span>
                     <span className="font-medium text-orange-600">${(
@@ -1381,7 +1453,7 @@ const BookPackage: React.FC = () => {
             </div>
             
             {/* Information Notice */}
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 sm:p-4 mb-4 sm:mb-6">
+            <div className="bg-yellow-50 rounded-lg p-3 sm:p-4 mb-4 sm:mb-6">
               <div className="flex">
                 <svg className="w-5 h-5 text-yellow-600 mr-2 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd"></path>
@@ -1399,7 +1471,7 @@ const BookPackage: React.FC = () => {
             
             {/* Invitation Download */}
             {(pkg?.invitation_download_link || pkg?.invitation_file) && (
-              <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 sm:p-4 mb-4 sm:mb-6">
+              <div className="bg-purple-50 rounded-lg p-3 sm:p-4 mb-4 sm:mb-6">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center">
                     <svg className="w-5 h-5 text-purple-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1477,17 +1549,17 @@ const BookPackage: React.FC = () => {
       {showAccountModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-fade-in" onClick={() => setShowAccountModal(false)}>
           <div 
-            className="bg-white max-w-sm w-full p-6 shadow-2xl animate-scale-in"
+            className="bg-white max-w-sm w-full p-6 rounded-2xl shadow-2xl animate-scale-in"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="text-center mb-4">
-              <div className="w-12 h-12 bg-blue-100 flex items-center justify-center mx-auto mb-3">
-                <svg className="w-6 h-6 text-blue-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-14 h-14 bg-gradient-to-br from-blue-100 to-blue-200 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                <svg className="w-7 h-7 text-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                 </svg>
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Create an Account?</h3>
-              <p className="text-sm text-gray-600">Sign up for faster checkout and track your bookings.</p>
+              <h3 className="text-lg font-bold text-gray-900 mb-2">Create an Account?</h3>
+              <p className="text-sm text-gray-500 leading-relaxed">Sign up for faster checkout and track your bookings.</p>
             </div>
             <div className="flex flex-col gap-2.5">
               <StandardButton
@@ -1546,15 +1618,23 @@ const BookPackage: React.FC = () => {
         .animate-mobile-summary-slide-in {
           animation: mobile-summary-slide-in 0.3s cubic-bezier(0.32, 0.72, 0, 1) both;
         }
+        @keyframes backdrop-fade {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        .animate-backdrop-fade {
+          animation: backdrop-fade 0.2s ease-out;
+        }
       `}</style>
 
-      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center py-8 px-4">
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50/40 flex flex-col items-center justify-center py-8 px-4">
         <div className="w-full max-w-6xl flex flex-col md:flex-row gap-8">
         {/* Left: Booking Form */}
         <div className="flex-1 min-w-0">
-          <div className={`mb-6 md:mb-8 bg-white rounded-xl p-4 md:p-6 shadow-sm border border-gray-100${currentStep >= 2 ? ' hidden md:block' : ''}`}>
-            <h2 className="text-base md:text-xl font-semibold mb-2 text-gray-800">{pkg.name}</h2>
-            <p className="text-gray-600 mb-3 md:mb-4 text-xs md:text-sm">{pkg.description}</p>
+          <div className={`mb-6 md:mb-8 bg-white rounded-2xl p-4 md:p-6 shadow-md overflow-hidden relative${currentStep >= 2 ? ' hidden md:block' : ''}`}>
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-600 via-blue-700 to-violet-600"></div>
+            <h2 className="text-base md:text-xl font-bold mb-2 text-gray-900">{pkg.name}</h2>
+            <p className="text-gray-500 mb-3 md:mb-4 text-xs md:text-sm leading-relaxed">{pkg.description}</p>
             {((pkg.features && Array.isArray(pkg.features) && pkg.features.length > 0) || 
               (typeof pkg.features === 'string' && pkg.features.trim() !== '')) && (
               <div className="mt-4">
@@ -1585,30 +1665,32 @@ const BookPackage: React.FC = () => {
           </div>
           
           {/* Step Navigation */}
-          <div className="flex mb-4 md:mb-6 bg-white rounded-xl p-3 md:p-4 shadow-sm border border-gray-100">
-            <div className="flex-1 flex items-center">
-              <div className={`w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center mr-2 md:mr-3 text-xs md:text-sm ${currentStep >= 1 ? 'bg-blue-800 text-white' : 'bg-gray-200 text-gray-500'}`}>
-                1
+          <div className="flex items-center mb-4 md:mb-6 bg-white rounded-2xl p-3 md:p-4 shadow-md">
+            <div className="flex items-center">
+              <div className={`w-8 h-8 md:w-9 md:h-9 rounded-full flex items-center justify-center text-xs md:text-sm font-semibold transition-all ${currentStep >= 1 ? 'bg-gradient-to-br from-blue-700 to-blue-900 text-white shadow-md' : 'bg-gray-100 text-gray-400'}`}>
+                {currentStep > 1 ? '✓' : '1'}
               </div>
-              <span className={`text-xs md:text-sm font-medium hidden sm:inline ${currentStep >= 1 ? 'text-blue-800' : 'text-gray-500'}`}>Booking Details</span>
-              <span className={`text-xs font-medium sm:hidden ${currentStep >= 1 ? 'text-blue-800' : 'text-gray-500'}`}>Details</span>
+              <span className={`ml-2 text-xs md:text-sm font-medium hidden sm:inline ${currentStep >= 1 ? 'text-blue-800' : 'text-gray-400'}`}>Booking Details</span>
+              <span className={`ml-2 text-xs font-medium sm:hidden ${currentStep >= 1 ? 'text-blue-800' : 'text-gray-400'}`}>Details</span>
             </div>
-            <div className="flex-1 flex items-center">
-              <div className={`w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center mr-2 md:mr-3 text-xs md:text-sm ${currentStep >= 2 ? 'bg-blue-800 text-white' : 'bg-gray-200 text-gray-500'}`}>
-                2
+            <div className={`flex-1 h-0.5 mx-3 rounded-full transition-all ${currentStep > 1 ? 'bg-blue-600' : 'bg-gray-200'}`}></div>
+            <div className="flex items-center">
+              <div className={`w-8 h-8 md:w-9 md:h-9 rounded-full flex items-center justify-center text-xs md:text-sm font-semibold transition-all ${currentStep >= 2 ? 'bg-gradient-to-br from-blue-700 to-blue-900 text-white shadow-md' : 'bg-gray-100 text-gray-400'}`}>
+                {currentStep > 2 ? '✓' : '2'}
               </div>
-              <span className={`text-xs md:text-sm font-medium hidden sm:inline ${currentStep >= 2 ? 'text-blue-800' : 'text-gray-500'}`}>Personal Info</span>
-              <span className={`text-xs font-medium sm:hidden ${currentStep >= 2 ? 'text-blue-800' : 'text-gray-500'}`}>Info</span>
+              <span className={`ml-2 text-xs md:text-sm font-medium hidden sm:inline ${currentStep >= 2 ? 'text-blue-800' : 'text-gray-400'}`}>Personal Info</span>
+              <span className={`ml-2 text-xs font-medium sm:hidden ${currentStep >= 2 ? 'text-blue-800' : 'text-gray-400'}`}>Info</span>
             </div>
-            <div className="flex-1 flex items-center">
-              <div className={`w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center mr-2 md:mr-3 text-xs md:text-sm ${currentStep >= 3 ? 'bg-blue-800 text-white' : 'bg-gray-200 text-gray-500'}`}>
+            <div className={`flex-1 h-0.5 mx-3 rounded-full transition-all ${currentStep > 2 ? 'bg-blue-600' : 'bg-gray-200'}`}></div>
+            <div className="flex items-center">
+              <div className={`w-8 h-8 md:w-9 md:h-9 rounded-full flex items-center justify-center text-xs md:text-sm font-semibold transition-all ${currentStep >= 3 ? 'bg-gradient-to-br from-blue-700 to-blue-900 text-white shadow-md' : 'bg-gray-100 text-gray-400'}`}>
                 3
               </div>
-              <span className={`text-xs md:text-sm font-medium ${currentStep >= 3 ? 'text-blue-800' : 'text-gray-500'}`}>Payment</span>
+              <span className={`ml-2 text-xs md:text-sm font-medium ${currentStep >= 3 ? 'text-blue-800' : 'text-gray-400'}`}>Payment</span>
             </div>
           </div>
           
-          <div className="space-y-4 md:space-y-6 bg-white rounded-xl shadow-sm p-4 md:p-6 border border-gray-100">
+          <div className="space-y-4 md:space-y-6 bg-white rounded-2xl shadow-md p-4 md:p-6">
             {currentStep === 1 ? (
               <>
                 {/* Date and Time Selection */}
@@ -1709,7 +1791,7 @@ const BookPackage: React.FC = () => {
                 </div>
                 
                 {pkg.attractions && pkg.attractions.length > 0 && (
-                  <div className="border border-gray-200 rounded-xl p-4 md:p-5">
+                  <div className="bg-gray-50/80 rounded-xl p-4 md:p-5">
                     <label className="block font-medium mb-3 text-gray-800 text-xs md:text-sm uppercase tracking-wide">Additional Attractions</label>
                     <div className="space-y-4">
                       {pkg.attractions.map((attraction) => {
@@ -1723,7 +1805,7 @@ const BookPackage: React.FC = () => {
                             <img 
                               src={getImageUrl(attraction.image)} 
                               alt={attraction.name} 
-                              className="w-12 h-12 md:w-16 md:h-16 object-cover rounded-lg border border-gray-200 flex-shrink-0" 
+                              className="w-12 h-12 md:w-16 md:h-16 object-cover rounded-lg shadow-sm flex-shrink-0" 
                             />
                           )}
                           <div className="flex-1 min-w-0">
@@ -1775,7 +1857,7 @@ const BookPackage: React.FC = () => {
                 )}
                 
                 {pkg.add_ons && pkg.add_ons.length > 0 && (
-                  <div className="border border-gray-200 rounded-xl p-4 md:p-5">
+                  <div className="bg-gray-50/80 rounded-xl p-4 md:p-5">
                     <label className="block font-medium mb-3 text-gray-800 text-xs md:text-sm uppercase tracking-wide">Add-ons</label>
                     <div className="space-y-4">
                       {[...pkg.add_ons].sort((a, b) => {
@@ -1797,10 +1879,10 @@ const BookPackage: React.FC = () => {
                         
                         return (
                         <div key={addOn.id} className={`flex items-center justify-between p-2 md:p-3 rounded-lg gap-2 md:gap-4 ${
-                          isForcedAddOn ? 'bg-amber-50 border border-amber-200' : 'bg-gray-50'
+                          isForcedAddOn ? 'bg-amber-50' : 'bg-white'
                         }`}>
                           {/* Add-on Image */}
-                          <div className="w-12 h-12 md:w-16 md:h-16 flex-shrink-0 flex items-center justify-center bg-gray-100 rounded-md border border-gray-200 overflow-hidden">
+                          <div className="w-12 h-12 md:w-16 md:h-16 flex-shrink-0 flex items-center justify-center bg-gray-100 rounded-md overflow-hidden">
                             {addOn.image ? (
                               <img src={getImageUrl(addOn.image)} alt={addOn.name} className="object-cover w-full h-full" />
                             ) : (
@@ -1881,7 +1963,7 @@ const BookPackage: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   {/* Promo Code Section: Only show if promos exist */}
                   {pkg.promos && pkg.promos.length > 0 && (
-                    <div className="border border-gray-200 rounded-xl p-4 md:p-5">
+                    <div className="bg-gray-50/80 rounded-xl p-4 md:p-5">
                       <label className="block font-medium mb-3 text-gray-800 text-xs md:text-sm uppercase tracking-wide">Promo Code</label>
                       <div className="flex gap-2 items-center">
                         <input 
@@ -1901,7 +1983,7 @@ const BookPackage: React.FC = () => {
                         </StandardButton>
                       </div>
                       {appliedPromo && (
-                        <div className="mt-3 p-2 bg-blue-80 text-blue-800 rounded-md text-xs border border-blue-800">
+                        <div className="mt-3 p-2 bg-blue-50 text-blue-800 rounded-md text-xs">
                           ✅ Applied: {appliedPromo.name}
                         </div>
                       )}
@@ -1909,7 +1991,7 @@ const BookPackage: React.FC = () => {
                   )}
                   {/* Gift Card Section: Only show if gift cards exist */}
                   {pkg.gift_cards && pkg.gift_cards.length > 0 && (
-                    <div className="border border-gray-200 rounded-xl p-4 md:p-5">
+                    <div className="bg-gray-50/80 rounded-xl p-4 md:p-5">
                       <label className="block font-medium mb-3 text-gray-800 text-xs md:text-sm uppercase tracking-wide">Gift Card</label>
                       <div className="flex gap-2 items-center">
                         <input 
@@ -1929,7 +2011,7 @@ const BookPackage: React.FC = () => {
                         </StandardButton>
                       </div>
                       {appliedGiftCard && (
-                        <div className="mt-3 p-2 bg-blue-80 text-blue-800 rounded-md text-xs border border-blue-800">
+                        <div className="mt-3 p-2 bg-blue-50 text-blue-800 rounded-md text-xs">
                           ✅ Applied: {appliedGiftCard.name}
                         </div>
                       )}
@@ -2061,7 +2143,7 @@ const BookPackage: React.FC = () => {
                 )}
 
                 {/* Billing Information Section */}
-                <div className="mt-6 pt-6 border-t border-gray-200">
+                <div className="mt-6 pt-6">
                   <h4 className="text-base font-semibold text-gray-900 mb-4">Billing Information</h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     <div className="md:col-span-2">
@@ -2231,10 +2313,22 @@ const BookPackage: React.FC = () => {
                     <p className="text-xs md:text-sm text-gray-600 mt-1">Secure payment powered by Authorize.Net</p>
                   </div>
                   <div className="flex gap-1.5 md:gap-2">
-                    <img src="https://upload.wikimedia.org/wikipedia/commons/5/5e/Visa_Inc._logo.svg" alt="Visa" className="h-5 md:h-6 opacity-80" />
-                    <img src="https://upload.wikimedia.org/wikipedia/commons/2/2a/Mastercard-logo.svg" alt="Mastercard" className="h-5 md:h-6 opacity-80" />
-                    <img src="https://upload.wikimedia.org/wikipedia/commons/f/fa/American_Express_logo_%282018%29.svg" alt="Amex" className="h-5 md:h-6 opacity-80" />
-                    <img src="https://upload.wikimedia.org/wikipedia/commons/5/57/Discover_Card_logo.svg" alt="Discover" className="h-5 md:h-6 opacity-80" />
+                    <div className="h-6 md:h-7 px-2 bg-gradient-to-br from-blue-800 to-blue-950 rounded flex items-center justify-center" title="Visa">
+                      <span className="text-white text-[10px] md:text-[11px] font-extrabold italic">VISA</span>
+                    </div>
+                    <div className="h-6 md:h-7 w-10 md:w-11 bg-gray-100 rounded flex items-center justify-center" title="Mastercard">
+                      <svg viewBox="0 0 32 20" className="h-4 md:h-5">
+                        <circle cx="12" cy="10" r="7" fill="#EB001B"/>
+                        <circle cx="20" cy="10" r="7" fill="#F79E1B"/>
+                        <path d="M16 4.6a7 7 0 010 10.8 7 7 0 010-10.8z" fill="#FF5F00"/>
+                      </svg>
+                    </div>
+                    <div className="h-6 md:h-7 px-1.5 bg-blue-500 rounded flex items-center justify-center" title="Amex">
+                      <span className="text-white text-[8px] md:text-[9px] font-bold">AMEX</span>
+                    </div>
+                    <div className="h-6 md:h-7 px-1.5 bg-orange-500 rounded flex items-center justify-center" title="Discover">
+                      <span className="text-white text-[7px] md:text-[8px] font-bold">DISC</span>
+                    </div>
                   </div>
                 </div>
                 
@@ -2381,7 +2475,7 @@ const BookPackage: React.FC = () => {
                         </div>
                         <div className="text-sm text-gray-700">
                           <p>
-                            Pay <span className="font-bold text-lg">${total.toFixed(2)}</span> to complete your booking.
+                            Pay <span className="font-bold text-lg">${finalTotal.toFixed(2)}</span> to complete your booking.
                           </p>
                         </div>
                       </div>
@@ -2390,7 +2484,7 @@ const BookPackage: React.FC = () => {
                 </div>
 
                 {/* Signature & Terms Section */}
-                <div className="space-y-4 mt-6 border-t pt-6">
+                <div className="space-y-4 mt-6 pt-6">
                   <h3 className="text-lg font-semibold">Signature & Agreement</h3>
 
                   <SignatureCapture
@@ -2460,67 +2554,70 @@ const BookPackage: React.FC = () => {
         
         {/* Right: Order Summary - Hidden on mobile */}
         <div className="w-full md:w-80 flex-shrink-0 hidden md:block">
-            <div className="bg-white rounded-xl shadow-sm p-4 md:p-6 sticky top-6 border border-gray-100">
-              <h3 className="font-semibold text-base md:text-lg mb-4 md:mb-5 text-gray-800 border-b pb-3 md:pb-4">Order Summary</h3>
+            <div className="bg-white rounded-2xl shadow-md p-4 md:p-6 sticky top-6 overflow-hidden relative">
+              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-600 to-violet-600"></div>
+              <h3 className="font-bold text-base md:text-lg mb-4 md:mb-5 text-gray-900">Order Summary</h3>
               {/* Package Image in Order Summary */}
               {pkg.image && (
                 <div className="mb-4 w-full flex justify-center">
-                  <img src={getImageUrl(pkg.image)} alt={pkg.name} className="max-h-32 rounded-lg object-contain border border-gray-200" />
+                  <img src={getImageUrl(pkg.image)} alt={pkg.name} className="max-h-32 rounded-xl object-contain" />
                 </div>
               )}
-              <div className="mb-5">
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-gray-600 text-sm">Package:</span>
+              <div className="mb-5 space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500 text-sm">Package</span>
                   <span className="font-medium text-gray-800 text-sm">{pkg.name}</span>
                 </div>
-                <div className="text-xs text-gray-500 mb-4">{participants} participants</div>
-                {/* Duration in Order Summary */}
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-gray-600 text-sm">Duration:</span>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500 text-sm">Participants</span>
+                  <span className="font-medium text-gray-800 text-sm">{participants}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500 text-sm">Duration</span>
                   <span className="font-medium text-gray-800 text-sm">{formatDuration()}</span>
                 </div>
                 {selectedDate && (
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-gray-600 text-sm">Date:</span>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-500 text-sm">Date</span>
                     <span className="font-medium text-gray-800 text-sm">
                       {parseLocalDate(selectedDate).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
                     </span>
                   </div>
                 )}
                 {selectedTime && (
-                  <div className="flex justify-between items-center mb-4">
-                    <span className="text-gray-600 text-sm">Time:</span>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-500 text-sm">Time</span>
                     <span className="font-medium text-gray-800 text-sm">{formatTimeTo12Hour(selectedTime)}</span>
                   </div>
                 )}
               </div>
             
-            <div className="space-y-3 border-t pt-4 text-sm">
+            <div className="space-y-3 text-sm">
               {/* Package Base Price - Detailed */}
-              <div className="bg-blue-50 rounded-lg p-3">
+              <div className="bg-blue-50/70 rounded-xl p-3">
                 <div className="flex justify-between items-start mb-1">
                   <span className="font-semibold text-gray-800">Base Package</span>
                   <span className="font-bold text-gray-900">${Number(pkg.price).toFixed(2)}</span>
                 </div>
                 <p className="text-xs text-gray-600">{pkg.name}</p>
-                <p className="text-xs text-gray-500 mt-1">
-                  ✓ Includes up to {pkg.min_participants || 1} participant{(pkg.min_participants || 1) > 1 ? 's' : ''}
+                <p className="text-xs text-gray-400 mt-1">
+                  Includes up to {pkg.min_participants || 1} participant{(pkg.min_participants || 1) > 1 ? 's' : ''}
                 </p>
-                <p className="text-xs text-gray-500">
-                  ✓ Duration: {formatDuration()}
+                <p className="text-xs text-gray-400">
+                  Duration: {formatDuration()}
                 </p>
               </div>
               
-              {/* Additional Participants - More Detailed */}
+              {/* Additional Participants */}
               {participants > (pkg.min_participants || 1) && pkg.price_per_additional && Number(pkg.price_per_additional) > 0 && (
-                <div className="bg-gray-50 rounded-lg p-3">
+                <div className="bg-gray-50 rounded-xl p-3">
                   <div className="flex justify-between items-start">
                     <div>
                       <span className="font-medium text-gray-800">Additional Participants</span>
-                      <p className="text-xs text-gray-500 mt-1">
+                      <p className="text-xs text-gray-400 mt-1">
                         Base covers {pkg.min_participants || 1}, you have {participants} total
                       </p>
-                      <p className="text-xs text-gray-600 mt-0.5">
+                      <p className="text-xs text-gray-500 mt-0.5">
                         {participants - (pkg.min_participants || 1)} extra × ${Number(pkg.price_per_additional).toFixed(2)}/person
                       </p>
                     </div>
@@ -2531,16 +2628,16 @@ const BookPackage: React.FC = () => {
                 </div>
               )}
               
-              {/* Participant Count Summary */}
-              <div className="flex justify-between items-center text-xs py-2 px-1 border-b border-gray-200">
-                <span className="text-gray-600">Total Participants</span>
-                <span className="font-semibold text-gray-800">{participants} people</span>
+              {/* Room Info */}
+              <div className="flex justify-between text-xs text-gray-400 py-1 px-1">
+                <span>Room Assignment</span>
+                <span className="text-gray-500">Auto-assigned at booking</span>
               </div>
               
-              {/* Attractions - Detailed Breakdown */}
+              {/* Attractions */}
               {Object.entries(selectedAttractions).some(([, qty]) => qty > 0) && (
-                <div className="pt-2">
-                  <div className="font-semibold text-gray-800 mb-2 text-xs uppercase tracking-wide">Attractions</div>
+                <div>
+                  <div className="font-semibold text-gray-700 mb-2 text-xs uppercase tracking-wide">Attractions</div>
                   {Object.entries(selectedAttractions).filter(([, qty]) => qty > 0).map(([idStr, qty]) => {
                     const id = Number(idStr);
                     const attraction = pkg.attractions.find((a) => a.id === id);
@@ -2550,12 +2647,12 @@ const BookPackage: React.FC = () => {
                     const lineTotal = price * qty * (isPerPerson ? participants : 1);
                     
                     return (
-                      <div key={id} className="bg-gray-50 rounded p-2 mb-1">
+                      <div key={id} className="bg-gray-50 rounded-lg p-2.5 mb-1.5">
                         <div className="flex justify-between text-xs">
                           <span className="font-medium text-gray-700">{attraction.name}</span>
                           <span className="font-semibold text-gray-800">+${lineTotal.toFixed(2)}</span>
                         </div>
-                        <p className="text-xs text-gray-500 mt-0.5">
+                        <p className="text-xs text-gray-400 mt-0.5">
                           {qty} × ${price.toFixed(2)}{isPerPerson ? ` × ${participants} people` : '/unit'}
                         </p>
                       </div>
@@ -2564,16 +2661,10 @@ const BookPackage: React.FC = () => {
                 </div>
               )}
               
-              {/* Room Info */}
-              <div className="flex justify-between text-xs text-gray-500 py-1 border-b border-gray-100">
-                <span>Room Assignment</span>
-                <span className="text-gray-600">Auto-assigned at booking</span>
-              </div>
-              
-              {/* Add-ons - Detailed Breakdown */}
+              {/* Add-ons */}
               {Object.entries(selectedAddOns).some(([, qty]) => qty > 0) && (
-                <div className="pt-2">
-                  <div className="font-semibold text-gray-800 mb-2 text-xs uppercase tracking-wide">Add-ons</div>
+                <div>
+                  <div className="font-semibold text-gray-700 mb-2 text-xs uppercase tracking-wide">Add-ons</div>
                   {Object.entries(selectedAddOns).filter(([, qty]) => qty > 0).map(([idStr, qty]) => {
                     const id = Number(idStr);
                     const addOn = pkg.add_ons.find((a) => a.id === id);
@@ -2581,12 +2672,12 @@ const BookPackage: React.FC = () => {
                     const price = Number(addOn.price);
                     
                     return (
-                      <div key={id} className="bg-gray-50 rounded p-2 mb-1">
+                      <div key={id} className="bg-gray-50 rounded-lg p-2.5 mb-1.5">
                         <div className="flex justify-between text-xs">
                           <span className="font-medium text-gray-700">{addOn.name}</span>
                           <span className="font-semibold text-gray-800">+${(price * qty).toFixed(2)}</span>
                         </div>
-                        <p className="text-xs text-gray-500 mt-0.5">{qty} × ${price.toFixed(2)}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">{qty} × ${price.toFixed(2)}</p>
                       </div>
                     );
                   })}
@@ -2594,53 +2685,67 @@ const BookPackage: React.FC = () => {
               )}
               
               {appliedPromo && (
-                <div className="flex justify-between text-blue-800">
+                <div className="flex justify-between text-blue-700 text-sm">
                   <span>Promo Discount</span>
                   <span>-${promoDiscount.toFixed(2)}</span>
                 </div>
               )}
               
               {appliedGiftCard && (
-                <div className="flex justify-between text-blue-800">
+                <div className="flex justify-between text-blue-700 text-sm">
                   <span>Gift Card</span>
                   <span>-${giftCardDiscount.toFixed(2)}</span>
                 </div>
               )}
               
-              {/* Fee breakdown - showing the 4.87% fee included in prices */}
-              <div className="flex justify-between text-xs text-gray-500 pt-2">
-                <span>Subtotal (before fee)</span>
-                <span>${priceBeforeFee.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between text-xs text-gray-500">
-                <span>Processing Fee (4.87%)</span>
-                <span>${includedFee.toFixed(2)}</span>
-              </div>
-              
-              <div className="flex justify-between pt-3 border-t font-semibold text-base">
-                <span>Total</span>
-                <span className="text-blue-800">${total.toFixed(2)}</span>
-              </div>
-              
-              {/* Package Notes */}
-              {pkg.customer_notes && (
-                <p className="mt-3 text-xs text-gray-500 whitespace-pre-wrap">{pkg.customer_notes}</p>
+              {/* Special pricing discount */}
+              {specialPricingBreakdown && specialPricingBreakdown.has_special_pricing && (
+                <div className="space-y-1">
+                  {specialPricingBreakdown.discounts_applied.map((discount, index) => (
+                    <div key={index} className="flex justify-between text-green-600 text-sm">
+                      <span>{discount.name}</span>
+                      <span>-${discount.discount_amount.toFixed(2)}</span>
+                    </div>
+                  ))}
+                </div>
               )}
               
+              {/* Fee breakdown */}
+              {feeBreakdown && feeBreakdown.fees.length > 0 && (
+                <PriceBreakdownDisplay breakdown={feeBreakdown} compact className="pt-1" />
+              )}
+              
+              {/* Total */}
+              <div className="bg-gradient-to-r from-blue-800 to-blue-900 rounded-xl p-3.5 mt-2">
+                <div className="flex justify-between items-center">
+                  <span className="font-bold text-white text-sm">Total</span>
+                  <span className="text-xl font-extrabold text-white">${finalTotal.toFixed(2)}</span>
+                </div>
+              </div>
+
+              {/* Package Notes */}
+              {pkg.customer_notes && (
+                <p className="mt-2 text-xs text-gray-400 whitespace-pre-wrap">{pkg.customer_notes}</p>
+              )}
+
               {/* Global Notes */}
               {globalNotes.length > 0 && (
-                <div className="mt-2 space-y-1">
+                <div className="mt-1 space-y-1">
                   {globalNotes.map((note) => (
-                    <p key={note.id} className="text-xs text-gray-500 whitespace-pre-wrap">
+                    <p key={note.id} className="text-xs text-gray-400 whitespace-pre-wrap">
                       {note.title ? `${note.title}: ` : ''}{note.content}
                     </p>
                   ))}
                 </div>
               )}
             </div>
-            
-            <div className="mt-6 text-xs text-gray-500 text-center border-t pt-4">
-              Your booking will be confirmed immediately after payment
+
+            <div className="mt-5 bg-gray-50 rounded-xl p-3 text-center">
+              <div className="flex items-center justify-center gap-1.5 text-xs text-gray-500">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                Secure checkout
+              </div>
+              <p className="text-[10px] text-gray-400 mt-1">Confirmed immediately after payment</p>
             </div>
           </div>
         </div>
@@ -2650,13 +2755,13 @@ const BookPackage: React.FC = () => {
       {/* Mobile Floating Order Summary Button - only visible on mobile */}
       <button
         onClick={() => setShowMobileOrderSummary(true)}
-        className="fixed top-4 left-4 z-40 md:hidden bg-blue-800 text-white px-3 py-2.5 rounded-full shadow-lg flex items-center gap-2 hover:bg-blue-900 active:scale-95 transition-all duration-200"
+        className="fixed top-4 left-4 z-40 md:hidden bg-gradient-to-r from-blue-800 to-blue-900 text-white px-4 py-2.5 rounded-full shadow-lg flex items-center gap-2 hover:from-blue-900 hover:to-blue-950 active:scale-95 transition-all duration-200"
         aria-label="View Order Summary"
       >
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
         </svg>
-        <span className="text-sm font-medium">${total.toFixed(2)}</span>
+        <span className="text-sm font-medium">${finalTotal.toFixed(2)}</span>
       </button>
 
       {/* Mobile Order Summary Popup */}
@@ -2668,81 +2773,84 @@ const BookPackage: React.FC = () => {
             onClick={() => setShowMobileOrderSummary(false)}
           />
           {/* Slide-in Panel */}
-          <div className="absolute top-0 left-0 h-full w-[85vw] max-w-sm bg-white shadow-2xl animate-mobile-summary-slide-in overflow-y-auto">
+          <div className="absolute top-0 left-0 h-full w-[85vw] max-w-sm bg-white shadow-2xl animate-mobile-summary-slide-in overflow-y-auto rounded-r-2xl">
             {/* Header */}
-            <div className="sticky top-0 bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between z-10">
-              <h3 className="font-semibold text-lg text-gray-800">Order Summary</h3>
+            <div className="sticky top-0 bg-gradient-to-r from-blue-800 to-blue-900 px-4 py-4 flex items-center justify-between z-10 rounded-tr-2xl">
+              <h3 className="font-bold text-lg text-white">Order Summary</h3>
               <button
                 onClick={() => setShowMobileOrderSummary(false)}
-                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors"
+                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/20 transition-colors"
                 aria-label="Close order summary"
               >
-                <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             </div>
 
             {/* Order Summary Content - same as sidebar */}
-            <div className="p-4">
+            <div className="p-4 bg-white">
               {/* Package Image */}
               {pkg.image && (
                 <div className="mb-4 w-full flex justify-center">
-                  <img src={getImageUrl(pkg.image)} alt={pkg.name} className="max-h-32 rounded-lg object-contain border border-gray-200" />
+                  <img src={getImageUrl(pkg.image)} alt={pkg.name} className="max-h-32 rounded-xl object-contain" />
                 </div>
               )}
-              <div className="mb-5">
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-gray-600 text-sm">Package:</span>
+              <div className="mb-5 space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500 text-sm">Package</span>
                   <span className="font-medium text-gray-800 text-sm">{pkg.name}</span>
                 </div>
-                <div className="text-xs text-gray-500 mb-4">{participants} participants</div>
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-gray-600 text-sm">Duration:</span>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500 text-sm">Participants</span>
+                  <span className="font-medium text-gray-800 text-sm">{participants}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500 text-sm">Duration</span>
                   <span className="font-medium text-gray-800 text-sm">{formatDuration()}</span>
                 </div>
                 {selectedDate && (
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-gray-600 text-sm">Date:</span>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-500 text-sm">Date</span>
                     <span className="font-medium text-gray-800 text-sm">
                       {parseLocalDate(selectedDate).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
                     </span>
                   </div>
                 )}
                 {selectedTime && (
-                  <div className="flex justify-between items-center mb-4">
-                    <span className="text-gray-600 text-sm">Time:</span>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-500 text-sm">Time</span>
                     <span className="font-medium text-gray-800 text-sm">{formatTimeTo12Hour(selectedTime)}</span>
                   </div>
                 )}
               </div>
 
-              <div className="space-y-3 border-t pt-4 text-sm">
+              <div className="space-y-3 text-sm">
                 {/* Base Package */}
-                <div className="bg-blue-50 rounded-lg p-3">
+                <div className="bg-blue-50/70 rounded-xl p-3">
                   <div className="flex justify-between items-start mb-1">
                     <span className="font-semibold text-gray-800">Base Package</span>
                     <span className="font-bold text-gray-900">${Number(pkg.price).toFixed(2)}</span>
                   </div>
                   <p className="text-xs text-gray-600">{pkg.name}</p>
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-gray-400 mt-1">
                     Includes up to {pkg.min_participants || 1} participant{(pkg.min_participants || 1) > 1 ? 's' : ''}
                   </p>
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-gray-400">
                     Duration: {formatDuration()}
                   </p>
                 </div>
 
                 {/* Additional Participants */}
                 {participants > (pkg.min_participants || 1) && pkg.price_per_additional && Number(pkg.price_per_additional) > 0 && (
-                  <div className="bg-gray-50 rounded-lg p-3">
+                  <div className="bg-gray-50 rounded-xl p-3">
                     <div className="flex justify-between items-start">
                       <div>
                         <span className="font-medium text-gray-800">Additional Participants</span>
-                        <p className="text-xs text-gray-500 mt-1">
+                        <p className="text-xs text-gray-400 mt-1">
                           Base covers {pkg.min_participants || 1}, you have {participants} total
                         </p>
-                        <p className="text-xs text-gray-600 mt-0.5">
+                        <p className="text-xs text-gray-500 mt-0.5">
                           {participants - (pkg.min_participants || 1)} extra × ${Number(pkg.price_per_additional).toFixed(2)}/person
                         </p>
                       </div>
@@ -2753,16 +2861,16 @@ const BookPackage: React.FC = () => {
                   </div>
                 )}
 
-                {/* Participant Count */}
-                <div className="flex justify-between items-center text-xs py-2 px-1 border-b border-gray-200">
-                  <span className="text-gray-600">Total Participants</span>
-                  <span className="font-semibold text-gray-800">{participants} people</span>
+                {/* Room Info */}
+                <div className="flex justify-between text-xs text-gray-400 py-1 px-1">
+                  <span>Room Assignment</span>
+                  <span className="text-gray-500">Auto-assigned at booking</span>
                 </div>
 
                 {/* Attractions */}
                 {Object.entries(selectedAttractions).some(([, qty]) => qty > 0) && (
-                  <div className="pt-2">
-                    <div className="font-semibold text-gray-800 mb-2 text-xs uppercase tracking-wide">Attractions</div>
+                  <div>
+                    <div className="font-semibold text-gray-700 mb-2 text-xs uppercase tracking-wide">Attractions</div>
                     {Object.entries(selectedAttractions).filter(([, qty]) => qty > 0).map(([idStr, qty]) => {
                       const id = Number(idStr);
                       const attraction = pkg.attractions.find((a) => a.id === id);
@@ -2771,12 +2879,12 @@ const BookPackage: React.FC = () => {
                       const isPerPerson = (attraction as any).pricing_type === 'per_person';
                       const lineTotal = price * qty * (isPerPerson ? participants : 1);
                       return (
-                        <div key={id} className="bg-gray-50 rounded p-2 mb-1">
+                        <div key={id} className="bg-gray-50 rounded-lg p-2.5 mb-1.5">
                           <div className="flex justify-between text-xs">
                             <span className="font-medium text-gray-700">{attraction.name}</span>
                             <span className="font-semibold text-gray-800">+${lineTotal.toFixed(2)}</span>
                           </div>
-                          <p className="text-xs text-gray-500 mt-0.5">
+                          <p className="text-xs text-gray-400 mt-0.5">
                             {qty} × ${price.toFixed(2)}{isPerPerson ? ` × ${participants} people` : '/unit'}
                           </p>
                         </div>
@@ -2785,28 +2893,22 @@ const BookPackage: React.FC = () => {
                   </div>
                 )}
 
-                {/* Room Info */}
-                <div className="flex justify-between text-xs text-gray-500 py-1 border-b border-gray-100">
-                  <span>Room Assignment</span>
-                  <span className="text-gray-600">Auto-assigned at booking</span>
-                </div>
-
                 {/* Add-ons */}
                 {Object.entries(selectedAddOns).some(([, qty]) => qty > 0) && (
-                  <div className="pt-2">
-                    <div className="font-semibold text-gray-800 mb-2 text-xs uppercase tracking-wide">Add-ons</div>
+                  <div>
+                    <div className="font-semibold text-gray-700 mb-2 text-xs uppercase tracking-wide">Add-ons</div>
                     {Object.entries(selectedAddOns).filter(([, qty]) => qty > 0).map(([idStr, qty]) => {
                       const id = Number(idStr);
                       const addOn = pkg.add_ons.find((a) => a.id === id);
                       if (!addOn) return null;
                       const price = Number(addOn.price);
                       return (
-                        <div key={id} className="bg-gray-50 rounded p-2 mb-1">
+                        <div key={id} className="bg-gray-50 rounded-lg p-2.5 mb-1.5">
                           <div className="flex justify-between text-xs">
                             <span className="font-medium text-gray-700">{addOn.name}</span>
                             <span className="font-semibold text-gray-800">+${(price * qty).toFixed(2)}</span>
                           </div>
-                          <p className="text-xs text-gray-500 mt-0.5">{qty} × ${price.toFixed(2)}</p>
+                          <p className="text-xs text-gray-400 mt-0.5">{qty} × ${price.toFixed(2)}</p>
                         </div>
                       );
                     })}
@@ -2814,44 +2916,54 @@ const BookPackage: React.FC = () => {
                 )}
 
                 {appliedPromo && (
-                  <div className="flex justify-between text-blue-800">
+                  <div className="flex justify-between text-blue-700 text-sm">
                     <span>Promo Discount</span>
                     <span>-${promoDiscount.toFixed(2)}</span>
                   </div>
                 )}
 
                 {appliedGiftCard && (
-                  <div className="flex justify-between text-blue-800">
+                  <div className="flex justify-between text-blue-700 text-sm">
                     <span>Gift Card</span>
                     <span>-${giftCardDiscount.toFixed(2)}</span>
                   </div>
                 )}
 
-                {/* Fee breakdown */}
-                <div className="flex justify-between text-xs text-gray-500 pt-2">
-                  <span>Subtotal (before fee)</span>
-                  <span>${priceBeforeFee.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-xs text-gray-500">
-                  <span>Processing Fee (4.87%)</span>
-                  <span>${includedFee.toFixed(2)}</span>
-                </div>
+                {/* Special pricing discount */}
+                {specialPricingBreakdown && specialPricingBreakdown.has_special_pricing && (
+                  <div className="space-y-1">
+                    {specialPricingBreakdown.discounts_applied.map((discount, index) => (
+                      <div key={index} className="flex justify-between text-green-600 text-sm">
+                        <span>{discount.name}</span>
+                        <span>-${discount.discount_amount.toFixed(2)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
-                <div className="flex justify-between pt-3 border-t font-semibold text-base">
-                  <span>Total</span>
-                  <span className="text-blue-800">${total.toFixed(2)}</span>
+                {/* Fee breakdown */}
+                {feeBreakdown && feeBreakdown.fees.length > 0 && (
+                  <PriceBreakdownDisplay breakdown={feeBreakdown} compact className="pt-1" />
+                )}
+
+                {/* Total */}
+                <div className="bg-gradient-to-r from-blue-800 to-blue-900 rounded-xl p-3.5 mt-2">
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-white text-sm">Total</span>
+                    <span className="text-xl font-extrabold text-white">${finalTotal.toFixed(2)}</span>
+                  </div>
                 </div>
 
                 {/* Package Notes */}
                 {pkg.customer_notes && (
-                  <p className="mt-3 text-xs text-gray-500 whitespace-pre-wrap">{pkg.customer_notes}</p>
+                  <p className="mt-2 text-xs text-gray-400 whitespace-pre-wrap">{pkg.customer_notes}</p>
                 )}
 
                 {/* Global Notes */}
                 {globalNotes.length > 0 && (
-                  <div className="mt-2 space-y-1">
+                  <div className="mt-1 space-y-1">
                     {globalNotes.map((note) => (
-                      <p key={note.id} className="text-xs text-gray-500 whitespace-pre-wrap">
+                      <p key={note.id} className="text-xs text-gray-400 whitespace-pre-wrap">
                         {note.title ? `${note.title}: ` : ''}{note.content}
                       </p>
                     ))}
@@ -2859,8 +2971,12 @@ const BookPackage: React.FC = () => {
                 )}
               </div>
 
-              <div className="mt-6 text-xs text-gray-500 text-center border-t pt-4">
-                Your booking will be confirmed immediately after payment
+              <div className="mt-5 bg-gray-50 rounded-xl p-3 text-center">
+                <div className="flex items-center justify-center gap-1.5 text-xs text-gray-500">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                  Secure checkout
+                </div>
+                <p className="text-[10px] text-gray-400 mt-1">Confirmed immediately after payment</p>
               </div>
             </div>
           </div>

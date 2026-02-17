@@ -22,12 +22,17 @@ import { customerService, type Customer } from '../../../services/CustomerServic
 import { generatePurchaseQRCode } from '../../../utils/qrcode';
 import Toast from '../../../components/ui/Toast';
 import { ASSET_URL } from '../../../utils/storage';
-import { loadAcceptJS, processCardPayment, validateCardNumber, formatCardNumber, getCardType, PAYMENT_TYPE, linkPaymentWithRetry } from '../../../services/PaymentService';
+import { loadAcceptJS, processCardPayment, validateCardNumber, formatCardNumber, getCardType, PAYMENT_TYPE } from '../../../services/PaymentService';
 import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
 import { extractIdFromSlug } from '../../../utils/slug';
 import StandardButton from '../../../components/ui/StandardButton';
 import SignatureCapture from '../../../components/SignatureCapture';
 import TermsAndConditionsCheckbox from '../../../components/TermsAndConditionsCheckbox';
+import { feeSupportService } from '../../../services/FeeSupportService';
+import type { FeeBreakdown } from '../../../types/FeeSupport.types';
+import PriceBreakdownDisplay from '../../../components/ui/PriceBreakdownDisplay';
+import { specialPricingService } from '../../../services/SpecialPricingService';
+import type { SpecialPricingBreakdown } from '../../../types/SpecialPricing.types';
 
 // Helper function to parse payment errors into user-friendly messages
 const getPaymentErrorMessage = (error: any): string => {
@@ -181,6 +186,8 @@ const PurchaseAttraction = () => {
   const [signatureImage, setSignatureImage] = useState<string | null>(null);
   const [termsAccepted, setTermsAccepted] = useState<boolean>(false);
   const [signatureTermsErrors, setSignatureTermsErrors] = useState<Record<string, string>>({});
+  const [feeBreakdown, setFeeBreakdown] = useState<FeeBreakdown | null>(null);
+  const [specialPricingBreakdown, setSpecialPricingBreakdown] = useState<SpecialPricingBreakdown | null>(null);
 
   // Show account modal for non-logged-in users (optional, doesn't block access)
   useEffect(() => {
@@ -406,11 +413,67 @@ const PurchaseAttraction = () => {
     return parseFloat(attraction.price.toString()) * quantity;
   };
   
-  // Calculate the 4.87% fee that's already included in prices (for display purposes)
-  const FEE_RATE = 0.0487;
-  const total = calculateTotal();
-  const priceBeforeFee = total / (1 + FEE_RATE);
-  const includedFee = total - priceBeforeFee;
+  // Use dynamic fee breakdown if available - no fallback to hardcoded rate
+  const baseTotal = calculateTotal();
+  const specialPricingDiscount = specialPricingBreakdown?.has_special_pricing ? specialPricingBreakdown.total_discount : 0;
+  const totalAfterSpecialPricing = Math.max(0, baseTotal - specialPricingDiscount);
+  const total = feeBreakdown ? feeBreakdown.total - specialPricingDiscount : totalAfterSpecialPricing;
+
+  // Fetch fee breakdown when attraction or quantity changes
+  useEffect(() => {
+    const fetchFeeBreakdown = async () => {
+      if (!attraction) {
+        setFeeBreakdown(null);
+        return;
+      }
+      try {
+        const basePrice = parseFloat(attraction.price.toString()) * quantity;
+        const response = await feeSupportService.getForEntity({
+          entity_type: 'attraction',
+          entity_id: Number(attraction.id),
+          base_price: basePrice,
+          location_id: attraction.locationId || undefined,
+        });
+        if (response.success && response.data) {
+          setFeeBreakdown(response.data);
+        }
+      } catch (error) {
+        console.error('Error fetching fee breakdown:', error);
+        setFeeBreakdown(null);
+      }
+    };
+    fetchFeeBreakdown();
+  }, [attraction, quantity]);
+
+  // Fetch special pricing breakdown for attraction (use today's date for immediate purchases)
+  useEffect(() => {
+    const fetchSpecialPricing = async () => {
+      if (!attraction) {
+        setSpecialPricingBreakdown(null);
+        return;
+      }
+      try {
+        // Use today's date for immediate attraction purchases
+        const today = new Date().toISOString().split('T')[0];
+        const basePrice = parseFloat(attraction.price.toString()) * quantity;
+        const breakdown = await specialPricingService.getPriceBreakdown({
+          entity_type: 'attraction',
+          entity_id: Number(attraction.id),
+          base_price: basePrice,
+          date: today,
+        });
+        if (breakdown.has_special_pricing) {
+          setSpecialPricingBreakdown(breakdown);
+        } else {
+          setSpecialPricingBreakdown(null);
+        }
+      } catch (error) {
+        console.error('Error fetching special pricing breakdown:', error);
+        setSpecialPricingBreakdown(null);
+      }
+    };
+    fetchSpecialPricing();
+  }, [attraction, quantity]);
 
   const handlePurchase = async () => {
     if (!attraction) return;
@@ -472,35 +535,8 @@ const PurchaseAttraction = () => {
         country: customerInfo.country,
       };
       
-      // ===== CHARGE-THEN-LINK FLOW =====
-      // Step 1: Charge the customer FIRST (no payable_id yet)
-      const paymentData = {
-        location_id: attraction.locationId || 1,
-        amount: totalAmount,
-        order_id: `A${attraction.id}-${Date.now().toString().slice(-8)}`,
-        description: `Attraction Purchase: ${attraction.name}`,
-        customer_id: selectedCustomerId || undefined,
-        signature_image: signatureImage || undefined,
-        terms_accepted: termsAccepted,
-      };
-
-      const paymentResponse = await processCardPayment(
-        cardData,
-        paymentData,
-        authorizeApiLoginId,
-        authorizeClientKey,
-        customerData
-      );
-      
-      if (!paymentResponse.success) {
-        throw new Error(paymentResponse.message || 'Payment failed. Please try again.');
-      }
-      
-      const paymentId = paymentResponse.payment?.id;
-      const transactionId = paymentResponse.transaction_id;
-      console.log('✅ Payment charged successfully, payment ID:', paymentId, 'txn:', transactionId);
-
-      // Step 2: Create attraction purchase (customer already charged)
+      // ===== CREATE-FIRST FLOW =====
+      // Step 1: Create attraction purchase FIRST (no charge yet)
       const purchaseData = {
         attraction_id: Number(attraction.id),
         customer_id: selectedCustomerId || undefined,
@@ -518,42 +554,60 @@ const PurchaseAttraction = () => {
         notes: `Attraction Purchase: ${attraction.name} (${quantity} ticket${quantity > 1 ? 's' : ''})`,
       };
 
-      const response = await attractionPurchaseService.createPurchase(purchaseData);
+      let response;
+      try {
+        response = await attractionPurchaseService.createPurchase(purchaseData);
+      } catch (createErr) {
+        console.error('❌ Purchase creation failed:', createErr);
+        throw new Error('We couldn\'t process your order right now. No charges were made. Please try again or contact us for help.');
+      }
       const createdPurchase = response.data;
       console.log('✅ Purchase created, ID:', createdPurchase.id);
 
-      // Update purchase with transaction_id
-      try {
-        await attractionPurchaseService.updatePurchase(createdPurchase.id, {
-          payment_id: transactionId,
-        });
-      } catch (updateError) {
-        // Non-critical - purchase and payment succeeded
-      }
-
-      // Step 3: Link payment to purchase (with retry for reliability)
-      if (paymentId) {
-        try {
-          await linkPaymentWithRetry(paymentId, createdPurchase.id, PAYMENT_TYPE.ATTRACTION_PURCHASE, 3, transactionId);
-          console.log('✅ Payment linked to purchase successfully');
-        } catch (linkErr) {
-          // Non-critical: payment and purchase both exist, just not linked yet
-          // Staff can see unlinked payments and manually resolve
-          console.error('⚠️ Failed to link payment to purchase:', linkErr);
-        }
-      }
-
-      // Generate QR code
+      // Step 2: Generate QR code
       const qrData = await generatePurchaseQRCode(createdPurchase.id);
-      setQrCodeImage(qrData);
 
-      // Send receipt email with QR code
-      try {
-        await attractionPurchaseService.sendReceipt(createdPurchase.id, qrData);
-        setToast({ message: 'Purchase confirmed! Receipt sent to your email.', type: 'success' });
-      } catch {
-        setToast({ message: 'Purchase confirmed! (Email failed to send)', type: 'info' });
+      // Step 3: Charge payment WITH payable_id — backend links payment + sends email + stores QR
+      const paymentData = {
+        location_id: attraction.locationId || 1,
+        amount: totalAmount,
+        order_id: `A${attraction.id}-${Date.now().toString().slice(-8)}`,
+        description: `Attraction Purchase: ${attraction.name}`,
+        customer_id: selectedCustomerId || undefined,
+        signature_image: signatureImage || undefined,
+        terms_accepted: termsAccepted,
+        payable_id: createdPurchase.id,
+        payable_type: PAYMENT_TYPE.ATTRACTION_PURCHASE,
+        send_email: true,
+        qr_code: qrData,
+      };
+
+      const paymentResponse = await processCardPayment(
+        cardData,
+        paymentData,
+        authorizeApiLoginId,
+        authorizeClientKey,
+        customerData
+      );
+      
+      if (!paymentResponse.success) {
+        // Payment failed — clean up the purchase we created
+        console.error('❌ Payment failed, deleting purchase:', createdPurchase.id);
+        try {
+          await attractionPurchaseService.deletePurchase(createdPurchase.id);
+          console.log('🗑️ Purchase deleted due to payment failure');
+        } catch (deleteErr) {
+          console.error('⚠️ Failed to delete purchase after payment failure:', deleteErr);
+        }
+        // Throw with the raw message — getPaymentErrorMessage in catch will make it friendly
+        const rawMsg = paymentResponse.message || '';
+        throw new Error(rawMsg || 'Your payment could not be processed. No charges were made to your card. Please check your card details and try again.');
       }
+      
+      console.log('✅ Payment charged successfully, txn:', paymentResponse.transaction_id);
+
+      setQrCodeImage(qrData);
+      setToast({ message: 'Purchase confirmed! Receipt sent to your email.', type: 'success' });
 
       setPurchaseComplete(true);
       setCurrentStep(4);
@@ -595,22 +649,22 @@ const PurchaseAttraction = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50/40">
       {/* Account Modal */}
       {showAccountModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-fade-in" onClick={() => setShowAccountModal(false)}>
           <div 
-            className="bg-white max-w-sm w-full p-6 shadow-2xl animate-scale-in"
+            className="bg-white max-w-sm w-full p-6 rounded-2xl shadow-2xl animate-scale-in"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="text-center mb-4">
-              <div className="w-12 h-12 bg-blue-100 flex items-center justify-center mx-auto mb-3">
-                <svg className="w-6 h-6 text-blue-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-14 h-14 bg-gradient-to-br from-blue-100 to-blue-200 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                <svg className="w-7 h-7 text-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                 </svg>
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Create an Account?</h3>
-              <p className="text-sm text-gray-600">Sign up for faster checkout and track your purchases.</p>
+              <h3 className="text-lg font-bold text-gray-900 mb-2">Create an Account?</h3>
+              <p className="text-sm text-gray-500 leading-relaxed">Sign up for faster checkout and track your purchases.</p>
             </div>
             <div className="flex flex-col gap-2.5">
               <StandardButton
@@ -655,28 +709,35 @@ const PurchaseAttraction = () => {
         .animate-scale-in {
           animation: scale-in 0.3s ease-out;
         }
+        @keyframes backdrop-fade {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        .animate-backdrop-fade {
+          animation: backdrop-fade 0.2s ease-out;
+        }
       `}</style>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
           {/* Left Column - Purchase Form */}
           <div className="lg:col-span-2">
-            <div className="bg-white shadow-sm rounded-lg overflow-hidden">
+            <div className="bg-white shadow-md rounded-2xl overflow-hidden">
               {/* Progress Steps */}
-              <div className="border-b border-gray-200">
-                <div className="px-4 md:px-6 py-3 md:py-4">
+              <div className="bg-gradient-to-r from-gray-50 to-white">
+                <div className="px-4 md:px-6 py-4 md:py-5">
                   <div className="flex items-center justify-between mb-2">
                     {[1, 2, 3, 4].map(step => (
                       <div key={step} className="flex items-center">
-                        <div className={`w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center text-xs md:text-sm ${
+                        <div className={`w-8 h-8 md:w-9 md:h-9 rounded-full flex items-center justify-center text-xs md:text-sm font-semibold transition-all ${
                           currentStep >= step 
-                            ? 'bg-blue-800 text-white' 
-                            : 'bg-gray-200 text-gray-500'
+                            ? 'bg-gradient-to-br from-blue-700 to-blue-900 text-white shadow-md' 
+                            : 'bg-gray-100 text-gray-400'
                         }`}>
-                          {step}
+                          {currentStep > step ? '\u2713' : step}
                         </div>
                         {step < 4 && (
-                          <div className={`w-8 md:w-16 h-1 mx-1 md:mx-2 ${currentStep > step ? 'bg-blue-800' : 'bg-gray-200'}`}></div>
+                          <div className={`w-8 md:w-16 h-1 mx-1 md:mx-2 rounded-full transition-all ${currentStep > step ? 'bg-blue-600' : 'bg-gray-200'}`}></div>
                         )}
                       </div>
                     ))}
@@ -701,7 +762,7 @@ const PurchaseAttraction = () => {
                     <p className="text-xs md:text-sm text-gray-600">How many tickets would you like to purchase?</p>
                   </div>
                   
-                  <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 rounded-xl p-6 md:p-8">
+                  <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 md:p-8 shadow-sm">
                     <div className="flex items-center justify-center mb-4">
                       <ShoppingCart className="h-8 w-8 md:h-10 md:w-10 text-blue-600" />
                     </div>
@@ -861,7 +922,7 @@ const PurchaseAttraction = () => {
                   </div>
                   
                   {/* Billing Information Section */}
-                  <div className="mt-6 pt-6 border-t border-gray-200">
+                  <div className="mt-6 pt-6">
                     <h4 className="text-base font-semibold text-gray-900 mb-4">Billing Information</h4>
                     <div className="space-y-4">
                       <div>
@@ -1042,10 +1103,22 @@ const PurchaseAttraction = () => {
                       <p className="text-xs md:text-sm text-gray-600 mt-0.5 md:mt-1">Secure payment powered by Authorize.Net</p>
                     </div>
                     <div className="flex gap-1.5 md:gap-2">
-                      <img src="https://upload.wikimedia.org/wikipedia/commons/5/5e/Visa_Inc._logo.svg" alt="Visa" className="h-4 md:h-5 lg:h-6 opacity-80" />
-                      <img src="https://upload.wikimedia.org/wikipedia/commons/2/2a/Mastercard-logo.svg" alt="Mastercard" className="h-4 md:h-5 lg:h-6 opacity-80" />
-                      <img src="https://upload.wikimedia.org/wikipedia/commons/f/fa/American_Express_logo_%282018%29.svg" alt="Amex" className="h-4 md:h-5 lg:h-6 opacity-80" />
-                      <img src="https://upload.wikimedia.org/wikipedia/commons/5/57/Discover_Card_logo.svg" alt="Discover" className="h-4 md:h-5 lg:h-6 opacity-80" />
+                      <div className="h-5 md:h-6 lg:h-7 px-1.5 md:px-2 bg-gradient-to-br from-blue-800 to-blue-950 rounded flex items-center justify-center" title="Visa">
+                        <span className="text-white text-[9px] md:text-[10px] lg:text-[11px] font-extrabold italic">VISA</span>
+                      </div>
+                      <div className="h-5 md:h-6 lg:h-7 w-8 md:w-10 lg:w-11 bg-gray-100 rounded flex items-center justify-center" title="Mastercard">
+                        <svg viewBox="0 0 32 20" className="h-3.5 md:h-4 lg:h-5">
+                          <circle cx="12" cy="10" r="7" fill="#EB001B"/>
+                          <circle cx="20" cy="10" r="7" fill="#F79E1B"/>
+                          <path d="M16 4.6a7 7 0 010 10.8 7 7 0 010-10.8z" fill="#FF5F00"/>
+                        </svg>
+                      </div>
+                      <div className="h-5 md:h-6 lg:h-7 px-1 md:px-1.5 bg-blue-500 rounded flex items-center justify-center" title="Amex">
+                        <span className="text-white text-[7px] md:text-[8px] lg:text-[9px] font-bold">AMEX</span>
+                      </div>
+                      <div className="h-5 md:h-6 lg:h-7 px-1 md:px-1.5 bg-orange-500 rounded flex items-center justify-center" title="Discover">
+                        <span className="text-white text-[6px] md:text-[7px] lg:text-[8px] font-bold">DISC</span>
+                      </div>
                     </div>
                   </div>
 
@@ -1145,7 +1218,7 @@ const PurchaseAttraction = () => {
                     )}
                     
                     {/* Security Notice */}
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-2.5 md:p-3 flex items-start gap-2">
+                    <div className="bg-blue-50 rounded-lg p-2.5 md:p-3 flex items-start gap-2">
                       <svg className="w-4 h-4 md:w-5 md:h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd"></path>
                       </svg>
@@ -1157,7 +1230,7 @@ const PurchaseAttraction = () => {
                   </div>
                   
                   {/* Signature & Terms Section */}
-                  <div className="space-y-4 mt-6 border-t pt-6">
+                  <div className="space-y-4 mt-6 pt-6">
                     <h3 className="text-lg font-semibold">Signature & Agreement</h3>
 
                     <SignatureCapture
@@ -1292,7 +1365,7 @@ const PurchaseAttraction = () => {
                         <span className="text-gray-600">Payment Method:</span>
                         <span className="font-medium text-gray-900">Credit/Debit Card</span>
                       </div>
-                      <div className="border-t border-gray-300 pt-2 mt-2 flex justify-between">
+                      <div className="pt-3 mt-3 flex justify-between">
                         <span className="text-gray-900 font-semibold">Total Paid:</span>
                         <span className="text-lg font-bold text-green-600">${calculateTotal().toFixed(2)}</span>
                       </div>
@@ -1300,7 +1373,7 @@ const PurchaseAttraction = () => {
                   </div>
 
                   {/* Billing Address */}
-                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
+                  <div className="bg-gray-50 rounded-xl p-4 mb-6">
                     <h3 className="font-semibold text-gray-900 mb-3 flex items-center">
                       <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
@@ -1339,7 +1412,7 @@ const PurchaseAttraction = () => {
 
           {/* Right Column - Attraction Summary */}
           <div className="lg:col-span-1">
-            <div className="bg-white shadow-sm rounded-lg overflow-hidden lg:sticky lg:top-8">
+            <div className="bg-white shadow-md rounded-2xl overflow-hidden lg:sticky lg:top-8">
               {/* Image Carousel */}
               {attraction.images && attraction.images.length > 0 && (
                 <div className="relative group">
@@ -1412,27 +1485,27 @@ const PurchaseAttraction = () => {
                       {attraction.category}
                     </span>
                   </div>
-                  <p className="text-sm md:text-base text-gray-600 leading-relaxed">{attraction.description}</p>
+                  <p className="text-sm md:text-base text-gray-500 leading-relaxed">{attraction.description}</p>
                 </div>
                 
                 {/* Attraction Details Grid */}
-                <div className="grid grid-cols-2 gap-3 mb-6 pb-4 border-b border-gray-200">
+                <div className="grid grid-cols-2 gap-3 mb-5">
                   <div className="flex items-start gap-2">
-                    <div className="p-2 bg-blue-50 rounded-lg">
+                    <div className="p-2 bg-blue-50 rounded-xl">
                       <MapPin className="h-4 w-4 text-blue-600" />
                     </div>
                     <div>
-                      <p className="text-xs text-gray-500">Location</p>
+                      <p className="text-xs text-gray-400">Location</p>
                       <p className="text-sm font-medium text-gray-900">{attraction.location}</p>
                     </div>
                   </div>
                   
                   <div className="flex items-start gap-2">
-                    <div className="p-2 bg-blue-50 rounded-lg">
+                    <div className="p-2 bg-blue-50 rounded-xl">
                       <Clock className="h-4 w-4 text-blue-600" />
                     </div>
                     <div>
-                      <p className="text-xs text-gray-500">Duration</p>
+                      <p className="text-xs text-gray-400">Duration</p>
                       <p className="text-sm font-medium text-gray-900">
                         {attraction.duration === '0' || !attraction.duration ? 'Unlimited' : formatDurationDisplay(parseFloat(attraction.duration), attraction.durationUnit)}
                       </p>
@@ -1440,21 +1513,21 @@ const PurchaseAttraction = () => {
                   </div>
                   
                   <div className="flex items-start gap-2">
-                    <div className="p-2 bg-blue-50 rounded-lg">
+                    <div className="p-2 bg-blue-50 rounded-xl">
                       <Users className="h-4 w-4 text-blue-600" />
                     </div>
                     <div>
-                      <p className="text-xs text-gray-500">Capacity</p>
+                      <p className="text-xs text-gray-400">Capacity</p>
                       <p className="text-sm font-medium text-gray-900">Up to {attraction.maxCapacity}</p>
                     </div>
                   </div>
                   
                   <div className="flex items-start gap-2">
-                    <div className="p-2 bg-blue-50 rounded-lg">
+                    <div className="p-2 bg-blue-50 rounded-xl">
                       <DollarSign className="h-4 w-4 text-blue-600" />
                     </div>
                     <div>
-                      <p className="text-xs text-gray-500">Pricing</p>
+                      <p className="text-xs text-gray-400">Pricing</p>
                       <p className="text-sm font-medium text-gray-900">
                         {attraction.pricingType === 'per_person' ? 'Per Person' : 
                          attraction.pricingType === 'per_group' ? 'Per Group' :
@@ -1465,11 +1538,11 @@ const PurchaseAttraction = () => {
                   </div>
                 </div>
                 
-                <div className="border-t border-gray-200 pt-4">
-                  <h3 className="font-semibold text-gray-900 mb-3 text-sm md:text-base">Order Summary</h3>
+                <div className="pt-4">
+                  <h3 className="font-bold text-gray-900 mb-3 text-sm md:text-base">Order Summary</h3>
                   <div className="space-y-2">
                   <div className="flex justify-between items-center">
-                    <span className="text-xs md:text-sm text-gray-600">
+                    <span className="text-xs md:text-sm text-gray-500">
                       {attraction.pricingType === 'per_person' ? 'Per person' : 
                        attraction.pricingType === 'per_group' ? 'Per group' :
                        attraction.pricingType === 'per_hour' ? 'Per hour' :
@@ -1481,43 +1554,55 @@ const PurchaseAttraction = () => {
                   {currentStep >= 1 && (
                     <>
                       <div className="flex justify-between items-center">
-                        <span className="text-xs md:text-sm text-gray-600">Quantity</span>
+                        <span className="text-xs md:text-sm text-gray-500">Quantity</span>
                         <span className="font-medium text-sm md:text-base">{quantity}</span>
                       </div>
                     </>
                   )}
                   </div>
                   
-                  {/* Fee breakdown */}
-                  <div className="flex justify-between items-center mt-3 pt-3 border-t border-gray-200">
-                    <span className="text-xs md:text-sm text-gray-600">Subtotal (before fee)</span>
-                    <span className="font-medium text-sm md:text-base">${priceBeforeFee.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-xs md:text-sm text-gray-600">Processing Fee (4.87%)</span>
-                    <span className="font-medium text-sm md:text-base">${includedFee.toFixed(2)}</span>
-                  </div>
+                  {/* Special pricing discount */}
+                  {specialPricingBreakdown && specialPricingBreakdown.has_special_pricing && (
+                    <div className="mt-3 space-y-1">
+                      {specialPricingBreakdown.discounts_applied.map((discount, index) => (
+                        <div key={index} className="flex justify-between text-green-600 text-sm">
+                          <span>{discount.name}</span>
+                          <span>-${discount.discount_amount.toFixed(2)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   
-                  <div className="flex justify-between items-center mt-4 pt-4 border-t-2 border-gray-300">
-                    <span className="font-bold text-gray-900 text-base md:text-lg">Total</span>
-                    <span className="text-xl md:text-2xl font-bold text-blue-800">${total.toFixed(2)}</span>
+                  {/* Fee breakdown */}
+                  {feeBreakdown && feeBreakdown.fees.length > 0 && (
+                    <div className="mt-3 pt-1">
+                      <PriceBreakdownDisplay breakdown={feeBreakdown} compact />
+                    </div>
+                  )}
+                  
+                  {/* Total */}
+                  <div className="bg-gradient-to-r from-blue-800 to-blue-900 rounded-xl p-3.5 mt-4">
+                    <div className="flex justify-between items-center">
+                      <span className="font-bold text-white text-sm">Total</span>
+                      <span className="text-xl md:text-2xl font-extrabold text-white">${total.toFixed(2)}</span>
+                    </div>
                   </div>
                 </div>
                 
                 {/* Trust badges */}
-                <div className="mt-6 pt-4 border-t border-gray-200">
+                <div className="mt-5 bg-gray-50 rounded-xl p-3">
                   <div className="flex items-center justify-around text-xs text-gray-500">
                     <div className="text-center">
-                      <Shield className="h-6 w-6 mx-auto mb-1" />
-                      <span>Secure Payment</span>
+                      <Shield className="h-4 w-4 mx-auto mb-1" />
+                      <span>Secure</span>
                     </div>
                     <div className="text-center">
-                      <Zap className="h-6 w-6 mx-auto mb-1" />
-                      <span>Instant Confirmation</span>
+                      <Zap className="h-4 w-4 mx-auto mb-1" />
+                      <span>Instant</span>
                     </div>
                     <div className="text-center">
-                      <Star className="h-6 w-6 mx-auto mb-1" />
-                      <span>Best Price Guarantee</span>
+                      <Star className="h-4 w-4 mx-auto mb-1" />
+                      <span>Best Price</span>
                     </div>
                   </div>
                 </div>
@@ -1532,11 +1617,13 @@ const PurchaseAttraction = () => {
       {/* QR Code Modal */}
       {showQRModal && qrCodeImage && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-backdrop-fade">
-          <div className="bg-white rounded-xl max-w-2xl w-full p-4 sm:p-6 max-h-[calc(100vh-2rem)] overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-2xl w-full p-4 sm:p-6 max-h-[calc(100vh-2rem)] overflow-y-auto shadow-2xl">
             <div className="text-center mb-4">
-              <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-3" />
-              <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">Purchase Confirmed!</h3>
-              <p className="text-sm text-gray-600">Your tickets have been confirmed</p>
+              <div className="mx-auto w-14 h-14 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-2xl flex items-center justify-center mb-3 shadow-lg">
+                <CheckCircle className="h-8 w-8 text-white" />
+              </div>
+              <h3 className="text-xl sm:text-2xl font-extrabold text-gray-900 mb-2">Purchase Confirmed!</h3>
+              <p className="text-sm text-gray-500">Your tickets have been confirmed</p>
             </div>
             
             {/* QR Code Display */}
@@ -1545,7 +1632,7 @@ const PurchaseAttraction = () => {
                 <img 
                   src={qrCodeImage} 
                   alt="Purchase QR Code"
-                  className="w-48 h-48 sm:w-64 sm:h-64 border border-gray-200 rounded-lg mb-3"
+                  className="w-48 h-48 sm:w-64 sm:h-64 rounded-xl shadow-sm mb-3"
                 />
                 <p className="text-xs sm:text-sm text-gray-600 mb-1">Scan this QR code at the entrance</p>
               </div>
@@ -1618,7 +1705,7 @@ const PurchaseAttraction = () => {
                     <span className="font-medium text-gray-900">x{quantity}</span>
                   </div>
                 )}
-                <div className="flex justify-between border-t pt-2 mt-2 text-sm sm:text-base">
+                <div className="flex justify-between pt-3 mt-3 text-sm sm:text-base">
                   <span className="text-gray-600 font-semibold">Total Paid:</span>
                   <span className="font-bold text-green-600 text-lg sm:text-xl">${calculateTotal().toFixed(2)}</span>
                 </div>
@@ -1630,7 +1717,7 @@ const PurchaseAttraction = () => {
             </div>
             
             {/* Information Notice */}
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+            <div className="bg-yellow-50 rounded-lg p-3 mb-4">
               <div className="flex">
                 <svg className="w-5 h-5 text-yellow-600 mr-2 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd"></path>

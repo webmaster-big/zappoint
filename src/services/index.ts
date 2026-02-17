@@ -96,6 +96,10 @@ export type {
   BulkUpdateData
 } from './ContactService';
 
+// Fee Support service exports
+export { feeSupportService } from './FeeSupportService';
+export type { FeeSupport, FeeSupportFormData, FeeSupportFilters, FeeBreakdown, FeeBreakdownItem } from '../types/FeeSupport.types';
+
 // Common API response types
 export type { ApiResponse, PaginatedResponse } from './PackageService';
 
