@@ -18,7 +18,7 @@ import type { Attraction, Package as PackageType, BookingType } from '../../type
 import { customerService, type GroupedAttraction, type GroupedPackage } from '../../services/CustomerService';
 import { ASSET_URL } from '../../utils/storage';
 import { generateSlug, generateLocationSlug } from '../../utils/slug';
-import { convertTo12Hour, formatDurationDisplay } from '../../utils/timeFormat';
+import { convertTo12Hour, formatDurationDisplay, getUpcomingAttractionSessions, getUpcomingPackageSessions } from '../../utils/timeFormat';
 
 const EntertainmentLandingPage = () => {
   const [selectedLocation, setSelectedLocation] = useState('All Locations');
@@ -134,6 +134,7 @@ const EntertainmentLandingPage = () => {
             price_per_additional: pkg.price_per_additional,
           };
         });
+        console.log(transformedPackages);
         setPackages(transformedPackages);
       }
     } catch (error) {
@@ -276,6 +277,43 @@ const EntertainmentLandingPage = () => {
   const formatTime = (time: string) => {
     if (!time) return '';
     return convertTo12Hour(time);
+  };
+
+  // Dynamically determine whether Michigan is currently on EST or EDT.
+  // America/Detroit is UTC-5 in winter (EST) and UTC-4 in summer (EDT).
+  const easternTimeAbbr = (() => {
+    const now = new Date();
+    const abbr = now.toLocaleString('en-US', { timeZone: 'America/Detroit', timeZoneName: 'short' })
+      .match(/(EST|EDT|ET)/)?.[1] ?? 'ET';
+    return abbr;
+  })();
+
+  // Returns true if the attraction has at least one upcoming session that hasn't ended yet.
+  // If there are no schedules configured, treat as always available.
+  // Returns true only when a session is currently in progress (started but not ended).
+  // If there are no schedules configured, treat as always available.
+  const hasAvailableUpcomingSessions = (
+    availability?: { days: string[]; start_time: string; end_time: string }[]
+  ): boolean => {
+    if (!availability || !Array.isArray(availability) || availability.length === 0) return true;
+    const sessions = getUpcomingAttractionSessions(availability, 20);
+    return sessions.some(s => s.isToday && s.hasStarted && !s.hasEnded);
+  };
+
+  // Returns the next session that hasn't started yet (for informational display).
+  // If a session is currently active, returns that session.
+  const getNextAvailableSession = (
+    availability?: { days: string[]; start_time: string; end_time: string }[]
+  ): { label: string; startTime: string; endTime: string; isActive: boolean } | null => {
+    if (!availability || !Array.isArray(availability) || availability.length === 0) return null;
+    const sessions = getUpcomingAttractionSessions(availability, 20);
+    // Prefer an active session first
+    const active = sessions.find(s => s.isToday && s.hasStarted && !s.hasEnded);
+    if (active) return { label: active.label, startTime: active.startTime, endTime: active.endTime, isActive: true };
+    // Otherwise return the next future session
+    const next = sessions.find(s => !s.hasEnded);
+    if (next) return { label: next.label, startTime: next.startTime, endTime: next.endTime, isActive: false };
+    return null;
   };
 
   return (
@@ -768,7 +806,10 @@ const EntertainmentLandingPage = () => {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 md:gap-7">
-                {filteredAttractions.map(attraction => (
+                {filteredAttractions.map(attraction => {
+                  const attractionAvailable = hasAvailableUpcomingSessions(attraction.availability);
+                  const nextSession = getNextAvailableSession(attraction.availability);
+                  return (
                   <div 
                     key={attraction.id} 
                     onClick={() => handleAttractionClick(attraction)}
@@ -798,9 +839,30 @@ const EntertainmentLandingPage = () => {
                       <h3 className="text-lg md:text-xl font-bold text-gray-900 mb-2 group-hover:text-violet-600 transition-colors">
                         {attraction.name}
                       </h3>
-                      <p className="text-sm text-gray-500 mb-5 line-clamp-2 leading-relaxed">
+                      <p className="text-sm text-gray-500 mb-3 line-clamp-2 leading-relaxed">
                         {attraction.description}
                       </p>
+                      {/* Next available session pill */}
+                      {nextSession && (
+                        <div className="flex items-center gap-1.5 mb-4">
+                          <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
+                            nextSession.isActive
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                              : 'bg-amber-50 text-amber-700 border border-amber-200'
+                          }`}>
+                            <Clock size={11} />
+                            <span>{nextSession.isActive ? 'Open now' : `Opens ${nextSession.label}: ${nextSession.startTime}`}</span>
+                          </div>
+                        </div>
+                      )}
+                      {!attractionAvailable && !nextSession && attraction.availability && attraction.availability.length > 0 && (
+                        <div className="flex items-center gap-1.5 mb-4">
+                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-400 border border-gray-200">
+                            <Clock size={11} />
+                            <span>No upcoming sessions</span>
+                          </div>
+                        </div>
+                      )}
                       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                         <div>
                           <span className="text-2xl font-extrabold text-gray-900">
@@ -809,19 +871,30 @@ const EntertainmentLandingPage = () => {
                           <span className="text-gray-400 text-xs ml-1">/ person</span>
                         </div>
                         <button
+                          disabled={!attractionAvailable}
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleBuyTickets(attraction);
+                            if (attractionAvailable) handleBuyTickets(attraction);
                           }}
-                          className="bg-violet-600 hover:bg-violet-700 text-white px-5 py-2.5 font-semibold rounded-lg transition-all flex items-center justify-center gap-2 text-sm shadow-md hover:shadow-lg"
+                          className={`px-5 py-2.5 font-semibold rounded-lg transition-all flex items-center justify-center gap-2 text-sm ${
+                            attractionAvailable
+                              ? 'bg-violet-600 hover:bg-violet-700 text-white shadow-md hover:shadow-lg cursor-pointer'
+                              : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                          }`}
                         >
                           <Ticket size={15} />
-                          Buy Tickets
+                          {attractionAvailable
+                            ? 'Buy Tickets'
+                            : nextSession && !nextSession.isActive
+                              ? `Opens ${nextSession.label.startsWith('Today') ? nextSession.startTime : nextSession.label}`
+                              : 'Unavailable'
+                          }
                         </button>
                       </div>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </section>
@@ -909,34 +982,78 @@ const EntertainmentLandingPage = () => {
                 </div>
               </div>
 
-              {/* Availability Schedule */}
+              {/* Availability Schedule & Upcoming Sessions */}
               <div className="mb-5">
                 <h3 className="text-sm font-bold text-gray-900 mb-2 flex items-center gap-1.5">
                   <Calendar size={14} className="text-blue-800" />
                   Availability
                 </h3>
                 {selectedAttraction.availability && Array.isArray(selectedAttraction.availability) && selectedAttraction.availability.length > 0 ? (
-                  <div className="space-y-2">
-                    {selectedAttraction.availability.map((schedule, index) => (
-                      schedule.days && Array.isArray(schedule.days) && schedule.days.length > 0 ? (
-                        <div key={index} className="bg-blue-50/60 border border-blue-100 p-3 rounded-xl">
-                          <div className="flex flex-wrap gap-1 mb-2">
-                            {schedule.days.map((day) => (
-                              <span key={day} className="px-2 py-0.5 bg-blue-800 text-white text-xs font-medium capitalize rounded-md">
-                                {day.substring(0, 3)}
+                  <>
+                    {/* Weekly schedule pattern */}
+                    <div className="space-y-2 mb-4">
+                      {selectedAttraction.availability.map((schedule, index) => (
+                        schedule.days && Array.isArray(schedule.days) && schedule.days.length > 0 ? (
+                          <div key={index} className="bg-blue-50/60 border border-blue-100 p-3 rounded-xl">
+                            <div className="flex flex-wrap gap-1 mb-2">
+                              {schedule.days.map((day) => (
+                                <span key={day} className="px-2 py-0.5 bg-blue-800 text-white text-xs font-medium capitalize rounded-md">
+                                  {day.substring(0, 3)}
+                                </span>
+                              ))}
+                            </div>
+                            <div className="flex items-center gap-1.5 text-xs text-gray-600">
+                              <Clock size={12} className="text-blue-600" />
+                              <span className="font-medium">
+                                {formatTime(schedule.start_time)} - {formatTime(schedule.end_time)}
                               </span>
+                            </div>
+                          </div>
+                        ) : null
+                      ))}
+                    </div>
+
+                    {/* Upcoming Sessions */}
+                    {(() => {
+                      const sessions = getUpcomingAttractionSessions(selectedAttraction.availability, 5);
+                      if (sessions.length === 0) return null;
+                      return (
+                        <div>
+                          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Upcoming Sessions ({easternTimeAbbr})</p>
+                          <div className="space-y-1.5">
+                            {sessions.map((session, idx) => (
+                              <div
+                                key={idx}
+                                className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs ${
+                                  session.hasEnded
+                                    ? 'bg-gray-50 text-gray-400 line-through'
+                                    : session.isToday && session.hasStarted
+                                      ? 'bg-emerald-50 border border-emerald-200 text-gray-700'
+                                      : session.isToday && !session.hasStarted
+                                        ? 'bg-blue-50 border border-blue-100 text-gray-700'
+                                        : 'bg-gray-50 text-gray-600'
+                                }`}
+                              >
+                                <span className="font-semibold">
+                                  {session.label}
+                                  {session.isToday && session.hasStarted && !session.hasEnded && (
+                                    <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-full uppercase">Now</span>
+                                  )}
+                                  {session.isToday && !session.hasStarted && !session.hasEnded && (
+                                    <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-bold rounded-full uppercase">Soon</span>
+                                  )}
+                                  {session.hasEnded && (
+                                    <span className="ml-1.5 text-[10px] text-gray-400 font-normal no-underline" style={{ textDecoration: 'none' }}>Ended</span>
+                                  )}
+                                </span>
+                                <span className="font-medium">{session.startTime} – {session.endTime}</span>
+                              </div>
                             ))}
                           </div>
-                          <div className="flex items-center gap-1.5 text-xs text-gray-600">
-                            <Clock size={12} className="text-blue-600" />
-                            <span className="font-medium">
-                              {formatTime(schedule.start_time)} - {formatTime(schedule.end_time)}
-                            </span>
-                          </div>
                         </div>
-                      ) : null
-                    ))}
-                  </div>
+                      );
+                    })()}
+                  </>
                 ) : (
                   <div className="bg-gray-50 p-3 rounded-xl">
                     <p className="text-xs text-gray-400">Contact location for availability details.</p>
@@ -959,15 +1076,55 @@ const EntertainmentLandingPage = () => {
 
               {/* Action Buttons */}
               <div className="space-y-2.5">
+                {(() => {
+                  const next = getNextAvailableSession(selectedAttraction.availability);
+                  if (!hasAvailableUpcomingSessions(selectedAttraction.availability)) {
+                    if (next && !next.isActive) {
+                      return (
+                        <div className={`flex items-center gap-2 px-3 py-2.5 rounded-xl ${
+                          next.label.startsWith('Today')
+                            ? 'bg-amber-50 border border-amber-200'
+                            : 'bg-gray-50 border border-gray-200'
+                        }`}>
+                          <Clock size={13} className="text-amber-600 flex-shrink-0" />
+                          <span className="text-xs text-amber-700 font-medium">
+                            Tickets available {next.label.startsWith('Today') ? 'from' : 'on'} {next.label.startsWith('Today') ? '' : next.label + ' · '}{next.startTime} – {next.endTime}
+                          </span>
+                        </div>
+                      );
+                    }
+                    return (
+                      <div className="flex items-center gap-2 px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl">
+                        <span className="text-xs text-gray-500 font-medium">No upcoming sessions available.</span>
+                      </div>
+                    );
+                  }
+                  if (next && next.isActive) {
+                    return (
+                      <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-50 border border-emerald-200">
+                        <Clock size={13} className="text-emerald-600" />
+                        <span className="text-xs font-semibold text-emerald-700">
+                          Open now · {next.startTime} – {next.endTime}
+                        </span>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
                 <button
+                  disabled={!hasAvailableUpcomingSessions(selectedAttraction.availability)}
                   onClick={(e) => {
                     e.stopPropagation();
-                    handleBuyTickets(selectedAttraction);
+                    if (hasAvailableUpcomingSessions(selectedAttraction.availability)) handleBuyTickets(selectedAttraction);
                   }}
-                  className="w-full py-3 bg-gradient-to-r from-blue-800 to-blue-700 text-white font-semibold text-sm rounded-xl hover:from-blue-900 hover:to-blue-800 transition-all flex items-center justify-center gap-2 shadow-md hover:shadow-lg"
+                  className={`w-full py-3 font-semibold text-sm rounded-xl transition-all flex items-center justify-center gap-2 ${
+                    hasAvailableUpcomingSessions(selectedAttraction.availability)
+                      ? 'bg-gradient-to-r from-blue-800 to-blue-700 text-white hover:from-blue-900 hover:to-blue-800 shadow-md hover:shadow-lg cursor-pointer'
+                      : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                  }`}
                 >
                   <Ticket size={16} />
-                  Buy Tickets
+                  {hasAvailableUpcomingSessions(selectedAttraction.availability) ? 'Buy Tickets' : 'Tickets Not Available'}
                 </button>
                 <button
                   onClick={(e) => {
@@ -1076,34 +1233,78 @@ const EntertainmentLandingPage = () => {
                 </div>
               )}
 
-              {/* Availability Schedule */}
+              {/* Availability Schedule & Upcoming Sessions */}
               <div className="mb-5">
                 <h3 className="text-sm font-bold text-gray-900 mb-2 flex items-center gap-1.5">
                   <Calendar size={14} className="text-blue-800" />
                   Availability
                 </h3>
                 {selectedPackage.availability_schedules && Array.isArray(selectedPackage.availability_schedules) && selectedPackage.availability_schedules.length > 0 ? (
-                  <div className="space-y-2">
-                    {selectedPackage.availability_schedules.map((schedule, index) => (
-                      schedule.day_configuration && Array.isArray(schedule.day_configuration) && schedule.day_configuration.length > 0 ? (
-                        <div key={index} className="bg-blue-50/60 border border-blue-100 p-3 rounded-xl">
-                          <div className="flex flex-wrap gap-1 mb-2">
-                            {schedule.day_configuration.map((day) => (
-                              <span key={day} className="px-2 py-0.5 bg-blue-800 text-white text-xs font-medium capitalize rounded-md">
-                                {day.substring(0, 3)}
+                  <>
+                    {/* Weekly schedule pattern */}
+                    <div className="space-y-2 mb-4">
+                      {selectedPackage.availability_schedules.map((schedule, index) => (
+                        schedule.day_configuration && Array.isArray(schedule.day_configuration) && schedule.day_configuration.length > 0 ? (
+                          <div key={index} className="bg-blue-50/60 border border-blue-100 p-3 rounded-xl">
+                            <div className="flex flex-wrap gap-1 mb-2">
+                              {schedule.day_configuration.map((day) => (
+                                <span key={day} className="px-2 py-0.5 bg-blue-800 text-white text-xs font-medium capitalize rounded-md">
+                                  {day.substring(0, 3)}
+                                </span>
+                              ))}
+                            </div>
+                            <div className="flex items-center gap-1.5 text-xs text-gray-600">
+                              <Clock size={12} className="text-blue-600" />
+                              <span className="font-medium">
+                                {formatTime(schedule.time_slot_start)} - {formatTime(schedule.time_slot_end)}
                               </span>
+                            </div>
+                          </div>
+                        ) : null
+                      ))}
+                    </div>
+
+                    {/* Upcoming Sessions */}
+                    {(() => {
+                      const sessions = getUpcomingPackageSessions(selectedPackage.availability_schedules!, 5);
+                      if (sessions.length === 0) return null;
+                      return (
+                        <div>
+                          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Upcoming Sessions ({easternTimeAbbr})</p>
+                          <div className="space-y-1.5">
+                            {sessions.map((session, idx) => (
+                              <div
+                                key={idx}
+                                className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs ${
+                                  session.hasEnded
+                                    ? 'bg-gray-50 text-gray-400 line-through'
+                                    : session.isToday && session.hasStarted
+                                      ? 'bg-emerald-50 border border-emerald-200 text-gray-700'
+                                      : session.isToday && !session.hasStarted
+                                        ? 'bg-blue-50 border border-blue-100 text-gray-700'
+                                        : 'bg-gray-50 text-gray-600'
+                                }`}
+                              >
+                                <span className="font-semibold">
+                                  {session.label}
+                                  {session.isToday && session.hasStarted && !session.hasEnded && (
+                                    <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-full uppercase">Now</span>
+                                  )}
+                                  {session.isToday && !session.hasStarted && !session.hasEnded && (
+                                    <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-bold rounded-full uppercase">Soon</span>
+                                  )}
+                                  {session.hasEnded && (
+                                    <span className="ml-1.5 text-[10px] text-gray-400 font-normal no-underline" style={{ textDecoration: 'none' }}>Ended</span>
+                                  )}
+                                </span>
+                                <span className="font-medium">{session.startTime} – {session.endTime}</span>
+                              </div>
                             ))}
                           </div>
-                          <div className="flex items-center gap-1.5 text-xs text-gray-600">
-                            <Clock size={12} className="text-blue-600" />
-                            <span className="font-medium">
-                              {formatTime(schedule.time_slot_start)} - {formatTime(schedule.time_slot_end)}
-                            </span>
-                          </div>
                         </div>
-                      ) : null
-                    ))}
-                  </div>
+                      );
+                    })()}
+                  </>
                 ) : (
                   <div className="bg-gray-50 p-3 rounded-xl">
                     <p className="text-xs text-gray-400">Contact location for availability details.</p>
