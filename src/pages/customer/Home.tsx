@@ -134,7 +134,6 @@ const EntertainmentLandingPage = () => {
             price_per_additional: pkg.price_per_additional,
           };
         });
-        console.log(transformedPackages);
         setPackages(transformedPackages);
       }
     } catch (error) {
