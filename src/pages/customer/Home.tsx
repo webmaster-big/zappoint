@@ -19,6 +19,7 @@ import { customerService, type GroupedAttraction, type GroupedPackage } from '..
 import { ASSET_URL } from '../../utils/storage';
 import { generateSlug, generateLocationSlug } from '../../utils/slug';
 import { convertTo12Hour, formatDurationDisplay, getUpcomingAttractionSessions, getUpcomingPackageSessions } from '../../utils/timeFormat';
+import LoadingSpinner from '../../components/ui/LoadingSpinner';
 
 const EntertainmentLandingPage = () => {
   const [selectedLocation, setSelectedLocation] = useState('All Locations');
@@ -289,26 +290,7 @@ const EntertainmentLandingPage = () => {
 
   // Full-page loader — don't render anything until data is ready
   if (loading) {
-    return (
-      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-gradient-to-br from-blue-950 via-blue-900 to-violet-900">
-        {/* Logo */}
-        <div className="mb-10">
-          <img src="/Zap-Zone.png" alt="Zap Zone" className="w-40 md:w-52 opacity-90" />
-        </div>
-
-        {/* Animated ring */}
-        <div className="relative flex items-center justify-center mb-8">
-          <div className="w-20 h-20 rounded-full border-4 border-white/10"></div>
-          <div className="absolute w-20 h-20 rounded-full border-4 border-t-violet-400 border-r-blue-400 border-b-transparent border-l-transparent animate-spin"></div>
-          <div className="absolute w-12 h-12 rounded-full border-4 border-t-transparent border-r-transparent border-b-white/40 border-l-white/40 animate-spin" style={{animationDuration:'1.4s',animationDirection:'reverse'}}></div>
-        </div>
-
-        {/* Text */}
-        <p className="text-white/80 text-sm font-semibold tracking-widest uppercase animate-pulse">
-          Loading experiences...
-        </p>
-      </div>
-    );
+    return <LoadingSpinner fullScreen message="Loading experiences..." />;
   }
 
   return (
