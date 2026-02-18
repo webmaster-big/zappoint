@@ -6,7 +6,11 @@ import {
   Plus,
   Minus,
   Search,
-  X
+  X,
+  Tag,
+  Calendar,
+  Banknote,
+  Mail
 } from 'lucide-react';
 import { formatDurationDisplay } from '../../../utils/timeFormat';
 import { useThemeColor } from '../../../hooks/useThemeColor';
@@ -29,6 +33,8 @@ import type { FeeBreakdown } from '../../../types/FeeSupport.types';
 import PriceBreakdownDisplay from '../../../components/ui/PriceBreakdownDisplay';
 import { specialPricingService } from '../../../services/SpecialPricingService';
 import type { SpecialPricingBreakdown } from '../../../types/SpecialPricing.types';
+import { dayOffService, type DayOff } from '../../../services/DayOffService';
+import ScheduleCalendar from '../../../components/ui/ScheduleCalendar';
 
 const CreatePurchase = () => {
   const { themeColor, fullColor } = useThemeColor();
@@ -71,6 +77,12 @@ const CreatePurchase = () => {
   const [sendEmail, setSendEmail] = useState(true);
   const [feeBreakdown, setFeeBreakdown] = useState<FeeBreakdown | null>(null);
   const [specialPricingBreakdown, setSpecialPricingBreakdown] = useState<SpecialPricingBreakdown | null>(null);
+  
+  // Schedule state
+  const [scheduledDate, setScheduledDate] = useState<string>('');
+  const [scheduledTime, setScheduledTime] = useState<string>('');
+  const [availableTimeSlots, setAvailableTimeSlots] = useState<string[]>([]);
+  const [dayOffDates, setDayOffDates] = useState<Set<string>>(new Set());
   
   const currentUser = getStoredUser();
   const isCompanyAdmin = currentUser?.role === 'company_admin';
@@ -127,7 +139,7 @@ const CreatePurchase = () => {
             images: attr.image ? (Array.isArray(attr.image) ? attr.image : [attr.image]) : [],
             status: attr.is_active ? 'active' : 'inactive',
             createdAt: attr.created_at,
-            availability: typeof attr.availability === 'object' ? attr.availability as Record<string, boolean> : {},
+            availability: (attr.availability || {}) as CreatePurchaseAttraction['availability'],
           }));
           
           setAttractions(convertedAttractions);
@@ -172,7 +184,7 @@ const CreatePurchase = () => {
           images: attr.image ? (Array.isArray(attr.image) ? attr.image : [attr.image]) : [],
           status: attr.is_active ? 'active' : 'inactive',
           createdAt: attr.created_at,
-          availability: typeof attr.availability === 'object' ? attr.availability as Record<string, boolean> : {},
+          availability: (attr.availability || {}) as CreatePurchaseAttraction['availability'],
         }));
         
         setAttractions(convertedAttractions);
@@ -389,7 +401,96 @@ const CreatePurchase = () => {
     setSelectedAttraction(attraction);
     setQuantity(1);
     setDiscount(0);
+    setScheduledDate('');
+    setScheduledTime('');
   };
+
+  // --- Schedule picker helpers ---
+  const dayNumberToName = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+  const getAttractionAvailability = (): Array<{ days: string[]; start_time: string; end_time: string }> => {
+    if (!selectedAttraction) return [];
+    const raw = selectedAttraction.availability;
+    if (Array.isArray(raw)) return raw as Array<{ days: string[]; start_time: string; end_time: string }>;
+    if (typeof raw === 'object' && raw !== null) {
+      const enabledDays = Object.entries(raw).filter(([, v]) => v).map(([d]) => d.toLowerCase());
+      if (enabledDays.length === 0) return [];
+      return [{ days: enabledDays, start_time: '09:00', end_time: '17:00' }];
+    }
+    return [];
+  };
+
+  const generateTimeSlots = (startTime: string, endTime: string, intervalMinutes: number = 60): string[] => {
+    const slots: string[] = [];
+    const [sH, sM] = startTime.split(':').map(Number);
+    const [eH, eM] = endTime.split(':').map(Number);
+    let cur = sH * 60 + sM;
+    const end = eH * 60 + eM;
+    while (cur < end) {
+      const h = Math.floor(cur / 60);
+      const m = cur % 60;
+      slots.push(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`);
+      cur += intervalMinutes;
+    }
+    return slots;
+  };
+
+  // Fetch day-offs for the selected attraction's location
+  useEffect(() => {
+    const fetchDayOffs = async () => {
+      if (!selectedAttraction) {
+        setDayOffDates(new Set());
+        return;
+      }
+      const locationId = selectedAttraction.locationId || selectedLocation;
+      if (!locationId) return;
+      try {
+        const response = await dayOffService.getDayOffsByLocation(locationId);
+        if (response.success && response.data) {
+          const blocked = new Set<string>();
+          const now = new Date();
+          now.setHours(0, 0, 0, 0);
+          response.data.forEach((dayOff: DayOff) => {
+            const offDate = new Date(dayOff.date);
+            const hasTimeRestriction = dayOff.time_start || dayOff.time_end;
+            if (hasTimeRestriction) return;
+            if (dayOff.is_recurring) {
+              const currYear = new Date(now.getFullYear(), offDate.getMonth(), offDate.getDate());
+              const nextYear = new Date(now.getFullYear() + 1, offDate.getMonth(), offDate.getDate());
+              if (currYear >= now) blocked.add(currYear.toISOString().split('T')[0]);
+              blocked.add(nextYear.toISOString().split('T')[0]);
+            } else {
+              if (offDate >= now) blocked.add(dayOff.date);
+            }
+          });
+          setDayOffDates(blocked);
+        }
+      } catch {
+        // Day-off fetch failed — proceed without blocking
+      }
+    };
+    fetchDayOffs();
+  }, [selectedAttraction, selectedLocation]);
+
+  // Update available time slots when date changes
+  useEffect(() => {
+    if (!scheduledDate || !selectedAttraction) {
+      setAvailableTimeSlots([]);
+      return;
+    }
+    const date = new Date(scheduledDate + 'T00:00:00');
+    const dayName = dayNumberToName[date.getDay()].toLowerCase();
+    const availability = getAttractionAvailability();
+    const daySlot = availability.find(slot => slot.days.map(d => d.toLowerCase()).includes(dayName));
+    if (daySlot) {
+      const slots = generateTimeSlots(daySlot.start_time, daySlot.end_time, 60);
+      setAvailableTimeSlots(slots);
+      if (!slots.includes(scheduledTime)) setScheduledTime('');
+    } else {
+      setAvailableTimeSlots([]);
+      setScheduledTime('');
+    }
+  }, [scheduledDate, selectedAttraction]);
 
   const handleCompletePurchase = async () => {
     if (!selectedAttraction) return;
@@ -439,6 +540,8 @@ const CreatePurchase = () => {
         payment_method: paymentMethod as 'card' | 'in-store' | 'paylater' | 'authorize.net',
         location_id: selectedAttraction.locationId || 1,
         purchase_date: new Date().toISOString().split('T')[0],
+        scheduled_date: scheduledDate || undefined,
+        scheduled_time: scheduledTime || undefined,
         notes: notes || `Attraction Purchase: ${selectedAttraction.name} (${quantity} ticket${quantity > 1 ? 's' : ''})`,
         send_email: sendEmail,
       };
@@ -590,6 +693,8 @@ const CreatePurchase = () => {
       setPaymentError('');
       setUseAuthorizeNet(true);
       setSendEmail(true);
+      setScheduledDate('');
+      setScheduledTime('');
 
     } catch (error: any) {
       setPaymentError(error.message || 'Payment processing failed. Please try again.');
@@ -640,9 +745,10 @@ const CreatePurchase = () => {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Column - Attraction Selection */}
-          <div className="lg:col-span-2">
-            <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+          {/* Left Column - All Form Sections */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* 1. Select Attraction */}
+            <div className="bg-white rounded-lg shadow-sm p-6">
               <h2 className="text-lg font-semibold text-gray-800 mb-4">Select Attraction</h2>
               
               {/* Search */}
@@ -701,7 +807,7 @@ const CreatePurchase = () => {
               </div>
             </div>
 
-            {/* Customer Information */}
+            {/* 2. Customer Information */}
             <div className="bg-white rounded-lg shadow-sm p-6">
               <h2 className="text-lg font-semibold text-gray-800 mb-4">Customer Information</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -777,335 +883,371 @@ const CreatePurchase = () => {
                 </div>
               </div>
             </div>
-          </div>
 
-          {/* Right Column - Purchase Summary */}
-          <div className="lg:col-span-1">
-            <div className="bg-white rounded-lg shadow-sm p-6 sticky top-6">
-              <h2 className="text-lg font-semibold text-gray-800 mb-4">Purchase Summary</h2>
-              
-              {selectedAttraction ? (
-                <>
-                  {/* Selected Attraction */}
-                  <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-                    <div className="flex justify-between items-start mb-2">
-                      <h3 className="font-semibold text-gray-800">{selectedAttraction.name}</h3>
+            {/* 3. Purchase Details — only when attraction is selected */}
+            {selectedAttraction && (
+              <div className="bg-white rounded-lg shadow-sm p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <Tag className="h-5 w-5 text-gray-500" />
+                  <h2 className="text-lg font-semibold text-gray-800">Purchase Details</h2>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Quantity */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Quantity</label>
+                    <div className="flex items-center gap-2">
                       <StandardButton
                         variant="ghost"
                         size="sm"
-                        onClick={() => setSelectedAttraction(null)}
-                        icon={X}
+                        onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                        icon={Minus}
                       >
                         {''}
                       </StandardButton>
-                    </div>
-                    {/* Attraction Image */}
-                    <div className="mb-3 w-full flex justify-center">
-                      {selectedAttraction.images && selectedAttraction.images.length > 0 ? (
-                        <img src={ASSET_URL + selectedAttraction.images[0]}  alt={selectedAttraction.name} className="max-h-32 rounded-lg object-contain border border-gray-200" />
-                      ) : (
-                        <span className="text-gray-400 text-xs">No Image</span>
-                      )}
-                    </div>
-                    <p className="text-sm text-gray-600 mb-3">{selectedAttraction.category}</p>
-                    {/* Quantity Selector */}
-                    <div className="mb-4">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Quantity</label>
-                      <div className="flex items-center">
-                        <StandardButton
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                          icon={Minus}
-                        >
-                          {''}
-                        </StandardButton>
-                        <span className="mx-3 font-semibold transition-all duration-300">{quantity}</span>
-                        <StandardButton
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setQuantity(quantity + 1)}
-                          icon={Plus}
-                        >
-                          {''}
-                        </StandardButton>
-                      </div>
-                      {/* Live subtotal preview */}
-                      <div className="mt-2 text-sm text-gray-600">
-                        ${selectedAttraction.price} × {quantity} = <span className="font-semibold text-gray-800 transition-all duration-300">${calculateSubtotal().toFixed(2)}</span>
-                      </div>
-                    </div>
-
-                    {/* Discount */}
-                    <div className="mb-4">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Discount ($)</label>
-                      <input
-                        type="number"
-                        min="0"
-                        max={calculateSubtotal()}
-                        value={discount}
-                        onChange={(e) => setDiscount(Number(e.target.value))}
-                        onWheel={(e) => (e.target as HTMLInputElement).blur()}
-                        className={`w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
-                      />
-                    </div>
-
-                    {/* Amount Paid */}
-                    <div className="mb-4">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Amount Paid {paymentMethod === 'paylater' && <span className="text-gray-500 text-xs">(Auto: $0.00)</span>}
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        max={calculateTotal()}
-                        value={paymentMethod === 'paylater' ? 0 : amountPaid}
-                        onChange={(e) => setAmountPaid(Number(e.target.value))}
-                        onWheel={(e) => (e.target as HTMLInputElement).blur()}
-                        disabled={paymentMethod === 'paylater'}
-                        className={`w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 ${paymentMethod === 'paylater' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-                        placeholder="0.00"
-                      />
-                    </div>
-
-                    {/* Notes */}
-                    <div className="mb-4">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Notes</label>
-                      <textarea
-                        value={notes}
-                        onChange={(e) => setNotes(e.target.value)}
-                        rows={2}
-                        className={`w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
-                        placeholder="Additional notes..."
-                      />
+                      <span className="w-10 text-center font-semibold text-lg">{quantity}</span>
+                      <StandardButton
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setQuantity(quantity + 1)}
+                        icon={Plus}
+                      >
+                        {''}
+                      </StandardButton>
+                      <span className="ml-2 text-sm text-gray-500">
+                        ${selectedAttraction.price} × {quantity} = <span className="font-semibold text-gray-800">${calculateSubtotal().toFixed(2)}</span>
+                      </span>
                     </div>
                   </div>
 
-                  {/* Payment Method */}
-                  <div className="mb-6">
-                    <h3 className="text-sm font-medium text-gray-700 mb-3">Payment Method</h3>
-                    <div className="grid grid-cols-3 gap-2">
-                      <StandardButton
-                        variant={paymentMethod === 'authorize.net' ? 'primary' : 'secondary'}
-                        size="md"
-                        onClick={() => setPaymentMethod('authorize.net')}
-                        icon={CreditCard}
-                      >
-                        Authorize.Net
-                      </StandardButton>
-                      
-                      <StandardButton
-                        variant={paymentMethod === 'in-store' ? 'primary' : 'secondary'}
-                        size="md"
-                        onClick={() => {
-                          setPaymentMethod('in-store');
-                          setAmountPaid(calculateTotal()); // Default to full payment for in-store
-                        }}
-                        icon={DollarSign}
-                      >
-                        In-Store
-                      </StandardButton>
-                      
-                      <button
-                        onClick={() => setPaymentMethod('paylater')}
-                        className={`p-3 border rounded-lg text-center transition-colors ${
-                          paymentMethod === 'paylater'
-                            ? `border-${themeColor}-500 bg-${themeColor}-50 text-${themeColor}-700`
-                            : 'border-gray-300 hover:border-gray-400'
-                        }`}
-                      >
-                        <svg className="h-5 w-5 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        <span className="text-sm">Pay Later</span>
-                      </button>
-                    </div>
+                  {/* Discount */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Discount ($)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      max={calculateSubtotal()}
+                      value={discount}
+                      onChange={(e) => setDiscount(Number(e.target.value))}
+                      onWheel={(e) => (e.target as HTMLInputElement).blur()}
+                      className={`w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
+                    />
                   </div>
 
-                  {/* Pay Later Notice */}
-                  {paymentMethod === 'paylater' && (
-                    <div className="mb-6 p-4 bg-orange-50 rounded-lg border border-orange-200">
-                      <div className="flex items-start gap-2">
-                        <svg className="w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                        </svg>
-                        <div>
-                          <p className="text-sm font-medium text-orange-800">Payment will be collected later</p>
-                          <p className="text-xs text-orange-700 mt-1">No payment is being processed now. Customer will pay at a later time.</p>
-                        </div>
+                  {/* Amount Paid */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Amount Paid {paymentMethod === 'paylater' && <span className="text-gray-500 text-xs">(Auto: $0.00)</span>}
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      max={calculateTotal()}
+                      value={paymentMethod === 'paylater' ? 0 : amountPaid}
+                      onChange={(e) => setAmountPaid(Number(e.target.value))}
+                      onWheel={(e) => (e.target as HTMLInputElement).blur()}
+                      disabled={paymentMethod === 'paylater'}
+                      className={`w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 ${paymentMethod === 'paylater' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                      placeholder="0.00"
+                    />
+                  </div>
+
+                  {/* Notes */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Notes</label>
+                    <textarea
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      rows={2}
+                      className={`w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
+                      placeholder="Additional notes..."
+                    />
+                  </div>
+                </div>
+
+                {/* Schedule Selection (full width below grid) */}
+                {getAttractionAvailability().length > 0 && (
+                  <div className="mt-6 pt-5 border-t border-gray-100">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Calendar className="h-4 w-4 text-gray-500" />
+                      <h3 className="text-sm font-medium text-gray-700">Schedule</h3>
+                    </div>
+                    <ScheduleCalendar
+                      availability={getAttractionAvailability()}
+                      dayOffDates={dayOffDates}
+                      scheduledDate={scheduledDate}
+                      scheduledTime={scheduledTime}
+                      availableTimeSlots={availableTimeSlots}
+                      onDateSelect={(dateStr) => setScheduledDate(dateStr)}
+                      onTimeSelect={(time) => setScheduledTime(time)}
+                      themeColor={themeColor}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 4. Payment Method — only when attraction is selected */}
+            {selectedAttraction && (
+              <div className="bg-white rounded-lg shadow-sm p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <Banknote className="h-5 w-5 text-gray-500" />
+                  <h2 className="text-lg font-semibold text-gray-800">Payment</h2>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 mb-4">
+                  <StandardButton
+                    variant={paymentMethod === 'authorize.net' ? 'primary' : 'secondary'}
+                    size="md"
+                    onClick={() => setPaymentMethod('authorize.net')}
+                    icon={CreditCard}
+                  >
+                    Authorize.Net
+                  </StandardButton>
+                  
+                  <StandardButton
+                    variant={paymentMethod === 'in-store' ? 'primary' : 'secondary'}
+                    size="md"
+                    onClick={() => {
+                      setPaymentMethod('in-store');
+                      setAmountPaid(calculateTotal());
+                    }}
+                    icon={DollarSign}
+                  >
+                    In-Store
+                  </StandardButton>
+                  
+                  <button
+                    onClick={() => setPaymentMethod('paylater')}
+                    className={`p-3 border rounded-lg text-center transition-colors ${
+                      paymentMethod === 'paylater'
+                        ? `border-${themeColor}-500 bg-${themeColor}-50 text-${themeColor}-700`
+                        : 'border-gray-300 hover:border-gray-400'
+                    }`}
+                  >
+                    <svg className="h-5 w-5 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span className="text-sm">Pay Later</span>
+                  </button>
+                </div>
+
+                {/* Pay Later Notice */}
+                {paymentMethod === 'paylater' && (
+                  <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
+                    <div className="flex items-start gap-2">
+                      <svg className="w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                      </svg>
+                      <div>
+                        <p className="text-sm font-medium text-orange-800">Payment will be collected later</p>
+                        <p className="text-xs text-orange-700 mt-1">No payment is being processed now. Customer will pay at a later time.</p>
                       </div>
                     </div>
-                  )}
+                  </div>
+                )}
 
-                  {/* Card Payment Form - Show when authorize.net is selected */}
-                  {paymentMethod === 'authorize.net' && (
-                    <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                      <h3 className="text-sm font-medium text-gray-700 mb-3">Card Details</h3>
-                      
-                      {/* Card Number */}
-                      <div className="mb-3">
-                        <label className="block text-xs font-medium text-gray-700 mb-1">Card Number</label>
-                        <div className="relative">
-                          <input
-                            type="text"
-                            value={cardNumber}
-                            onChange={handleCardNumberChange}
-                            placeholder="1234 5678 9012 3456"
-                            className={`w-full rounded-lg border px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 ${
-                              cardNumber && validateCardNumber(cardNumber)
-                                ? 'border-green-400 bg-green-50'
-                                : cardNumber
-                                ? 'border-red-400'
-                                : 'border-gray-300'
-                            }`}
-                            maxLength={19}
-                            disabled={isProcessingPayment}
-                          />
-                          {cardNumber && validateCardNumber(cardNumber) && (
-                            <div className="absolute right-2 top-1/2 -translate-y-1/2">
-                              <svg className="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path>
-                              </svg>
-                            </div>
-                          )}
-                        </div>
-                        {cardNumber && (
-                          <p className="text-xs mt-1 text-gray-600">{getCardType(cardNumber)}</p>
+                {/* Card Payment Form */}
+                {paymentMethod === 'authorize.net' && (
+                  <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <h3 className="text-sm font-medium text-gray-700 mb-3">Card Details</h3>
+                    
+                    {/* Card Number */}
+                    <div className="mb-3">
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Card Number</label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={cardNumber}
+                          onChange={handleCardNumberChange}
+                          placeholder="1234 5678 9012 3456"
+                          className={`w-full rounded-lg border px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 ${
+                            cardNumber && validateCardNumber(cardNumber)
+                              ? 'border-green-400 bg-green-50'
+                              : cardNumber
+                              ? 'border-red-400'
+                              : 'border-gray-300'
+                          }`}
+                          maxLength={19}
+                          disabled={isProcessingPayment}
+                        />
+                        {cardNumber && validateCardNumber(cardNumber) && (
+                          <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                            <svg className="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path>
+                            </svg>
+                          </div>
                         )}
                       </div>
-                      
-                      {/* Expiration and CVV */}
-                      <div className="grid grid-cols-3 gap-2">
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">Month</label>
-                          <select
-                            value={cardMonth}
-                            onChange={(e) => setCardMonth(e.target.value)}
-                            className={`w-full rounded-lg border border-gray-300 px-2 py-2 text-sm focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
-                            disabled={isProcessingPayment}
-                          >
-                            <option value="">MM</option>
-                            {Array.from({ length: 12 }, (_, i) => {
-                              const month = (i + 1).toString().padStart(2, '0');
-                              return <option key={month} value={month}>{month}</option>;
-                            })}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">Year</label>
-                          <select
-                            value={cardYear}
-                            onChange={(e) => setCardYear(e.target.value)}
-                            className={`w-full rounded-lg border border-gray-300 px-2 py-2 text-sm focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
-                            disabled={isProcessingPayment}
-                          >
-                            <option value="">YYYY</option>
-                            {Array.from({ length: 10 }, (_, i) => {
-                              const year = (new Date().getFullYear() + i).toString();
-                              return <option key={year} value={year}>{year}</option>;
-                            })}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">CVV</label>
-                          <input
-                            type="text"
-                            value={cardCVV}
-                            onChange={(e) => {
-                              const value = e.target.value.replace(/\\D/g, '');
-                              if (value.length <= 4) {
-                                setCardCVV(value);
-                              }
-                            }}
-                            placeholder="123"
-                            className={`w-full rounded-lg border border-gray-300 px-2 py-2 text-sm font-mono focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
-                            maxLength={4}
-                            disabled={isProcessingPayment}
-                          />
-                        </div>
-                      </div>
-                      
-                      {/* Error Message */}
-                      {paymentError && (
-                        <div className="mt-3 bg-red-50 border border-red-200 rounded-lg p-2 text-xs text-red-800">
-                          {paymentError}
-                        </div>
+                      {cardNumber && (
+                        <p className="text-xs mt-1 text-gray-600">{getCardType(cardNumber)}</p>
                       )}
-                      
-                          {/* Security Notice */}
-                          <div className="mt-3 flex items-start gap-2 text-xs text-gray-600">
-                            <svg className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd"></path>
-                            </svg>
-                            <span>Secure payment powered by Authorize.Net</span>
-                          </div>
                     </div>
-                  )}
+                    
+                    {/* Expiration and CVV */}
+                    <div className="grid grid-cols-3 gap-2">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Month</label>
+                        <select
+                          value={cardMonth}
+                          onChange={(e) => setCardMonth(e.target.value)}
+                          className={`w-full rounded-lg border border-gray-300 px-2 py-2 text-sm focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
+                          disabled={isProcessingPayment}
+                        >
+                          <option value="">MM</option>
+                          {Array.from({ length: 12 }, (_, i) => {
+                            const month = (i + 1).toString().padStart(2, '0');
+                            return <option key={month} value={month}>{month}</option>;
+                          })}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Year</label>
+                        <select
+                          value={cardYear}
+                          onChange={(e) => setCardYear(e.target.value)}
+                          className={`w-full rounded-lg border border-gray-300 px-2 py-2 text-sm focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
+                          disabled={isProcessingPayment}
+                        >
+                          <option value="">YYYY</option>
+                          {Array.from({ length: 10 }, (_, i) => {
+                            const year = (new Date().getFullYear() + i).toString();
+                            return <option key={year} value={year}>{year}</option>;
+                          })}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">CVV</label>
+                        <input
+                          type="text"
+                          value={cardCVV}
+                          onChange={(e) => {
+                            const value = e.target.value.replace(/\\D/g, '');
+                            if (value.length <= 4) {
+                              setCardCVV(value);
+                            }
+                          }}
+                          placeholder="123"
+                          className={`w-full rounded-lg border border-gray-300 px-2 py-2 text-sm font-mono focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
+                          maxLength={4}
+                          disabled={isProcessingPayment}
+                        />
+                      </div>
+                    </div>
+                    
+                    {/* Error Message */}
+                    {paymentError && (
+                      <div className="mt-3 bg-red-50 border border-red-200 rounded-lg p-2 text-xs text-red-800">
+                        {paymentError}
+                      </div>
+                    )}
+                    
+                    {/* Security Notice */}
+                    <div className="mt-3 flex items-start gap-2 text-xs text-gray-600">
+                      <svg className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd"></path>
+                      </svg>
+                      <span>Secure payment powered by Authorize.Net</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
-                  {/* Pricing Breakdown */}
-                  <div className="border-t border-gray-200 pt-4 mb-6">
-                    <div className="flex justify-between mb-2">
-                      <span className="text-gray-600">Subtotal</span>
-                      <span className="font-medium transition-all duration-300">${calculateSubtotal().toFixed(2)}</span>
+          {/* Right Column - Compact Order Summary */}
+          <div className="lg:col-span-1">
+            <div className="bg-white rounded-lg shadow-sm p-6 sticky top-6">
+              <h2 className="text-lg font-semibold text-gray-800 mb-4">Order Summary</h2>
+              
+              {selectedAttraction ? (
+                <>
+                  {/* Selected Attraction Compact Card */}
+                  <div className="flex items-start gap-3 mb-4 p-3 bg-gray-50 rounded-lg">
+                    <div className="w-14 h-14 flex-shrink-0 rounded-md overflow-hidden bg-gray-100 border border-gray-200">
+                      {selectedAttraction.images && selectedAttraction.images.length > 0 ? (
+                        <img src={ASSET_URL + selectedAttraction.images[0]} alt={selectedAttraction.name} className="object-cover w-full h-full" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">N/A</div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-1">
+                        <h3 className="font-semibold text-gray-800 text-sm truncate">{selectedAttraction.name}</h3>
+                        <button onClick={() => setSelectedAttraction(null)} className="text-gray-400 hover:text-gray-600 flex-shrink-0 p-0.5">
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                      <p className="text-xs text-gray-500">{selectedAttraction.category}</p>
+                      <p className={`text-sm font-bold text-${themeColor}-600 mt-1`}>
+                        ${selectedAttraction.price}
+                        <span className="text-xs font-normal text-gray-500 ml-1">
+                          {selectedAttraction.pricingType === 'per_person' ? '/person' : 
+                           selectedAttraction.pricingType === 'per_group' ? '/group' : 
+                           selectedAttraction.pricingType === 'per_hour' ? '/hour' : ''}
+                        </span>
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Line Items */}
+                  <div className="space-y-2 text-sm mb-4">
+                    <div className="flex justify-between text-gray-600">
+                      <span>Qty: {quantity} × ${selectedAttraction.price}</span>
+                      <span className="font-medium">${calculateSubtotal().toFixed(2)}</span>
                     </div>
                     {discount > 0 && (
-                      <div className="flex justify-between mb-2 text-red-600 transition-all duration-300">
+                      <div className="flex justify-between text-red-600">
                         <span>Discount</span>
                         <span>-${discount.toFixed(2)}</span>
                       </div>
                     )}
-                    
-                    {/* Special pricing discount - automatic discounts based on date */}
                     {specialPricingBreakdown && specialPricingBreakdown.has_special_pricing && (
-                      <div className="pt-2 border-t border-dashed border-gray-200 mb-2">
+                      <>
                         {specialPricingBreakdown.discounts_applied.map((spDiscount, index) => (
-                          <div key={index} className="flex justify-between text-green-700 text-sm">
+                          <div key={index} className="flex justify-between text-green-700">
                             <span>{spDiscount.name}</span>
                             <span>-${spDiscount.discount_amount.toFixed(2)}</span>
                           </div>
                         ))}
-                      </div>
+                      </>
                     )}
-                    
-                    {/* Fee breakdown - only if fee supports exist */}
                     {feeBreakdown && feeBreakdown.fees.length > 0 && (
-                      <PriceBreakdownDisplay breakdown={feeBreakdown} compact className="mb-2" />
+                      <PriceBreakdownDisplay breakdown={feeBreakdown} compact className="!text-sm" />
                     )}
-                    
-                    <div className="flex justify-between font-bold text-lg mt-3 pt-3 border-t border-gray-200">
+                  </div>
+
+                  {/* Total */}
+                  <div className="border-t border-gray-200 pt-3 mb-4">
+                    <div className="flex justify-between font-bold text-lg">
                       <span>Total</span>
-                      <span className="transition-all duration-300">${finalTotal.toFixed(2)}</span>
+                      <span>${finalTotal.toFixed(2)}</span>
                     </div>
-                    
                     {paymentMethod === 'paylater' && (
-                      <div className="flex justify-between font-semibold text-md mt-2 pt-2 border-t border-dashed border-gray-300 text-orange-700">
+                      <div className="flex justify-between font-semibold text-sm mt-1 text-orange-700">
                         <span>Amount Due Now</span>
                         <span>$0.00</span>
                       </div>
                     )}
                   </div>
 
-                  {/* Send Email Receipt Checkbox */}
-                  <div className="mb-6">
-                    <label className="flex items-center space-x-3 cursor-pointer group">
+                  {/* Send Email Receipt */}
+                  <div className="mb-4">
+                    <label className="flex items-center gap-2 cursor-pointer group">
                       <input
                         type="checkbox"
                         checked={sendEmail}
                         onChange={(e) => setSendEmail(e.target.checked)}
                         className={`w-4 h-4 rounded border-gray-300 text-${themeColor}-600 focus:ring-${themeColor}-500 cursor-pointer`}
                       />
+                      <Mail className="h-3.5 w-3.5 text-gray-400" />
                       <span className="text-sm text-gray-700 group-hover:text-gray-900">
-                        Send email receipt to customer
+                        Send email receipt
                       </span>
                     </label>
-                    {!sendEmail && (
-                      <p className="text-xs text-gray-500 mt-1 ml-7">
-                        Customer will not receive a purchase confirmation email
-                      </p>
-                    )}
                   </div>
 
-                  {/* Complete Purchase Button */}
+                  {/* Complete Purchase */}
                   <StandardButton
                     variant="primary"
                     size="lg"

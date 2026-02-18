@@ -33,6 +33,8 @@ import type { FeeBreakdown } from '../../../types/FeeSupport.types';
 import PriceBreakdownDisplay from '../../../components/ui/PriceBreakdownDisplay';
 import { specialPricingService } from '../../../services/SpecialPricingService';
 import type { SpecialPricingBreakdown } from '../../../types/SpecialPricing.types';
+import { dayOffService, type DayOff } from '../../../services/DayOffService';
+import ScheduleCalendar from '../../../components/ui/ScheduleCalendar';
 
 // Helper function to parse payment errors into user-friendly messages
 const getPaymentErrorMessage = (error: any): string => {
@@ -181,6 +183,7 @@ const PurchaseAttraction = () => {
   const [showCountrySuggestions, setShowCountrySuggestions] = useState(false);
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [showMobileSummary, setShowMobileSummary] = useState(false);
 
   // Signature & Terms state
   const [signatureImage, setSignatureImage] = useState<string | null>(null);
@@ -188,6 +191,118 @@ const PurchaseAttraction = () => {
   const [signatureTermsErrors, setSignatureTermsErrors] = useState<Record<string, string>>({});
   const [feeBreakdown, setFeeBreakdown] = useState<FeeBreakdown | null>(null);
   const [specialPricingBreakdown, setSpecialPricingBreakdown] = useState<SpecialPricingBreakdown | null>(null);
+
+  // Scheduled date & time state
+  const [scheduledDate, setScheduledDate] = useState<string>('');
+  const [scheduledTime, setScheduledTime] = useState<string>('');
+  const [availableTimeSlots, setAvailableTimeSlots] = useState<string[]>([]);
+  const [dayOffDates, setDayOffDates] = useState<Set<string>>(new Set());
+
+  const dayNumberToName = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+  // Generate time slots from start to end time with given interval (in minutes)
+  const generateTimeSlots = (startTime: string, endTime: string, intervalMinutes: number = 60): string[] => {
+    const slots: string[] = [];
+    const [startHours, startMins] = startTime.split(':').map(Number);
+    const [endHours, endMins] = endTime.split(':').map(Number);
+    
+    let currentMinutes = startHours * 60 + startMins;
+    const endMinutes = endHours * 60 + endMins;
+    
+    while (currentMinutes < endMinutes) {
+      const hours = Math.floor(currentMinutes / 60);
+      const mins = currentMinutes % 60;
+      slots.push(`${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`);
+      currentMinutes += intervalMinutes;
+    }
+    
+    return slots;
+  };
+
+  // Get attraction availability as normalized array
+  // Backend format: { days: ["tuesday"], start_time: "16:00", end_time: "21:00" }
+  // Legacy format: { Monday: true, Tuesday: false, ... }
+  const getAttractionAvailability = (): Array<{ days: string[]; start_time: string; end_time: string }> => {
+    if (!attraction) return [];
+    
+    const rawAvailability = attraction.availability;
+    
+    // New array format: [{ days: ["tuesday"], start_time, end_time }]
+    if (Array.isArray(rawAvailability)) {
+      return rawAvailability as Array<{ days: string[]; start_time: string; end_time: string }>;
+    }
+    
+    // Legacy format: Record<string, boolean> → convert to array format with default times
+    if (typeof rawAvailability === 'object' && rawAvailability !== null) {
+      const enabledDays = Object.entries(rawAvailability)
+        .filter(([, isAvailable]) => isAvailable)
+        .map(([day]) => day.toLowerCase());
+      if (enabledDays.length === 0) return [];
+      return [{ days: enabledDays, start_time: '09:00', end_time: '17:00' }];
+    }
+    
+    return [];
+  };
+
+  // Update available time slots when scheduled date changes
+  useEffect(() => {
+    if (!scheduledDate || !attraction) {
+      setAvailableTimeSlots([]);
+      return;
+    }
+
+    const date = new Date(scheduledDate + 'T00:00:00');
+    const dayName = dayNumberToName[date.getDay()].toLowerCase();
+    const availability = getAttractionAvailability();
+    const dayAvailability = availability.find(slot => slot.days.map(d => d.toLowerCase()).includes(dayName));
+
+    if (dayAvailability) {
+      const slots = generateTimeSlots(dayAvailability.start_time, dayAvailability.end_time, 60);
+      setAvailableTimeSlots(slots);
+      // Reset selected time if not in available slots
+      if (!slots.includes(scheduledTime)) {
+        setScheduledTime('');
+      }
+    } else {
+      setAvailableTimeSlots([]);
+      setScheduledTime('');
+    }
+  }, [scheduledDate, attraction]);
+
+  // Fetch day-offs for the attraction's location
+  useEffect(() => {
+    const fetchDayOffs = async () => {
+      if (!attraction) return;
+      const locationId = attraction.locationId;
+      if (!locationId) return;
+      try {
+        const response = await dayOffService.getDayOffsByLocation(locationId);
+        if (response.success && response.data) {
+          const blocked = new Set<string>();
+          const now = new Date();
+          now.setHours(0, 0, 0, 0);
+          response.data.forEach((dayOff: DayOff) => {
+            const offDate = new Date(dayOff.date);
+            // Only full-day blocks (no time/package/room restrictions) apply to attractions
+            const hasTimeRestriction = dayOff.time_start || dayOff.time_end;
+            if (hasTimeRestriction) return;
+            if (dayOff.is_recurring) {
+              const currYear = new Date(now.getFullYear(), offDate.getMonth(), offDate.getDate());
+              const nextYear = new Date(now.getFullYear() + 1, offDate.getMonth(), offDate.getDate());
+              if (currYear >= now) blocked.add(currYear.toISOString().split('T')[0]);
+              blocked.add(nextYear.toISOString().split('T')[0]);
+            } else {
+              if (offDate >= now) blocked.add(dayOff.date);
+            }
+          });
+          setDayOffDates(blocked);
+        }
+      } catch {
+        // Day-off fetch failed — proceed without blocking
+      }
+    };
+    fetchDayOffs();
+  }, [attraction]);
 
   // Show account modal for non-logged-in users (optional, doesn't block access)
   useEffect(() => {
@@ -287,7 +402,7 @@ const PurchaseAttraction = () => {
           images: attr.image ? (Array.isArray(attr.image) ? attr.image.map(img => ASSET_URL + img) : [ASSET_URL + attr.image]) : [],
           status: attr.is_active ? 'active' : 'inactive',
           createdAt: attr.created_at,
-          availability: typeof attr.availability === 'object' ? attr.availability as Record<string, boolean> : {},
+          availability: (attr.availability as PurchaseAttractionAttraction['availability']) || {},
         };
         setAttraction(convertedAttraction);
       } catch {
@@ -551,6 +666,8 @@ const PurchaseAttraction = () => {
         payment_method: 'authorize.net' as 'card' | 'in-store' | 'paylater' | 'authorize.net',
         location_id: attraction.locationId || 1,
         purchase_date: new Date().toISOString().split('T')[0],
+        scheduled_date: scheduledDate || undefined,
+        scheduled_time: scheduledTime || undefined,
         notes: `Attraction Purchase: ${attraction.name} (${quantity} ticket${quantity > 1 ? 's' : ''})`,
       };
 
@@ -716,6 +833,20 @@ const PurchaseAttraction = () => {
         .animate-backdrop-fade {
           animation: backdrop-fade 0.2s ease-out;
         }
+        @keyframes mobile-summary-fade-in {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes mobile-summary-slide-in {
+          from { transform: translateX(-100%); }
+          to { transform: translateX(0); }
+        }
+        .animate-mobile-summary-fade-in {
+          animation: mobile-summary-fade-in 0.25s ease-out both;
+        }
+        .animate-mobile-summary-slide-in {
+          animation: mobile-summary-slide-in 0.3s cubic-bezier(0.32, 0.72, 0, 1) both;
+        }
       `}</style>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8">
@@ -801,6 +932,20 @@ const PurchaseAttraction = () => {
                       </button>
                     </div>
                   </div>
+
+                  {/* Schedule Selection */}
+                  {getAttractionAvailability().length > 0 && (
+                    <ScheduleCalendar
+                      availability={getAttractionAvailability()}
+                      dayOffDates={dayOffDates}
+                      scheduledDate={scheduledDate}
+                      scheduledTime={scheduledTime}
+                      availableTimeSlots={availableTimeSlots}
+                      onDateSelect={(dateStr) => setScheduledDate(dateStr)}
+                      onTimeSelect={(time) => setScheduledTime(time)}
+                      themeColor="blue"
+                    />
+                  )}
                   
                   <div className="flex justify-end">
                     <StandardButton
@@ -1410,8 +1555,8 @@ const PurchaseAttraction = () => {
             </div>
           </div>
 
-          {/* Right Column - Attraction Summary */}
-          <div className="lg:col-span-1">
+          {/* Right Column - Attraction Summary (hidden on mobile, shown on lg+) */}
+          <div className="lg:col-span-1 hidden lg:block">
             <div className="bg-white shadow-md rounded-2xl overflow-hidden lg:sticky lg:top-8">
               {/* Image Carousel */}
               {attraction.images && attraction.images.length > 0 && (
@@ -1611,6 +1756,177 @@ const PurchaseAttraction = () => {
           </div>
         </div>
       </div>
+
+      {/* Mobile Floating Summary Button — only visible below lg */}
+      <button
+        onClick={() => setShowMobileSummary(true)}
+        className="fixed top-4 left-4 z-40 lg:hidden bg-gradient-to-r from-blue-800 to-blue-900 text-white px-4 py-2.5 rounded-full shadow-lg flex items-center gap-2 hover:from-blue-900 hover:to-blue-950 active:scale-95 transition-all duration-200"
+        aria-label="View Order Summary"
+      >
+        <ShoppingCart className="w-4 h-4" />
+        <span className="text-sm font-medium">${total.toFixed(2)}</span>
+      </button>
+
+      {/* Mobile Order Summary Sidebar */}
+      {showMobileSummary && (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/50 animate-mobile-summary-fade-in"
+            onClick={() => setShowMobileSummary(false)}
+          />
+          {/* Slide-in Panel */}
+          <div className="absolute top-0 left-0 h-full w-[85vw] max-w-sm bg-white shadow-2xl animate-mobile-summary-slide-in overflow-y-auto rounded-r-2xl">
+            {/* Header */}
+            <div className="sticky top-0 bg-gradient-to-r from-blue-800 to-blue-900 px-4 py-4 flex items-center justify-between z-10 rounded-tr-2xl">
+              <h3 className="font-bold text-lg text-white">Order Summary</h3>
+              <button
+                onClick={() => setShowMobileSummary(false)}
+                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/20 transition-colors"
+                aria-label="Close order summary"
+              >
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Summary Content */}
+            <div className="p-4">
+              {/* Image */}
+              {attraction.images && attraction.images.length > 0 && (
+                <div className="relative h-48 rounded-xl overflow-hidden mb-4">
+                  <img
+                    src={attraction.images[0]}
+                    alt={attraction.name}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              )}
+
+              {/* Attraction Info */}
+              <div className="mb-4">
+                <h2 className="text-lg font-bold text-gray-900 mb-1">{attraction.name}</h2>
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                  <Tag className="h-3 w-3 mr-1" />
+                  {attraction.category}
+                </span>
+              </div>
+
+              {/* Details Grid */}
+              <div className="grid grid-cols-2 gap-3 mb-5">
+                <div className="flex items-start gap-2">
+                  <div className="p-2 bg-blue-50 rounded-xl">
+                    <MapPin className="h-4 w-4 text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-400">Location</p>
+                    <p className="text-sm font-medium text-gray-900">{attraction.location}</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2">
+                  <div className="p-2 bg-blue-50 rounded-xl">
+                    <Clock className="h-4 w-4 text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-400">Duration</p>
+                    <p className="text-sm font-medium text-gray-900">
+                      {attraction.duration === '0' || !attraction.duration ? 'Unlimited' : formatDurationDisplay(parseFloat(attraction.duration), attraction.durationUnit)}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2">
+                  <div className="p-2 bg-blue-50 rounded-xl">
+                    <Users className="h-4 w-4 text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-400">Capacity</p>
+                    <p className="text-sm font-medium text-gray-900">Up to {attraction.maxCapacity}</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2">
+                  <div className="p-2 bg-blue-50 rounded-xl">
+                    <DollarSign className="h-4 w-4 text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-400">Pricing</p>
+                    <p className="text-sm font-medium text-gray-900">
+                      {attraction.pricingType === 'per_person' ? 'Per Person' :
+                       attraction.pricingType === 'per_group' ? 'Per Group' :
+                       attraction.pricingType === 'per_hour' ? 'Per Hour' :
+                       attraction.pricingType === 'per_game' ? 'Per Game' : 'Fixed'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Order Summary Pricing */}
+              <div className="pt-4 border-t border-gray-100">
+                <h3 className="font-bold text-gray-900 mb-3 text-sm">Pricing</h3>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-gray-500">
+                      {attraction.pricingType === 'per_person' ? 'Per person' :
+                       attraction.pricingType === 'per_group' ? 'Per group' :
+                       attraction.pricingType === 'per_hour' ? 'Per hour' :
+                       attraction.pricingType === 'per_game' ? 'Per game' : 'Fixed price'}
+                    </span>
+                    <span className="font-medium text-sm">${Number(attraction.price).toFixed(2)}</span>
+                  </div>
+                  {currentStep >= 1 && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs text-gray-500">Quantity</span>
+                      <span className="font-medium text-sm">{quantity}</span>
+                    </div>
+                  )}
+                </div>
+
+                {specialPricingBreakdown && specialPricingBreakdown.has_special_pricing && (
+                  <div className="mt-3 space-y-1">
+                    {specialPricingBreakdown.discounts_applied.map((discount, index) => (
+                      <div key={index} className="flex justify-between text-green-600 text-sm">
+                        <span>{discount.name}</span>
+                        <span>-${discount.discount_amount.toFixed(2)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {feeBreakdown && feeBreakdown.fees.length > 0 && (
+                  <div className="mt-3 pt-1">
+                    <PriceBreakdownDisplay breakdown={feeBreakdown} compact />
+                  </div>
+                )}
+
+                <div className="bg-gradient-to-r from-blue-800 to-blue-900 rounded-xl p-3.5 mt-4">
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-white text-sm">Total</span>
+                    <span className="text-xl font-extrabold text-white">${total.toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Trust badges */}
+              <div className="mt-5 bg-gray-50 rounded-xl p-3">
+                <div className="flex items-center justify-around text-xs text-gray-500">
+                  <div className="text-center">
+                    <Shield className="h-4 w-4 mx-auto mb-1" />
+                    <span>Secure</span>
+                  </div>
+                  <div className="text-center">
+                    <Zap className="h-4 w-4 mx-auto mb-1" />
+                    <span>Instant</span>
+                  </div>
+                  <div className="text-center">
+                    <Star className="h-4 w-4 mx-auto mb-1" />
+                    <span>Best Price</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
 
 

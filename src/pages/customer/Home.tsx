@@ -287,33 +287,29 @@ const EntertainmentLandingPage = () => {
     return abbr;
   })();
 
-  // Returns true if the attraction has at least one upcoming session that hasn't ended yet.
-  // If there are no schedules configured, treat as always available.
-  // Returns true only when a session is currently in progress (started but not ended).
-  // If there are no schedules configured, treat as always available.
-  const hasAvailableUpcomingSessions = (
-    availability?: { days: string[]; start_time: string; end_time: string }[]
-  ): boolean => {
-    if (!availability || !Array.isArray(availability) || availability.length === 0) return true;
-    const sessions = getUpcomingAttractionSessions(availability, 20);
-    return sessions.some(s => s.isToday && s.hasStarted && !s.hasEnded);
-  };
+  // Full-page loader — don't render anything until data is ready
+  if (loading) {
+    return (
+      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-gradient-to-br from-blue-950 via-blue-900 to-violet-900">
+        {/* Logo */}
+        <div className="mb-10">
+          <img src="/Zap-Zone.png" alt="Zap Zone" className="w-40 md:w-52 opacity-90" />
+        </div>
 
-  // Returns the next session that hasn't started yet (for informational display).
-  // If a session is currently active, returns that session.
-  const getNextAvailableSession = (
-    availability?: { days: string[]; start_time: string; end_time: string }[]
-  ): { label: string; startTime: string; endTime: string; isActive: boolean } | null => {
-    if (!availability || !Array.isArray(availability) || availability.length === 0) return null;
-    const sessions = getUpcomingAttractionSessions(availability, 20);
-    // Prefer an active session first
-    const active = sessions.find(s => s.isToday && s.hasStarted && !s.hasEnded);
-    if (active) return { label: active.label, startTime: active.startTime, endTime: active.endTime, isActive: true };
-    // Otherwise return the next future session
-    const next = sessions.find(s => !s.hasEnded);
-    if (next) return { label: next.label, startTime: next.startTime, endTime: next.endTime, isActive: false };
-    return null;
-  };
+        {/* Animated ring */}
+        <div className="relative flex items-center justify-center mb-8">
+          <div className="w-20 h-20 rounded-full border-4 border-white/10"></div>
+          <div className="absolute w-20 h-20 rounded-full border-4 border-t-violet-400 border-r-blue-400 border-b-transparent border-l-transparent animate-spin"></div>
+          <div className="absolute w-12 h-12 rounded-full border-4 border-t-transparent border-r-transparent border-b-white/40 border-l-white/40 animate-spin" style={{animationDuration:'1.4s',animationDirection:'reverse'}}></div>
+        </div>
+
+        {/* Text */}
+        <p className="text-white/80 text-sm font-semibold tracking-widest uppercase animate-pulse">
+          Loading experiences...
+        </p>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -563,13 +559,6 @@ const EntertainmentLandingPage = () => {
 
         {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-12">
-        {/* Loading State */}
-        {loading ? (
-          <div className="flex justify-center items-center py-20">
-            <div className="animate-spin rounded-full h-12 w-12 md:h-16 md:w-16 border-b-4 border-blue-800"></div>
-          </div>
-        ) : (
-          <>
         {/* Special Packages Section - Only show if there are special packages and filter allows */}
         {filteredSpecialPackages.length > 0 && (activeFilter === 'all' || activeFilter === 'packages') && (
           <section className="mb-12 md:mb-20">
@@ -806,8 +795,6 @@ const EntertainmentLandingPage = () => {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 md:gap-7">
                 {filteredAttractions.map(attraction => {
-                  const attractionAvailable = hasAvailableUpcomingSessions(attraction.availability);
-                  const nextSession = getNextAvailableSession(attraction.availability);
                   return (
                   <div 
                     key={attraction.id} 
@@ -841,27 +828,7 @@ const EntertainmentLandingPage = () => {
                       <p className="text-sm text-gray-500 mb-3 line-clamp-2 leading-relaxed">
                         {attraction.description}
                       </p>
-                      {/* Next available session pill */}
-                      {nextSession && (
-                        <div className="flex items-center gap-1.5 mb-4">
-                          <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
-                            nextSession.isActive
-                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                              : 'bg-amber-50 text-amber-700 border border-amber-200'
-                          }`}>
-                            <Clock size={11} />
-                            <span>{nextSession.isActive ? 'Open now' : `Opens ${nextSession.label}: ${nextSession.startTime}`}</span>
-                          </div>
-                        </div>
-                      )}
-                      {!attractionAvailable && !nextSession && attraction.availability && attraction.availability.length > 0 && (
-                        <div className="flex items-center gap-1.5 mb-4">
-                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-400 border border-gray-200">
-                            <Clock size={11} />
-                            <span>No upcoming sessions</span>
-                          </div>
-                        </div>
-                      )}
+
                       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                         <div>
                           <span className="text-2xl font-extrabold text-gray-900">
@@ -870,24 +837,14 @@ const EntertainmentLandingPage = () => {
                           <span className="text-gray-400 text-xs ml-1">/ person</span>
                         </div>
                         <button
-                          disabled={!attractionAvailable}
                           onClick={(e) => {
                             e.stopPropagation();
-                            if (attractionAvailable) handleBuyTickets(attraction);
+                            handleBuyTickets(attraction);
                           }}
-                          className={`px-5 py-2.5 font-semibold rounded-lg transition-all flex items-center justify-center gap-2 text-sm ${
-                            attractionAvailable
-                              ? 'bg-violet-600 hover:bg-violet-700 text-white shadow-md hover:shadow-lg cursor-pointer'
-                              : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                          }`}
+                          className="px-5 py-2.5 font-semibold rounded-lg transition-all flex items-center justify-center gap-2 text-sm bg-violet-600 hover:bg-violet-700 text-white shadow-md hover:shadow-lg cursor-pointer"
                         >
                           <Ticket size={15} />
-                          {attractionAvailable
-                            ? 'Buy Tickets'
-                            : nextSession && !nextSession.isActive
-                              ? `Opens ${nextSession.label.startsWith('Today') ? nextSession.startTime : nextSession.label}`
-                              : 'Unavailable'
-                          }
+                          Buy Tickets
                         </button>
                       </div>
                     </div>
@@ -897,8 +854,6 @@ const EntertainmentLandingPage = () => {
               </div>
             )}
           </section>
-        )}
-          </>
         )}
       </main>
 
@@ -1075,55 +1030,15 @@ const EntertainmentLandingPage = () => {
 
               {/* Action Buttons */}
               <div className="space-y-2.5">
-                {(() => {
-                  const next = getNextAvailableSession(selectedAttraction.availability);
-                  if (!hasAvailableUpcomingSessions(selectedAttraction.availability)) {
-                    if (next && !next.isActive) {
-                      return (
-                        <div className={`flex items-center gap-2 px-3 py-2.5 rounded-xl ${
-                          next.label.startsWith('Today')
-                            ? 'bg-amber-50 border border-amber-200'
-                            : 'bg-gray-50 border border-gray-200'
-                        }`}>
-                          <Clock size={13} className="text-amber-600 flex-shrink-0" />
-                          <span className="text-xs text-amber-700 font-medium">
-                            Tickets available {next.label.startsWith('Today') ? 'from' : 'on'} {next.label.startsWith('Today') ? '' : next.label + ' · '}{next.startTime} – {next.endTime}
-                          </span>
-                        </div>
-                      );
-                    }
-                    return (
-                      <div className="flex items-center gap-2 px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl">
-                        <span className="text-xs text-gray-500 font-medium">No upcoming sessions available.</span>
-                      </div>
-                    );
-                  }
-                  if (next && next.isActive) {
-                    return (
-                      <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-50 border border-emerald-200">
-                        <Clock size={13} className="text-emerald-600" />
-                        <span className="text-xs font-semibold text-emerald-700">
-                          Open now · {next.startTime} – {next.endTime}
-                        </span>
-                      </div>
-                    );
-                  }
-                  return null;
-                })()}
                 <button
-                  disabled={!hasAvailableUpcomingSessions(selectedAttraction.availability)}
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (hasAvailableUpcomingSessions(selectedAttraction.availability)) handleBuyTickets(selectedAttraction);
+                    handleBuyTickets(selectedAttraction);
                   }}
-                  className={`w-full py-3 font-semibold text-sm rounded-xl transition-all flex items-center justify-center gap-2 ${
-                    hasAvailableUpcomingSessions(selectedAttraction.availability)
-                      ? 'bg-gradient-to-r from-blue-800 to-blue-700 text-white hover:from-blue-900 hover:to-blue-800 shadow-md hover:shadow-lg cursor-pointer'
-                      : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                  }`}
+                  className="w-full py-3 font-semibold text-sm rounded-xl transition-all flex items-center justify-center gap-2 bg-gradient-to-r from-blue-800 to-blue-700 text-white hover:from-blue-900 hover:to-blue-800 shadow-md hover:shadow-lg cursor-pointer"
                 >
                   <Ticket size={16} />
-                  {hasAvailableUpcomingSessions(selectedAttraction.availability) ? 'Buy Tickets' : 'Tickets Not Available'}
+                  Buy Tickets
                 </button>
                 <button
                   onClick={(e) => {

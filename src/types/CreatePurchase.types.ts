@@ -15,7 +15,7 @@ export interface CreatePurchaseAttraction {
   images: string[];
   status: string;
   createdAt?: string;
-  availability?: Record<string, boolean>;
+  availability?: Record<string, boolean> | Array<{ days: string[]; start_time: string; end_time: string }>;
 }
 
 export interface CreatePurchaseCustomerInfo {

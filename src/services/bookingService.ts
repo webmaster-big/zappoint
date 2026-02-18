@@ -188,6 +188,7 @@ export interface Booking {
   checked_in_at?: string;
   completed_at?: string;
   cancelled_at?: string;
+  deleted_at?: string; // Soft delete timestamp
   created_at: string;
   updated_at: string;
   // Relations
@@ -510,6 +511,55 @@ const bookingService = {
     data: any;
   }> {
     const response = await api.post('/packages/room/create', data);
+    return response.data;
+  },
+
+  // ========== SOFT DELETE METHODS ==========
+
+  /**
+   * Get all soft-deleted (trashed) bookings
+   */
+  async getTrashedBookings(filters?: {
+    search?: string;
+    location_id?: number;
+    user_id?: number;
+    sort_by?: string;
+    sort_order?: 'asc' | 'desc';
+    per_page?: number;
+    page?: number;
+  }): Promise<PaginatedBookingResponse> {
+    const response = await api.get('/bookings/trashed', { params: filters });
+    return response.data;
+  },
+
+  /**
+   * Restore a soft-deleted booking
+   */
+  async restoreBooking(id: number): Promise<BookingResponse> {
+    const response = await api.post(`/bookings/${id}/restore`);
+    return response.data;
+  },
+
+  /**
+   * Permanently delete a soft-deleted booking
+   */
+  async forceDeleteBooking(id: number): Promise<{
+    success: boolean;
+    message: string;
+  }> {
+    const response = await api.delete(`/bookings/${id}/force-delete`);
+    return response.data;
+  },
+
+  /**
+   * Bulk restore soft-deleted bookings
+   */
+  async bulkRestore(ids: number[]): Promise<{
+    success: boolean;
+    message: string;
+    data: { restored_count: number };
+  }> {
+    const response = await api.post('/bookings/bulk-restore', { ids });
     return response.data;
   },
 };

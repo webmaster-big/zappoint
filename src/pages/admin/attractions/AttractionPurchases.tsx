@@ -12,7 +12,9 @@ import {
   XCircle,
   Clock,
   Eye,
-  DollarSign
+  DollarSign,
+  RotateCcw,
+  Archive
 } from 'lucide-react';
 import { formatDurationDisplay } from '../../../utils/timeFormat';
 import { useThemeColor } from '../../../hooks/useThemeColor';
@@ -55,6 +57,15 @@ const ManagePurchases = () => {
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'in-store'>('in-store');
   const [paymentNotes, setPaymentNotes] = useState('');
   const [processingPayment, setProcessingPayment] = useState(false);
+  
+  // Soft delete (trash) states
+  const [showTrashed, setShowTrashed] = useState(false);
+  const [trashedPurchases, setTrashedPurchases] = useState<AttractionPurchasesPurchase[]>([]);
+  const [trashedLoading, setTrashedLoading] = useState(false);
+  const [trashedCurrentPage, setTrashedCurrentPage] = useState(1);
+  const [trashedTotalPages, setTrashedTotalPages] = useState(1);
+  const [trashedTotal, setTrashedTotal] = useState(0);
+  const [selectedTrashed, setSelectedTrashed] = useState<string[]>([]);
 
   // Status colors and icons
   const statusConfig: Record<string, { color: string; icon: typeof CheckCircle }> = {
@@ -488,6 +499,137 @@ const ManagePurchases = () => {
     }
   };
 
+  // ========== SOFT DELETE (TRASH) FUNCTIONS ==========
+
+  // Convert trashed API response to component format
+  const convertTrashedPurchases = (rawPurchases: any[]): AttractionPurchasesPurchase[] => {
+    return rawPurchases.map((purchase: any) => ({
+      id: purchase.id.toString(),
+      type: 'attraction',
+      attractionName: purchase.attraction?.name || 'Unknown Attraction',
+      customerName: purchase.customer 
+        ? `${purchase.customer.first_name} ${purchase.customer.last_name}`
+        : purchase.guest_name || 'Walk-in Customer',
+      email: purchase.customer?.email || purchase.guest_email || '',
+      phone: purchase.customer?.phone || purchase.guest_phone || '',
+      quantity: purchase.quantity,
+      status: purchase.status as 'confirmed' | 'pending' | 'checked-in' | 'cancelled' | 'refunded',
+      totalAmount: Number(purchase.total_amount),
+      amountPaid: Number(purchase.amount_paid || 0),
+      createdAt: purchase.created_at,
+      deletedAt: purchase.deleted_at,
+      paymentMethod: purchase.payment_method as 'credit_card' | 'paypal',
+      duration: purchase.attraction?.duration ? formatDurationDisplay(purchase.attraction.duration, purchase.attraction.duration_unit) : '',
+      activity: purchase.attraction?.category || '',
+      locationId: purchase.location_id,
+    }));
+  };
+
+  // Load trashed (soft-deleted) purchases
+  const loadTrashedPurchases = async (page: number = 1) => {
+    try {
+      setTrashedLoading(true);
+      const response = await attractionPurchaseService.getTrashedPurchases({
+        page,
+        per_page: itemsPerPage,
+        search: filters.search,
+        user_id: getStoredUser()?.id,
+        ...(selectedLocation && { location_id: Number(selectedLocation) })
+      });
+
+      if (response.success && response.data) {
+        setTrashedPurchases(convertTrashedPurchases(response.data.purchases));
+        setTrashedTotalPages(response.data.pagination.last_page);
+        setTrashedTotal(response.data.pagination.total);
+        setTrashedCurrentPage(response.data.pagination.current_page);
+      }
+    } catch (error) {
+      console.error('Error loading trashed purchases:', error);
+      setToast({ message: 'Failed to load deleted purchases', type: 'error' });
+    } finally {
+      setTrashedLoading(false);
+    }
+  };
+
+  // Restore a single soft-deleted purchase
+  const handleRestorePurchase = async (id: string) => {
+    try {
+      const response = await attractionPurchaseService.restorePurchase(Number(id));
+      if (response.success) {
+        setToast({ message: 'Purchase restored successfully', type: 'success' });
+        loadTrashedPurchases(trashedCurrentPage);
+        // Also update active purchases cache
+        if (response.data) {
+          await attractionPurchaseCacheService.updatePurchaseInCache(response.data);
+        }
+      }
+    } catch (error) {
+      console.error('Error restoring purchase:', error);
+      setToast({ message: 'Failed to restore purchase', type: 'error' });
+    }
+  };
+
+  // Bulk restore selected trashed purchases
+  const handleBulkRestore = async () => {
+    if (selectedTrashed.length === 0) return;
+
+    try {
+      const ids = selectedTrashed.map(id => Number(id));
+      const response = await attractionPurchaseService.bulkRestore(ids);
+      if (response.success) {
+        setToast({ message: `${response.data.restored_count} purchase(s) restored successfully`, type: 'success' });
+        setSelectedTrashed([]);
+        loadTrashedPurchases(trashedCurrentPage);
+      }
+    } catch (error) {
+      console.error('Error bulk restoring purchases:', error);
+      setToast({ message: 'Failed to restore some purchases', type: 'error' });
+    }
+  };
+
+  // Permanently delete a trashed purchase
+  const handleForceDelete = async (id: string) => {
+    if (!window.confirm('Are you sure you want to PERMANENTLY delete this purchase? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      await attractionPurchaseService.forceDeletePurchase(Number(id));
+      setToast({ message: 'Purchase permanently deleted', type: 'success' });
+      loadTrashedPurchases(trashedCurrentPage);
+    } catch (error) {
+      console.error('Error force deleting purchase:', error);
+      setToast({ message: 'Failed to permanently delete purchase', type: 'error' });
+    }
+  };
+
+  // Toggle trashed view
+  const toggleTrashedView = () => {
+    setShowTrashed(!showTrashed);
+    if (!showTrashed) {
+      loadTrashedPurchases(1);
+    }
+    setSelectedTrashed([]);
+  };
+
+  // Handle select trashed purchase
+  const handleSelectTrashed = (id: string) => {
+    setSelectedTrashed(prev =>
+      prev.includes(id)
+        ? prev.filter(purchaseId => purchaseId !== id)
+        : [...prev, id]
+    );
+  };
+
+  // Handle select all trashed
+  const handleSelectAllTrashed = () => {
+    if (selectedTrashed.length === trashedPurchases.length) {
+      setSelectedTrashed([]);
+    } else {
+      setSelectedTrashed(trashedPurchases.map(p => p.id));
+    }
+  };
+
 //   // Get unique statuses and payment methods
 //   const getUniqueValues = (key: keyof Purchase) => {
 //     const values = purchases.map(purchase => purchase[key]);
@@ -541,13 +683,23 @@ const ManagePurchases = () => {
             />
           )}
           <StandardButton
-            variant="primary"
+            variant={showTrashed ? 'primary' : 'secondary'}
             size="md"
-            onClick={exportToCSV}
-            icon={Download}
+            onClick={toggleTrashedView}
+            icon={showTrashed ? RefreshCcw : Archive}
           >
-            Export CSV
+            {showTrashed ? 'View Active' : 'View Deleted'}
           </StandardButton>
+          {!showTrashed && (
+            <StandardButton
+              variant="primary"
+              size="md"
+              onClick={exportToCSV}
+              icon={Download}
+            >
+              Export CSV
+            </StandardButton>
+          )}
         </div>
       </div>
 
@@ -669,7 +821,7 @@ const ManagePurchases = () => {
       </div>
 
       {/* Bulk Actions */}
-      {selectedPurchases.length > 0 && (
+      {!showTrashed && selectedPurchases.length > 0 && (
         <div className={`bg-${themeColor}-50 p-4 rounded-lg mb-6 flex flex-wrap items-center gap-4`}>
           <span className={`text-${fullColor} font-medium`}>
             {selectedPurchases.length} purchase(s) selected
@@ -697,7 +849,8 @@ const ManagePurchases = () => {
         </div>
       )}
 
-      {/* Purchases Table */}
+      {/* Purchases Table - Active Purchases */}
+      {!showTrashed && (
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -860,6 +1013,153 @@ const ManagePurchases = () => {
           </div>
         )}
       </div>
+      )}
+
+      {/* Trashed Purchases View */}
+      {showTrashed && (
+        <>
+          {/* Bulk Actions for Trashed */}
+          {selectedTrashed.length > 0 && (
+            <div className="bg-orange-50 p-4 rounded-lg mb-6 flex flex-wrap items-center gap-4">
+              <span className="text-orange-700 font-medium">
+                {selectedTrashed.length} deleted purchase(s) selected
+              </span>
+              <StandardButton
+                variant="primary"
+                size="md"
+                onClick={handleBulkRestore}
+                icon={RotateCcw}
+              >
+                Restore Selected
+              </StandardButton>
+            </div>
+          )}
+
+          {/* Trashed Table */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            {trashedLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className={`animate-spin rounded-full h-8 w-8 border-b-2 border-${fullColor}`}></div>
+                <span className="ml-3 text-gray-600">Loading deleted purchases...</span>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-red-50 border-b border-red-100">
+                    <tr>
+                      <th scope="col" className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-12">
+                        <input
+                          type="checkbox"
+                          checked={selectedTrashed.length === trashedPurchases.length && trashedPurchases.length > 0}
+                          onChange={handleSelectAllTrashed}
+                          className="rounded border-gray-300 text-red-600 focus:ring-red-600"
+                        />
+                      </th>
+                      <th scope="col" className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Customer</th>
+                      <th scope="col" className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Attraction</th>
+                      <th scope="col" className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Total</th>
+                      <th scope="col" className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
+                      <th scope="col" className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Deleted At</th>
+                      <th scope="col" className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {trashedPurchases.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="px-4 py-8 text-center text-sm text-gray-600">
+                          <Archive className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                          No deleted purchases found
+                        </td>
+                      </tr>
+                    ) : (
+                      trashedPurchases.map((purchase: any) => (
+                        <tr key={purchase.id} className="hover:bg-red-50/50">
+                          <td className="px-4 py-4 whitespace-nowrap">
+                            <input
+                              type="checkbox"
+                              checked={selectedTrashed.includes(purchase.id)}
+                              onChange={() => handleSelectTrashed(purchase.id)}
+                              className="rounded border-gray-300 text-red-600 focus:ring-red-600"
+                            />
+                          </td>
+                          <td className="px-4 py-4">
+                            <div>
+                              <div className="text-sm font-medium text-gray-900">{purchase.customerName}</div>
+                              <div className="text-xs text-gray-600 mt-1">{purchase.email}</div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {purchase.attractionName}
+                          </td>
+                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                            ${purchase.totalAmount.toFixed(2)}
+                          </td>
+                          <td className="px-4 py-4 whitespace-nowrap">
+                            <span className={`text-xs font-medium px-3 py-1 rounded-full ${statusConfig[purchase.status]?.color || 'bg-gray-100 text-gray-800'}`}>
+                              {purchase.status}
+                            </span>
+                          </td>
+                          <td className="px-4 py-4 whitespace-nowrap text-sm text-red-600">
+                            {purchase.deletedAt ? formatDate(purchase.deletedAt) : 'N/A'}
+                          </td>
+                          <td className="px-4 py-4 whitespace-nowrap">
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => handleRestorePurchase(purchase.id)}
+                                className="p-2 text-green-600 hover:text-green-700 hover:bg-green-50 rounded-lg transition-colors"
+                                title="Restore"
+                              >
+                                <RotateCcw className="h-4 w-4" />
+                              </button>
+                              <button
+                                onClick={() => handleForceDelete(purchase.id)}
+                                className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                                title="Permanently Delete"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Trashed Pagination */}
+            {trashedTotalPages > 1 && (
+              <div className="bg-white px-4 py-4 border-t border-gray-100">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-gray-600">
+                    Showing page <span className="font-medium">{trashedCurrentPage}</span> of{' '}
+                    <span className="font-medium">{trashedTotalPages}</span> ({trashedTotal} total)
+                  </div>
+                  <div className="flex gap-2">
+                    <StandardButton
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => loadTrashedPurchases(Math.max(1, trashedCurrentPage - 1))}
+                      disabled={trashedCurrentPage === 1}
+                    >
+                      Previous
+                    </StandardButton>
+                    <StandardButton
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => loadTrashedPurchases(Math.min(trashedTotalPages, trashedCurrentPage + 1))}
+                      disabled={trashedCurrentPage === trashedTotalPages}
+                    >
+                      Next
+                    </StandardButton>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </>
+      )}
 
       {/* Toast Notification */}
       {toast && (

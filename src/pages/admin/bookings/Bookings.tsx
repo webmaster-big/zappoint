@@ -27,7 +27,9 @@ import {
   ArrowUpDown,
   ChevronUp,
   ChevronDown,
-  AlertTriangle
+  AlertTriangle,
+  RotateCcw,
+  Archive
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import StandardButton from '../../../components/ui/StandardButton';
@@ -258,6 +260,15 @@ const Bookings: React.FC = () => {
 
   // Check-in confirmation state
   const [showCheckInConfirm, setShowCheckInConfirm] = useState<string | null>(null);
+  
+  // Soft delete (trash) states
+  const [showTrashed, setShowTrashed] = useState(false);
+  const [trashedBookings, setTrashedBookings] = useState<BookingsPageBooking[]>([]);
+  const [trashedLoading, setTrashedLoading] = useState(false);
+  const [trashedCurrentPage, setTrashedCurrentPage] = useState(1);
+  const [trashedTotalPages, setTrashedTotalPages] = useState(1);
+  const [trashedTotal, setTrashedTotal] = useState(0);
+  const [selectedTrashed, setSelectedTrashed] = useState<string[]>([]);
   
   // Drag and drop handlers for column reordering
   const handleDragStart = (e: React.DragEvent, columnKey: BookingsColumnKey) => {
@@ -2128,6 +2139,123 @@ const Bookings: React.FC = () => {
     }
   };
 
+  // ========== SOFT DELETE (TRASH) FUNCTIONS ==========
+
+  // Transform trashed booking to display format
+  const transformTrashedBooking = (booking: any): BookingsPageBooking & { deletedAt?: string } => {
+    const transformed = transformRawBooking(booking);
+    return {
+      ...transformed,
+      deletedAt: booking.deleted_at,
+    };
+  };
+
+  // Load trashed (soft-deleted) bookings
+  const loadTrashedBookings = async (page: number = 1) => {
+    try {
+      setTrashedLoading(true);
+      const response = await bookingService.getTrashedBookings({
+        page,
+        per_page: itemsPerPage,
+        search: filters.search,
+        user_id: currentUser?.id,
+        ...(selectedLocation && { location_id: selectedLocation })
+      });
+
+      if (response.success && response.data) {
+        const transformed = response.data.bookings.map(transformTrashedBooking);
+        setTrashedBookings(transformed);
+        setTrashedTotalPages(response.data.pagination.last_page);
+        setTrashedTotal(response.data.pagination.total);
+        setTrashedCurrentPage(response.data.pagination.current_page);
+      }
+    } catch (error) {
+      console.error('Error loading trashed bookings:', error);
+      alert('Failed to load deleted bookings');
+    } finally {
+      setTrashedLoading(false);
+    }
+  };
+
+  // Restore a single soft-deleted booking
+  const handleRestoreBooking = async (id: string) => {
+    try {
+      const response = await bookingService.restoreBooking(Number(id));
+      if (response.success) {
+        alert('Booking restored successfully');
+        loadTrashedBookings(trashedCurrentPage);
+        // Also update active bookings cache
+        if (response.data) {
+          await bookingCacheService.updateBookingInCache(response.data);
+        }
+      }
+    } catch (error) {
+      console.error('Error restoring booking:', error);
+      alert('Failed to restore booking');
+    }
+  };
+
+  // Bulk restore selected trashed bookings
+  const handleBulkRestoreBookings = async () => {
+    if (selectedTrashed.length === 0) return;
+
+    try {
+      const ids = selectedTrashed.map(id => Number(id));
+      const response = await bookingService.bulkRestore(ids);
+      if (response.success) {
+        alert(`${response.data.restored_count} booking(s) restored successfully`);
+        setSelectedTrashed([]);
+        loadTrashedBookings(trashedCurrentPage);
+      }
+    } catch (error) {
+      console.error('Error bulk restoring bookings:', error);
+      alert('Failed to restore some bookings');
+    }
+  };
+
+  // Permanently delete a trashed booking
+  const handleForceDeleteBooking = async (id: string, referenceNumber: string) => {
+    if (!window.confirm(`Are you sure you want to PERMANENTLY delete booking #${referenceNumber}? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      await bookingService.forceDeleteBooking(Number(id));
+      alert('Booking permanently deleted');
+      loadTrashedBookings(trashedCurrentPage);
+    } catch (error) {
+      console.error('Error force deleting booking:', error);
+      alert('Failed to permanently delete booking');
+    }
+  };
+
+  // Toggle trashed view
+  const toggleTrashedView = () => {
+    setShowTrashed(!showTrashed);
+    if (!showTrashed) {
+      loadTrashedBookings(1);
+    }
+    setSelectedTrashed([]);
+  };
+
+  // Handle select trashed booking
+  const handleSelectTrashedBooking = (id: string) => {
+    setSelectedTrashed(prev =>
+      prev.includes(id)
+        ? prev.filter(bookingId => bookingId !== id)
+        : [...prev, id]
+    );
+  };
+
+  // Handle select all trashed
+  const handleSelectAllTrashed = () => {
+    if (selectedTrashed.length === trashedBookings.length) {
+      setSelectedTrashed([]);
+    } else {
+      setSelectedTrashed(trashedBookings.map(b => b.id));
+    }
+  };
+
   const handleBulkStatusChange = async (newStatus: BookingsPageBooking['status']) => {
     if (selectedBookings.length === 0) return;
     
@@ -2631,6 +2759,14 @@ const Bookings: React.FC = () => {
             >
               Generate Report
             </StandardButton>
+            <StandardButton
+              variant={showTrashed ? 'primary' : 'secondary'}
+              size="md"
+              onClick={toggleTrashedView}
+              icon={showTrashed ? RefreshCcw : Archive}
+            >
+              {showTrashed ? 'View Active' : 'View Deleted'}
+            </StandardButton>
           </div>
         </div>
 
@@ -2952,7 +3088,8 @@ const Bookings: React.FC = () => {
           </div>
         )}
 
-        {/* Bookings Table */}
+        {/* Bookings Table - Active Bookings */}
+        {!showTrashed && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           {/* Reset Column Order Button */}
           <div className="px-4 py-2 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
@@ -3196,6 +3333,169 @@ const Bookings: React.FC = () => {
             </div>
           )}
         </div>
+        )}
+
+        {/* Trashed Bookings View */}
+        {showTrashed && (
+          <>
+            {/* Bulk Actions for Trashed */}
+            {selectedTrashed.length > 0 && (
+              <div className="bg-orange-50 p-4 rounded-lg mb-6 flex flex-wrap items-center gap-4">
+                <span className="text-orange-700 font-medium">
+                  {selectedTrashed.length} deleted booking(s) selected
+                </span>
+                <StandardButton
+                  variant="primary"
+                  size="md"
+                  onClick={handleBulkRestoreBookings}
+                  icon={RotateCcw}
+                >
+                  Restore Selected
+                </StandardButton>
+              </div>
+            )}
+
+            {/* Trashed Table */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+              {trashedLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className={`animate-spin rounded-full h-8 w-8 border-b-2 border-${fullColor}`}></div>
+                  <span className="ml-3 text-gray-600">Loading deleted bookings...</span>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm text-left">
+                    <thead className="text-xs text-gray-500 uppercase bg-red-50 border-b">
+                      <tr>
+                        <th scope="col" className="px-4 py-3 font-medium w-12">
+                          <input
+                            type="checkbox"
+                            checked={selectedTrashed.length === trashedBookings.length && trashedBookings.length > 0}
+                            onChange={handleSelectAllTrashed}
+                            className="rounded border-gray-300 text-red-600 focus:ring-red-600"
+                          />
+                        </th>
+                        <th scope="col" className="px-4 py-3 font-medium">Reference</th>
+                        <th scope="col" className="px-4 py-3 font-medium">Customer</th>
+                        <th scope="col" className="px-4 py-3 font-medium">Package</th>
+                        <th scope="col" className="px-4 py-3 font-medium">Date</th>
+                        <th scope="col" className="px-4 py-3 font-medium">Total</th>
+                        <th scope="col" className="px-4 py-3 font-medium">Status</th>
+                        <th scope="col" className="px-4 py-3 font-medium">Deleted At</th>
+                        <th scope="col" className="px-4 py-3 font-medium">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {trashedBookings.length === 0 ? (
+                        <tr>
+                          <td colSpan={9} className="px-4 py-8 text-center text-sm text-gray-600">
+                            <Archive className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                            No deleted bookings found
+                          </td>
+                        </tr>
+                      ) : (
+                        trashedBookings.map((booking: any) => (
+                          <tr key={booking.id} className="hover:bg-red-50/50">
+                            <td className="px-4 py-3">
+                              <input
+                                type="checkbox"
+                                checked={selectedTrashed.includes(booking.id)}
+                                onChange={() => handleSelectTrashedBooking(booking.id)}
+                                className="rounded border-gray-300 text-red-600 focus:ring-red-600"
+                              />
+                            </td>
+                            <td className="px-4 py-3 font-medium text-gray-900">
+                              {booking.referenceNumber}
+                            </td>
+                            <td className="px-4 py-3">
+                              <div>
+                                <div className="font-medium text-gray-900">{booking.customerName}</div>
+                                <div className="text-xs text-gray-500">{booking.email}</div>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-gray-900">
+                              {booking.packageName}
+                            </td>
+                            <td className="px-4 py-3 text-gray-900">
+                              {booking.date ? parseLocalDate(booking.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A'}
+                            </td>
+                            <td className="px-4 py-3 text-gray-900">
+                              ${booking.totalAmount.toFixed(2)}
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                                booking.status === 'confirmed' ? 'bg-blue-100 text-blue-800' :
+                                booking.status === 'checked-in' ? 'bg-green-100 text-green-800' :
+                                booking.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                booking.status === 'cancelled' ? 'bg-gray-100 text-gray-800' :
+                                'bg-purple-100 text-purple-800'
+                              }`}>
+                                {booking.status}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-red-600 text-xs">
+                              {booking.deletedAt ? new Date(booking.deletedAt).toLocaleDateString('en-US', {
+                                month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit'
+                              }) : 'N/A'}
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={() => handleRestoreBooking(booking.id)}
+                                  className="p-2 text-green-600 hover:text-green-700 hover:bg-green-50 rounded-lg transition-colors"
+                                  title="Restore"
+                                >
+                                  <RotateCcw className="h-4 w-4" />
+                                </button>
+                                <button
+                                  onClick={() => handleForceDeleteBooking(booking.id, booking.referenceNumber)}
+                                  className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                                  title="Permanently Delete"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Trashed Pagination */}
+              {trashedTotalPages > 1 && (
+                <div className="bg-white px-6 py-4 border-t border-gray-100">
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm text-gray-800">
+                      Showing page <span className="font-medium">{trashedCurrentPage}</span> of{' '}
+                      <span className="font-medium">{trashedTotalPages}</span> ({trashedTotal} total)
+                    </div>
+                    <div className="flex gap-2">
+                      <StandardButton
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => loadTrashedBookings(Math.max(1, trashedCurrentPage - 1))}
+                        disabled={trashedCurrentPage === 1}
+                      >
+                        Previous
+                      </StandardButton>
+                      <StandardButton
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => loadTrashedBookings(Math.min(trashedTotalPages, trashedCurrentPage + 1))}
+                        disabled={trashedCurrentPage === trashedTotalPages}
+                      >
+                        Next
+                      </StandardButton>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </>
+        )}
 
         {/* Export Modal */}
         {showExportModal && (

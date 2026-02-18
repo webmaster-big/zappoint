@@ -15,7 +15,7 @@ export interface PurchaseAttractionAttraction {
   images: string[];
   status: 'active' | 'inactive';
   createdAt: string;
-  availability: Record<string, boolean>;
+  availability: Record<string, boolean> | Array<{ days: string[]; start_time: string; end_time: string }>;
 }
 
 export interface PurchaseAttractionCustomerInfo {

@@ -38,15 +38,23 @@ export interface AttractionPurchase {
   payment_method: 'card' | 'in-store' | 'paylater' | 'authorize.net';
   status: 'pending' | 'confirmed' | 'checked-in' | 'cancelled' | 'refunded';
   purchase_date: string;
+  scheduled_date?: string; // Customer's chosen date to use the ticket
+  scheduled_time?: string; // Customer's chosen time slot
   notes?: string;
   created_by?: number;
   created_at: string;
   updated_at: string;
+  deleted_at?: string; // Soft delete timestamp
   attraction?: {
     id: number;
     name: string;
     price: number;
     pricing_type: string;
+    availability?: Array<{
+      day: string;
+      start_time: string;
+      end_time: string;
+    }>;
   };
   customer?: {
     id: number;
@@ -65,6 +73,8 @@ export interface CreatePurchaseData {
   quantity: number;
   payment_method: 'card' | 'in-store' | 'paylater' | 'authorize.net';
   purchase_date: string;
+  scheduled_date?: string; // Customer's chosen date
+  scheduled_time?: string; // Customer's chosen time slot
   notes?: string;
   // Optional fields for payment tracking
   amount?: number;
@@ -88,12 +98,22 @@ export interface PurchaseFilters {
   start_date?: string;
   end_date?: string;
   search?: string;
-  sort_by?: 'purchase_date' | 'total_amount' | 'quantity' | 'status' | 'created_at';
+  sort_by?: 'purchase_date' | 'total_amount' | 'quantity' | 'status' | 'created_at' | 'deleted_at';
   sort_order?: 'asc' | 'desc';
   per_page?: number;
   page?: number;
   user_id?: number;
   location_id?: number;
+}
+
+export interface TrashedFilters {
+  search?: string;
+  location_id?: number;
+  user_id?: number;
+  sort_by?: string;
+  sort_order?: 'asc' | 'desc';
+  per_page?: number;
+  page?: number;
 }
 
 export interface ApiResponse<T> {
@@ -266,6 +286,40 @@ class AttractionPurchaseService {
    */
   async bulkDelete(ids: number[]): Promise<ApiResponse<null>> {
     const response = await api.post('/attraction-purchases/bulk-delete', { ids });
+    return response.data;
+  }
+
+  // ========== SOFT DELETE METHODS ==========
+
+  /**
+   * Get all soft-deleted (trashed) purchases
+   */
+  async getTrashedPurchases(filters?: TrashedFilters): Promise<PaginatedResponse<AttractionPurchase>> {
+    const response = await api.get('/attraction-purchases/trashed', { params: filters });
+    return response.data;
+  }
+
+  /**
+   * Restore a soft-deleted purchase
+   */
+  async restorePurchase(id: number): Promise<ApiResponse<AttractionPurchase>> {
+    const response = await api.post(`/attraction-purchases/${id}/restore`);
+    return response.data;
+  }
+
+  /**
+   * Permanently delete a soft-deleted purchase
+   */
+  async forceDeletePurchase(id: number): Promise<ApiResponse<null>> {
+    const response = await api.delete(`/attraction-purchases/${id}/force-delete`);
+    return response.data;
+  }
+
+  /**
+   * Bulk restore soft-deleted purchases
+   */
+  async bulkRestore(ids: number[]): Promise<ApiResponse<{ restored_count: number }>> {
+    const response = await api.post('/attraction-purchases/bulk-restore', { ids });
     return response.data;
   }
 }

@@ -1262,10 +1262,10 @@ const CheckIn: React.FC = () => {
               </div>
 
               {/* Modal Footer */}
-              <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 p-6 flex gap-4">
+              <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 p-4 sm:p-6 flex gap-2 sm:gap-3">
                 <StandardButton
                   variant="secondary"
-                  size="md"
+                  size="sm"
                   onClick={handleCancelCheckIn}
                   className="flex-1"
                 >
@@ -1276,7 +1276,7 @@ const CheckIn: React.FC = () => {
                 {verifiedBooking.payment_status !== 'paid' && (
                   <StandardButton
                     variant="primary"
-                    size="md"
+                    size="sm"
                     icon={DollarSign}
                     onClick={() => handleOpenPaymentModal(verifiedBooking)}
                     disabled={processing || processingPayment}
@@ -1286,20 +1286,18 @@ const CheckIn: React.FC = () => {
                   </StandardButton>
                 )}
                 
-                {/* Check-in button - only show if paid */}
-                {verifiedBooking.payment_status === 'paid' && (
-                  <StandardButton
-                    variant="success"
-                    size="md"
-                    icon={processing ? RefreshCw : CheckCircle}
-                    onClick={handleConfirmCheckIn}
-                    disabled={processing}
-                    loading={processing}
-                    className="flex-1"
-                  >
-                    {processing ? 'Checking In...' : 'Confirm Check-In'}
-                  </StandardButton>
-                )}
+                {/* Check-in button - always show for confirmed bookings */}
+                <StandardButton
+                  variant="success"
+                  size="sm"
+                  icon={processing ? RefreshCw : CheckCircle}
+                  onClick={handleConfirmCheckIn}
+                  disabled={processing}
+                  loading={processing}
+                  className="flex-1"
+                >
+                  {processing ? 'Checking In...' : 'Check-In'}
+                </StandardButton>
               </div>
             </div>
           </div>
