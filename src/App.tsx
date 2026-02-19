@@ -1,7 +1,8 @@
-import { Route, Routes } from "react-router-dom"
+import { Route, Routes, Navigate, useLocation } from "react-router-dom"
 import NotFound from "./pages/NotFound";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import PageTitleSetter from "./components/PageTitleSetter";
+import { getStoredUser } from "./utils/storage";
 import MainLayout from "./layouts/AdminMainLayout";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import CustomerProtectedRoute from "./components/auth/CustomerProtectedRoute";
@@ -79,6 +80,33 @@ import EmailNotificationDetails from "./pages/admin/email/EmailNotificationDetai
 import FeeSupports from "./pages/admin/fee-supports/FeeSupports";
 import SpecialPricings from "./pages/admin/special-pricing/SpecialPricings";
 
+// Redirect /settings/google-calendar to the correct role-based settings page
+const GoogleCalendarRedirect = () => {
+  const location = useLocation();
+  const user = getStoredUser();
+  const role = user?.role || '';
+  const rolePrefix = role === 'company_admin' ? 'admin' : role === 'location_manager' ? 'manager' : role === 'attendant' ? 'attendant' : 'admin';
+
+  // If opened as a popup, notify the opener and close immediately
+  if (window.opener) {
+    const params = new URLSearchParams(location.search);
+    if (params.get('connected') === 'true') {
+      window.opener.postMessage(
+        { type: 'GOOGLE_CALENDAR_CONNECTED', location_id: params.get('location_id') },
+        window.location.origin
+      );
+    } else if (params.get('error')) {
+      window.opener.postMessage(
+        { type: 'GOOGLE_CALENDAR_ERROR', error: params.get('error') },
+        window.location.origin
+      );
+    }
+    window.close();
+    return null;
+  }
+
+  return <Navigate to={`/${rolePrefix}/settings${location.search}`} replace />;
+};
 
 function App() {
   return (
@@ -203,6 +231,9 @@ function App() {
           <Route path="/manager/settings" element={<ProtectedRoute allowedRoles={['location_manager']}><Settings /></ProtectedRoute>} />
           <Route path="/admin/settings" element={<ProtectedRoute allowedRoles={['company_admin']}><Settings /></ProtectedRoute>} />
         </Route>
+        
+        {/* Google Calendar OAuth callback redirect */}
+        <Route path="/settings/google-calendar" element={<GoogleCalendarRedirect />} />
         
         {/* 404 Not Found Route */}
         <Route path="*" element={<NotFound />} />

@@ -874,11 +874,15 @@ const Settings = () => {
           
           <div className="p-4 bg-gray-50 rounded-lg">
             {loadingAuthorizeAccount ? (
-              <div className="flex items-center justify-center py-8">
-                <div className="flex items-center gap-3">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-                  <span className="text-sm text-gray-600">Loading payment integration...</span>
+              <div className="flex items-center justify-between animate-pulse">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-gray-200 rounded-full" />
+                  <div className="space-y-2">
+                    <div className="h-3.5 w-24 bg-gray-200 rounded" />
+                    <div className="h-3 w-16 bg-gray-200 rounded" />
+                  </div>
                 </div>
+                <div className="h-8 w-28 bg-gray-200 rounded-lg" />
               </div>
             ) : (
               <div className="flex items-center justify-between">
@@ -1002,10 +1006,13 @@ const Settings = () => {
                 </div>
               </div>
             ) : gcalLoading ? (
-              <div className="flex items-center justify-center py-4">
-                <div className="flex items-center gap-3">
-                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-400"></div>
-                  <span className="text-sm text-gray-500">Checking status...</span>
+              <div className="flex items-center gap-3 py-1">
+                <div className={`w-10 h-10 rounded-full bg-${themeColor}-50 flex items-center justify-center`}>
+                  <RefreshCw size={18} className={`text-${themeColor}-400 animate-spin`} />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-700">Checking connection…</p>
+                  <p className="text-xs text-gray-400">Fetching Google Calendar status</p>
                 </div>
               </div>
             ) : gcalStatus && !gcalStatus.credentials_configured ? (
