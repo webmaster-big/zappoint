@@ -38,3 +38,19 @@ export interface GoogleCalendarSyncData {
   location_id: number;
   from_date: string;
 }
+
+export interface GoogleCalendarConnection {
+  id: number;
+  location_id: number;
+  google_account_email: string | null;
+  calendar_id: string | null;
+  is_connected: boolean;
+  last_synced_at: string | null;
+  sync_from_date: string | null;
+  location: {
+    id: number;
+    name: string;
+    city: string;
+    state: string;
+  };
+}

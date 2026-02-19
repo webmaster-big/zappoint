@@ -7,6 +7,7 @@ import type {
   GoogleCalendarSyncResult,
   GoogleCalendarSetCalendarData,
   GoogleCalendarSyncData,
+  GoogleCalendarConnection,
 } from '../types/googleCalendar.types';
 import type { SettingsApiResponse } from '../types/settings.types';
 
@@ -131,6 +132,16 @@ export const removeBookingEvent = async (
 ): Promise<SettingsApiResponse> => {
   const response = await api.delete<SettingsApiResponse>(
     `/google-calendar/bookings/${bookingId}/event`
+  );
+  return response.data;
+};
+
+/**
+ * Get all Google Calendar connections across all locations (company_admin only)
+ */
+export const getAllGoogleCalendarConnections = async (): Promise<SettingsApiResponse<GoogleCalendarConnection[]>> => {
+  const response = await api.get<SettingsApiResponse<GoogleCalendarConnection[]>>(
+    '/google-calendar/connections'
   );
   return response.data;
 };

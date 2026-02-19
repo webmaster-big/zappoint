@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Palette, Lock, Mail, X, Eye, EyeOff, Building2, MapPin, Trash2, CheckCircle, Calendar, RefreshCw, Unlink, ExternalLink } from 'lucide-react';
+import { Palette, Lock, Mail, X, Eye, EyeOff, Building2, MapPin, Trash2, CheckCircle, Calendar, RefreshCw, ExternalLink } from 'lucide-react';
 import { useThemeColor } from '../../hooks/useThemeColor';
 import StandardButton from '../../components/ui/StandardButton';
 import Toast from '../../components/ui/Toast';
@@ -29,11 +29,13 @@ import {
   listGoogleCalendars,
   setGoogleCalendar,
   syncGoogleCalendar,
+  getAllGoogleCalendarConnections,
 } from '../../services/GoogleCalendarService';
 import type {
   GoogleCalendarStatus,
   GoogleCalendar,
   GoogleCalendarSyncResult,
+  GoogleCalendarConnection,
 } from '../../types/googleCalendar.types';
 
 
@@ -158,6 +160,14 @@ const Settings = () => {
   const [gcalSyncResult, setGcalSyncResult] = useState<GoogleCalendarSyncResult | null>(null);
   const [gcalChangingCalendar, setGcalChangingCalendar] = useState(false);
   
+  // Google Calendar - All Connections (company_admin)
+  const [showGcalAllModal, setShowGcalAllModal] = useState(false);
+  const [allGcalConnections, setAllGcalConnections] = useState<GoogleCalendarConnection[]>([]);
+  const [loadingGcalAll, setLoadingGcalAll] = useState(false);
+  
+  // Google Calendar - user location_id for auto-select
+  const [userLocationId, setUserLocationId] = useState<number | null>(null);
+  
   useEffect(() => {
     // Load saved color from localStorage
     const { color, shade } = getThemeColor();
@@ -194,6 +204,11 @@ const Settings = () => {
     if (user) {
       setCurrentEmail(user.email || '');
       setUserRole(user.role || '');
+      // Auto-set location for non-company_admin users
+      if (user.location_id && user.role !== 'company_admin') {
+        setUserLocationId(user.location_id);
+        setGcalSelectedLocationId(user.location_id);
+      }
     }
     
     // Fetch Authorize.Net account status
@@ -202,8 +217,28 @@ const Settings = () => {
     // Fetch locations for Google Calendar
     fetchGcalLocations();
     
-    // Handle Google Calendar OAuth redirect
+    // Handle Google Calendar OAuth redirect (from URL params if popup fails)
     handleGcalRedirect();
+    
+    // Listen for popup message
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'GOOGLE_CALENDAR_CONNECTED') {
+        const locId = event.data.location_id;
+        setSuccessMessage('Google Calendar connected successfully!');
+        setShowSuccess(true);
+        setTimeout(() => setShowSuccess(false), 3000);
+        if (locId) {
+          setGcalSelectedLocationId(Number(locId));
+          fetchGcalStatus(Number(locId));
+        }
+      }
+      if (event.data?.type === 'GOOGLE_CALENDAR_ERROR') {
+        alert(`Google Calendar connection failed: ${event.data.error}`);
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    
+    return () => window.removeEventListener('message', handleMessage);
   }, []);
   
   // ── Google Calendar helpers ──────────────────────────────
@@ -220,6 +255,11 @@ const Settings = () => {
           state: loc.state || '',
         }))
       );
+      // Auto-fetch status for non-company_admin users with a location
+      const user = getStoredUser();
+      if (user?.location_id && user.role !== 'company_admin') {
+        fetchGcalStatus(user.location_id);
+      }
     } catch (error) {
       console.error('Error fetching locations for Google Calendar:', error);
     }
@@ -299,14 +339,40 @@ const Settings = () => {
     try {
       const response = await getGoogleCalendarAuthUrl(gcalSelectedLocationId);
       if (response.success && response.data?.auth_url) {
-        window.location.href = response.data.auth_url;
+        // Open Google consent in a centered popup window
+        const width = 600;
+        const height = 700;
+        const left = window.screenX + (window.outerWidth - width) / 2;
+        const top = window.screenY + (window.outerHeight - height) / 2;
+        const popup = window.open(
+          response.data.auth_url,
+          'google-calendar-auth',
+          `width=${width},height=${height},left=${left},top=${top},scrollbars=yes,resizable=yes`
+        );
+        
+        // Poll for popup close (fallback if postMessage doesn't fire)
+        if (popup) {
+          const pollTimer = setInterval(() => {
+            if (popup.closed) {
+              clearInterval(pollTimer);
+              // Re-check status after popup closes
+              if (gcalSelectedLocationId) {
+                fetchGcalStatus(gcalSelectedLocationId);
+              }
+              setGcalConnecting(false);
+            }
+          }, 500);
+        } else {
+          // Popup blocked — fall back to redirect
+          window.location.href = response.data.auth_url;
+        }
       } else {
         alert('Failed to get authorization URL');
+        setGcalConnecting(false);
       }
     } catch (error: any) {
       console.error('Error getting Google Calendar auth URL:', error);
       alert(error.response?.data?.message || 'Failed to start Google Calendar connection');
-    } finally {
       setGcalConnecting(false);
     }
   };
@@ -383,6 +449,42 @@ const Settings = () => {
       alert(error.response?.data?.message || 'Sync failed. Please try again.');
     } finally {
       setGcalSyncing(false);
+    }
+  };
+
+  const fetchAllGcalConnections = async () => {
+    setLoadingGcalAll(true);
+    try {
+      const response = await getAllGoogleCalendarConnections();
+      if (response.success) {
+        setAllGcalConnections(response.data || []);
+      }
+    } catch (error) {
+      console.error('Error fetching all Google Calendar connections:', error);
+    } finally {
+      setLoadingGcalAll(false);
+    }
+  };
+
+  const handleGcalLocationDisconnect = async (locationId: number, locationName: string) => {
+    if (!confirm(`Are you sure you want to disconnect Google Calendar for ${locationName}?`)) return;
+    try {
+      const response = await disconnectGoogleCalendar(locationId);
+      if (response.success) {
+        setSuccessMessage(`Google Calendar disconnected for ${locationName}`);
+        setShowSuccess(true);
+        setTimeout(() => setShowSuccess(false), 3000);
+        fetchAllGcalConnections();
+        // If we're also viewing this location inline, refresh
+        if (gcalSelectedLocationId === locationId) {
+          fetchGcalStatus(locationId);
+        }
+      } else {
+        alert(response.message || 'Failed to disconnect');
+      }
+    } catch (error: any) {
+      console.error('Error disconnecting Google Calendar:', error);
+      alert(error.response?.data?.message || 'Failed to disconnect. Please try again.');
     }
   };
 
@@ -838,8 +940,198 @@ const Settings = () => {
           </div>
         </div>
 
+        {/* Google Calendar Integration Card */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold text-gray-900">Google Calendar</h2>
+            {userRole === 'company_admin' && (
+              <StandardButton
+                onClick={() => {
+                  setShowGcalAllModal(true);
+                  fetchAllGcalConnections();
+                }}
+                variant="ghost"
+                size="sm"
+                icon={Building2}
+              >
+                View All
+              </StandardButton>
+            )}
+          </div>
+
+          {/* Location Selector */}
+          {userRole === 'company_admin' ? (
+            <div className="mb-4">
+              <select
+                value={gcalSelectedLocationId || ''}
+                onChange={(e) => handleGcalLocationChange(Number(e.target.value))}
+                className={`w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
+              >
+                <option value="">Select a location...</option>
+                {gcalLocations.map((loc) => (
+                  <option key={loc.id} value={loc.id}>
+                    {loc.name}{loc.city ? ` — ${loc.city}` : ''}{loc.state ? `, ${loc.state}` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : userLocationId ? (
+            <div className="mb-4 flex items-center gap-2 text-sm text-gray-600">
+              <MapPin size={14} className={`text-${themeColor}-500`} />
+              <span className="font-medium">
+                {gcalLocations.find(l => l.id === userLocationId)?.name || `Location #${userLocationId}`}
+              </span>
+              {(() => {
+                const loc = gcalLocations.find(l => l.id === userLocationId);
+                return loc?.city ? (
+                  <span className="text-gray-400">· {loc.city}{loc.state ? `, ${loc.state}` : ''}</span>
+                ) : null;
+              })()}
+            </div>
+          ) : null}
+
+          <div className="p-4 bg-gray-50 rounded-lg">
+            {!gcalSelectedLocationId ? (
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">
+                  <Calendar className="text-gray-400" size={20} />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-700">Google Calendar</p>
+                  <p className="text-sm text-gray-500">{userRole === 'company_admin' ? 'Select a location to manage calendar sync' : 'No location assigned'}</p>
+                </div>
+              </div>
+            ) : gcalLoading ? (
+              <div className="flex items-center justify-center py-4">
+                <div className="flex items-center gap-3">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-400"></div>
+                  <span className="text-sm text-gray-500">Checking status...</span>
+                </div>
+              </div>
+            ) : gcalStatus && !gcalStatus.credentials_configured ? (
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-yellow-100 rounded-full flex items-center justify-center">
+                  <Calendar className="text-yellow-600" size={20} />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-yellow-800">Not Available</p>
+                  <p className="text-xs text-yellow-700">Google API credentials not configured. Contact your administrator.</p>
+                </div>
+              </div>
+            ) : gcalStatus && !gcalStatus.is_connected ? (
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">
+                    <Calendar className="text-gray-400" size={20} />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-700">Google Calendar</p>
+                    <p className="text-sm text-gray-500">Not connected</p>
+                  </div>
+                </div>
+                <StandardButton
+                  onClick={handleGcalConnect}
+                  variant="primary"
+                  size="sm"
+                  loading={gcalConnecting}
+                  disabled={gcalConnecting}
+                  icon={ExternalLink}
+                >
+                  Connect
+                </StandardButton>
+              </div>
+            ) : gcalStatus && gcalStatus.is_connected ? (
+              <div className="space-y-3">
+                {/* Connected status */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                      <CheckCircle className="text-green-600" size={20} />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium text-green-800">Connected</p>
+                        {gcalStatus.last_synced_at && (
+                          <span className="text-xs text-gray-400 hidden sm:inline">· Synced {new Date(gcalStatus.last_synced_at).toLocaleDateString()}</span>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-500">{gcalStatus.google_account_email}</p>
+                    </div>
+                  </div>
+                  <StandardButton
+                    onClick={handleGcalDisconnect}
+                    variant="danger"
+                    size="sm"
+                    loading={gcalDisconnecting}
+                    disabled={gcalDisconnecting}
+                  >
+                    Disconnect
+                  </StandardButton>
+                </div>
+
+                {/* Calendar & Sync — compact layout */}
+                <div className="pt-3 border-t border-gray-200 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Calendar</label>
+                    {gcalLoadingCalendars ? (
+                      <div className="flex items-center gap-2 text-xs text-gray-400 py-2">
+                        <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-gray-400"></div>
+                        Loading...
+                      </div>
+                    ) : (
+                      <select
+                        value={gcalStatus.calendar_id || 'primary'}
+                        onChange={(e) => handleGcalCalendarChange(e.target.value)}
+                        disabled={gcalChangingCalendar}
+                        className={`w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 disabled:opacity-50`}
+                      >
+                        {gcalCalendars.length === 0 && <option value="primary">Primary Calendar</option>}
+                        {gcalCalendars.map((cal) => (
+                          <option key={cal.id} value={cal.id}>
+                            {cal.summary}{cal.primary ? ' (primary)' : ''}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Sync bookings from</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="date"
+                        value={gcalSyncFromDate}
+                        onChange={(e) => setGcalSyncFromDate(e.target.value)}
+                        className={`flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
+                      />
+                      <StandardButton
+                        onClick={handleGcalSync}
+                        variant="primary"
+                        size="sm"
+                        loading={gcalSyncing}
+                        disabled={gcalSyncing}
+                        icon={RefreshCw}
+                      >
+                        Sync
+                      </StandardButton>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Sync result */}
+                {gcalSyncResult && (
+                  <div className="text-xs text-gray-600 px-3 py-2 bg-white rounded border border-gray-200">
+                    <span className="text-green-600 font-semibold">{gcalSyncResult.created}</span> created · {' '}
+                    <span className="text-yellow-600 font-semibold">{gcalSyncResult.skipped}</span> skipped · {' '}
+                    <span className="text-red-600 font-semibold">{gcalSyncResult.failed}</span> failed
+                  </div>
+                )}
+              </div>
+            ) : null}
+          </div>
+        </div>
+
         {/* Theme Color Selection Card */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
           <div className="flex items-center gap-3 mb-6">
             <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
               <Palette className="text-white" size={24} />
@@ -1236,16 +1528,11 @@ const Settings = () => {
         {showAllAccountsModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-backdrop-fade" onClick={() => setShowAllAccountsModal(false)}>
             <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col animate-scale-in" onClick={(e) => e.stopPropagation()}>
-              <div className="p-6 border-b border-gray-200">
+              <div className="p-5 border-b border-gray-200">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-12 h-12 bg-${themeColor}-100 rounded-full flex items-center justify-center`}>
-                      <Building2 className={`text-${themeColor}-600`} size={24} />
-                    </div>
-                    <div>
-                      <h3 className="text-2xl font-bold text-gray-900">All Authorize.Net Connections</h3>
-                      <p className="text-sm text-gray-600 mt-1">View all connected Authorize.Net accounts across locations</p>
-                    </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">All Authorize.Net Connections</h3>
+                    <p className="text-sm text-gray-500 mt-0.5">Payment accounts across all locations</p>
                   </div>
                   <StandardButton
                     onClick={() => setShowAllAccountsModal(false)}
@@ -1371,179 +1658,120 @@ const Settings = () => {
           </div>
         )}
 
-        {/* Google Calendar Integration Card */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-green-500 rounded-lg flex items-center justify-center">
-              <Calendar className="text-white" size={24} />
-            </div>
-            <div>
-              <h2 className="text-xl font-semibold text-gray-900">Google Calendar Integration</h2>
-              <p className="text-sm text-gray-600">Sync bookings to Google Calendar automatically</p>
-            </div>
-          </div>
-
-          {/* Location Selector */}
-          <div className="mb-5">
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Location</label>
-            <select
-              value={gcalSelectedLocationId || ''}
-              onChange={(e) => handleGcalLocationChange(Number(e.target.value))}
-              className={`w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
-            >
-              <option value="">Select a location...</option>
-              {gcalLocations.map((loc) => (
-                <option key={loc.id} value={loc.id}>
-                  {loc.name}{loc.city ? ` — ${loc.city}` : ''}{loc.state ? `, ${loc.state}` : ''}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Status Area */}
-          {gcalSelectedLocationId && (
-            <div className="space-y-4">
-              {gcalLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <div className="flex items-center gap-3">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-                    <span className="text-sm text-gray-600">Checking connection status...</span>
+        {/* Company Admin - All Google Calendar Connections Modal */}
+        {showGcalAllModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-backdrop-fade" onClick={() => setShowGcalAllModal(false)}>
+            <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col animate-scale-in" onClick={(e) => e.stopPropagation()}>
+              <div className="p-5 border-b border-gray-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">All Google Calendar Connections</h3>
+                    <p className="text-sm text-gray-500 mt-0.5">Connections across all locations</p>
                   </div>
-                </div>
-              ) : gcalStatus && !gcalStatus.credentials_configured ? (
-                /* Credentials not configured by developer */
-                <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                  <div className="flex gap-3">
-                    <svg className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd"></path>
-                    </svg>
-                    <div>
-                      <p className="text-sm font-semibold text-yellow-800">Google Calendar Not Available</p>
-                      <p className="text-xs text-yellow-700 mt-1">Google Calendar API credentials have not been configured. Please contact your administrator.</p>
-                    </div>
-                  </div>
-                </div>
-              ) : gcalStatus && !gcalStatus.is_connected ? (
-                /* Not connected — show connect button */
-                <div className="p-5 bg-gray-50 rounded-lg border border-gray-200 text-center">
-                  <Calendar className="mx-auto text-gray-400 mb-3" size={40} />
-                  <p className="text-sm text-gray-700 mb-1 font-medium">Not connected</p>
-                  <p className="text-xs text-gray-500 mb-4">Sync your bookings to Google Calendar so they appear in your schedule automatically.</p>
                   <StandardButton
-                    onClick={handleGcalConnect}
-                    variant="primary"
-                    loading={gcalConnecting}
-                    disabled={gcalConnecting}
-                    icon={ExternalLink}
-                  >
-                    Connect Google Calendar
-                  </StandardButton>
+                    onClick={() => setShowGcalAllModal(false)}
+                    variant="ghost"
+                    size="sm"
+                    icon={X}
+                    className="text-gray-400 hover:text-gray-600"
+                  />
                 </div>
-              ) : gcalStatus && gcalStatus.is_connected ? (
-                /* Connected state */
-                <>
-                  {/* Connection Info */}
-                  <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                          <CheckCircle className="text-green-600" size={20} />
-                        </div>
-                        <div>
-                          <p className="text-sm font-semibold text-green-800">Connected</p>
-                          <p className="text-xs text-green-700">{gcalStatus.google_account_email}</p>
-                          {gcalStatus.last_synced_at && (
-                            <p className="text-xs text-green-600 mt-0.5">
-                              Last synced: {new Date(gcalStatus.last_synced_at).toLocaleString()}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                      <StandardButton
-                        onClick={handleGcalDisconnect}
-                        variant="danger"
-                        size="sm"
-                        loading={gcalDisconnecting}
-                        disabled={gcalDisconnecting}
-                        icon={Unlink}
-                      >
-                        Disconnect
-                      </StandardButton>
-                    </div>
-                  </div>
+              </div>
 
-                  {/* Calendar Selector */}
-                  <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Calendar</label>
-                    {gcalLoadingCalendars ? (
-                      <div className="flex items-center gap-2 text-sm text-gray-500 py-1">
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-500"></div>
-                        Loading calendars...
-                      </div>
-                    ) : (
-                      <select
-                        value={gcalStatus.calendar_id || 'primary'}
-                        onChange={(e) => handleGcalCalendarChange(e.target.value)}
-                        disabled={gcalChangingCalendar}
-                        className={`w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 disabled:opacity-50`}
+              <div className="flex-1 overflow-y-auto p-5">
+                {loadingGcalAll ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-400"></div>
+                  </div>
+                ) : allGcalConnections.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Calendar className="mx-auto text-gray-300 mb-3" size={36} />
+                    <p className="text-sm font-medium text-gray-700">No connections yet</p>
+                    <p className="text-xs text-gray-500 mt-1">No locations have connected Google Calendar.</p>
+                  </div>
+                ) : (
+                  <div className="grid gap-4">
+                    {allGcalConnections.map((conn) => (
+                      <div
+                        key={conn.id}
+                        className="border border-gray-200 rounded-lg p-4 hover:border-gray-300 transition-colors"
                       >
-                        {gcalCalendars.length === 0 && (
-                          <option value="primary">Primary Calendar</option>
-                        )}
-                        {gcalCalendars.map((cal) => (
-                          <option key={cal.id} value={cal.id}>
-                            {cal.summary}{cal.primary ? ' (primary)' : ''}
-                          </option>
-                        ))}
-                      </select>
-                    )}
-                    {gcalChangingCalendar && (
-                      <p className="text-xs text-gray-500 mt-1">Updating calendar...</p>
-                    )}
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <MapPin size={16} className={`text-${themeColor}-600`} />
+                              <span className="font-semibold text-gray-900">
+                                {conn.location.name}
+                              </span>
+                              <span className="text-sm text-gray-500">
+                                {conn.location.city}{conn.location.state ? `, ${conn.location.state}` : ''}
+                              </span>
+                              <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                                conn.is_connected
+                                  ? 'bg-green-100 text-green-700'
+                                  : 'bg-gray-100 text-gray-600'
+                              }`}>
+                                {conn.is_connected ? 'Connected' : 'Disconnected'}
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
+                              {conn.google_account_email && (
+                                <div>
+                                  <p className="text-xs text-gray-500 mb-1">Google Account</p>
+                                  <p className="text-sm text-gray-700">{conn.google_account_email}</p>
+                                </div>
+                              )}
+                              {conn.calendar_id && (
+                                <div>
+                                  <p className="text-xs text-gray-500 mb-1">Calendar</p>
+                                  <p className="text-sm text-gray-700 font-mono text-xs truncate">{conn.calendar_id === 'primary' ? 'Primary Calendar' : conn.calendar_id}</p>
+                                </div>
+                              )}
+                              {conn.last_synced_at && (
+                                <div>
+                                  <p className="text-xs text-gray-500 mb-1">Last Synced</p>
+                                  <p className="text-sm text-gray-700">
+                                    {new Date(conn.last_synced_at).toLocaleString()}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          <div className="ml-4 flex flex-col items-end gap-3">
+                            <div className={`w-3 h-3 rounded-full ${
+                              conn.is_connected ? 'bg-green-500 animate-pulse' : 'bg-gray-400'
+                            }`}></div>
+                            {conn.is_connected && (
+                              <StandardButton
+                                onClick={() => handleGcalLocationDisconnect(conn.location_id, conn.location.name)}
+                                variant="danger"
+                                size="sm"
+                                icon={Trash2}
+                                title="Disconnect this location"
+                              >
+                                Disconnect
+                              </StandardButton>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
+                )}
+              </div>
 
-                  {/* Sync Section */}
-                  <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                    <p className="text-sm font-medium text-gray-700 mb-3">Sync Existing Bookings</p>
-                    <div className="flex flex-col sm:flex-row gap-3">
-                      <div className="flex-1">
-                        <label className="block text-xs text-gray-500 mb-1">From date</label>
-                        <input
-                          type="date"
-                          value={gcalSyncFromDate}
-                          onChange={(e) => setGcalSyncFromDate(e.target.value)}
-                          className={`w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
-                        />
-                      </div>
-                      <div className="flex items-end">
-                        <StandardButton
-                          onClick={handleGcalSync}
-                          variant="primary"
-                          size="sm"
-                          loading={gcalSyncing}
-                          disabled={gcalSyncing}
-                          icon={RefreshCw}
-                        >
-                          Sync Now
-                        </StandardButton>
-                      </div>
-                    </div>
-                    {gcalSyncResult && (
-                      <div className="mt-3 p-3 bg-white rounded-lg border border-gray-200">
-                        <p className="text-sm text-gray-700">
-                          <span className="text-green-600 font-semibold">{gcalSyncResult.created}</span> created,{' '}
-                          <span className="text-yellow-600 font-semibold">{gcalSyncResult.skipped}</span> skipped,{' '}
-                          <span className="text-red-600 font-semibold">{gcalSyncResult.failed}</span> failed
-                        </p>
-                      </div>
-                    )}
-                    <p className="text-xs text-gray-500 mt-2">After syncing, all future booking changes auto-sync to Google Calendar.</p>
-                  </div>
-                </>
-              ) : null}
+              <div className="p-4 border-t border-gray-200 flex justify-end">
+                <StandardButton
+                  onClick={() => setShowGcalAllModal(false)}
+                  variant="secondary"
+                  size="sm"
+                >
+                  Close
+                </StandardButton>
+              </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Authorize.Net Connection Modal */}
         {showAuthorizeModal && (
