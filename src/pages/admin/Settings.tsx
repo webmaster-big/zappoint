@@ -165,9 +165,6 @@ const Settings = () => {
   const [allGcalConnections, setAllGcalConnections] = useState<GoogleCalendarConnection[]>([]);
   const [loadingGcalAll, setLoadingGcalAll] = useState(false);
   
-  // Google Calendar - user location_id for auto-select
-  const [userLocationId, setUserLocationId] = useState<number | null>(null);
-  
   useEffect(() => {
     // Load saved color from localStorage
     const { color, shade } = getThemeColor();
@@ -204,9 +201,8 @@ const Settings = () => {
     if (user) {
       setCurrentEmail(user.email || '');
       setUserRole(user.role || '');
-      // Auto-set location for non-company_admin users
+      // Auto-set location for non-company_admin users (value used silently, no UI display)
       if (user.location_id && user.role !== 'company_admin') {
-        setUserLocationId(user.location_id);
         setGcalSelectedLocationId(user.location_id);
       }
     }
@@ -978,6 +974,23 @@ const Settings = () => {
             </div>
           </div>
 
+          {/* Location Selector — company_admin only; other roles auto-resolve from their profile */}
+          {userRole === 'company_admin' && (
+            <div className="mb-4">
+              <select
+                value={gcalSelectedLocationId || ''}
+                onChange={(e) => handleGcalLocationChange(Number(e.target.value))}
+                className={`w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
+              >
+                <option value="">Select a location...</option>
+                {gcalLocations.map((loc) => (
+                  <option key={loc.id} value={loc.id}>
+                    {loc.name}{loc.city ? ` — ${loc.city}` : ''}{loc.state ? `, ${loc.state}` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div className="p-4 bg-gray-50 rounded-lg">
             {!gcalSelectedLocationId ? (
