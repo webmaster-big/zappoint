@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Palette, Lock, Mail, X, Eye, EyeOff, Building2, MapPin, Trash2, CheckCircle, Calendar, RefreshCw, ExternalLink } from 'lucide-react';
+import { Palette, Lock, Mail, X, Eye, EyeOff, Building2, MapPin, Trash2, CheckCircle, Calendar, RefreshCw, ExternalLink, HelpCircle, Info } from 'lucide-react';
 import { useThemeColor } from '../../hooks/useThemeColor';
 import StandardButton from '../../components/ui/StandardButton';
 import Toast from '../../components/ui/Toast';
@@ -946,7 +946,7 @@ const Settings = () => {
 
         {/* Google Calendar Integration Card */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-1">
             <h2 className="text-xl font-semibold text-gray-900">Google Calendar</h2>
             {userRole === 'company_admin' && (
               <StandardButton
@@ -962,37 +962,22 @@ const Settings = () => {
               </StandardButton>
             )}
           </div>
+          <div className="flex items-center gap-1.5 mb-4">
+            <p className="text-sm text-gray-500">Sync your bookings to Google Calendar automatically.</p>
+            <div className="relative group">
+              <HelpCircle size={14} className="text-gray-400 cursor-help" />
+              <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-72 bg-gray-900 text-white text-xs rounded-lg px-3 py-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 pointer-events-none shadow-lg">
+                <div className="space-y-1">
+                  <p>• New bookings automatically appear as calendar events</p>
+                  <p>• Changes & cancellations sync in real-time</p>
+                  <p>• Events are linked to the connected Google account</p>
+                  <p>• Each location can connect its own calendar</p>
+                </div>
+                <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-x-[6px] border-x-transparent border-t-[6px] border-t-gray-900"></div>
+              </div>
+            </div>
+          </div>
 
-          {/* Location Selector */}
-          {userRole === 'company_admin' ? (
-            <div className="mb-4">
-              <select
-                value={gcalSelectedLocationId || ''}
-                onChange={(e) => handleGcalLocationChange(Number(e.target.value))}
-                className={`w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
-              >
-                <option value="">Select a location...</option>
-                {gcalLocations.map((loc) => (
-                  <option key={loc.id} value={loc.id}>
-                    {loc.name}{loc.city ? ` — ${loc.city}` : ''}{loc.state ? `, ${loc.state}` : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
-          ) : userLocationId ? (
-            <div className="mb-4 flex items-center gap-2 text-sm text-gray-600">
-              <MapPin size={14} className={`text-${themeColor}-500`} />
-              <span className="font-medium">
-                {gcalLocations.find(l => l.id === userLocationId)?.name || `Location #${userLocationId}`}
-              </span>
-              {(() => {
-                const loc = gcalLocations.find(l => l.id === userLocationId);
-                return loc?.city ? (
-                  <span className="text-gray-400">· {loc.city}{loc.state ? `, ${loc.state}` : ''}</span>
-                ) : null;
-              })()}
-            </div>
-          ) : null}
 
           <div className="p-4 bg-gray-50 rounded-lg">
             {!gcalSelectedLocationId ? (
@@ -1007,8 +992,8 @@ const Settings = () => {
               </div>
             ) : gcalLoading ? (
               <div className="flex items-center gap-3 py-1">
-                <div className={`w-10 h-10 rounded-full bg-${themeColor}-50 flex items-center justify-center`}>
-                  <RefreshCw size={18} className={`text-${themeColor}-400 animate-spin`} />
+                <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center">
+                  <RefreshCw size={18} className="text-blue-500 animate-spin" />
                 </div>
                 <div>
                   <p className="text-sm font-medium text-gray-700">Checking connection…</p>
@@ -1026,26 +1011,33 @@ const Settings = () => {
                 </div>
               </div>
             ) : gcalStatus && !gcalStatus.is_connected ? (
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">
-                    <Calendar className="text-gray-400" size={20} />
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">
+                      <Calendar className="text-gray-400" size={20} />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Not Connected</p>
+                      <p className="text-sm text-gray-500">Sign in with Google to enable calendar sync</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-700">Google Calendar</p>
-                    <p className="text-sm text-gray-500">Not connected</p>
-                  </div>
+                  <StandardButton
+                    onClick={handleGcalConnect}
+                    variant="primary"
+                    size="sm"
+                    loading={gcalConnecting}
+                    disabled={gcalConnecting}
+                    icon={ExternalLink}
+                  >
+                    Connect
+                  </StandardButton>
                 </div>
-                <StandardButton
-                  onClick={handleGcalConnect}
-                  variant="primary"
-                  size="sm"
-                  loading={gcalConnecting}
-                  disabled={gcalConnecting}
-                  icon={ExternalLink}
-                >
-                  Connect
-                </StandardButton>
+                <div className="text-xs text-gray-400 bg-white border border-gray-200 rounded-lg px-3 py-2 space-y-0.5">
+                  <p>• A Google sign-in window will open — authorize access to your calendar.</p>
+                  <p>• New bookings will automatically appear as events on your Google Calendar.</p>
+                  <p>• Cancellations and changes are synced in real-time.</p>
+                </div>
               </div>
             ) : gcalStatus && gcalStatus.is_connected ? (
               <div className="space-y-3">
@@ -1065,21 +1057,42 @@ const Settings = () => {
                       <p className="text-xs text-gray-500">{gcalStatus.google_account_email}</p>
                     </div>
                   </div>
-                  <StandardButton
-                    onClick={handleGcalDisconnect}
-                    variant="danger"
-                    size="sm"
-                    loading={gcalDisconnecting}
-                    disabled={gcalDisconnecting}
-                  >
-                    Disconnect
-                  </StandardButton>
+                  <div className="relative group">
+                    <StandardButton
+                      onClick={handleGcalDisconnect}
+                      variant="danger"
+                      size="sm"
+                      loading={gcalDisconnecting}
+                      disabled={gcalDisconnecting}
+                    >
+                      Disconnect
+                    </StandardButton>
+                    <div className="absolute right-0 top-full mt-2 w-64 bg-gray-900 text-white text-xs rounded-lg px-3 py-2.5 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 pointer-events-none shadow-lg">
+                      <div className="flex items-start gap-2">
+                        <Info size={14} className="text-red-400 mt-0.5 shrink-0" />
+                        <div className="space-y-1">
+                          <p className="font-medium text-red-300">Warning</p>
+                          <p>Disconnecting will revoke calendar access and delete all previously synced booking events from Google Calendar.</p>
+                        </div>
+                      </div>
+                      <div className="absolute right-6 bottom-full w-0 h-0 border-x-[6px] border-x-transparent border-b-[6px] border-b-gray-900"></div>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Calendar & Sync — compact layout */}
                 <div className="pt-3 border-t border-gray-200 grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1">Calendar</label>
+                    <div className="flex items-center gap-1 mb-1">
+                      <label className="block text-xs font-medium text-gray-500">Target Calendar</label>
+                      <div className="relative group">
+                        <HelpCircle size={12} className="text-gray-400 cursor-help" />
+                        <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-56 bg-gray-900 text-white text-xs rounded-lg px-3 py-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 pointer-events-none shadow-lg">
+                          Booking events will be created in this calendar. Choose a specific calendar or use your primary one.
+                          <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-x-[6px] border-x-transparent border-t-[6px] border-t-gray-900"></div>
+                        </div>
+                      </div>
+                    </div>
                     {gcalLoadingCalendars ? (
                       <div className="flex items-center gap-2 text-xs text-gray-400 py-2">
                         <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-gray-400"></div>
@@ -1102,7 +1115,16 @@ const Settings = () => {
                     )}
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1">Sync bookings from</label>
+                    <div className="flex items-center gap-1 mb-1">
+                      <label className="block text-xs font-medium text-gray-500">Sync from date</label>
+                      <div className="relative group">
+                        <HelpCircle size={12} className="text-gray-400 cursor-help" />
+                        <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-56 bg-gray-900 text-white text-xs rounded-lg px-3 py-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 pointer-events-none shadow-lg">
+                          Only bookings on or after this date will be pushed to Google Calendar. Past bookings before this date are not synced.
+                          <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-x-[6px] border-x-transparent border-t-[6px] border-t-gray-900"></div>
+                        </div>
+                      </div>
+                    </div>
                     <div className="flex gap-2">
                       <input
                         type="date"
@@ -1132,6 +1154,27 @@ const Settings = () => {
                     <span className="text-red-600 font-semibold">{gcalSyncResult.failed}</span> failed
                   </div>
                 )}
+              </div>
+            ) : gcalSelectedLocationId ? (
+              /* Fallback: status fetch failed or returned null */
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-red-50 rounded-full flex items-center justify-center">
+                    <Calendar className="text-red-400" size={20} />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-700">Unable to load status</p>
+                    <p className="text-xs text-gray-400">Could not reach the server. Check your connection and try again.</p>
+                  </div>
+                </div>
+                <StandardButton
+                  onClick={() => fetchGcalStatus(gcalSelectedLocationId)}
+                  variant="ghost"
+                  size="sm"
+                  icon={RefreshCw}
+                >
+                  Retry
+                </StandardButton>
               </div>
             ) : null}
           </div>
