@@ -26,6 +26,16 @@ interface AttractionAvailabilitySchedule {
   end_time: string;
 }
 
+interface AttractionAddOn {
+  id: number;
+  name: string;
+  price: number;
+  description?: string;
+  image?: string;
+  min_quantity?: number;
+  max_quantity?: number;
+}
+
 interface Attraction {
   id: number;
   name: string;
@@ -41,6 +51,8 @@ interface Attraction {
   created_at: string;
   is_active: boolean;
   availability?: AttractionAvailabilitySchedule[];
+  add_ons?: AttractionAddOn[];
+  add_ons_order?: string[];
 }
 
 const AttractionDetails = () => {
@@ -280,6 +292,50 @@ const AttractionDetails = () => {
               </div>
             </div>
           </div>
+
+          {/* Add-ons */}
+          {attraction.add_ons && attraction.add_ons.length > 0 && (
+            <div className="p-6">
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">Add-ons</h2>
+              <div className="space-y-3">
+                {[...attraction.add_ons].sort((a, b) => {
+                  if (!attraction.add_ons_order || attraction.add_ons_order.length === 0) return 0;
+                  const indexA = attraction.add_ons_order.indexOf(a.name);
+                  const indexB = attraction.add_ons_order.indexOf(b.name);
+                  if (indexA === -1 && indexB === -1) return 0;
+                  if (indexA === -1) return 1;
+                  if (indexB === -1) return -1;
+                  return indexA - indexB;
+                }).map((addOn) => (
+                  <div key={addOn.id} className="flex items-center gap-4 border border-gray-200 rounded-lg p-4 bg-gray-50">
+                    <div className="w-14 h-14 flex-shrink-0 bg-gray-100 rounded-md overflow-hidden flex items-center justify-center">
+                      {addOn.image ? (
+                        <img src={ASSET_URL + addOn.image} alt={addOn.name} className="object-cover w-full h-full" />
+                      ) : (
+                        <span className="text-gray-400 text-xs">No Img</span>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-gray-900">{addOn.name}</p>
+                      {addOn.description && (
+                        <p className="text-sm text-gray-500 truncate">{addOn.description}</p>
+                      )}
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <p className="font-semibold text-gray-900">${Number(addOn.price).toFixed(2)}</p>
+                      {(addOn.min_quantity != null || addOn.max_quantity != null) && (
+                        <p className="text-xs text-gray-500">
+                          {addOn.min_quantity != null && `Min: ${addOn.min_quantity}`}
+                          {addOn.min_quantity != null && addOn.max_quantity != null && ' · '}
+                          {addOn.max_quantity != null && `Max: ${addOn.max_quantity}`}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Availability */}
           <div className="p-6">

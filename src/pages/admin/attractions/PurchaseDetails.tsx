@@ -13,7 +13,7 @@ import {
   DollarSign,
   FileText
 } from 'lucide-react';
-import { formatDurationDisplay, formatLocalDateTime } from '../../../utils/timeFormat';
+import { formatDurationDisplay, formatLocalDateTime, convertTo12Hour } from '../../../utils/timeFormat';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { attractionPurchaseService } from '../../../services/AttractionPurchaseService';
 import Toast from '../../../components/ui/Toast';
@@ -243,6 +243,24 @@ const PurchaseDetails = () => {
                 </div>
               </div>
 
+              {/* Scheduled Date & Time */}
+              {purchase.scheduled_date && (
+                <div className="flex items-start gap-3">
+                  <div className={`p-2 bg-${fullColor.replace('-600', '')}-100 rounded-lg`}>
+                    <Calendar className={`h-5 w-5 text-${fullColor}`} />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Scheduled</p>
+                    <p className="font-medium text-gray-900">
+                      {new Date(purchase.scheduled_date.substring(0, 10) + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                      {purchase.scheduled_time && (
+                        <span className="ml-2 text-gray-600">at {convertTo12Hour(purchase.scheduled_time)}</span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* Duration */}
               {purchase.attraction?.duration && (
                 <div className="flex items-start gap-3">
@@ -259,6 +277,33 @@ const PurchaseDetails = () => {
               )}
             </div>
           </div>
+
+          {/* Purchased Add-ons */}
+          {purchase.add_ons && purchase.add_ons.length > 0 && (
+            <div className="p-6 border-b border-gray-100">
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">Purchased Add-ons</h2>
+              <div className="space-y-3">
+                {purchase.add_ons.map((addOn: any, index: number) => (
+                  <div key={addOn.id || index} className="flex items-center justify-between border border-gray-200 rounded-lg p-4 bg-gray-50">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-gray-900">{addOn.name || addOn.add_on?.name || 'Add-on'}</p>
+                      <p className="text-sm text-gray-500">
+                        Qty: {addOn.quantity || addOn.pivot?.quantity || 1} × ${Number(addOn.price_at_purchase || addOn.pivot?.price_at_purchase || addOn.price || 0).toFixed(2)}
+                      </p>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <p className="font-semibold text-gray-900">
+                        ${(
+                          (addOn.quantity || addOn.pivot?.quantity || 1) *
+                          Number(addOn.price_at_purchase || addOn.pivot?.price_at_purchase || addOn.price || 0)
+                        ).toFixed(2)}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Payment Information */}
           <div className="p-6 border-b border-gray-100 bg-gray-50">

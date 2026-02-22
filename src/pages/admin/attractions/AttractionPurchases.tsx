@@ -16,7 +16,7 @@ import {
   RotateCcw,
   Archive
 } from 'lucide-react';
-import { formatDurationDisplay } from '../../../utils/timeFormat';
+import { formatDurationDisplay, convertTo12Hour } from '../../../utils/timeFormat';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
 import type { AttractionPurchasesPurchase, AttractionPurchasesFilterOptions } from '../../../types/AttractionPurchases.types';
@@ -132,6 +132,8 @@ const ManagePurchases = () => {
       duration: purchase.attraction?.duration ? formatDurationDisplay(purchase.attraction.duration, purchase.attraction.duration_unit) : '',
       activity: purchase.attraction?.category || '',
       locationId: purchase.location_id,
+      scheduledDate: purchase.scheduled_date || null,
+      scheduledTime: purchase.scheduled_time || null,
     }));
   };
 
@@ -522,6 +524,8 @@ const ManagePurchases = () => {
       duration: purchase.attraction?.duration ? formatDurationDisplay(purchase.attraction.duration, purchase.attraction.duration_unit) : '',
       activity: purchase.attraction?.category || '',
       locationId: purchase.location_id,
+      scheduledDate: purchase.scheduled_date || null,
+      scheduledTime: purchase.scheduled_time || null,
     }));
   };
 
@@ -871,6 +875,7 @@ const ManagePurchases = () => {
                 <th scope="col" className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Paid</th>
                 <th scope="col" className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Payment</th>
                 <th scope="col" className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Date</th>
+                <th scope="col" className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Scheduled</th>
                 <th scope="col" className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
                 <th scope="col" className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
               </tr>
@@ -878,7 +883,7 @@ const ManagePurchases = () => {
             <tbody className="divide-y divide-gray-100">
               {currentPurchases.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="px-4 py-8 text-center text-sm text-gray-600">
+                  <td colSpan={11} className="px-4 py-8 text-center text-sm text-gray-600">
                     No purchases found
                   </td>
                 </tr>
@@ -920,6 +925,18 @@ const ManagePurchases = () => {
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
                         {formatDate(purchase.createdAt)}
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {purchase.scheduledDate ? (
+                          <div>
+                            <div>{new Date(purchase.scheduledDate.substring(0, 10) + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
+                            {purchase.scheduledTime && (
+                              <div className="text-xs text-gray-400">{convertTo12Hour(purchase.scheduledTime)}</div>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-gray-300">—</span>
+                        )}
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap">
                         <select

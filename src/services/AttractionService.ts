@@ -46,6 +46,8 @@ export interface Attraction {
   updated_at: string;
   min_quantity?: number;
   max_quantity?: number;
+  add_ons?: Array<{ id: number; name: string; price: number; [key: string]: unknown }>;
+  add_ons_order?: string[];
 }
 
 export interface AttractionFilters {
@@ -82,6 +84,8 @@ export interface CreateAttractionData {
   rating?: number;
   min_age?: number;
   is_active?: boolean;
+  addon_ids?: number[];
+  add_ons_order?: string[];
 }
 
 export type UpdateAttractionData = Partial<CreateAttractionData>;

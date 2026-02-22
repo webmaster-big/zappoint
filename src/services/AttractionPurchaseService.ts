@@ -84,6 +84,12 @@ export interface CreatePurchaseData {
   status?: 'pending' | 'confirmed' | 'checked-in' | 'cancelled' | 'refunded';
   payment_id?: string;
   location_id?: number;
+  // Add-ons selected for this purchase
+  additional_addons?: Array<{
+    addon_id: number;
+    quantity: number;
+    price_at_purchase: number;
+  }>;
 }
 
 export interface UpdatePurchaseData extends Partial<CreatePurchaseData> {

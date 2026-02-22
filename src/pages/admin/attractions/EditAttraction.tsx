@@ -8,9 +8,10 @@ import { attractionCacheService } from '../../../services/AttractionCacheService
 import type { UpdateAttractionData } from '../../../services/AttractionService';
 import Toast from '../../../components/ui/Toast';
 import { ASSET_URL, getStoredUser } from '../../../utils/storage';
-import { categoryService } from '../../../services';
+import { categoryService, addOnService } from '../../../services';
+import { addOnCacheService } from '../../../services/AddOnCacheService';
 import type { Category } from '../../../services/CategoryService';
-import { Plus, Trash2, Info, Tag, Calendar, Clock } from 'lucide-react';
+import { Plus, Trash2, Info, Tag, Calendar, Clock, GripVertical, X } from 'lucide-react';
 import { formatTimeRange, formatDurationDisplay } from '../../../utils/timeFormat';
 import StandardButton from '../../../components/ui/StandardButton';
 
@@ -63,6 +64,40 @@ const EditAttraction = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [isActive, setIsActive] = useState<boolean>(false);
 
+  // Add-on state
+  const [addOns, setAddOns] = useState<{ id: number; name: string; price: number }[]>([]);
+  const [selectedAddOns, setSelectedAddOns] = useState<string[]>([]);
+  const [draggedAddOnIndex, setDraggedAddOnIndex] = useState<number | null>(null);
+
+  // Drag and drop handlers for add-ons
+  const handleAddOnDragStart = (index: number) => {
+    setDraggedAddOnIndex(index);
+  };
+
+  const handleAddOnDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedAddOnIndex === null || draggedAddOnIndex === index) return;
+
+    setSelectedAddOns((prev) => {
+      const newAddOns = [...prev];
+      const draggedItem = newAddOns[draggedAddOnIndex];
+      newAddOns.splice(draggedAddOnIndex, 1);
+      newAddOns.splice(index, 0, draggedItem);
+      setDraggedAddOnIndex(index);
+      return newAddOns;
+    });
+  };
+
+  const handleAddOnDragEnd = () => {
+    setDraggedAddOnIndex(null);
+  };
+
+  const handleAddOnToggle = (name: string) => {
+    setSelectedAddOns((prev) =>
+      prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]
+    );
+  };
+
   // Load attraction data
   useEffect(() => {
     if (!id) {
@@ -102,6 +137,13 @@ const EditAttraction = () => {
         // Preserve the current active status
         setIsActive(attraction.is_active ?? true);
 
+        // Pre-populate selected add-ons from the attraction's add_ons_order
+        if (attraction.add_ons_order && Array.isArray(attraction.add_ons_order)) {
+          setSelectedAddOns(attraction.add_ons_order);
+        } else if (attraction.add_ons && Array.isArray(attraction.add_ons)) {
+          setSelectedAddOns(attraction.add_ons.map((a: any) => a.name));
+        }
+
         // Set image previews if images exist (handle both string and array)
         if (attraction.image) {
           const images = Array.isArray(attraction.image) ? attraction.image : [attraction.image];
@@ -132,7 +174,31 @@ const EditAttraction = () => {
       }
     };
     
+    // Fetch add-ons
+    const fetchAddOns = async () => {
+      try {
+        const params: { user_id?: number } = { user_id: getStoredUser()?.id };
+        const cacheFilters = { is_active: true as const };
+        const cachedAddOns = await addOnCacheService.getFilteredAddOnsFromCache(cacheFilters);
+
+        if (cachedAddOns && cachedAddOns.length > 0) {
+          addOnCacheService.syncInBackground(params);
+          setAddOns(cachedAddOns.map(a => ({ id: a.id, name: a.name, price: a.price || 0 })));
+        } else {
+          const res = await addOnService.getAddOns(params);
+          const list = res.data?.add_ons || [];
+          if (list.length > 0) {
+            await addOnCacheService.cacheAddOns(list);
+          }
+          setAddOns(list.map((a: any) => ({ id: a.id, name: a.name, price: a.price || 0 })));
+        }
+      } catch (error) {
+        console.error('Error fetching add-ons:', error);
+      }
+    };
+    
     fetchCategories();
+    fetchAddOns();
   }, [id]);
 
   const handleInputChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -311,6 +377,8 @@ const EditAttraction = () => {
         availability: formData.availability,
         image: formData.images.length > 0 ? formData.images : undefined, // Send all images as array
         is_active: isActive,
+        addon_ids: selectedAddOns.map(name => addOns.find(a => a.name === name)?.id).filter(Boolean) as number[],
+        add_ons_order: selectedAddOns,
       };
 
       console.log('Updating attraction data:', attractionData);
@@ -734,6 +802,85 @@ const EditAttraction = () => {
                 >
                   Add Another Schedule
                 </StandardButton>
+              </div>
+            </div>
+
+            {/* Add-ons Section */}
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-bold text-neutral-900 flex items-center gap-2 relative group">
+                  <Info className="w-5 h-5 text-primary" /> Add-ons
+                  <span className="absolute z-20 left-0 top-full mt-2 min-w-[250px] max-w-xs bg-gray-900 text-white text-xs rounded-md px-3 py-2 opacity-0 group-hover:opacity-100 pointer-events-none transition-all">
+                    Optional extras that customers can add when purchasing this attraction
+                  </span>
+                </h3>
+                <StandardButton
+                  type="button"
+                  onClick={() => {
+                    if (selectedAddOns.length === addOns.length) {
+                      setSelectedAddOns([]);
+                    } else {
+                      setSelectedAddOns(addOns.map(a => a.name));
+                    }
+                  }}
+                  variant={selectedAddOns.length === addOns.length ? 'primary' : 'ghost'}
+                  size="sm"
+                >
+                  {selectedAddOns.length === addOns.length ? 'Deselect All' : 'Select All'}
+                </StandardButton>
+              </div>
+
+              {/* Selected Add-ons - Draggable list */}
+              {selectedAddOns.length > 0 && (
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-600 mb-2">Selected Add-ons <span className="text-xs font-normal text-gray-500">(drag to reorder)</span></label>
+                  <div className="space-y-2">
+                    {selectedAddOns.map((addOnName, index) => {
+                      const addOn = addOns.find(a => a.name === addOnName);
+                      return (
+                        <div
+                          key={addOnName}
+                          className={`flex items-center gap-2 p-2 bg-green-50 border border-green-200 rounded-lg ${draggedAddOnIndex === index ? 'opacity-50' : ''}`}
+                          draggable
+                          onDragStart={() => handleAddOnDragStart(index)}
+                          onDragOver={(e) => handleAddOnDragOver(e, index)}
+                          onDragEnd={handleAddOnDragEnd}
+                        >
+                          <div className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600">
+                            <GripVertical size={18} />
+                          </div>
+                          <span className="flex-1 text-sm font-medium text-gray-800">{addOnName}</span>
+                          {addOn && <span className="text-xs text-green-600">${addOn.price}</span>}
+                          <button
+                            type="button"
+                            onClick={() => handleAddOnToggle(addOnName)}
+                            className="text-red-500 hover:text-red-700 p-1"
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Available Add-ons to select */}
+              <div className="flex flex-wrap gap-2 mb-2">
+                {addOns.filter(add => !selectedAddOns.includes(add.name)).map((add) => (
+                  <StandardButton
+                    type="button"
+                    key={add.name}
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => handleAddOnToggle(add.name)}
+                  >
+                    {add.name} <span className="text-xs opacity-70">${add.price}</span>
+                  </StandardButton>
+                ))}
+                {addOns.length === 0 && (
+                  <p className="text-sm text-gray-400">No add-ons available. Create add-ons from the Add-ons management page.</p>
+                )}
               </div>
             </div>
 

@@ -16,6 +16,8 @@ export interface AttractionPurchasesPurchase {
   duration: string;
   activity: string;
   locationId?: number;
+  scheduledDate?: string | null;
+  scheduledTime?: string | null;
 }
 
 export interface AttractionPurchasesFilterOptions {

@@ -1,5 +1,16 @@
 // Types for: src/pages/admin/attractions/PurchaseAttraction.tsx
 
+export interface PurchaseAttractionAddOn {
+  id: number;
+  name: string;
+  price: number;
+  description?: string;
+  image?: string;
+  is_active?: boolean;
+  min_quantity?: number;
+  max_quantity?: number;
+}
+
 export interface PurchaseAttractionAttraction {
   id: string;
   name: string;
@@ -16,6 +27,8 @@ export interface PurchaseAttractionAttraction {
   status: 'active' | 'inactive';
   createdAt: string;
   availability: Record<string, boolean> | Array<{ days: string[]; start_time: string; end_time: string }>;
+  addOns?: PurchaseAttractionAddOn[];
+  addOnsOrder?: string[];
 }
 
 export interface PurchaseAttractionCustomerInfo {

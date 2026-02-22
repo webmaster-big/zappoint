@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { formatDurationDisplay } from '../../../utils/timeFormat';
 import { useThemeColor } from '../../../hooks/useThemeColor';
-import type { CreatePurchaseAttraction, CreatePurchaseCustomerInfo } from '../../../types/CreatePurchase.types';
+import type { CreatePurchaseAttraction, CreatePurchaseCustomerInfo, CreatePurchaseAddOn } from '../../../types/CreatePurchase.types';
 import { attractionService, type Attraction } from '../../../services/AttractionService';
 import { attractionCacheService } from '../../../services/AttractionCacheService';
 import { attractionPurchaseService } from '../../../services/AttractionPurchaseService';
@@ -84,6 +84,11 @@ const CreatePurchase = () => {
   const [availableTimeSlots, setAvailableTimeSlots] = useState<string[]>([]);
   const [dayOffDates, setDayOffDates] = useState<Set<string>>(new Set());
   
+  // Add-on state
+  const [selectedAddOns, setSelectedAddOns] = useState<{ [id: number]: number }>({});
+  const [showAddOnDetailsModal, setShowAddOnDetailsModal] = useState(false);
+  const [selectedAddOnForDetails, setSelectedAddOnForDetails] = useState<CreatePurchaseAddOn | null>(null);
+  
   const currentUser = getStoredUser();
   const isCompanyAdmin = currentUser?.role === 'company_admin';
   const [locations, setLocations] = useState<Array<{ id: number; name: string; address?: string; city?: string; state?: string }>>([]);
@@ -140,6 +145,17 @@ const CreatePurchase = () => {
             status: attr.is_active ? 'active' : 'inactive',
             createdAt: attr.created_at,
             availability: (attr.availability || {}) as CreatePurchaseAttraction['availability'],
+            addOns: (attr as any).add_ons?.map((a: any) => ({
+              id: a.id,
+              name: a.name,
+              price: Number(a.price),
+              description: a.description,
+              image: a.image,
+              is_active: a.is_active,
+              min_quantity: a.min_quantity,
+              max_quantity: a.max_quantity,
+            })) || [],
+            addOnsOrder: (attr as any).add_ons_order || [],
           }));
           
           setAttractions(convertedAttractions);
@@ -185,6 +201,17 @@ const CreatePurchase = () => {
           status: attr.is_active ? 'active' : 'inactive',
           createdAt: attr.created_at,
           availability: (attr.availability || {}) as CreatePurchaseAttraction['availability'],
+          addOns: (attr as any).add_ons?.map((a: any) => ({
+            id: a.id,
+            name: a.name,
+            price: Number(a.price),
+            description: a.description,
+            image: a.image,
+            is_active: a.is_active,
+            min_quantity: a.min_quantity,
+            max_quantity: a.max_quantity,
+          })) || [],
+          addOnsOrder: (attr as any).add_ons_order || [],
         }));
         
         setAttractions(convertedAttractions);
@@ -329,9 +356,26 @@ const CreatePurchase = () => {
     return selectedAttraction.price * quantity;
   };
 
+  const calculateAddOnsTotal = () => {
+    if (!selectedAttraction || !selectedAttraction.addOns) return 0;
+    return Object.entries(selectedAddOns).reduce((sum, [idStr, qty]) => {
+      const addOn = selectedAttraction.addOns?.find(a => a.id === Number(idStr));
+      return sum + (addOn ? addOn.price * qty : 0);
+    }, 0);
+  };
+
   const calculateTotal = () => {
     const subtotal = calculateSubtotal();
-    return Math.max(0, subtotal - discount);
+    const addOnsTotal = calculateAddOnsTotal();
+    return Math.max(0, subtotal + addOnsTotal - discount);
+  };
+
+  const handleAddOnQty = (addOnId: number, qty: number) => {
+    const addOn = selectedAttraction?.addOns?.find(a => a.id === addOnId);
+    const minQty = 0;
+    const maxQty = addOn?.max_quantity ?? 99;
+    const clamped = Math.max(minQty, Math.min(maxQty, qty));
+    setSelectedAddOns(prev => ({ ...prev, [addOnId]: clamped }));
   };
   
   // Use dynamic fee breakdown if available - no fallback to hardcoded rate
@@ -348,8 +392,7 @@ const CreatePurchase = () => {
         return;
       }
       try {
-        const subtotal = selectedAttraction.price * quantity;
-        const basePrice = Math.max(0, subtotal - discount);
+        const basePrice = calculateTotal();
         const response = await feeSupportService.getForEntity({
           entity_type: 'attraction',
           entity_id: Number(selectedAttraction.id),
@@ -365,7 +408,7 @@ const CreatePurchase = () => {
       }
     };
     fetchFeeBreakdown();
-  }, [selectedAttraction, quantity, discount, selectedLocation]);
+  }, [selectedAttraction, quantity, discount, selectedLocation, selectedAddOns]);
 
   // Fetch special pricing breakdown for attraction (use today's date for immediate purchases)
   useEffect(() => {
@@ -403,6 +446,7 @@ const CreatePurchase = () => {
     setDiscount(0);
     setScheduledDate('');
     setScheduledTime('');
+    setSelectedAddOns({});
   };
 
   // --- Schedule picker helpers ---
@@ -535,6 +579,20 @@ const CreatePurchase = () => {
       const cashAmountPaid = amountPaid > 0 ? amountPaid : totalAmount;
 
       // Step 1: Create purchase FIRST (so we have the purchase ID for payment)
+      // Build additional_addons array from selected add-ons
+      const additionalAddons = Object.entries(selectedAddOns)
+        .filter(([, qty]) => qty > 0)
+        .map(([idStr, qty]) => {
+          const addOn = selectedAttraction.addOns?.find(a => a.id === Number(idStr));
+          if (!addOn) return null;
+          return {
+            addon_id: Number(idStr),
+            quantity: qty,
+            price_at_purchase: addOn.price,
+          };
+        })
+        .filter((item): item is { addon_id: number; quantity: number; price_at_purchase: number } => item !== null);
+
       const purchaseData = {
         attraction_id: Number(selectedAttraction.id),
         customer_id: selectedCustomerId || undefined,
@@ -553,6 +611,7 @@ const CreatePurchase = () => {
         scheduled_time: scheduledTime || undefined,
         notes: notes || `Attraction Purchase: ${selectedAttraction.name} (${quantity} ticket${quantity > 1 ? 's' : ''})`,
         send_email: sendEmail,
+        additional_addons: additionalAddons.length > 0 ? additionalAddons : undefined,
       };
 
       const response = await attractionPurchaseService.createPurchase(purchaseData);
@@ -704,6 +763,7 @@ const CreatePurchase = () => {
       setSendEmail(true);
       setScheduledDate('');
       setScheduledTime('');
+      setSelectedAddOns({});
 
     } catch (error: any) {
       setPaymentError(error.message || 'Payment processing failed. Please try again.');
@@ -975,6 +1035,78 @@ const CreatePurchase = () => {
                   </div>
                 </div>
 
+                {/* Add-ons Selection */}
+                {selectedAttraction.addOns && selectedAttraction.addOns.length > 0 && (
+                  <div className="mt-6 pt-5 border-t border-gray-100">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Tag className="h-4 w-4 text-gray-500" />
+                      <h3 className="text-sm font-medium text-gray-700">Add-ons</h3>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {[...selectedAttraction.addOns].sort((a, b) => {
+                        if (!selectedAttraction.addOnsOrder || selectedAttraction.addOnsOrder.length === 0) return 0;
+                        const indexA = selectedAttraction.addOnsOrder.indexOf(a.name);
+                        const indexB = selectedAttraction.addOnsOrder.indexOf(b.name);
+                        if (indexA === -1 && indexB === -1) return 0;
+                        if (indexA === -1) return 1;
+                        if (indexB === -1) return -1;
+                        return indexA - indexB;
+                      }).map((addOn) => {
+                        const maxQty = addOn.max_quantity ?? 99;
+                        const currentQty = selectedAddOns[addOn.id] || 0;
+
+                        return (
+                          <div key={addOn.id} className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
+                            {/* Add-on Image */}
+                            <div className="w-10 h-10 flex-shrink-0 flex items-center justify-center bg-gray-100 rounded-md overflow-hidden">
+                              {addOn.image ? (
+                                <img src={ASSET_URL + addOn.image} alt={addOn.name} className="object-cover w-full h-full" />
+                              ) : (
+                                <span className="text-gray-400 text-[8px]">No Img</span>
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1">
+                                <span className="font-medium text-gray-800 text-xs truncate">{addOn.name}</span>
+                                {addOn.description && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedAddOnForDetails(addOn);
+                                      setShowAddOnDetailsModal(true);
+                                    }}
+                                    className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors font-medium flex-shrink-0"
+                                  >
+                                    Details
+                                  </button>
+                                )}
+                              </div>
+                              <span className="block text-[10px] text-gray-500">${addOn.price.toFixed(2)} each</span>
+                            </div>
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              <button
+                                className="w-6 h-6 rounded bg-white border border-gray-300 text-gray-800 flex items-center justify-center text-xs font-semibold disabled:opacity-50"
+                                onClick={() => handleAddOnQty(addOn.id, currentQty - 1)}
+                                disabled={currentQty <= 0}
+                              >
+                                -
+                              </button>
+                              <span className="w-6 text-center text-xs font-medium">{currentQty}</span>
+                              <button
+                                className="w-6 h-6 rounded bg-white border border-gray-300 text-gray-800 flex items-center justify-center text-xs font-semibold disabled:opacity-50"
+                                onClick={() => handleAddOnQty(addOn.id, currentQty + 1)}
+                                disabled={currentQty >= maxQty}
+                              >
+                                +
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 {/* Schedule Selection (full width below grid) */}
                 {getAttractionAvailability().length > 0 && (
                   <div className="mt-6 pt-5 border-t border-gray-100">
@@ -1206,6 +1338,17 @@ const CreatePurchase = () => {
                       <span>Qty: {quantity} × ${selectedAttraction.price}</span>
                       <span className="font-medium">${calculateSubtotal().toFixed(2)}</span>
                     </div>
+                    {/* Selected Add-ons */}
+                    {Object.entries(selectedAddOns).filter(([, qty]) => qty > 0).map(([idStr, qty]) => {
+                      const addOn = selectedAttraction.addOns?.find(a => a.id === Number(idStr));
+                      if (!addOn) return null;
+                      return (
+                        <div key={idStr} className="flex justify-between text-gray-600">
+                          <span className="truncate pr-2">{addOn.name} × {qty}</span>
+                          <span className="font-medium">${(addOn.price * qty).toFixed(2)}</span>
+                        </div>
+                      );
+                    })}
                     {discount > 0 && (
                       <div className="flex justify-between text-red-600">
                         <span>Discount</span>
@@ -1280,6 +1423,50 @@ const CreatePurchase = () => {
           </div>
         </div>
       </div>
+
+      {/* Add-On Details Modal */}
+      {showAddOnDetailsModal && selectedAddOnForDetails && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-backdrop-fade" onClick={() => setShowAddOnDetailsModal(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="sticky top-0 bg-white p-4 flex justify-between items-center border-b border-gray-100">
+              <h3 className="text-lg font-semibold text-gray-800">{selectedAddOnForDetails.name}</h3>
+              <button
+                onClick={() => setShowAddOnDetailsModal(false)}
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+            <div className="p-6">
+              <div className="mb-6 flex justify-center">
+                {selectedAddOnForDetails.image ? (
+                  <img
+                    src={ASSET_URL + selectedAddOnForDetails.image}
+                    alt={selectedAddOnForDetails.name}
+                    className="max-w-full max-h-64 object-contain rounded-lg shadow-sm"
+                  />
+                ) : (
+                  <div className="w-full h-48 bg-gray-100 rounded-lg flex items-center justify-center">
+                    <span className="text-gray-400">No image available</span>
+                  </div>
+                )}
+              </div>
+              <div className="mb-4 flex items-center justify-between">
+                <span className="text-gray-600 text-sm">Price:</span>
+                <span className={`text-lg font-semibold text-${themeColor}-600`}>${selectedAddOnForDetails.price.toFixed(2)}</span>
+              </div>
+              <div className="pt-4 border-t border-gray-100">
+                <h4 className="text-sm font-medium text-gray-700 mb-2">Description</h4>
+                {selectedAddOnForDetails.description ? (
+                  <p className="text-sm text-gray-600 whitespace-pre-wrap">{selectedAddOnForDetails.description}</p>
+                ) : (
+                  <p className="text-sm text-gray-400 italic">No description available</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* No Authorize.Net Account Modal */}
       {showNoAuthAccountModal && (

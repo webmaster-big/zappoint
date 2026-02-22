@@ -1871,7 +1871,7 @@ const BookPackage: React.FC = () => {
                 {pkg.add_ons && pkg.add_ons.length > 0 && (
                   <div className="bg-gray-50/80 rounded-xl p-4 md:p-5">
                     <label className="block font-medium mb-3 text-gray-800 text-xs md:text-sm uppercase tracking-wide">Add-ons</label>
-                    <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       {[...pkg.add_ons].sort((a, b) => {
                         // Sort by add_ons_order if available, otherwise keep original order
                         if (!pkg.add_ons_order || pkg.add_ons_order.length === 0) return 0;

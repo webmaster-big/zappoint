@@ -15,7 +15,7 @@ import {
   DollarSign
 } from 'lucide-react';
 import { formatDurationDisplay } from '../../../utils/timeFormat';
-import type { PurchaseAttractionAttraction, PurchaseAttractionCustomerInfo } from '../../../types/PurchaseAttraction.types';
+import type { PurchaseAttractionAttraction, PurchaseAttractionCustomerInfo, PurchaseAttractionAddOn } from '../../../types/PurchaseAttraction.types';
 import { attractionService, type Attraction } from '../../../services/AttractionService';
 import { attractionPurchaseService } from '../../../services/AttractionPurchaseService';
 import { customerService, type Customer } from '../../../services/CustomerService';
@@ -184,6 +184,11 @@ const PurchaseAttraction = () => {
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showMobileSummary, setShowMobileSummary] = useState(false);
+
+  // Add-on selection state: { addonId: quantity }
+  const [selectedAddOns, setSelectedAddOns] = useState<{ [id: number]: number }>({});
+  const [showAddOnDetailsModal, setShowAddOnDetailsModal] = useState(false);
+  const [selectedAddOnForDetails, setSelectedAddOnForDetails] = useState<PurchaseAttractionAddOn | null>(null);
 
   // Signature & Terms state
   const [signatureImage, setSignatureImage] = useState<string | null>(null);
@@ -403,6 +408,17 @@ const PurchaseAttraction = () => {
           status: attr.is_active ? 'active' : 'inactive',
           createdAt: attr.created_at,
           availability: (attr.availability as PurchaseAttractionAttraction['availability']) || {},
+          addOns: attr.add_ons?.map((a: any) => ({
+            id: a.id,
+            name: a.name,
+            price: Number(a.price) || 0,
+            description: a.description || '',
+            image: a.image || undefined,
+            is_active: a.is_active,
+            min_quantity: a.min_quantity || 0,
+            max_quantity: a.max_quantity || 99,
+          })) || [],
+          addOnsOrder: attr.add_ons_order || [],
         };
         setAttraction(convertedAttraction);
       } catch {
@@ -525,7 +541,30 @@ const PurchaseAttraction = () => {
   // Calculate total
   const calculateTotal = () => {
     if (!attraction) return 0;
-    return parseFloat(attraction.price.toString()) * quantity;
+    const base = parseFloat(attraction.price.toString()) * quantity;
+    const addOnsSum = Object.entries(selectedAddOns).reduce((sum, [idStr, qty]) => {
+      const id = Number(idStr);
+      const addOn = attraction.addOns?.find(a => a.id === id);
+      if (!addOn) return sum;
+      return sum + addOn.price * qty;
+    }, 0);
+    return base + addOnsSum;
+  };
+
+  // Handle add-on quantity change
+  const handleAddOnQty = (id: number, qty: number) => {
+    const addOn = attraction?.addOns?.find(a => a.id === id);
+    if (!addOn) return;
+    const maxQty = addOn.max_quantity || 99;
+    const minQty = addOn.min_quantity || 0;
+    if (qty > maxQty) qty = maxQty;
+    if (qty < 0) qty = 0;
+    // If going from 0 to positive and min_quantity is set, use min_quantity
+    const currentQty = selectedAddOns[id] || 0;
+    if (currentQty === 0 && qty > 0 && minQty > 1) {
+      qty = minQty;
+    }
+    setSelectedAddOns(prev => ({ ...prev, [id]: Math.max(0, qty) }));
   };
   
   // Use dynamic fee breakdown if available - no fallback to hardcoded rate
@@ -542,7 +581,7 @@ const PurchaseAttraction = () => {
         return;
       }
       try {
-        const basePrice = parseFloat(attraction.price.toString()) * quantity;
+        const basePrice = calculateTotal();
         const response = await feeSupportService.getForEntity({
           entity_type: 'attraction',
           entity_id: Number(attraction.id),
@@ -558,7 +597,7 @@ const PurchaseAttraction = () => {
       }
     };
     fetchFeeBreakdown();
-  }, [attraction, quantity]);
+  }, [attraction, quantity, selectedAddOns]);
 
   // Fetch special pricing breakdown for attraction (use today's date for immediate purchases)
   useEffect(() => {
@@ -570,7 +609,7 @@ const PurchaseAttraction = () => {
       try {
         // Use today's date for immediate attraction purchases
         const today = new Date().toISOString().split('T')[0];
-        const basePrice = parseFloat(attraction.price.toString()) * quantity;
+        const basePrice = calculateTotal();
         const breakdown = await specialPricingService.getPriceBreakdown({
           entity_type: 'attraction',
           entity_id: Number(attraction.id),
@@ -588,7 +627,7 @@ const PurchaseAttraction = () => {
       }
     };
     fetchSpecialPricing();
-  }, [attraction, quantity]);
+  }, [attraction, quantity, selectedAddOns]);
 
   // Synchronous ref guard to prevent multi-click duplicate submissions
   const isSubmittingRef = useRef(false);
@@ -662,6 +701,20 @@ const PurchaseAttraction = () => {
       
       // ===== CREATE-FIRST FLOW =====
       // Step 1: Create attraction purchase FIRST (no charge yet)
+      // Build additional_addons array from selected add-ons
+      const additionalAddons = Object.entries(selectedAddOns)
+        .filter(([, qty]) => qty > 0)
+        .map(([idStr, qty]) => {
+          const addOn = attraction.addOns?.find(a => a.id === Number(idStr));
+          if (!addOn) return null;
+          return {
+            addon_id: Number(idStr),
+            quantity: qty,
+            price_at_purchase: addOn.price,
+          };
+        })
+        .filter((item): item is { addon_id: number; quantity: number; price_at_purchase: number } => item !== null);
+
       const purchaseData = {
         attraction_id: Number(attraction.id),
         customer_id: selectedCustomerId || undefined,
@@ -679,6 +732,7 @@ const PurchaseAttraction = () => {
         scheduled_date: scheduledDate || undefined,
         scheduled_time: scheduledTime || undefined,
         notes: `Attraction Purchase: ${attraction.name} (${quantity} ticket${quantity > 1 ? 's' : ''})`,
+        additional_addons: additionalAddons.length > 0 ? additionalAddons : undefined,
       };
 
       let response;
@@ -956,6 +1010,77 @@ const PurchaseAttraction = () => {
                       onTimeSelect={(time) => setScheduledTime(time)}
                       themeColor="blue"
                     />
+                  )}
+
+                  {/* Add-ons Selection */}
+                  {attraction.addOns && attraction.addOns.length > 0 && (
+                    <div className="bg-gray-50/80 rounded-xl p-4 md:p-5">
+                      <label className="block font-medium mb-3 text-gray-800 text-xs md:text-sm uppercase tracking-wide">Add-ons</label>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {[...attraction.addOns].sort((a, b) => {
+                          if (!attraction.addOnsOrder || attraction.addOnsOrder.length === 0) return 0;
+                          const indexA = attraction.addOnsOrder.indexOf(a.name);
+                          const indexB = attraction.addOnsOrder.indexOf(b.name);
+                          if (indexA === -1 && indexB === -1) return 0;
+                          if (indexA === -1) return 1;
+                          if (indexB === -1) return -1;
+                          return indexA - indexB;
+                        }).map((addOn) => {
+                          const maxQty = addOn.max_quantity ?? 99;
+                          const currentQty = selectedAddOns[addOn.id] || 0;
+
+                          return (
+                            <div key={addOn.id} className="flex items-center gap-2 p-2 md:p-3 rounded-lg bg-white">
+                              {/* Add-on Image */}
+                              <div className="w-10 h-10 md:w-12 md:h-12 flex-shrink-0 flex items-center justify-center bg-gray-100 rounded-md overflow-hidden">
+                                {addOn.image ? (
+                                  <img src={ASSET_URL + addOn.image} alt={addOn.name} className="object-cover w-full h-full" />
+                                ) : (
+                                  <span className="text-gray-400 text-[8px]">No Img</span>
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-1 flex-wrap">
+                                  <span className="font-medium text-gray-800 text-xs md:text-sm truncate">{addOn.name}</span>
+                                  {addOn.description && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setSelectedAddOnForDetails(addOn);
+                                        setShowAddOnDetailsModal(true);
+                                      }}
+                                      className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors font-medium flex-shrink-0"
+                                    >
+                                      Details
+                                    </button>
+                                  )}
+                                </div>
+                                <span className="block text-[10px] md:text-xs text-gray-500 mt-0.5">
+                                  ${addOn.price.toFixed(2)} each
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1 flex-shrink-0">
+                                <button
+                                  className="w-6 h-6 md:w-7 md:h-7 rounded-md bg-white border border-gray-300 text-gray-800 flex items-center justify-center text-xs font-semibold shadow-sm disabled:opacity-50"
+                                  onClick={() => handleAddOnQty(addOn.id, currentQty - 1)}
+                                  disabled={currentQty <= 0}
+                                >
+                                  -
+                                </button>
+                                <span className="w-6 md:w-8 text-center text-xs md:text-sm font-medium">{currentQty}</span>
+                                <button
+                                  className="w-6 h-6 md:w-7 md:h-7 rounded-md bg-white border border-gray-300 text-gray-800 flex items-center justify-center text-xs font-semibold shadow-sm disabled:opacity-50"
+                                  onClick={() => handleAddOnQty(addOn.id, currentQty + 1)}
+                                  disabled={currentQty >= maxQty}
+                                >
+                                  +
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
                   )}
                   
                   <div className="flex justify-end">
@@ -1715,6 +1840,23 @@ const PurchaseAttraction = () => {
                       </div>
                     </>
                   )}
+
+                  {/* Selected Add-ons */}
+                  {Object.entries(selectedAddOns).filter(([, qty]) => qty > 0).length > 0 && (
+                    <div className="mt-2 pt-2 border-t border-gray-200 space-y-1.5">
+                      <span className="text-xs font-medium text-gray-600 uppercase tracking-wide">Add-ons</span>
+                      {Object.entries(selectedAddOns).filter(([, qty]) => qty > 0).map(([idStr, qty]) => {
+                        const addOn = attraction.addOns?.find(a => a.id === Number(idStr));
+                        if (!addOn) return null;
+                        return (
+                          <div key={idStr} className="flex justify-between items-center">
+                            <span className="text-xs text-gray-500 truncate pr-2">{addOn.name} × {qty}</span>
+                            <span className="font-medium text-xs md:text-sm">${(addOn.price * qty).toFixed(2)}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                   </div>
                   
                   {/* Special pricing discount */}
@@ -1890,6 +2032,23 @@ const PurchaseAttraction = () => {
                       <span className="font-medium text-sm">{quantity}</span>
                     </div>
                   )}
+
+                  {/* Selected Add-ons */}
+                  {Object.entries(selectedAddOns).filter(([, qty]) => qty > 0).length > 0 && (
+                    <div className="mt-2 pt-2 border-t border-gray-200 space-y-1.5">
+                      <span className="text-xs font-medium text-gray-600 uppercase tracking-wide">Add-ons</span>
+                      {Object.entries(selectedAddOns).filter(([, qty]) => qty > 0).map(([idStr, qty]) => {
+                        const addOn = attraction.addOns?.find(a => a.id === Number(idStr));
+                        if (!addOn) return null;
+                        return (
+                          <div key={idStr} className="flex justify-between items-center">
+                            <span className="text-xs text-gray-500 truncate pr-2">{addOn.name} × {qty}</span>
+                            <span className="font-medium text-xs">${(addOn.price * qty).toFixed(2)}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
 
                 {specialPricingBreakdown && specialPricingBreakdown.has_special_pricing && (
@@ -1940,6 +2099,52 @@ const PurchaseAttraction = () => {
       )}
 
 
+
+      {/* Add-On Details Modal */}
+      {showAddOnDetailsModal && selectedAddOnForDetails && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-backdrop-fade" onClick={() => setShowAddOnDetailsModal(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="sticky top-0 bg-white p-4 flex justify-between items-center border-b border-gray-100">
+              <h3 className="text-lg font-semibold text-gray-800">{selectedAddOnForDetails.name}</h3>
+              <button
+                onClick={() => setShowAddOnDetailsModal(false)}
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+              </button>
+            </div>
+            <div className="p-6">
+              <div className="mb-6 flex justify-center">
+                {selectedAddOnForDetails.image ? (
+                  <img
+                    src={ASSET_URL + selectedAddOnForDetails.image}
+                    alt={selectedAddOnForDetails.name}
+                    className="max-w-full max-h-64 object-contain rounded-lg shadow-sm"
+                  />
+                ) : (
+                  <div className="w-full h-48 bg-gray-100 rounded-lg flex items-center justify-center">
+                    <span className="text-gray-400">No image available</span>
+                  </div>
+                )}
+              </div>
+              <div className="mb-4 flex items-center justify-between">
+                <span className="text-gray-600 text-sm">Price:</span>
+                <span className="text-lg font-semibold text-blue-800">${selectedAddOnForDetails.price.toFixed(2)}</span>
+              </div>
+              <div className="pt-4 border-t border-gray-100">
+                <h4 className="text-sm font-medium text-gray-700 mb-2">Description</h4>
+                {selectedAddOnForDetails.description ? (
+                  <p className="text-sm text-gray-600 whitespace-pre-wrap">{selectedAddOnForDetails.description}</p>
+                ) : (
+                  <p className="text-sm text-gray-400 italic">No description available</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* QR Code Modal */}
       {showQRModal && qrCodeImage && (
