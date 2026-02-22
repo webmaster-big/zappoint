@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   ShoppingCart, 
   CreditCard, 
@@ -492,21 +492,30 @@ const CreatePurchase = () => {
     }
   }, [scheduledDate, selectedAttraction]);
 
+  // Synchronous ref guard to prevent multi-click duplicate submissions
+  const isSubmittingRef = useRef(false);
+
   const handleCompletePurchase = async () => {
     if (!selectedAttraction) return;
+    // Prevent duplicate submissions (ref is synchronous, unlike state)
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
 
     // Validate card information if payment method is authorize.net
     if (paymentMethod === 'authorize.net') {
       if (!cardNumber || !cardMonth || !cardYear || !cardCVV) {
         setPaymentError('Please fill in all card details');
+        isSubmittingRef.current = false;
         return;
       }
       if (!validateCardNumber(cardNumber)) {
         setPaymentError('Invalid card number');
+        isSubmittingRef.current = false;
         return;
       }
       if (!authorizeApiLoginId) {
         setPaymentError('Payment system not initialized. Please refresh the page.');
+        isSubmittingRef.current = false;
         return;
       }
     }
@@ -702,6 +711,7 @@ const CreatePurchase = () => {
     } finally {
       setSubmitting(false);
       setIsProcessingPayment(false);
+      isSubmittingRef.current = false;
     }
   };
 

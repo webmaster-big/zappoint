@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useParams } from "react-router-dom";
 import QRCode from 'qrcode';
 import type { BookPackagePackage } from '../../../types/BookPackage.types';
@@ -999,9 +999,15 @@ const BookPackage: React.FC = () => {
 
   const partialAmount = calculatePartialAmount();
 
+  // Synchronous ref guard to prevent multi-click duplicate submissions
+  const isSubmittingRef = useRef(false);
+
   // Handle booking submission with payment processing
   const handlePayNow = async () => {
     if (!pkg) return;
+    // Prevent duplicate submissions (ref is synchronous, unlike state)
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
 
     // Validate signature and terms acceptance
     const stErrors: Record<string, string> = {};
@@ -1013,6 +1019,7 @@ const BookPackage: React.FC = () => {
     }
     if (Object.keys(stErrors).length > 0) {
       setSignatureTermsErrors(stErrors);
+      isSubmittingRef.current = false;
       return;
     }
     setSignatureTermsErrors({});
@@ -1029,6 +1036,7 @@ const BookPackage: React.FC = () => {
       if (bookingDateTime < earliestAllowed) {
         const daysNotice = Math.ceil(noticeHoursCheck / 24);
         setPaymentError(`This package requires at least ${noticeHoursCheck} hours (${daysNotice} day${daysNotice > 1 ? 's' : ''}) advance booking notice. Please select a later date/time.`);
+        isSubmittingRef.current = false;
         return;
       }
     }
@@ -1036,16 +1044,19 @@ const BookPackage: React.FC = () => {
     // Validate card information
     if (!cardNumber || !cardMonth || !cardYear || !cardCVV) {
       setPaymentError('Please fill in all card details');
+      isSubmittingRef.current = false;
       return;
     }
     
     if (!validateCardNumber(cardNumber)) {
       setPaymentError('Invalid card number');
+      isSubmittingRef.current = false;
       return;
     }
     
     if (!authorizeApiLoginId) {
       setPaymentError('Payment system not initialized. Please refresh the page.');
+      isSubmittingRef.current = false;
       return;
     }
     
@@ -1217,6 +1228,7 @@ const BookPackage: React.FC = () => {
       setPaymentError(userFriendlyMessage);
     } finally {
       setIsProcessingPayment(false);
+      isSubmittingRef.current = false;
     }
   };
 

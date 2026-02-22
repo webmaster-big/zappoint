@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Save, Plus, Minus, Calendar, Clock } from 'lucide-react';
 import QRCode from 'qrcode';
@@ -780,22 +780,31 @@ const ManualBooking: React.FC = () => {
     fetchSpecialPricing();
   }, [pkg, form.bookingDate]);
 
+  // Synchronous ref guard to prevent multi-click duplicate submissions
+  const isSubmittingRef = useRef(false);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    // Prevent duplicate submissions (ref is synchronous, unlike state)
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     
     if (!form.customerName || !form.email || !form.packageId || !form.bookingDate || !form.bookingTime) {
       setToast({ message: 'Please fill in all required fields', type: 'error' });
+      isSubmittingRef.current = false;
       return;
     }
 
     if (!pkg) {
       setToast({ message: 'Please select a valid package', type: 'error' });
+      isSubmittingRef.current = false;
       return;
     }
 
     // Validate space selection if spaces are available for the package
     if (pkg.rooms && pkg.rooms.length > 0 && !form.roomId) {
       setToast({ message: 'Please select a space for this booking', type: 'error' });
+      isSubmittingRef.current = false;
       return;
     }
 
@@ -1044,6 +1053,7 @@ const ManualBooking: React.FC = () => {
       }
     } finally {
       setLoading(false);
+      isSubmittingRef.current = false;
     }
   };
 

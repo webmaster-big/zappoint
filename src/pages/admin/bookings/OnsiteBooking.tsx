@@ -1,5 +1,5 @@
 // src/pages/onsite-booking/OnsiteBooking.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Calendar, Clock, Users, CreditCard, Gift, Tag, Plus, Minus, DollarSign, X } from 'lucide-react';
 import QRCode from 'qrcode';
 import { useThemeColor } from '../../../hooks/useThemeColor';
@@ -1308,11 +1308,18 @@ const OnsiteBooking: React.FC = () => {
     setStep(1);
   };
 
+  // Synchronous ref guard to prevent multi-click duplicate submissions
+  const isSubmittingRef = useRef(false);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    // Prevent duplicate submissions (ref is synchronous, unlike state)
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     
     if (!selectedPackage) {
       setToast({ message: 'Please select a package', type: 'error' });
+      isSubmittingRef.current = false;
       return;
     }
     
@@ -1320,6 +1327,7 @@ const OnsiteBooking: React.FC = () => {
     if (bookingData.paymentType === 'custom' && bookingData.paymentMethod !== 'paylater') {
       if (!bookingData.customPaymentAmount || bookingData.customPaymentAmount <= 0) {
         setToast({ message: 'Please enter a valid custom payment amount', type: 'error' });
+        isSubmittingRef.current = false;
         return;
       }
     }
@@ -1328,10 +1336,12 @@ const OnsiteBooking: React.FC = () => {
     if (bookingData.paymentMethod === 'authorize.net' || (bookingData.paymentMethod === 'card' && useAuthorizeNet)) {
       if (!validateCardNumber(cardNumber)) {
         setPaymentError('Please enter a valid card number');
+        isSubmittingRef.current = false;
         return;
       }
       if (!cardMonth || !cardYear || !cardCVV) {
         setPaymentError('Please fill in all card details');
+        isSubmittingRef.current = false;
         return;
       }
     }
@@ -1708,6 +1718,7 @@ const OnsiteBooking: React.FC = () => {
     } finally {
       setSubmitting(false);
       setIsProcessingPayment(false);
+      isSubmittingRef.current = false;
     }
   };
 

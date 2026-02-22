@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   Users, 
@@ -590,8 +590,14 @@ const PurchaseAttraction = () => {
     fetchSpecialPricing();
   }, [attraction, quantity]);
 
+  // Synchronous ref guard to prevent multi-click duplicate submissions
+  const isSubmittingRef = useRef(false);
+
   const handlePurchase = async () => {
     if (!attraction) return;
+    // Prevent duplicate submissions (ref is synchronous, unlike state)
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
 
     // Validate signature and terms acceptance
     const stErrors: Record<string, string> = {};
@@ -603,6 +609,7 @@ const PurchaseAttraction = () => {
     }
     if (Object.keys(stErrors).length > 0) {
       setSignatureTermsErrors(stErrors);
+      isSubmittingRef.current = false;
       return;
     }
     setSignatureTermsErrors({});
@@ -610,14 +617,17 @@ const PurchaseAttraction = () => {
     // Validate card information
     if (!cardNumber || !cardMonth || !cardYear || !cardCVV) {
       setPaymentError('Please fill in all card details');
+      isSubmittingRef.current = false;
       return;
     }
     if (!validateCardNumber(cardNumber)) {
       setPaymentError('Invalid card number');
+      isSubmittingRef.current = false;
       return;
     }
     if (!authorizeApiLoginId) {
       setPaymentError('Payment system not initialized. Please refresh the page.');
+      isSubmittingRef.current = false;
       return;
     }
 
@@ -737,6 +747,7 @@ const PurchaseAttraction = () => {
     } finally {
       setSubmitting(false);
       setIsProcessingPayment(false);
+      isSubmittingRef.current = false;
     }
   };
 
