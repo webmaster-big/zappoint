@@ -715,20 +715,18 @@ const SpaceSchedule = () => {
 
           {/* Right Side Controls */}
           <div className="flex items-center gap-2">
-            <StandardButton
-              variant="primary"
-              onClick={goToToday}
-            >
-              Today
-            </StandardButton>
-
-            {/* Loading indicator for date changes */}
-            {bookingsLoading && (
-              <div className="flex items-center gap-2 text-gray-500">
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span className="text-sm">Loading...</span>
+            <div className="relative">
+              <StandardButton
+                variant="primary"
+                onClick={goToToday}
+              >
+                Today
+              </StandardButton>
+              {/* Loading indicator - absolutely positioned, always mounted, fades in/out */}
+              <div className={`absolute -top-1 -right-1 w-4 h-4 bg-white rounded-full flex items-center justify-center shadow-sm transition-opacity duration-300 ${bookingsLoading ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+                <Loader2 className="w-3 h-3 animate-spin text-gray-400" />
               </div>
-            )}
+            </div>
 
             {/* Legend Tooltip */}
             <div className="relative group">

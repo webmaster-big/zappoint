@@ -19,7 +19,7 @@ import { customerService, type GroupedAttraction, type GroupedPackage } from '..
 import { ASSET_URL } from '../../utils/storage';
 import { generateSlug, generateLocationSlug } from '../../utils/slug';
 import { convertTo12Hour, formatDurationDisplay, getUpcomingAttractionSessions, getUpcomingPackageSessions } from '../../utils/timeFormat';
-import LoadingSpinner from '../../components/ui/LoadingSpinner';
+
 
 const EntertainmentLandingPage = () => {
   const [selectedLocation, setSelectedLocation] = useState('All Locations');
@@ -36,7 +36,7 @@ const EntertainmentLandingPage = () => {
   const [attractions, setAttractions] = useState<Attraction[]>([]);
   const [packages, setPackages] = useState<PackageType[]>([]);
   const [locations, setLocations] = useState<string[]>(['All Locations']);
-  const [loading, setLoading] = useState(true);
+  const [dataLoading, setDataLoading] = useState(true);
 
   // Load data from backend on mount
   useEffect(() => {
@@ -55,8 +55,7 @@ const EntertainmentLandingPage = () => {
 
   const loadData = async () => {
     try {
-      setLoading(true);
-      
+      setDataLoading(true);
       // Fetch grouped attractions and packages from backend
       const [attractionsResponse, packagesResponse] = await Promise.all([
         customerService.getGroupedAttractions(searchQuery || undefined),
@@ -140,7 +139,7 @@ const EntertainmentLandingPage = () => {
     } catch (error) {
       console.error('Error loading data:', error);
     } finally {
-      setLoading(false);
+      setDataLoading(false);
     }
   };
   const filteredAttractions = attractions.filter(attraction => {
@@ -287,11 +286,6 @@ const EntertainmentLandingPage = () => {
       .match(/(EST|EDT|ET)/)?.[1] ?? 'ET';
     return abbr;
   })();
-
-  // Full-page loader — don't render anything until data is ready
-  if (loading) {
-    return <LoadingSpinner fullScreen message="Loading experiences..." />;
-  }
 
   return (
     <>
@@ -659,12 +653,19 @@ const EntertainmentLandingPage = () => {
                   Choose your perfect entertainment experience
                 </p>
               </div>
-              <p className="text-gray-500 text-xs md:text-sm font-medium bg-gray-100 px-3 py-1.5 rounded-full">
-                {filteredPackages.length} packages available
-              </p>
+              {!dataLoading && (
+                <p className="text-gray-500 text-xs md:text-sm font-medium bg-gray-100 px-3 py-1.5 rounded-full">
+                  {filteredPackages.length} packages available
+                </p>
+              )}
             </div>
 
-            {filteredPackages.length === 0 ? (
+            {dataLoading ? (
+              <div className="flex flex-col items-center justify-center py-16">
+                <img src="/Zap-Zone.png" alt="Loading" className="w-36 h-20 object-contain animate-bounce" />
+                <p className="text-gray-400 text-xs mt-3">Loading packages...</p>
+              </div>
+            ) : filteredPackages.length === 0 ? (
               <div className="text-center py-12">
                 <p className="text-gray-500 text-sm md:text-lg">No packages found matching your criteria.</p>
               </div>
@@ -765,12 +766,19 @@ const EntertainmentLandingPage = () => {
                   Pick your thrill, one at a time
                 </p>
               </div>
-              <p className="text-gray-500 text-xs md:text-sm font-medium bg-gray-100 px-3 py-1.5 rounded-full">
-                {filteredAttractions.length} attractions available
-              </p>
+              {!dataLoading && (
+                <p className="text-gray-500 text-xs md:text-sm font-medium bg-gray-100 px-3 py-1.5 rounded-full">
+                  {filteredAttractions.length} attractions available
+                </p>
+              )}
             </div>
 
-            {filteredAttractions.length === 0 ? (
+            {dataLoading ? (
+              <div className="flex flex-col items-center justify-center py-16">
+                <img src="/Zap-Zone.png" alt="Loading" className="w-36 h-20 object-contain animate-bounce" />
+                <p className="text-gray-400 text-xs mt-3">Loading attractions...</p>
+              </div>
+            ) : filteredAttractions.length === 0 ? (
               <div className="text-center py-12">
                 <p className="text-gray-500 text-sm md:text-lg">No attractions found matching your criteria.</p>
               </div>

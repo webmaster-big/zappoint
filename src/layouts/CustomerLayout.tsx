@@ -181,10 +181,12 @@ const CustomerLayout = () => {
                           className="w-full flex items-center space-x-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
                           onClick={handleLogout}
                           disabled={isLoggingOut}
-                        >  {isLoggingOut ? (
-                            <div className="flex items-center gap-2">
-                              <LoadingSpinner size="small" message="Signing out..." />
-                            </div>
+                        >
+                          {isLoggingOut ? (
+                            <span className="flex items-center gap-2">
+                              <span className="w-3.5 h-3.5 border-2 border-red-300 border-t-red-600 rounded-full animate-spin" />
+                              <span>Signing out...</span>
+                            </span>
                           ) : (
                             <>
                               <span>Sign Out</span>
@@ -273,14 +275,15 @@ const CustomerLayout = () => {
                       <span>Account Settings</span>
                     </button>
                     <button 
-                      className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-red-600 text-white font-medium hover:bg-red-700 transition-colors"
+                      className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-red-600 text-white font-medium hover:bg-red-700 transition-colors rounded-lg"
                       onClick={handleLogout}
                       disabled={isLoggingOut}
                     >
                       {isLoggingOut ? (
-                        <div className="flex items-center gap-2">
-                          <LoadingSpinner size="small" message="Signing out..." />
-                        </div>
+                        <span className="flex items-center gap-2">
+                          <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                          <span>Signing out...</span>
+                        </span>
                       ) : (
                         <span>Sign Out</span>
                       )}

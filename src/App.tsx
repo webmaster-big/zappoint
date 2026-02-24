@@ -79,6 +79,7 @@ import EditEmailNotification from "./pages/admin/email/EditEmailNotification";
 import EmailNotificationDetails from "./pages/admin/email/EmailNotificationDetails";
 import FeeSupports from "./pages/admin/fee-supports/FeeSupports";
 import SpecialPricings from "./pages/admin/special-pricing/SpecialPricings";
+import RsvpPage from "./pages/public/RsvpPage";
 
 // Redirect /settings/google-calendar to the correct role-based settings page
 const GoogleCalendarRedirect = () => {
@@ -123,6 +124,7 @@ function App() {
         <Route path="/home" element={<Home />} />
         <Route path="/book/package/:location/:slug" element={<BookPackage />} />
         <Route path="/purchase/attraction/:location/:slug" element={<PurchaseAttraction />} />
+        <Route path="/rsvp/:token" element={<RsvpPage />} />
         
         {/* Customer Routes */}
         <Route element={<CustomerLayout />}>

@@ -134,6 +134,7 @@ export type GiftCardType = 'fixed' | 'percentage';
 export type GiftCardStatus = 'active' | 'inactive' | 'expired' | 'redeemed' | 'cancelled' | 'deleted';
 
 export interface GiftCard {
+  id?: number;
   code: string;
   type: GiftCardType;
   initial_value: number;
@@ -142,32 +143,50 @@ export interface GiftCard {
   description: string;
   status: GiftCardStatus;
   expiry_date?: string;
+  location_id?: number;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface OwnedGiftCard extends GiftCard {
   redeemed: boolean;
+  pivot?: {
+    customer_id: number;
+    gift_card_id: number;
+    purchased_at?: string;
+    redeemed_at?: string;
+  };
 }
 
 // Notification types
-export type NotificationType = 'booking' | 'payment' | 'promotion' | 'gift_card' | 'reminder';
+export type NotificationType = 'booking' | 'payment' | 'promotion' | 'gift_card' | 'reminder' | 'general' | 'attraction';
 export type NotificationStatus = 'unread' | 'read' | 'archived';
+export type NotificationPriority = 'low' | 'normal' | 'high' | 'urgent';
 
 export interface NotificationMetadata {
   bookingId?: string;
   amount?: number;
   expiryDate?: string;
   location?: string;
+  [key: string]: unknown;
 }
 
 export interface Notification {
-  id: string;
+  id: number | string;
+  customer_id?: number;
+  location_id?: number | null;
   type: NotificationType;
   title: string;
   message: string;
   status: NotificationStatus;
-  createdAt: string;
+  priority?: NotificationPriority;
+  read_at?: string | null;
+  createdAt?: string;
+  created_at?: string;
+  updated_at?: string;
   actionUrl?: string;
   actionText?: string;
+  data?: Record<string, unknown> | null;
   metadata?: NotificationMetadata;
 }
 

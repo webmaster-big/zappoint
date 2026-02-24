@@ -1,219 +1,166 @@
-import { useState, useEffect } from 'react';
-import { Bell, Check, X, Calendar, Gift, Info, CheckCircle, Clock } from 'lucide-react';
-import type { 
-  Notification, 
-  NotificationType, 
-  NotificationStatus
-} from '../../types/customer';
+import { useState, useEffect, useCallback } from 'react';
+import { Bell, Check, X, Calendar, Gift, Info, CheckCircle, Clock, Loader2 } from 'lucide-react';
+import {
+  customerNotificationService,
+  type CustomerNotification,
+  type CustomerNotificationType,
+} from '../../services/CustomerNotificationService';
 
-const sampleNotifications: Notification[] = [
-  {
-    id: '1',
-    type: 'booking',
-    title: 'Booking Confirmed',
-    message: 'Your Birthday Bash Package booking at Brighton location has been confirmed for December 25, 2024.',
-    status: 'unread',
-    createdAt: '2024-12-16T10:30:00Z',
-    actionUrl: '/customer/reservations',
-    actionText: 'View Booking',
-    metadata: {
-      bookingId: 'ZAP-2024-001',
-      location: 'Brighton'
-    }
-  },
-  {
-    id: '2',
-    type: 'payment',
-    title: 'Payment Successful',
-    message: 'Payment of $299.00 for your Birthday Bash Package has been processed successfully.',
-    status: 'unread',
-    createdAt: '2024-12-16T10:25:00Z',
-    actionUrl: '/customer/reservations',
-    actionText: 'View Receipt',
-    metadata: {
-      amount: 299,
-      bookingId: 'ZAP-2024-001'
-    }
-  },
-  {
-    id: '3',
-    type: 'promotion',
-    title: 'Special Holiday Offer!',
-    message: 'Get 20% off on all Family Fun Packages this holiday season. Valid until December 31st.',
-    status: 'read',
-    createdAt: '2024-12-15T14:00:00Z',
-    actionUrl: '/',
-    actionText: 'Browse Packages',
-    metadata: {
-      expiryDate: '2024-12-31'
-    }
-  },
-  {
-    id: '4',
-    type: 'reminder',
-    title: 'Upcoming Booking Reminder',
-    message: 'Your Family Fun Package booking is scheduled for tomorrow at 4:00 PM at Canton location.',
-    status: 'read',
-    createdAt: '2024-12-19T09:00:00Z',
-    actionUrl: '/customer/reservations',
-    actionText: 'View Details',
-    metadata: {
-      bookingId: 'ZAP-2024-002',
-      location: 'Canton'
-    }
-  },
-  {
-    id: '5',
-    type: 'gift_card',
-    title: 'Gift Card Purchase Complete',
-    message: 'Your $50 ZapZone Gift Card has been successfully purchased. Code: GC-50-OWNED',
-    status: 'read',
-    createdAt: '2024-12-14T16:20:00Z',
-    actionUrl: '/customer/gift-cards',
-    actionText: 'View Gift Cards',
-    metadata: {
-      amount: 50
-    }
-  },
-  {
-    id: '7',
-    type: 'booking',
-    title: 'Booking Cancelled',
-    message: 'Your Corporate Team Building booking has been cancelled as requested. Refund will be processed within 3-5 business days.',
-    status: 'read',
-    createdAt: '2024-12-10T15:45:00Z',
-    actionUrl: '/customer/reservations',
-    actionText: 'View Reservations',
-    metadata: {
-      bookingId: 'ZAP-2024-003',
-      amount: 499
-    }
-  }
-];
-
+type FilterTab = 'all' | 'unread' | 'read';
 
 const CustomerNotifications = () => {
-  // Get customer from localStorage
-  // const getCustomer = () => {
-  //   const customerData = localStorage.getItem('zapzone_customer');
-  //   return customerData ? JSON.parse(customerData) : null;
-  // };
+  const [notifications, setNotifications] = useState<CustomerNotification[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [actionLoading, setActionLoading] = useState<number | null>(null);
 
-  // const customer = getCustomer();
-  // const isLoggedIn = customer && customer.token;
-
-  const [notifications, setNotifications] = useState<Notification[]>(sampleNotifications);
-  const [filteredNotifications, setFilteredNotifications] = useState<Notification[]>(sampleNotifications);
-  const [filter, setFilter] = useState<'all' | 'unread' | 'read'>('all');
-  const [typeFilter, setTypeFilter] = useState<NotificationType | 'all'>('all');
-  const [selectedNotifications, setSelectedNotifications] = useState<string[]>([]);
-  // Pagination state
+  const [filter, setFilter] = useState<FilterTab>('all');
+  const [typeFilter, setTypeFilter] = useState<CustomerNotificationType | 'all'>('all');
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(5);
+  const [pageSize, setPageSize] = useState(10);
+  const [totalItems, setTotalItems] = useState(0);
+  const [lastPage, setLastPage] = useState(1);
 
-  useEffect(() => {
-    let filtered = notifications;
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
 
-    // Filter by read status
-    if (filter === 'unread') {
-      filtered = filtered.filter(n => n.status === 'unread');
-    } else if (filter === 'read') {
-      filtered = filtered.filter(n => n.status === 'read');
+  const fetchNotifications = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const params: Record<string, unknown> = {
+        per_page: pageSize,
+        page: currentPage,
+      };
+
+      if (filter === 'unread') params.is_read = false;
+      else if (filter === 'read') params.is_read = true;
+      if (typeFilter !== 'all') params.type = typeFilter;
+
+      const res = await customerNotificationService.getNotifications(params as never);
+
+      if (res.success && res.data) {
+        setNotifications(res.data.notifications);
+        setTotalItems(res.data.pagination.total);
+        setLastPage(res.data.pagination.last_page);
+      } else {
+        setNotifications([]);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to load notifications';
+      setError(msg);
+      setNotifications([]);
+    } finally {
+      setLoading(false);
     }
+  }, [filter, typeFilter, currentPage, pageSize]);
 
-    // Filter by type
-    if (typeFilter !== 'all') {
-      filtered = filtered.filter(n => n.type === typeFilter);
+  const fetchUnreadCount = useCallback(async () => {
+    try {
+      const res = await customerNotificationService.getUnreadCount();
+      if (res.success) setUnreadCount(res.data.unread_count);
+    } catch {
+      // silent
     }
+  }, []);
 
-    // Sort by date (newest first)
-    filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  useEffect(() => { fetchNotifications(); }, [fetchNotifications]);
+  useEffect(() => { fetchUnreadCount(); }, [fetchUnreadCount]);
 
-    // Pagination
-    const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-    let page = currentPage;
-    if (page > totalPages) page = totalPages;
-    const startIdx = (page - 1) * pageSize;
-    const endIdx = startIdx + pageSize;
-    setFilteredNotifications(filtered.slice(startIdx, endIdx));
-  }, [notifications, filter, typeFilter, currentPage, pageSize]);
-
-  const markAsRead = (notificationId: string) => {
-    setNotifications(prev => 
-      prev.map(n => 
-        n.id === notificationId ? { ...n, status: 'read' as NotificationStatus } : n
-      )
-    );
-  };
-
-  const markAsUnread = (notificationId: string) => {
-    setNotifications(prev => 
-      prev.map(n => 
-        n.id === notificationId ? { ...n, status: 'unread' as NotificationStatus } : n
-      )
-    );
-  };
-
-  const deleteNotification = (notificationId: string) => {
-    setNotifications(prev => prev.filter(n => n.id !== notificationId));
-    setSelectedNotifications(prev => prev.filter(id => id !== notificationId));
-  };
-
-  const markAllAsRead = () => {
-    setNotifications(prev => 
-      prev.map(n => ({ ...n, status: 'read' as NotificationStatus }))
-    );
-  };
-
-  const handleBulkAction = (action: 'read' | 'unread' | 'delete') => {
-    if (action === 'delete') {
-      setNotifications(prev => prev.filter(n => !selectedNotifications.includes(n.id)));
-    } else {
-      setNotifications(prev => 
-        prev.map(n => 
-          selectedNotifications.includes(n.id) 
-            ? { ...n, status: action as NotificationStatus }
-            : n
-        )
-      );
+  const markAsRead = async (id: number) => {
+    try {
+      setActionLoading(id);
+      await customerNotificationService.markAsRead(id);
+      setNotifications(prev => prev.map(n => (n.id === id ? { ...n, read_at: new Date().toISOString() } : n)));
+      setUnreadCount(prev => Math.max(0, prev - 1));
+    } catch {
+      // silent
+    } finally {
+      setActionLoading(null);
     }
-    setSelectedNotifications([]);
   };
 
-  const toggleNotificationSelection = (notificationId: string) => {
-    setSelectedNotifications(prev => 
-      prev.includes(notificationId)
-        ? prev.filter(id => id !== notificationId)
-        : [...prev, notificationId]
-    );
+  const markAllAsRead = async () => {
+    try {
+      setActionLoading(-1);
+      await customerNotificationService.markAllAsRead();
+      setNotifications(prev => prev.map(n => ({ ...n, read_at: n.read_at || new Date().toISOString() })));
+      setUnreadCount(0);
+    } catch {
+      // silent
+    } finally {
+      setActionLoading(null);
+    }
   };
 
-  const selectAllNotifications = () => {
-    setSelectedNotifications(
-      selectedNotifications.length === filteredNotifications.length
-        ? []
-        : filteredNotifications.map(n => n.id)
-    );
+  const deleteNotification = async (id: number) => {
+    try {
+      setActionLoading(id);
+      await customerNotificationService.deleteNotification(id);
+      setNotifications(prev => prev.filter(n => n.id !== id));
+      setSelectedIds(prev => prev.filter(sid => sid !== id));
+      setTotalItems(prev => prev - 1);
+    } catch {
+      // silent
+    } finally {
+      setActionLoading(null);
+    }
   };
 
-  const getNotificationIcon = (type: NotificationType) => {
+  const handleBulkAction = async (action: 'read' | 'delete') => {
+    if (selectedIds.length === 0) return;
+    setActionLoading(-1);
+    try {
+      if (action === 'delete') {
+        await Promise.all(selectedIds.map(id => customerNotificationService.deleteNotification(id)));
+        setNotifications(prev => prev.filter(n => !selectedIds.includes(n.id)));
+        setTotalItems(prev => prev - selectedIds.length);
+      } else {
+        await Promise.all(selectedIds.map(id => customerNotificationService.markAsRead(id)));
+        setNotifications(prev =>
+          prev.map(n => selectedIds.includes(n.id) ? { ...n, read_at: n.read_at || new Date().toISOString() } : n)
+        );
+        fetchUnreadCount();
+      }
+    } catch {
+      // silent
+    } finally {
+      setSelectedIds([]);
+      setActionLoading(null);
+    }
+  };
+
+  const toggleSelection = (id: number) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(sid => sid !== id) : [...prev, id]);
+  };
+
+  const selectAll = () => {
+    setSelectedIds(selectedIds.length === notifications.length ? [] : notifications.map(n => n.id));
+  };
+
+  const isUnread = (n: CustomerNotification) => !n.read_at;
+
+  const getIcon = (type: CustomerNotificationType) => {
     switch (type) {
-      case 'booking': return <Calendar className="w-5 h-5" />;
-      case 'payment': return <CheckCircle className="w-5 h-5" />;
-      case 'promotion': return <Gift className="w-5 h-5" />;
-      case 'gift_card': return <Gift className="w-5 h-5" />;
-      case 'reminder': return <Clock className="w-5 h-5" />;
-      default: return <Info className="w-5 h-5" />;
+      case 'booking': return <Calendar className="w-4 h-4" />;
+      case 'payment': return <CheckCircle className="w-4 h-4" />;
+      case 'promotion': return <Gift className="w-4 h-4" />;
+      case 'gift_card': return <Gift className="w-4 h-4" />;
+      case 'reminder': return <Clock className="w-4 h-4" />;
+      case 'attraction': return <Info className="w-4 h-4" />;
+      default: return <Info className="w-4 h-4" />;
     }
   };
 
-  const getNotificationColor = (type: NotificationType) => {
+  const getColor = (type: CustomerNotificationType) => {
     switch (type) {
       case 'booking': return 'text-blue-600 bg-blue-50';
-      case 'payment': return 'text-green-600 bg-green-50';
+      case 'payment': return 'text-emerald-600 bg-emerald-50';
       case 'promotion': return 'text-purple-600 bg-purple-50';
       case 'gift_card': return 'text-pink-600 bg-pink-50';
-      case 'reminder': return 'text-yellow-600 bg-yellow-50';
+      case 'reminder': return 'text-amber-600 bg-amber-50';
+      case 'attraction': return 'text-indigo-600 bg-indigo-50';
       default: return 'text-gray-600 bg-gray-50';
     }
   };
@@ -222,315 +169,297 @@ const CustomerNotifications = () => {
     const date = new Date(dateString);
     const now = new Date();
     const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
-
-    if (diffInHours < 1) {
-      return 'Just now';
-    } else if (diffInHours < 24) {
-      return `${Math.floor(diffInHours)} hours ago`;
-    } else if (diffInHours < 48) {
-      return 'Yesterday';
-    } else {
-      return date.toLocaleDateString();
-    }
+    if (diffInHours < 1) return 'Just now';
+    if (diffInHours < 24) return `${Math.floor(diffInHours)}h ago`;
+    if (diffInHours < 48) return 'Yesterday';
+    return date.toLocaleDateString();
   };
 
-  const unreadCount = notifications.filter(n => n.status === 'unread').length;
+  const localUnread = notifications.filter(n => !n.read_at).length;
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Header */}
-          <div className="mb-8">
-            <h1 className="text-xl font-semibold text-gray-900 flex items-center gap-3">
-              Notifications
+    <>
+      <style>{`
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .fade-in { animation: fadeIn 0.25s ease-out; }
+        .slide-up { animation: slideUp 0.35s ease-out both; }
+        .hover-lift { transition: all 0.2s ease; }
+        .hover-lift:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.06); }
+      `}</style>
+
+      <div className="min-h-screen bg-gray-50/80">
+        {/* Hero */}
+        <section className="relative bg-gradient-to-br from-blue-900 via-blue-800 to-violet-700 text-white py-6 md:py-8 overflow-hidden">
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(255,255,255,0.06),transparent_60%)]" />
+          <div className="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 slide-up">
+            <div className="flex items-end justify-between">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="p-1.5 bg-white/10 backdrop-blur rounded-lg border border-white/10">
+                    <Bell className="w-3.5 h-3.5" />
+                  </div>
+                  <span className="text-blue-200/70 text-xs font-semibold uppercase tracking-widest">Notifications</span>
+                </div>
+                <h1 className="text-xl font-bold" style={{ color: 'white' }}>Notifications</h1>
+                <p className="text-blue-200/60 text-sm mt-0.5">Stay updated with your bookings and offers</p>
+              </div>
               {unreadCount > 0 && (
-                <span className="bg-red-500 text-white text-xs px-2 py-0.5 font-medium">
+                <span className="text-xs font-medium bg-white/10 border border-white/10 backdrop-blur px-3 py-1 rounded-full text-blue-100">
                   {unreadCount} unread
                 </span>
               )}
-            </h1>
-            <p className="text-gray-600 mt-1 text-sm">Stay updated with your bookings, payments, and special offers</p>
+            </div>
           </div>
+        </section>
 
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           {/* Controls */}
-          <div className="bg-white border border-gray-200 mb-6">
-            <div className="p-4">
-              <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
-                {/* Filters */}
-                <div className="flex flex-wrap gap-2">
+          <div className="bg-white border border-gray-100 rounded-xl p-4 mb-5 slide-up">
+            <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+              {/* Filter Tabs */}
+              <div className="flex gap-1.5">
+                {(['all', 'unread', 'read'] as FilterTab[]).map(tab => (
                   <button
-                    className={`px-4 py-2 text-sm font-medium transition ${
-                      filter === 'all' 
-                        ? 'bg-blue-800 text-white' 
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    key={tab}
+                    onClick={() => { setFilter(tab); setCurrentPage(1); }}
+                    className={`px-3 py-1.5 text-xs font-semibold rounded-md transition ${
+                      filter === tab
+                        ? 'bg-blue-700 text-white'
+                        : 'bg-gray-100 text-gray-500 hover:bg-gray-150'
                     }`}
-                    onClick={() => setFilter('all')}
                   >
-                    All ({notifications.length})
+                    {tab === 'all' ? `All (${totalItems})` : tab === 'unread' ? `Unread (${unreadCount})` : 'Read'}
                   </button>
-                  <button
-                    className={`px-4 py-2 text-sm font-medium transition ${
-                      filter === 'unread' 
-                        ? 'bg-blue-800 text-white' 
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
-                    onClick={() => setFilter('unread')}
-                  >
-                    Unread ({unreadCount})
-                  </button>
-                  <button
-                    className={`px-4 py-2 text-sm font-medium transition ${
-                      filter === 'read' 
-                        ? 'bg-blue-800 text-white' 
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
-                    onClick={() => setFilter('read')}
-                  >
-                    Read ({notifications.filter(n => n.status === 'read').length})
-                  </button>
-                </div>
-
-                {/* Type Filter */}
-                <div className="flex items-center gap-2">
-                  <label className="text-sm font-medium text-gray-700">Type:</label>
-                  <select
-                    value={typeFilter}
-                    onChange={(e) => setTypeFilter(e.target.value as NotificationType | 'all')}
-                    className="border border-gray-300 px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-800"
-                  >
-                    <option value="all">All Types</option>
-                    <option value="booking">Bookings</option>
-                    <option value="payment">Payments</option>
-                    <option value="promotion">Promotions</option>
-                    <option value="gift_card">Gift Cards</option>
-                    <option value="reminder">Reminders</option>
-                  </select>
-                </div>
+                ))}
               </div>
 
-              {/* Bulk Actions */}
-              {selectedNotifications.length > 0 && (
-                <div className="mt-4 pt-4 border-t border-gray-200">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-gray-600">
-                      {selectedNotifications.length} selected
-                    </span>
-                    <button
-                      onClick={() => handleBulkAction('read')}
-                      className="px-3 py-1 text-xs bg-green-100 text-green-800 hover:bg-green-200 transition"
-                    >
-                      Mark as Read
-                    </button>
-                    <button
-                      onClick={() => handleBulkAction('unread')}
-                      className="px-3 py-1 text-xs bg-blue-100 text-blue-800 hover:bg-blue-200 transition"
-                    >
-                      Mark as Unread
-                    </button>
-                    <button
-                      onClick={() => handleBulkAction('delete')}
-                      className="px-3 py-1 text-xs bg-red-100 text-red-800 hover:bg-red-200 transition"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              )}
+              {/* Type Filter */}
+              <select
+                value={typeFilter}
+                onChange={(e) => { setTypeFilter(e.target.value as CustomerNotificationType | 'all'); setCurrentPage(1); }}
+                className="text-xs border border-gray-200 rounded-md px-2.5 py-1.5 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+              >
+                <option value="all">All Types</option>
+                <option value="booking">Bookings</option>
+                <option value="payment">Payments</option>
+                <option value="promotion">Promotions</option>
+                <option value="gift_card">Gift Cards</option>
+                <option value="reminder">Reminders</option>
+                <option value="attraction">Attractions</option>
+                <option value="general">General</option>
+              </select>
+            </div>
 
-              {/* Quick Actions */}
-              <div className="mt-4 pt-4 border-t border-gray-200 flex items-center gap-2">
+            {/* Bulk Actions */}
+            {selectedIds.length > 0 && (
+              <div className="mt-3 pt-3 border-t border-gray-100 flex items-center gap-3">
+                <span className="text-xs text-gray-500">{selectedIds.length} selected</span>
                 <button
-                  onClick={selectAllNotifications}
-                  className="text-sm text-blue-800 hover:text-blue-900 font-medium"
+                  onClick={() => handleBulkAction('read')}
+                  disabled={actionLoading === -1}
+                  className="px-2.5 py-1 text-xs font-semibold bg-emerald-50 text-emerald-700 rounded-md hover:bg-emerald-100 transition disabled:opacity-50"
                 >
-                  {selectedNotifications.length === filteredNotifications.length ? 'Deselect All' : 'Select All'}
+                  Mark Read
                 </button>
-                {unreadCount > 0 && (
-                  <button
-                    onClick={markAllAsRead}
-                    className="text-sm text-green-700 hover:text-green-800 font-medium"
-                  >
-                    Mark All as Read
-                  </button>
-                )}
+                <button
+                  onClick={() => handleBulkAction('delete')}
+                  disabled={actionLoading === -1}
+                  className="px-2.5 py-1 text-xs font-semibold bg-red-50 text-red-700 rounded-md hover:bg-red-100 transition disabled:opacity-50"
+                >
+                  Delete
+                </button>
               </div>
+            )}
+
+            {/* Quick Actions */}
+            <div className="mt-3 pt-3 border-t border-gray-100 flex items-center gap-3">
+              <button onClick={selectAll} className="text-xs text-blue-700 hover:text-blue-800 font-semibold">
+                {selectedIds.length === notifications.length && notifications.length > 0 ? 'Deselect All' : 'Select All'}
+              </button>
+              {localUnread > 0 && (
+                <button
+                  onClick={markAllAsRead}
+                  disabled={actionLoading === -1}
+                  className="text-xs text-emerald-700 hover:text-emerald-800 font-semibold disabled:opacity-50"
+                >
+                  {actionLoading === -1 ? 'Marking…' : 'Mark All Read'}
+                </button>
+              )}
             </div>
           </div>
 
+          {/* Loading */}
+          {loading && (
+            <div className="flex items-center justify-center py-20">
+              <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
+              <span className="ml-2.5 text-sm text-gray-500">Loading notifications…</span>
+            </div>
+          )}
+
+          {/* Error */}
+          {!loading && error && (
+            <div className="bg-red-50 border border-red-100 rounded-lg p-5 text-center">
+              <p className="text-sm text-red-700 mb-3">{error}</p>
+              <button
+                onClick={fetchNotifications}
+                className="px-4 py-1.5 text-xs bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+
           {/* Notifications List */}
-          <div className="space-y-3">
-            {filteredNotifications.length === 0 ? (
-              <div className="text-center py-12 bg-white border border-gray-200">
-                <Bell className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">No notifications found</h3>
-                <p className="text-gray-600">
-                  {filter === 'all' 
-                    ? "You don't have any notifications yet."
-                    : `No ${filter} notifications to show.`}
-                </p>
-              </div>
-            ) : (
-              filteredNotifications.map((notification) => (
-                <div
-                  key={notification.id}
-                  className={`bg-white border transition-all duration-200 hover:shadow-md ${
-                    notification.status === 'unread' 
-                      ? 'border-blue-200 bg-blue-50/30' 
-                      : 'border-gray-200'
-                  }`}
-                >
-                  <div className="p-4">
-                    <div className="flex items-start gap-4">
-                      {/* Checkbox */}
-                      <input
-                        type="checkbox"
-                        checked={selectedNotifications.includes(notification.id)}
-                        onChange={() => toggleNotificationSelection(notification.id)}
-                        className="mt-1"
-                      />
+          {!loading && !error && (
+            <div className="space-y-2">
+              {notifications.length === 0 ? (
+                <div className="text-center py-16 bg-white border border-gray-100 rounded-xl">
+                  <Bell className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+                  <h3 className="text-base font-semibold text-gray-800 mb-1">No notifications</h3>
+                  <p className="text-sm text-gray-500">
+                    {filter === 'all' ? "You're all caught up!" : `No ${filter} notifications.`}
+                  </p>
+                </div>
+              ) : (
+                notifications.map((notification, idx) => (
+                  <div
+                    key={notification.id}
+                    className={`bg-white border rounded-lg hover-lift slide-up transition ${
+                      isUnread(notification) ? 'border-blue-100' : 'border-gray-100'
+                    }`}
+                    style={{ animationDelay: `${idx * 0.03}s` }}
+                  >
+                    <div className="p-3.5">
+                      <div className="flex items-start gap-3">
+                        {/* Checkbox */}
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(notification.id)}
+                          onChange={() => toggleSelection(notification.id)}
+                          className="mt-1 rounded text-blue-600"
+                        />
 
-                      {/* Icon */}
-                      <div className={`p-2 ${getNotificationColor(notification.type)}`}>
-                        {getNotificationIcon(notification.type)}
-                      </div>
+                        {/* Icon */}
+                        <div className={`p-2 rounded-lg shrink-0 ${getColor(notification.type)}`}>
+                          {getIcon(notification.type)}
+                        </div>
 
-                      {/* Content */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <h3 className={`text-base font-medium ${
-                              notification.status === 'unread' ? 'text-gray-900' : 'text-gray-700'
-                            }`}>
-                              {notification.title}
-                              {notification.status === 'unread' && (
-                                <span className="ml-2 w-2 h-2 bg-blue-600 inline-block rounded-full"></span>
+                        {/* Content */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1 min-w-0">
+                              <h3 className={`text-sm font-semibold leading-tight ${isUnread(notification) ? 'text-gray-900' : 'text-gray-600'}`}>
+                                {notification.title}
+                                {isUnread(notification) && (
+                                  <span className="ml-1.5 inline-block w-1.5 h-1.5 bg-blue-600 rounded-full align-middle" />
+                                )}
+                              </h3>
+                              <p className="text-xs text-gray-500 mt-0.5 line-clamp-2 leading-relaxed">
+                                {notification.message}
+                              </p>
+
+                              {/* Extra data */}
+                              {notification.data && Object.keys(notification.data).length > 0 && (() => {
+                                const d = notification.data as Record<string, string | number | undefined>;
+                                return (
+                                  <div className="mt-1.5 flex flex-wrap gap-1.5 text-xs text-gray-400">
+                                    {d.booking_id && <span className="bg-gray-50 px-2 py-0.5 rounded font-medium">Booking: {String(d.booking_id)}</span>}
+                                    {d.amount && <span className="bg-gray-50 px-2 py-0.5 rounded font-medium">${String(d.amount)}</span>}
+                                    {d.location && <span className="bg-gray-50 px-2 py-0.5 rounded font-medium">{String(d.location)}</span>}
+                                  </div>
+                                );
+                              })()}
+
+                              {/* Priority */}
+                              {notification.priority && notification.priority !== 'normal' && (
+                                <div className="mt-1.5">
+                                  <span className={`text-xs px-2 py-0.5 font-semibold rounded-full ${
+                                    notification.priority === 'urgent' ? 'bg-red-100 text-red-700' :
+                                    notification.priority === 'high' ? 'bg-orange-100 text-orange-700' :
+                                    'bg-gray-100 text-gray-600'
+                                  }`}>
+                                    {notification.priority}
+                                  </span>
+                                </div>
                               )}
-                            </h3>
-                            <p className="text-gray-600 mt-1 text-sm line-clamp-2">
-                              {notification.message}
-                            </p>
-                            
-                            {/* Metadata */}
-                            {notification.metadata && (
-                              <div className="mt-2 flex flex-wrap gap-4 text-xs text-gray-500">
-                                {notification.metadata.bookingId && (
-                                  <span>Booking: {notification.metadata.bookingId}</span>
-                                )}
-                                {notification.metadata.amount && (
-                                  <span>Amount: ${notification.metadata.amount}</span>
-                                )}
-                                {notification.metadata.location && (
-                                  <span>Location: {notification.metadata.location}</span>
-                                )}
-                              </div>
-                            )}
+                            </div>
 
-                            {/* Action Button */}
-                            {notification.actionUrl && notification.actionText && (
-                              <div className="mt-3">
-                                <a
-                                  href={notification.actionUrl}
-                                  className="inline-flex items-center text-xs text-blue-800 hover:text-blue-900 font-medium"
+                            {/* Time & Actions */}
+                            <div className="flex flex-col items-end gap-1.5 shrink-0">
+                              <span className="text-xs text-gray-400 font-medium">{formatDate(notification.created_at)}</span>
+                              <div className="flex gap-0.5">
+                                {isUnread(notification) ? (
+                                  <button
+                                    onClick={() => markAsRead(notification.id)}
+                                    disabled={actionLoading === notification.id}
+                                    className="p-1 text-emerald-600 hover:bg-emerald-50 rounded transition disabled:opacity-50"
+                                    title="Mark as read"
+                                  >
+                                    {actionLoading === notification.id ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
+                                  </button>
+                                ) : (
+                                  <button className="p-1 text-gray-300 rounded" disabled title="Already read">
+                                    <Bell size={13} />
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => deleteNotification(notification.id)}
+                                  disabled={actionLoading === notification.id}
+                                  className="p-1 text-red-500 hover:bg-red-50 rounded transition disabled:opacity-50"
+                                  title="Delete"
                                 >
-                                  {notification.actionText}
-                                  <svg className="ml-1 w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                  </svg>
-                                </a>
+                                  {actionLoading === notification.id ? <Loader2 size={13} className="animate-spin" /> : <X size={13} />}
+                                </button>
                               </div>
-                            )}
-                          </div>
-
-                          <div className="flex flex-col items-end gap-2">
-                            <span className="text-xs text-gray-500">
-                              {formatDate(notification.createdAt)}
-                            </span>
-                            
-                            {/* Actions */}
-                            <div className="flex gap-1">
-                              {notification.status === 'unread' ? (
-                                <button
-                                  onClick={() => markAsRead(notification.id)}
-                                  className="p-1 text-green-600 hover:bg-green-50 transition"
-                                  title="Mark as read"
-                                >
-                                  <Check size={16} />
-                                </button>
-                              ) : (
-                                <button
-                                  onClick={() => markAsUnread(notification.id)}
-                                  className="p-1 text-blue-600 hover:bg-blue-50 transition"
-                                  title="Mark as unread"
-                                >
-                                  <Bell size={16} />
-                                </button>
-                              )}
-                              <button
-                                onClick={() => deleteNotification(notification.id)}
-                                className="p-1 text-red-600 hover:bg-red-50 transition"
-                                title="Delete notification"
-                              >
-                                <X size={16} />
-                              </button>
                             </div>
                           </div>
                         </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))
-            )}
-          </div>
+                ))
+              )}
+            </div>
+          )}
 
-          {/* Pagination Controls */}
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4 mt-8">
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-600">Rows per page:</span>
-              <select
-                value={pageSize}
-                onChange={e => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
-                className="border border-gray-300 rounded px-2 py-1 text-xs"
-              >
-                {[5, 10, 20, 50].map(size => (
-                  <option key={size} value={size}>{size}</option>
-                ))}
-              </select>
+          {/* Pagination */}
+          {!loading && !error && totalItems > 0 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-5 bg-white border border-gray-100 rounded-xl p-3">
+              <div className="flex items-center gap-2 text-xs text-gray-500">
+                <span>Rows:</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
+                  className="border border-gray-200 rounded-md px-2 py-1 text-xs bg-gray-50"
+                >
+                  {[5, 10, 20, 50].map(size => (
+                    <option key={size} value={size}>{size}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1 text-xs border border-gray-200 rounded-md disabled:opacity-40 hover:bg-gray-50 font-medium transition"
+                >
+                  Prev
+                </button>
+                <span className="text-xs text-gray-500">{currentPage} / {lastPage}</span>
+                <button
+                  onClick={() => setCurrentPage(p => Math.min(lastPage, p + 1))}
+                  disabled={currentPage >= lastPage}
+                  className="px-3 py-1 text-xs border border-gray-200 rounded-md disabled:opacity-40 hover:bg-gray-50 font-medium transition"
+                >
+                  Next
+                </button>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className="px-2 py-1 border border-gray-300 text-gray-700 rounded disabled:opacity-50 text-xs"
-              >
-                Prev
-              </button>
-              <span className="text-xs text-gray-600">
-                Page {currentPage} of {Math.max(1, Math.ceil(notifications.filter(n => {
-                  let match = true;
-                  if (filter === 'unread') match = n.status === 'unread';
-                  else if (filter === 'read') match = n.status === 'read';
-                  if (typeFilter !== 'all') match = match && n.type === typeFilter;
-                  return match;
-                }).length / pageSize))}
-              </span>
-              <button
-                onClick={() => setCurrentPage(p => p + 1)}
-                disabled={currentPage >= Math.ceil(notifications.filter(n => {
-                  let match = true;
-                  if (filter === 'unread') match = n.status === 'unread';
-                  else if (filter === 'read') match = n.status === 'read';
-                  if (typeFilter !== 'all') match = match && n.type === typeFilter;
-                  return match;
-                }).length / pageSize)}
-                className="px-2 py-1 border border-gray-300 text-gray-700 rounded disabled:opacity-50 text-xs"
-              >
-                Next
-              </button>
-            </div>
-          </div>
+          )}
         </div>
       </div>
+    </>
   );
 };
 

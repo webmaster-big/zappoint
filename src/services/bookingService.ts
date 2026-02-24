@@ -3,6 +3,24 @@ import type { BookPackagePackage } from '../types/BookPackage.types';
 import type { Package, PackageFilters } from './PackageService';
 import { API_BASE_URL, getStoredUser } from '../utils/storage';
 
+// Returns the best available auth token:
+// 1. Admin/user token (zapzone_user) for admin pages
+// 2. Customer token (zapzone_customer) as fallback for customer pages
+const getBestToken = (): string | null => {
+  const adminToken = getStoredUser()?.token;
+  if (adminToken) return adminToken;
+  try {
+    const stored = localStorage.getItem('zapzone_customer');
+    if (stored) {
+      const customer = JSON.parse(stored);
+      return customer?.token || null;
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+};
+
 // Create axios instance with base configuration
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -15,8 +33,7 @@ const api = axios.create({
 // Add request interceptor to include auth token
 api.interceptors.request.use(
   (config) => {
-    const token = getStoredUser()?.token;
-    console.log('BookingService - Adding auth token to request:', token);
+    const token = getBestToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }

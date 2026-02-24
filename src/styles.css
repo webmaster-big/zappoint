@@ -597,6 +597,23 @@ html.light h1, html.light h2, html.light h3, html.light h4, html.light h5, html.
   color: #0f172a !important;
 }
 
+/* Headings inside explicit white-text containers must stay white
+   (more specific than the html.light rule above, so it wins) */
+html.light .text-white h1,
+html.light .text-white h2,
+html.light .text-white h3,
+html.light .text-white h4,
+html.light .text-white h5,
+html.light .text-white h6,
+html.dark .text-white h1,
+html.dark .text-white h2,
+html.dark .text-white h3,
+html.dark .text-white h4,
+html.dark .text-white h5,
+html.dark .text-white h6 {
+  color: white !important;
+}
+
 html.light .text-gray-800,
 html.light .text-gray-900 {
   color: #0f172a !important;

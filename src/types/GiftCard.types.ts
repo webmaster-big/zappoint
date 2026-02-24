@@ -13,6 +13,7 @@ export interface GiftCardItem {
   status: GiftCardStatus;
   expiry_date?: string; // ISO string
   created_by: string; // admin id
+  location_id?: number; // location scope
   created_at: string; // ISO string
   updated_at?: string; // ISO string
   deleted?: boolean;

@@ -4,6 +4,7 @@ import StandardButton from '../../../components/ui/StandardButton';
 import type { GiftCardStatus, GiftCardType, GiftCardItem } from '../../../types/GiftCard.types';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { giftCardService } from '../../../services';
+import { getStoredUser } from '../../../utils/storage';
 import Toast from '../../../components/ui/Toast';
 
 const GiftCard: React.FC = () => {
@@ -45,10 +46,15 @@ const GiftCard: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Get admin's location_id for scoping gift cards
+  const adminLocationId = getStoredUser()?.location_id;
+
   const loadGiftCards = async () => {
     try {
       setLoading(true);
-      const response = await giftCardService.getGiftCards();
+      const response = await giftCardService.getGiftCards(
+        adminLocationId ? { location_id: adminLocationId } : undefined
+      );
       
       if (response.data && response.data.gift_cards) {
         const formattedCards: GiftCardItem[] = response.data.gift_cards.map(card => ({
@@ -122,7 +128,8 @@ const GiftCard: React.FC = () => {
         max_usage: Number(form.max_usage),
         description: form.description,
         status: 'active',
-        created_by: 1 // Default user ID
+        created_by: getStoredUser()?.id || 1,
+        location_id: adminLocationId || undefined,
       });
 
       showToast('Gift card created successfully!', 'success');
@@ -158,43 +165,71 @@ const GiftCard: React.FC = () => {
     const { name, value } = e.target;
     setEditForm((prev) => ({ ...prev, [name]: value }));
   };
-  const handleEditSave = () => {
+  const handleEditSave = async () => {
     if (editIndex === null || !editForm) return;
-    const updatedCards = [...giftCards];
-    const card = { ...updatedCards[editIndex] };
-    if (editForm.type) card.type = editForm.type as GiftCardType;
-    if (editForm.initial_value !== undefined) card.initial_value = Number(editForm.initial_value);
-    if (editForm.balance !== undefined) card.balance = Number(editForm.balance);
-    if (editForm.max_usage !== undefined) card.max_usage = Number(editForm.max_usage);
-    if (editForm.description !== undefined) card.description = editForm.description;
-    if (editForm.expiry_date !== undefined) card.expiry_date = editForm.expiry_date ? new Date(editForm.expiry_date).toISOString() : undefined;
-    if (editForm.status) card.status = editForm.status as GiftCardStatus;
-    card.updated_at = new Date().toISOString();
-    updatedCards[editIndex] = card;
-    setGiftCards(updatedCards);
-    localStorage.setItem("zapzone_giftcards", JSON.stringify(updatedCards));
-    closeEditModal();
+    const card = giftCards[editIndex];
+    const cardId = (card as unknown as { id?: number }).id;
+    if (!cardId) {
+      showToast('Cannot update: gift card has no ID', 'error');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await giftCardService.updateGiftCard(cardId, {
+        type: (editForm.type as 'fixed' | 'percentage') || undefined,
+        initial_value: editForm.initial_value !== undefined ? Number(editForm.initial_value) : undefined,
+        balance: editForm.balance !== undefined ? Number(editForm.balance) : undefined,
+        max_usage: editForm.max_usage !== undefined ? Number(editForm.max_usage) : undefined,
+        description: editForm.description,
+        expiry_date: editForm.expiry_date || undefined,
+        status: (editForm.status as 'active' | 'inactive' | 'expired' | 'redeemed' | 'cancelled' | 'deleted') || undefined,
+      });
+      showToast('Gift card updated successfully!', 'success');
+      await loadGiftCards();
+      closeEditModal();
+    } catch (error) {
+      console.error('Error updating gift card:', error);
+      showToast('Error updating gift card', 'error');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleDeactivate = (index: number) => {
-    const updatedCards = [...giftCards];
-    updatedCards[index] = {
-      ...updatedCards[index],
-      status: "inactive" as GiftCardStatus,
-      updated_at: new Date().toISOString(),
-    };
-    setGiftCards(updatedCards);
-    localStorage.setItem("zapzone_giftcards", JSON.stringify(updatedCards));
+  const handleDeactivate = async (index: number) => {
+    const card = giftCards[index];
+    const cardId = (card as unknown as { id?: number }).id;
+    if (!cardId) return;
+
+    try {
+      setLoading(true);
+      await giftCardService.updateGiftCard(cardId, { status: 'inactive' });
+      showToast('Gift card deactivated', 'success');
+      await loadGiftCards();
+    } catch (error) {
+      console.error('Error deactivating gift card:', error);
+      showToast('Error deactivating gift card', 'error');
+    } finally {
+      setLoading(false);
+    }
   };
-  const handleActivate = (index: number) => {
-    const updatedCards = [...giftCards];
-    updatedCards[index] = {
-      ...updatedCards[index],
-      status: "active" as GiftCardStatus,
-      updated_at: new Date().toISOString(),
-    };
-    setGiftCards(updatedCards);
-    localStorage.setItem("zapzone_giftcards", JSON.stringify(updatedCards));
+
+  const handleActivate = async (index: number) => {
+    const card = giftCards[index];
+    const cardId = (card as unknown as { id?: number }).id;
+    if (!cardId) return;
+
+    try {
+      setLoading(true);
+      await giftCardService.updateGiftCard(cardId, { status: 'active' });
+      showToast('Gift card activated', 'success');
+      await loadGiftCards();
+    } catch (error) {
+      console.error('Error activating gift card:', error);
+      showToast('Error activating gift card', 'error');
+    } finally {
+      setLoading(false);
+    }
   };
   const handleDelete = async (index: number) => {
     const card = giftCards[index];

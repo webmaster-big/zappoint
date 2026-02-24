@@ -36,6 +36,7 @@ export interface GiftCard {
   status: 'active' | 'inactive' | 'expired' | 'redeemed' | 'cancelled' | 'deleted';
   expiry_date?: string;
   created_by: number;
+  location_id?: number;
   deleted: boolean;
   created_at: string;
   updated_at: string;
@@ -45,6 +46,7 @@ export interface GiftCardFilters {
   status?: 'active' | 'inactive' | 'expired' | 'redeemed' | 'cancelled' | 'deleted';
   type?: 'fixed' | 'percentage';
   search?: string;
+  location_id?: number;
   sort_by?: 'code' | 'initial_value' | 'balance' | 'created_at';
   sort_order?: 'asc' | 'desc';
   per_page?: number;
@@ -61,6 +63,7 @@ export interface CreateGiftCardData {
   status?: 'active' | 'inactive' | 'expired' | 'redeemed' | 'cancelled' | 'deleted';
   expiry_date?: string;
   created_by: number;
+  location_id?: number;
 }
 
 export type UpdateGiftCardData = Partial<CreateGiftCardData>;
