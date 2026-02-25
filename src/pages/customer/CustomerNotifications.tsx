@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Bell, Check, X, Calendar, Gift, Info, CheckCircle, Clock, Loader2 } from 'lucide-react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { Bell, Check, X, Calendar, Gift, Info, CheckCircle, Clock, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import {
   customerNotificationService,
   type CustomerNotification,
   type CustomerNotificationType,
 } from '../../services/CustomerNotificationService';
+import Toast from '../../components/ui/Toast';
 
 type FilterTab = 'all' | 'unread' | 'read';
 
@@ -23,6 +24,14 @@ const CustomerNotifications = () => {
 
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const toastTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    if (toastTimeout.current) clearTimeout(toastTimeout.current);
+    setToast({ message, type });
+    toastTimeout.current = setTimeout(() => setToast(null), 3000);
+  };
 
   const fetchNotifications = useCallback(async () => {
     try {
@@ -74,8 +83,9 @@ const CustomerNotifications = () => {
       await customerNotificationService.markAsRead(id);
       setNotifications(prev => prev.map(n => (n.id === id ? { ...n, read_at: new Date().toISOString() } : n)));
       setUnreadCount(prev => Math.max(0, prev - 1));
+      showToast('Marked as read', 'success');
     } catch {
-      // silent
+      showToast('Failed to mark as read', 'error');
     } finally {
       setActionLoading(null);
     }
@@ -87,8 +97,9 @@ const CustomerNotifications = () => {
       await customerNotificationService.markAllAsRead();
       setNotifications(prev => prev.map(n => ({ ...n, read_at: n.read_at || new Date().toISOString() })));
       setUnreadCount(0);
+      showToast('All notifications marked as read', 'success');
     } catch {
-      // silent
+      showToast('Failed to mark all as read', 'error');
     } finally {
       setActionLoading(null);
     }
@@ -101,8 +112,9 @@ const CustomerNotifications = () => {
       setNotifications(prev => prev.filter(n => n.id !== id));
       setSelectedIds(prev => prev.filter(sid => sid !== id));
       setTotalItems(prev => prev - 1);
+      showToast('Notification deleted', 'success');
     } catch {
-      // silent
+      showToast('Failed to delete notification', 'error');
     } finally {
       setActionLoading(null);
     }
@@ -116,15 +128,17 @@ const CustomerNotifications = () => {
         await Promise.all(selectedIds.map(id => customerNotificationService.deleteNotification(id)));
         setNotifications(prev => prev.filter(n => !selectedIds.includes(n.id)));
         setTotalItems(prev => prev - selectedIds.length);
+        showToast(`${selectedIds.length} notifications deleted`, 'success');
       } else {
         await Promise.all(selectedIds.map(id => customerNotificationService.markAsRead(id)));
         setNotifications(prev =>
           prev.map(n => selectedIds.includes(n.id) ? { ...n, read_at: n.read_at || new Date().toISOString() } : n)
         );
         fetchUnreadCount();
+        showToast(`${selectedIds.length} notifications marked as read`, 'success');
       }
     } catch {
-      // silent
+      showToast('Bulk action failed', 'error');
     } finally {
       setSelectedIds([]);
       setActionLoading(null);
@@ -179,13 +193,20 @@ const CustomerNotifications = () => {
 
   return (
     <>
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+
       <style>{`
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes shimmer { 0% { background-position: -400px 0; } 100% { background-position: 400px 0; } }
         .fade-in { animation: fadeIn 0.25s ease-out; }
         .slide-up { animation: slideUp 0.35s ease-out both; }
         .hover-lift { transition: all 0.2s ease; }
         .hover-lift:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.06); }
+        .skeleton { background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%); background-size: 800px 100%; animation: shimmer 1.5s infinite linear; border-radius: 8px; }
+        [data-tooltip] { position: relative; }
+        [data-tooltip]:hover::after { content: attr(data-tooltip); position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%); padding: 4px 10px; font-size: 11px; font-weight: 500; color: #fff; background: #1e293b; border-radius: 6px; white-space: nowrap; z-index: 50; pointer-events: none; animation: fadeIn 0.15s ease-out; }
+        [data-tooltip]:hover::before { content: ''; position: absolute; bottom: calc(100% + 2px); left: 50%; transform: translateX(-50%); border: 4px solid transparent; border-top-color: #1e293b; z-index: 50; pointer-events: none; animation: fadeIn 0.15s ease-out; }
       `}</style>
 
       <div className="min-h-screen bg-gray-50/80">
@@ -289,11 +310,22 @@ const CustomerNotifications = () => {
             </div>
           </div>
 
-          {/* Loading */}
+          {/* Loading Skeleton */}
           {loading && (
-            <div className="flex items-center justify-center py-20">
-              <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
-              <span className="ml-2.5 text-sm text-gray-500">Loading notifications…</span>
+            <div className="space-y-2.5">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="bg-white border border-gray-100 rounded-lg p-4 slide-up" style={{ animationDelay: `${i * 0.06}s` }}>
+                  <div className="flex items-start gap-3">
+                    <div className="skeleton w-8 h-8 rounded-lg shrink-0" />
+                    <div className="flex-1 space-y-2">
+                      <div className="skeleton h-4 w-3/5 rounded" />
+                      <div className="skeleton h-3 w-4/5 rounded" />
+                      <div className="skeleton h-3 w-2/5 rounded" />
+                    </div>
+                    <div className="skeleton h-4 w-12 rounded" />
+                  </div>
+                </div>
+              ))}
             </div>
           )}
 
@@ -393,23 +425,27 @@ const CustomerNotifications = () => {
                                   <button
                                     onClick={() => markAsRead(notification.id)}
                                     disabled={actionLoading === notification.id}
-                                    className="p-1 text-emerald-600 hover:bg-emerald-50 rounded transition disabled:opacity-50"
-                                    title="Mark as read"
+                                    className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-md transition disabled:opacity-50"
+                                    data-tooltip="Mark as read"
                                   >
-                                    {actionLoading === notification.id ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
+                                    {actionLoading === notification.id ? (
+                                      <span className="block w-3.5 h-3.5 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
+                                    ) : <Check size={13} />}
                                   </button>
                                 ) : (
-                                  <button className="p-1 text-gray-300 rounded" disabled title="Already read">
+                                  <button className="p-1.5 text-gray-300 rounded-md" disabled data-tooltip="Already read">
                                     <Bell size={13} />
                                   </button>
                                 )}
                                 <button
                                   onClick={() => deleteNotification(notification.id)}
                                   disabled={actionLoading === notification.id}
-                                  className="p-1 text-red-500 hover:bg-red-50 rounded transition disabled:opacity-50"
-                                  title="Delete"
+                                  className="p-1.5 text-red-500 hover:bg-red-50 rounded-md transition disabled:opacity-50"
+                                  data-tooltip="Delete notification"
                                 >
-                                  {actionLoading === notification.id ? <Loader2 size={13} className="animate-spin" /> : <X size={13} />}
+                                  {actionLoading === notification.id ? (
+                                    <span className="block w-3.5 h-3.5 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
+                                  ) : <X size={13} />}
                                 </button>
                               </div>
                             </div>
@@ -425,34 +461,77 @@ const CustomerNotifications = () => {
 
           {/* Pagination */}
           {!loading && !error && totalItems > 0 && (
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-5 bg-white border border-gray-100 rounded-xl p-3">
-              <div className="flex items-center gap-2 text-xs text-gray-500">
-                <span>Rows:</span>
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-5 bg-white border border-gray-100 rounded-xl px-4 py-3">
+              <div className="flex items-center gap-3 text-xs text-gray-500">
                 <select
                   value={pageSize}
                   onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
-                  className="border border-gray-200 rounded-md px-2 py-1 text-xs bg-gray-50"
+                  className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                 >
                   {[5, 10, 20, 50].map(size => (
-                    <option key={size} value={size}>{size}</option>
+                    <option key={size} value={size}>{size} / page</option>
                   ))}
                 </select>
+                <span className="text-gray-400">
+                  {((currentPage - 1) * pageSize) + 1}–{Math.min(currentPage * pageSize, totalItems)} of {totalItems}
+                </span>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setCurrentPage(1)}
+                  disabled={currentPage === 1}
+                  className="p-1.5 rounded-lg disabled:opacity-30 hover:bg-gray-100 transition"
+                  data-tooltip="First page"
+                >
+                  <ChevronsLeft size={14} className="text-gray-600" />
+                </button>
                 <button
                   onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                   disabled={currentPage === 1}
-                  className="px-3 py-1 text-xs border border-gray-200 rounded-md disabled:opacity-40 hover:bg-gray-50 font-medium transition"
+                  className="p-1.5 rounded-lg disabled:opacity-30 hover:bg-gray-100 transition"
+                  data-tooltip="Previous"
                 >
-                  Prev
+                  <ChevronLeft size={14} className="text-gray-600" />
                 </button>
-                <span className="text-xs text-gray-500">{currentPage} / {lastPage}</span>
+                {Array.from({ length: lastPage }, (_, i) => i + 1)
+                  .filter(p => p === 1 || p === lastPage || Math.abs(p - currentPage) <= 1)
+                  .reduce<(number | string)[]>((acc, p, i, arr) => {
+                    if (i > 0 && p - (arr[i - 1] as number) > 1) acc.push('...');
+                    acc.push(p);
+                    return acc;
+                  }, [])
+                  .map((p, i) =>
+                    typeof p === 'string' ? (
+                      <span key={`dots-${i}`} className="px-1 text-gray-400 text-xs select-none">…</span>
+                    ) : (
+                      <button
+                        key={p}
+                        onClick={() => setCurrentPage(p)}
+                        className={`min-w-[28px] h-7 text-xs font-semibold rounded-lg transition ${
+                          currentPage === p
+                            ? 'bg-blue-700 text-white shadow-sm'
+                            : 'text-gray-600 hover:bg-gray-100'
+                        }`}
+                      >
+                        {p}
+                      </button>
+                    )
+                  )}
                 <button
                   onClick={() => setCurrentPage(p => Math.min(lastPage, p + 1))}
                   disabled={currentPage >= lastPage}
-                  className="px-3 py-1 text-xs border border-gray-200 rounded-md disabled:opacity-40 hover:bg-gray-50 font-medium transition"
+                  className="p-1.5 rounded-lg disabled:opacity-30 hover:bg-gray-100 transition"
+                  data-tooltip="Next"
                 >
-                  Next
+                  <ChevronRight size={14} className="text-gray-600" />
+                </button>
+                <button
+                  onClick={() => setCurrentPage(lastPage)}
+                  disabled={currentPage >= lastPage}
+                  className="p-1.5 rounded-lg disabled:opacity-30 hover:bg-gray-100 transition"
+                  data-tooltip="Last page"
+                >
+                  <ChevronsRight size={14} className="text-gray-600" />
                 </button>
               </div>
             </div>

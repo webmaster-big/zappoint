@@ -1,11 +1,12 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Gift, Calendar, Copy, Check, Loader2, MapPin, X } from 'lucide-react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { Gift, Calendar, Copy, Check, MapPin, X } from 'lucide-react';
 import {
   customerGiftCardService,
   type CustomerGiftCard,
 } from '../../services/CustomerGiftCardService';
 import axios from 'axios';
 import { API_BASE_URL } from '../../utils/storage';
+import Toast from '../../components/ui/Toast';
 
 // Minimal location type for the filter dropdown
 interface LocationOption {
@@ -34,6 +35,14 @@ const CustomerGiftCards = () => {
   const [showPaymentModal, setShowPaymentModal] = useState<CustomerGiftCard | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState<CustomerGiftCard | null>(null);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const toastTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    if (toastTimeout.current) clearTimeout(toastTimeout.current);
+    setToast({ message, type });
+    toastTimeout.current = setTimeout(() => setToast(null), 3000);
+  };
 
   // ── Data loading ───────────────────────────────────────────────────
 
@@ -119,6 +128,7 @@ const CustomerGiftCards = () => {
   const handleCopyCode = (code: string) => {
     navigator.clipboard.writeText(code);
     setCopiedCode(code);
+    showToast('Gift card code copied!', 'success');
     setTimeout(() => setCopiedCode(null), 1500);
   };
 
@@ -127,15 +137,22 @@ const CustomerGiftCards = () => {
 
   return (
     <>
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+
       <style>{`
         @keyframes backdrop-fade { from { opacity: 0; } to { opacity: 1; } }
         @keyframes scale-in { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
         @keyframes slide-up { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes shimmer { 0% { background-position: -400px 0; } 100% { background-position: 400px 0; } }
         .animate-backdrop-fade { animation: backdrop-fade 0.2s ease-out; }
         .animate-scale-in { animation: scale-in 0.3s ease-out; }
         .animate-slide-up { animation: slide-up 0.4s ease-out both; }
         .card-hover { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
         .card-hover:hover { transform: translateY(-2px); box-shadow: 0 8px 20px -6px rgba(0,0,0,0.08); }
+        .skeleton { background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%); background-size: 800px 100%; animation: shimmer 1.5s infinite linear; border-radius: 8px; }
+        [data-tooltip] { position: relative; }
+        [data-tooltip]:hover::after { content: attr(data-tooltip); position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%); padding: 4px 10px; font-size: 11px; font-weight: 500; color: #fff; background: #1e293b; border-radius: 6px; white-space: nowrap; z-index: 50; pointer-events: none; animation: backdrop-fade 0.15s ease-out; }
+        [data-tooltip]:hover::before { content: ''; position: absolute; bottom: calc(100% + 2px); left: 50%; transform: translateX(-50%); border: 4px solid transparent; border-top-color: #1e293b; z-index: 50; pointer-events: none; animation: backdrop-fade 0.15s ease-out; }
       `}</style>
       <div className="min-h-screen bg-gray-50">
         {/* Hero Header */}
@@ -210,11 +227,22 @@ const CustomerGiftCards = () => {
                 </div>
               </div>
 
-              {/* Loading */}
+              {/* Loading Skeleton */}
               {availableLoading && (
-                <div className="flex items-center justify-center py-16">
-                  <Loader2 className="w-8 h-8 animate-spin text-blue-800" />
-                  <span className="ml-3 text-gray-600">Loading gift cards…</span>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
+                  {[...Array(6)].map((_, i) => (
+                    <div key={i} className="bg-white border border-gray-100/80 rounded-xl overflow-hidden animate-slide-up" style={{ animationDelay: `${i * 0.06}s` }}>
+                      <div className="skeleton h-36 rounded-none" />
+                      <div className="p-4 space-y-3">
+                        <div className="skeleton h-4 w-3/4 rounded" />
+                        <div className="skeleton h-3 w-1/2 rounded" />
+                        <div className="flex justify-between items-center pt-3 border-t border-gray-50">
+                          <div className="skeleton h-3 w-20 rounded" />
+                          <div className="skeleton h-8 w-20 rounded-lg" />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
 
@@ -286,11 +314,22 @@ const CustomerGiftCards = () => {
 
           {tab === 'owned' && (
             <>
-              {/* Loading */}
+              {/* Loading Skeleton */}
               {ownedLoading && (
-                <div className="flex items-center justify-center py-16">
-                  <Loader2 className="w-8 h-8 animate-spin text-blue-800" />
-                  <span className="ml-3 text-gray-600">Loading your gift cards…</span>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
+                  {[...Array(3)].map((_, i) => (
+                    <div key={i} className="bg-white border border-gray-100/80 rounded-xl overflow-hidden animate-slide-up" style={{ animationDelay: `${i * 0.06}s` }}>
+                      <div className="skeleton h-36 rounded-none" />
+                      <div className="p-4 space-y-3">
+                        <div className="skeleton h-4 w-3/4 rounded" />
+                        <div className="space-y-2 pt-2.5 border-t border-gray-50">
+                          <div className="skeleton h-3 w-full rounded" />
+                          <div className="skeleton h-3 w-2/3 rounded" />
+                        </div>
+                        <div className="skeleton h-10 w-full rounded-xl" />
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
 
@@ -351,7 +390,7 @@ const CustomerGiftCards = () => {
                             <button
                               className="p-1.5 hover:bg-gray-100 rounded-lg transition"
                               onClick={() => handleCopyCode(card.code)}
-                              title="Copy Code"
+                              data-tooltip="Copy code"
                             >
                               {copiedCode === card.code ? <Check size={14} className="text-green-600" /> : <Copy size={14} className="text-gray-400" />}
                             </button>

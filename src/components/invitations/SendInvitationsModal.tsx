@@ -10,6 +10,7 @@ interface Props {
   booking: Booking;
   onClose: () => void;
   onSuccess: () => void;
+  onToast?: (message: string, type: 'success' | 'error' | 'info') => void;
 }
 
 interface GuestRow {
@@ -30,7 +31,7 @@ const createEmptyRow = (): GuestRow => ({
   errors: {},
 });
 
-const SendInvitationsModal = ({ booking, onClose, onSuccess }: Props) => {
+const SendInvitationsModal = ({ booking, onClose, onSuccess, onToast }: Props) => {
   const [guests, setGuests] = useState<GuestRow[]>([createEmptyRow()]);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -133,11 +134,14 @@ const SendInvitationsModal = ({ booking, onClose, onSuccess }: Props) => {
       const res = await invitationService.sendInvitations(booking.id, { guests: payload });
 
       setSuccessMessage(res.message);
+      onToast?.(res.message || `${guests.length} invitation${guests.length !== 1 ? 's' : ''} sent!`, 'success');
       onSuccess();
       // Close after brief delay so user sees success message
-      setTimeout(() => onClose(), 2000);
+      setTimeout(() => onClose(), 1500);
     } catch (err: any) {
-      setError(err.response?.data?.message || err.message || 'Failed to send invitations');
+      const errMsg = err.response?.data?.message || err.message || 'Failed to send invitations';
+      setError(errMsg);
+      onToast?.(errMsg, 'error');
     } finally {
       setSending(false);
     }
@@ -151,6 +155,7 @@ const SendInvitationsModal = ({ booking, onClose, onSuccess }: Props) => {
       setShowPreview(true);
     } catch {
       setError('Failed to load preview');
+      onToast?.('Failed to load preview', 'error');
     } finally {
       setLoadingPreview(false);
     }
@@ -160,42 +165,42 @@ const SendInvitationsModal = ({ booking, onClose, onSuccess }: Props) => {
 
   return (
     <div
-      className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
+      className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50"
       onClick={onClose}
     >
       <div
-        className="bg-white max-w-3xl w-full max-h-[90vh] overflow-y-auto"
+        className="bg-white max-w-3xl w-full max-h-[90vh] overflow-y-auto rounded-xl shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="p-6 border-b border-gray-200">
+        <div className="p-5 border-b border-gray-100 bg-gradient-to-r from-blue-900 via-blue-800 to-violet-700 rounded-t-xl">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-lg font-semibold text-gray-900">Send Party Invitations</h3>
-              <p className="text-sm text-gray-600 mt-1">
+              <h3 className="text-base font-semibold" style={{ color: 'white' }}>Send Party Invitations</h3>
+              <p className="text-sm text-blue-200/70 mt-0.5">
                 {pkg?.name} — {booking.booking_date} at {convertTo12Hour(booking.booking_time)}
               </p>
             </div>
-            <button onClick={onClose} className="p-2 hover:bg-gray-100 transition text-gray-500">
+            <button onClick={onClose} className="p-1.5 hover:bg-white/15 rounded-lg transition text-white">
               ✕
             </button>
           </div>
         </div>
 
         {/* Capacity Bar */}
-        <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+        <div className="px-6 py-4 bg-gray-50/80 border-b border-gray-100">
           <div className="flex justify-between items-center mb-2">
             <span className="text-sm font-medium text-gray-700">Invitation Capacity</span>
-            <span className="text-sm text-gray-600">
-              {existingCount} sent / {maxGuests} total slots
+            <span className="text-sm text-gray-500">
+              {existingCount} sent / {maxGuests} total
               {remainingSlots > 0 && (
-                <span className="text-green-600 font-medium ml-2">({remainingSlots} remaining)</span>
+                <span className="text-emerald-600 font-medium ml-2">({remainingSlots} remaining)</span>
               )}
             </span>
           </div>
-          <div className="w-full bg-gray-200 h-2">
+          <div className="w-full bg-gray-200 h-1.5 rounded-full overflow-hidden">
             <div
-              className="bg-blue-800 h-2 transition-all"
+              className="bg-blue-700 h-1.5 rounded-full transition-all"
               style={{ width: `${Math.min(((existingCount + guests.length) / maxGuests) * 100, 100)}%` }}
             />
           </div>
@@ -209,16 +214,16 @@ const SendInvitationsModal = ({ booking, onClose, onSuccess }: Props) => {
         {/* Guest Entry Rows */}
         <div className="p-6 space-y-4">
           {error && (
-            <div className="bg-red-50 border border-red-200 p-3 text-sm text-red-700">{error}</div>
+            <div className="bg-red-50 border border-red-100 rounded-lg p-3 text-sm text-red-700">{error}</div>
           )}
           {successMessage && (
-            <div className="bg-green-50 border border-green-200 p-3 text-sm text-green-700">
+            <div className="bg-emerald-50 border border-emerald-100 rounded-lg p-3 text-sm text-emerald-700">
               {successMessage}
             </div>
           )}
 
           {guests.map((guest, index) => (
-            <div key={guest.id} className="border border-gray-200 p-4">
+            <div key={guest.id} className="border border-gray-100 rounded-xl p-4">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-sm font-medium text-gray-700">Guest #{index + 1}</span>
                 {guests.length > 1 && (
@@ -240,8 +245,8 @@ const SendInvitationsModal = ({ booking, onClose, onSuccess }: Props) => {
                     value={guest.name}
                     onChange={e => updateGuest(guest.id, 'name', e.target.value)}
                     placeholder="Guest name"
-                    className={`w-full px-3 py-2 border text-sm focus:outline-none focus:ring-2 focus:ring-blue-800 ${
-                      guest.errors.name ? 'border-red-300' : 'border-gray-300'
+                    className={`w-full px-3 py-2 border text-sm rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${
+                      guest.errors.name ? 'border-red-300' : 'border-gray-200'
                     }`}
                   />
                   {guest.errors.name && (
@@ -259,8 +264,8 @@ const SendInvitationsModal = ({ booking, onClose, onSuccess }: Props) => {
                     value={guest.email}
                     onChange={e => updateGuest(guest.id, 'email', e.target.value)}
                     placeholder="email@example.com"
-                    className={`w-full px-3 py-2 border text-sm focus:outline-none focus:ring-2 focus:ring-blue-800 ${
-                      guest.errors.email ? 'border-red-300' : 'border-gray-300'
+                    className={`w-full px-3 py-2 border text-sm rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${
+                      guest.errors.email ? 'border-red-300' : 'border-gray-200'
                     }`}
                   />
                   {guest.errors.email && (
@@ -278,8 +283,8 @@ const SendInvitationsModal = ({ booking, onClose, onSuccess }: Props) => {
                     value={guest.phone}
                     onChange={e => updateGuest(guest.id, 'phone', e.target.value)}
                     placeholder="+1 (555) 123-4567"
-                    className={`w-full px-3 py-2 border text-sm focus:outline-none focus:ring-2 focus:ring-blue-800 ${
-                      guest.errors.phone ? 'border-red-300' : 'border-gray-300'
+                    className={`w-full px-3 py-2 border text-sm rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${
+                      guest.errors.phone ? 'border-red-300' : 'border-gray-200'
                     }`}
                   />
                   {guest.errors.phone && (
@@ -300,7 +305,7 @@ const SendInvitationsModal = ({ booking, onClose, onSuccess }: Props) => {
                         value={method}
                         checked={guest.send_via === method}
                         onChange={() => updateGuest(guest.id, 'send_via', method)}
-                        className="text-blue-800 focus:ring-blue-800"
+                        className="text-blue-700 focus:ring-blue-700"
                       />
                       <span className="text-sm text-gray-700 capitalize">{method === 'both' ? 'Email & Text' : method}</span>
                     </label>
@@ -314,7 +319,7 @@ const SendInvitationsModal = ({ booking, onClose, onSuccess }: Props) => {
           {guests.length < remainingSlots && (
             <button
               onClick={addGuestRow}
-              className="w-full py-2 border-2 border-dashed border-gray-300 text-sm text-gray-600 hover:border-blue-800 hover:text-blue-800 transition"
+              className="w-full py-2.5 border-2 border-dashed border-gray-200 rounded-xl text-sm text-gray-500 hover:border-blue-400 hover:text-blue-700 transition"
             >
               + Add Another Guest
             </button>
@@ -322,7 +327,7 @@ const SendInvitationsModal = ({ booking, onClose, onSuccess }: Props) => {
 
           {/* Package Invitation Note */}
           {pkg?.invitation_file && (
-            <div className="bg-blue-50 border border-blue-200 p-3 text-sm text-blue-800">
+            <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 text-sm text-blue-700">
               <span className="font-medium">Note:</span> This package has a designed invitation file that will be
               attached to email invitations automatically.
             </div>
@@ -330,36 +335,41 @@ const SendInvitationsModal = ({ booking, onClose, onSuccess }: Props) => {
         </div>
 
         {/* Footer Actions */}
-        <div className="p-6 border-t border-gray-200 flex flex-col sm:flex-row gap-3">
+        <div className="p-5 border-t border-gray-100 flex flex-col sm:flex-row gap-3">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm border border-gray-300 text-gray-700 font-medium hover:bg-gray-50 transition"
+            className="px-4 py-2 text-sm border border-gray-200 text-gray-600 font-medium rounded-lg hover:bg-gray-50 transition"
           >
             Cancel
           </button>
           <button
             onClick={handlePreview}
             disabled={loadingPreview}
-            className="px-4 py-2 text-sm border border-blue-300 text-blue-700 font-medium hover:bg-blue-50 transition disabled:opacity-50"
+            className="px-4 py-2 text-sm border border-blue-200 text-blue-700 font-medium rounded-lg hover:bg-blue-50 transition disabled:opacity-50"
           >
             {loadingPreview ? 'Loading...' : 'Preview Invitation'}
           </button>
           <button
             onClick={handleSend}
             disabled={sending || guests.length === 0 || remainingSlots <= 0}
-            className="flex-1 px-4 py-2 text-sm bg-blue-800 text-white font-medium hover:bg-blue-900 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 px-4 py-2 text-sm bg-blue-700 text-white font-medium rounded-lg hover:bg-blue-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {sending ? 'Sending...' : `Send ${guests.length} Invitation${guests.length !== 1 ? 's' : ''}`}
+            {sending ? (
+              <span className="flex items-center justify-center gap-2">
+                <span className="block w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                Sending…
+              </span>
+            ) : `Send ${guests.length} Invitation${guests.length !== 1 ? 's' : ''}`}
           </button>
         </div>
 
         {/* Preview Modal (nested) */}
         {showPreview && preview && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[60]" onClick={() => setShowPreview(false)}>
-            <div className="bg-white max-w-2xl w-full max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-              <div className="p-6 border-b border-gray-200 flex items-center justify-between">
-                <h4 className="text-lg font-semibold text-gray-900">Invitation Preview</h4>
-                <button onClick={() => setShowPreview(false)} className="p-2 hover:bg-gray-100 text-gray-500">
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-[60]" onClick={() => setShowPreview(false)}>
+            <div className="bg-white max-w-2xl w-full max-h-[80vh] overflow-y-auto rounded-xl shadow-xl" onClick={e => e.stopPropagation()}>
+              <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+                <h4 className="text-base font-semibold text-gray-900">Invitation Preview</h4>
+                <button onClick={() => setShowPreview(false)} className="p-1.5 hover:bg-gray-100 rounded-lg transition text-gray-500">
                   ✕
                 </button>
               </div>
@@ -368,8 +378,8 @@ const SendInvitationsModal = ({ booking, onClose, onSuccess }: Props) => {
                 {/* Email Preview */}
                 <div>
                   <h5 className="text-sm font-medium text-gray-700 mb-2">Email Preview</h5>
-                  <div className="border border-gray-200 p-1">
-                    <div className="bg-gray-50 px-3 py-2 text-sm border-b border-gray-200">
+                  <div className="border border-gray-100 rounded-lg overflow-hidden">
+                    <div className="bg-gray-50 px-3 py-2 text-sm border-b border-gray-100">
                       <strong>Subject:</strong> {preview.subject}
                     </div>
                     <div
@@ -392,10 +402,10 @@ const SendInvitationsModal = ({ booking, onClose, onSuccess }: Props) => {
                 )}
               </div>
 
-              <div className="p-4 border-t border-gray-200">
+              <div className="p-4 border-t border-gray-100">
                 <button
                   onClick={() => setShowPreview(false)}
-                  className="w-full px-4 py-2 text-sm bg-blue-800 text-white font-medium hover:bg-blue-900 transition"
+                  className="w-full px-4 py-2 text-sm bg-blue-700 text-white font-medium rounded-lg hover:bg-blue-800 transition"
                 >
                   Close Preview
                 </button>
