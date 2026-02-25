@@ -173,11 +173,11 @@ const SendInvitationsModal = ({ booking, onClose, onSuccess, onToast }: Props) =
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="p-5 border-b border-gray-100 bg-gradient-to-r from-blue-900 via-blue-800 to-violet-700 rounded-t-xl">
+        <div className="p-5 border-b border-gray-100 bg-gradient-to-r from-blue-900 via-blue-800 to-violet-700 rounded-t-xl text-white">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-base font-semibold" style={{ color: 'white' }}>Send Party Invitations</h3>
-              <p className="text-sm text-blue-200/70 mt-0.5">
+              <h3 className="text-base font-semibold" style={{ color: '#ffffff' }}>Send Party Invitations</h3>
+              <p className="text-sm mt-0.5" style={{ color: 'rgba(191,219,254,0.8)' }}>
                 {pkg?.name} — {booking.booking_date} at {convertTo12Hour(booking.booking_time)}
               </p>
             </div>

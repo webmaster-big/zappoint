@@ -415,7 +415,6 @@ const CustomerReservations = () => {
                           <button
                             onClick={() => handleViewDetails(booking)}
                             className="inline-flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition"
-                            data-tooltip="View full details"
                           >
                             <Eye size={14} />
                             View
@@ -424,7 +423,6 @@ const CustomerReservations = () => {
                             <button
                               onClick={() => handleSendInvitations(booking)}
                               className="inline-flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium bg-blue-700 text-white rounded-lg hover:bg-blue-800 transition"
-                              data-tooltip="Send party invitations"
                             >
                               Invite
                             </button>
@@ -567,11 +565,11 @@ const CustomerReservations = () => {
           <div className="bg-white rounded-2xl max-w-lg w-full max-h-[85vh] overflow-hidden scale-in shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="max-h-[85vh] overflow-y-auto no-scrollbar">
               {/* Modal Header */}
-              <div className="sticky top-0 z-10 bg-gradient-to-r from-blue-900 via-blue-800 to-violet-700 px-5 py-4">
+              <div className="sticky top-0 z-10 bg-gradient-to-r from-blue-900 via-blue-800 to-violet-700 px-5 py-4 text-white">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-base font-semibold" style={{ color: 'white' }}>Booking Details</h3>
-                    <p className="text-xs mt-0.5" style={{ color: 'rgba(191, 219, 254, 0.7)' }}>{selectedBooking.reference_number}</p>
+                    <h3 className="text-base font-semibold" style={{ color: '#ffffff' }}>Booking Details</h3>
+                    <p className="text-xs mt-0.5" style={{ color: 'rgba(191,219,254,0.8)' }}>{selectedBooking.reference_number}</p>
                   </div>
                   <button
                     onClick={() => setShowDetailsModal(false)}
