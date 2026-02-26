@@ -538,12 +538,28 @@ const CreatePurchase = () => {
 
   // Synchronous ref guard to prevent multi-click duplicate submissions
   const isSubmittingRef = useRef(false);
+  const lastSubmitTimeRef = useRef(0);
 
-  const handleCompletePurchase = async () => {
+  const handleCompletePurchase = async (e?: React.MouseEvent) => {
+    // Prevent event bubbling and default behavior
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+
     if (!selectedAttraction) return;
     // Prevent duplicate submissions (ref is synchronous, unlike state)
     if (isSubmittingRef.current) return;
+
+    // Cooldown: reject if last submission was less than 3 seconds ago
+    const now = Date.now();
+    if (now - lastSubmitTimeRef.current < 3000) {
+      console.warn('⚠️ Purchase submission blocked (cooldown)');
+      return;
+    }
+
     isSubmittingRef.current = true;
+    lastSubmitTimeRef.current = now;
 
     // Validate card information if payment method is authorize.net
     if (paymentMethod === 'authorize.net') {

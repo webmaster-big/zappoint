@@ -631,12 +631,28 @@ const PurchaseAttraction = () => {
 
   // Synchronous ref guard to prevent multi-click duplicate submissions
   const isSubmittingRef = useRef(false);
+  const lastSubmitTimeRef = useRef(0);
 
-  const handlePurchase = async () => {
+  const handlePurchase = async (e?: React.MouseEvent) => {
+    // Prevent event bubbling and default behavior
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+
     if (!attraction) return;
     // Prevent duplicate submissions (ref is synchronous, unlike state)
     if (isSubmittingRef.current) return;
+
+    // Cooldown: reject if last submission was less than 3 seconds ago
+    const now = Date.now();
+    if (now - lastSubmitTimeRef.current < 3000) {
+      console.warn('⚠️ Purchase submission blocked (cooldown)');
+      return;
+    }
+
     isSubmittingRef.current = true;
+    lastSubmitTimeRef.current = now;
 
     // Validate signature and terms acceptance
     const stErrors: Record<string, string> = {};
@@ -1549,8 +1565,9 @@ const PurchaseAttraction = () => {
                       <span className="hidden sm:inline">← Back</span>
                     </StandardButton>
                     <button
+                      type="button"
                       onClick={handlePurchase}
-                      disabled={submitting || !cardNumber || !cardMonth || !cardYear || !cardCVV || !validateCardNumber(cardNumber)}
+                      disabled={submitting || isProcessingPayment || !cardNumber || !cardMonth || !cardYear || !cardCVV || !validateCardNumber(cardNumber)}
                       className="py-2.5 md:py-3 px-3 md:px-6 rounded-lg bg-blue-800 text-white font-medium hover:bg-blue-900 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center text-xs md:text-base shadow-sm hover:shadow-md"
                     >
                       {isProcessingPayment ? (

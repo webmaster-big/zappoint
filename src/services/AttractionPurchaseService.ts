@@ -170,6 +170,11 @@ export interface PurchaseStatistics {
 }
 
 class AttractionPurchaseService {
+  // Deduplication: track in-flight createPurchase requests to prevent doubles
+  private _createPurchaseInFlight: boolean = false;
+  private _lastCreatePurchaseTime: number = 0;
+  private _lastCreatePurchaseKey: string = '';
+
   /**
    * Get all attraction purchases with optional filters
    */
@@ -195,10 +200,35 @@ class AttractionPurchaseService {
 
   /**
    * Create a new attraction purchase
+   * Includes deduplication guard to prevent double submissions
    */
   async createPurchase(data: CreatePurchaseData): Promise<ApiResponse<AttractionPurchase>> {
-    const response = await api.post('/attraction-purchases', data);
-    return response.data;
+    // Build a fingerprint from key fields to detect duplicate requests
+    const dedupKey = `${data.attraction_id}-${data.guest_email || data.customer_id || ''}-${data.quantity}-${data.amount}-${data.purchase_date}`;
+    const now = Date.now();
+
+    // Reject if an identical request is already in-flight
+    if (this._createPurchaseInFlight && dedupKey === this._lastCreatePurchaseKey) {
+      console.warn('⚠️ Duplicate createPurchase blocked (in-flight)');
+      throw new Error('Purchase is already being processed. Please wait.');
+    }
+
+    // Reject if an identical request completed less than 5 seconds ago
+    if (dedupKey === this._lastCreatePurchaseKey && now - this._lastCreatePurchaseTime < 5000) {
+      console.warn('⚠️ Duplicate createPurchase blocked (cooldown)');
+      throw new Error('A similar purchase was just created. Please wait a moment before trying again.');
+    }
+
+    this._createPurchaseInFlight = true;
+    this._lastCreatePurchaseKey = dedupKey;
+
+    try {
+      const response = await api.post('/attraction-purchases', data);
+      this._lastCreatePurchaseTime = Date.now();
+      return response.data;
+    } finally {
+      this._createPurchaseInFlight = false;
+    }
   }
 
   /**
