@@ -178,7 +178,7 @@ const SendInvitationsModal = ({ booking, onClose, onSuccess, onToast }: Props) =
             <div>
               <h3 className="text-base font-semibold" style={{ color: '#ffffff' }}>Send Party Invitations</h3>
               <p className="text-sm mt-0.5" style={{ color: 'rgba(191,219,254,0.8)' }}>
-                {pkg?.name} — {booking.booking_date} at {convertTo12Hour(booking.booking_time)}
+                {pkg?.name} — {new Date(booking.booking_date.split('T')[0] + 'T12:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })} at {convertTo12Hour(booking.booking_time)}
               </p>
             </div>
             <button onClick={onClose} className="p-1.5 hover:bg-white/15 rounded-lg transition text-white">
