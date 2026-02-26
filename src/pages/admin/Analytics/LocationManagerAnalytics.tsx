@@ -135,6 +135,16 @@ const LocationManagerAnalytics: React.FC = () => {
   }
 
   const { location, key_metrics, hourly_revenue, daily_revenue, weekly_trend, package_performance, attraction_performance, time_slot_performance } = analyticsData;
+
+  // Format daily_revenue with readable date labels (e.g. "Mon, Jan 27")
+  const formattedDailyRevenue = daily_revenue.map(d => ({
+    ...d,
+    displayDate: (() => {
+      const [year, month, dayNum] = d.date.split('-').map(Number);
+      const dateObj = new Date(year, month - 1, dayNum);
+      return `${d.day}, ${dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+    })(),
+  }));
   
   // Key metrics for single location
   const keyMetrics = [
@@ -142,8 +152,8 @@ const LocationManagerAnalytics: React.FC = () => {
     { label: 'Package Bookings', value: key_metrics.package_bookings.value, icon: Package, change: key_metrics.package_bookings.change + ' vs last period', trend: key_metrics.package_bookings.trend },
     { label: 'Ticket Sales', value: key_metrics.ticket_sales.value, icon: Ticket, change: key_metrics.ticket_sales.change + ' vs last period', trend: key_metrics.ticket_sales.trend },
     { label: 'Total Visitors', value: key_metrics.total_visitors.value, icon: Users, change: key_metrics.total_visitors.change + ' vs last period', trend: key_metrics.total_visitors.trend },
-    { label: 'Active Packages', value: key_metrics.active_packages.value, icon: Package, change: key_metrics.active_packages.info, trend: 'up' },
-    { label: 'Active Attractions', value: key_metrics.active_attractions.value, icon: Activity, change: key_metrics.active_attractions.info, trend: 'up' },
+    { label: 'Active Packages', value: key_metrics.active_packages.value, icon: Package, change: `${key_metrics.active_packages.value} of ${key_metrics.active_packages.total} active`, trend: 'up', info: key_metrics.active_packages.info },
+    { label: 'Active Attractions', value: key_metrics.active_attractions.value, icon: Activity, change: `${key_metrics.active_attractions.value} of ${key_metrics.active_attractions.total} active`, trend: 'up', info: key_metrics.active_attractions.info },
   ];
 
   return (
@@ -241,22 +251,36 @@ const LocationManagerAnalytics: React.FC = () => {
               <div className="group relative">
                 <Info className="w-4 h-4 text-gray-400 cursor-help" />
                 <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
-                  Revenue and booking patterns throughout the day
+                  Revenue and booking patterns throughout the day (only hours with activity)
                 </div>
               </div>
             </div>
             <Clock className="w-4 h-4 text-gray-400" />
           </div>
           <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={hourly_revenue}>
+            <LineChart data={hourly_revenue.filter(h => h.revenue > 0 || h.bookings > 0 || h.attraction_purchases > 0)}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-              <XAxis dataKey="hour" stroke="#6b7280" />
+              <XAxis dataKey="label" stroke="#6b7280" />
               <YAxis yAxisId="left" stroke={`var(--color-${themeColor}-500)`} />
               <YAxis yAxisId="right" orientation="right" stroke="#10b981" />
-              <Tooltip />
+              <Tooltip
+                content={({ active, payload }) => {
+                  if (!active || !payload?.length) return null;
+                  const data = payload[0].payload;
+                  return (
+                    <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-3 text-sm">
+                      <p className="font-semibold text-gray-900 mb-2">{data.label}</p>
+                      <p className="text-gray-600">Revenue: <span className="font-medium text-gray-900">${Number(data.revenue).toLocaleString()}</span></p>
+                      <p className="text-gray-600">Bookings: <span className="font-medium text-gray-900">{data.bookings}</span></p>
+                      <p className="text-gray-600">Attraction Purchases: <span className="font-medium text-gray-900">{data.attraction_purchases}</span></p>
+                    </div>
+                  );
+                }}
+              />
               <Legend />
               <Line yAxisId="left" type="monotone" dataKey="revenue" stroke={`var(--color-${themeColor}-500)`} strokeWidth={2} name="Revenue ($)" />
               <Line yAxisId="right" type="monotone" dataKey="bookings" stroke="#10b981" strokeWidth={2} name="Bookings" />
+              <Line yAxisId="right" type="monotone" dataKey="attraction_purchases" stroke="#f59e0b" strokeWidth={2} name="Attraction Purchases" />
             </LineChart>
           </ResponsiveContainer>
         </div>
@@ -265,25 +289,41 @@ const LocationManagerAnalytics: React.FC = () => {
         <div className="bg-white rounded-xl p-3 sm:p-4 shadow-sm border border-gray-100">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
-              <h3 className="text-lg font-semibold text-gray-900">Daily Performance (Week)</h3>
+              <h3 className="text-lg font-semibold text-gray-900">Daily Performance</h3>
               <div className="group relative">
                 <Info className="w-4 h-4 text-gray-400 cursor-help" />
                 <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
-                  Revenue and participant trends over the last 7 days
+                  Revenue, bookings, and attraction purchase trends per day
                 </div>
               </div>
             </div>
             <Activity className="w-4 h-4 text-gray-400" />
           </div>
           <ResponsiveContainer width="100%" height={300}>
-            <AreaChart data={daily_revenue}>
+            <AreaChart data={formattedDailyRevenue}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-              <XAxis dataKey="day" stroke="#6b7280" />
-              <YAxis stroke="#6b7280" />
-              <Tooltip />
+              <XAxis dataKey="displayDate" stroke="#6b7280" tick={{ fontSize: 11 }} interval={Math.max(0, Math.floor(formattedDailyRevenue.length / 7) - 1)} angle={-35} textAnchor="end" height={60} />
+              <YAxis yAxisId="left" stroke={`var(--color-${themeColor}-500)`} />
+              <YAxis yAxisId="right" orientation="right" stroke="#6b7280" />
+              <Tooltip
+                content={({ active, payload }) => {
+                  if (!active || !payload?.length) return null;
+                  const data = payload[0].payload;
+                  return (
+                    <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-3 text-sm">
+                      <p className="font-semibold text-gray-900 mb-2">{data.displayDate}</p>
+                      <p className="text-gray-600">Revenue: <span className="font-medium text-gray-900">${Number(data.revenue).toLocaleString()}</span></p>
+                      <p className="text-gray-600">Bookings: <span className="font-medium text-gray-900">{data.bookings}</span></p>
+                      <p className="text-gray-600">Attraction Purchases: <span className="font-medium text-gray-900">{data.attraction_purchases}</span></p>
+                      <p className="text-gray-600">Participants: <span className="font-medium text-gray-900">{data.participants}</span></p>
+                    </div>
+                  );
+                }}
+              />
               <Legend />
-              <Area type="monotone" dataKey="revenue" stroke={`var(--color-${themeColor}-500)`} fill={`var(--color-${themeColor}-500)`} fillOpacity={0.1} name="Revenue ($)" />
-              <Area type="monotone" dataKey="participants" stroke="#10b981" fill="#10b981" fillOpacity={0.1} name="Participants" />
+              <Area yAxisId="left" type="monotone" dataKey="revenue" stroke={`var(--color-${themeColor}-500)`} fill={`var(--color-${themeColor}-500)`} fillOpacity={0.1} name="Revenue ($)" />
+              <Area yAxisId="right" type="monotone" dataKey="bookings" stroke="#10b981" fill="#10b981" fillOpacity={0.1} name="Bookings" />
+              <Area yAxisId="right" type="monotone" dataKey="attraction_purchases" stroke="#f59e0b" fill="#f59e0b" fillOpacity={0.1} name="Attraction Purchases" />
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -307,13 +347,29 @@ const LocationManagerAnalytics: React.FC = () => {
               <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
               <XAxis dataKey="name" stroke="#6b7280" />
               <YAxis stroke="#6b7280" />
-              <Tooltip />
+              <Tooltip
+                content={({ active, payload }) => {
+                  if (!active || !payload?.length) return null;
+                  const data = payload[0].payload;
+                  return (
+                    <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-3 text-sm">
+                      <p className="font-semibold text-gray-900 mb-2">{data.name}</p>
+                      <p className="text-gray-600">Category: <span className="font-medium text-gray-900 capitalize">{data.category}</span></p>
+                      <p className="text-gray-600">Bookings: <span className="font-medium text-gray-900">{data.bookings}</span></p>
+                      <p className="text-gray-600">Revenue: <span className="font-medium text-gray-900">${Number(data.revenue).toLocaleString()}</span></p>
+                      <p className="text-gray-600">Participants: <span className="font-medium text-gray-900">{data.participants}</span></p>
+                      <p className="text-gray-600">Avg Party Size: <span className="font-medium text-gray-900">{data.avg_party_size}</span></p>
+                      <p className="text-gray-600">Price: <span className="font-medium text-gray-900">${Number(data.price).toLocaleString()}</span></p>
+                    </div>
+                  );
+                }}
+              />
               <Bar dataKey="bookings" fill={`var(--color-${themeColor}-500)`} radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
 
-        {/* Attraction Utilization */}
+        {/* Attraction Ticket Sales */}
         <div className="bg-white rounded-xl p-3 sm:p-4 shadow-sm border border-gray-100">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
@@ -321,7 +377,7 @@ const LocationManagerAnalytics: React.FC = () => {
               <div className="group relative">
                 <Info className="w-4 h-4 text-gray-400 cursor-help" />
                 <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
-                  Individual ticket purchases shown as utilization % of capacity for each attraction.
+                  Tickets sold and revenue per attraction
                 </div>
               </div>
             </div>
@@ -331,9 +387,28 @@ const LocationManagerAnalytics: React.FC = () => {
             <BarChart data={attraction_performance} layout="vertical">
               <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
               <XAxis type="number" stroke="#6b7280" />
-              <YAxis dataKey="name" type="category" stroke="#6b7280" width={80} />
-              <Tooltip />
-              <Bar dataKey="utilization" fill={`var(--color-${themeColor}-500)`} radius={[0, 4, 4, 0]} />
+              <YAxis dataKey="name" type="category" stroke="#6b7280" width={100} />
+              <Tooltip
+                content={({ active, payload }) => {
+                  if (!active || !payload?.length) return null;
+                  const data = payload[0].payload;
+                  return (
+                    <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-3 text-sm">
+                      <p className="font-semibold text-gray-900 mb-2">{data.name}</p>
+                      <p className="text-gray-600">Category: <span className="font-medium text-gray-900 capitalize">{data.category}</span></p>
+                      <p className="text-gray-600">Tickets Sold: <span className="font-medium text-gray-900">{data.tickets_sold}</span></p>
+                      <p className="text-gray-600">Sessions: <span className="font-medium text-gray-900">{data.sessions}</span></p>
+                      <p className="text-gray-600">Revenue: <span className="font-medium text-gray-900">${Number(data.revenue).toLocaleString()}</span></p>
+                      <p className="text-gray-600">Utilization: <span className="font-medium text-gray-900">{data.utilization}%</span></p>
+                      <p className="text-gray-600">Price: <span className="font-medium text-gray-900">${Number(data.price).toLocaleString()}</span></p>
+                      <p className="text-gray-600">Max Capacity: <span className="font-medium text-gray-900">{data.max_capacity}</span></p>
+                    </div>
+                  );
+                }}
+              />
+              <Legend />
+              <Bar dataKey="tickets_sold" fill={`var(--color-${themeColor}-500)`} radius={[0, 4, 4, 0]} name="Tickets Sold" />
+              <Bar dataKey="revenue" fill="#10b981" radius={[0, 4, 4, 0]} name="Revenue" />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -358,10 +433,25 @@ const LocationManagerAnalytics: React.FC = () => {
               <XAxis dataKey="week" stroke="#6b7280" />
               <YAxis yAxisId="left" stroke={`var(--color-${themeColor}-500)`} />
               <YAxis yAxisId="right" orientation="right" stroke="#10b981" />
-              <Tooltip />
+              <Tooltip
+                content={({ active, payload }) => {
+                  if (!active || !payload?.length) return null;
+                  const data = payload[0].payload;
+                  return (
+                    <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-3 text-sm">
+                      <p className="font-semibold text-gray-900 mb-1">{data.week}</p>
+                      <p className="text-xs text-gray-500 mb-2">{data.week_start} — {data.week_end}</p>
+                      <p className="text-gray-600">Revenue: <span className="font-medium text-gray-900">${Number(data.revenue).toLocaleString()}</span></p>
+                      <p className="text-gray-600">Bookings: <span className="font-medium text-gray-900">{data.bookings}</span></p>
+                      <p className="text-gray-600">Tickets Sold: <span className="font-medium text-gray-900">{data.tickets}</span></p>
+                    </div>
+                  );
+                }}
+              />
               <Legend />
               <Line yAxisId="left" type="monotone" dataKey="revenue" stroke={`var(--color-${themeColor}-500)`} strokeWidth={2} name="Revenue ($)" />
               <Line yAxisId="right" type="monotone" dataKey="bookings" stroke="#10b981" strokeWidth={2} name="Bookings" />
+              <Line yAxisId="right" type="monotone" dataKey="tickets" stroke="#f59e0b" strokeWidth={2} name="Tickets Sold" />
             </LineChart>
           </ResponsiveContainer>
         </div>
@@ -374,19 +464,41 @@ const LocationManagerAnalytics: React.FC = () => {
               <div className="group relative">
                 <Info className="w-4 h-4 text-gray-400 cursor-help" />
                 <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
-                  Revenue by time period
+                  Revenue, bookings, and ticket sales by hour (only hours with activity)
                 </div>
               </div>
             </div>
             <Clock className="w-4 h-4 text-gray-400" />
           </div>
           <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={time_slot_performance}>
+            <BarChart data={time_slot_performance.filter(slot => slot.total_transactions > 0)}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-              <XAxis dataKey="slot" stroke="#6b7280" />
-              <YAxis stroke="#6b7280" />
-              <Tooltip />
-              <Bar dataKey="revenue" fill={`var(--color-${themeColor}-500)`} radius={[4, 4, 0, 0]} />
+              <XAxis dataKey="label" stroke="#6b7280" />
+              <YAxis yAxisId="left" stroke={`var(--color-${themeColor}-500)`} />
+              <YAxis yAxisId="right" orientation="right" stroke="#6b7280" />
+              <Tooltip
+                content={({ active, payload }) => {
+                  if (!active || !payload?.length) return null;
+                  const data = payload[0].payload;
+                  return (
+                    <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-3 text-sm">
+                      <p className="font-semibold text-gray-900 mb-2">{data.label}</p>
+                      <p className="text-gray-600">Total Revenue: <span className="font-medium text-gray-900">${Number(data.total_revenue).toLocaleString()}</span></p>
+                      <p className="text-gray-600 ml-3">Booking Revenue: <span className="font-medium text-gray-900">${Number(data.booking_revenue).toLocaleString()}</span></p>
+                      <p className="text-gray-600 ml-3">Attraction Revenue: <span className="font-medium text-gray-900">${Number(data.attraction_revenue).toLocaleString()}</span></p>
+                      <p className="text-gray-600">Bookings: <span className="font-medium text-gray-900">{data.bookings}</span></p>
+                      <p className="text-gray-600">Tickets Sold: <span className="font-medium text-gray-900">{data.tickets_sold}</span></p>
+                      <p className="text-gray-600">Participants: <span className="font-medium text-gray-900">{data.participants}</span></p>
+                      <p className="text-gray-600">Total Transactions: <span className="font-medium text-gray-900">{data.total_transactions}</span></p>
+                      <p className="text-gray-600">Avg Value: <span className="font-medium text-gray-900">${Number(data.avg_value).toLocaleString()}</span></p>
+                    </div>
+                  );
+                }}
+              />
+              <Legend />
+              <Bar yAxisId="left" dataKey="total_revenue" fill={`var(--color-${themeColor}-500)`} radius={[4, 4, 0, 0]} name="Total Revenue" />
+              <Bar yAxisId="right" dataKey="bookings" fill="#10b981" radius={[4, 4, 0, 0]} name="Bookings" />
+              <Bar yAxisId="right" dataKey="tickets_sold" fill="#f59e0b" radius={[4, 4, 0, 0]} name="Tickets Sold" />
             </BarChart>
           </ResponsiveContainer>
         </div>

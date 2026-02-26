@@ -87,22 +87,28 @@ export interface LocationAnalyticsResponse {
     };
     active_packages: {
       value: number;
+      total: number;
       info: string;
     };
     active_attractions: {
       value: number;
+      total: number;
       info: string;
     };
   };
   hourly_revenue: Array<{
-    hour: string;
+    hour: number;
+    label: string;
     revenue: number;
     bookings: number;
+    attraction_purchases: number;
   }>;
   daily_revenue: Array<{
     day: string;
     date: string;
     revenue: number;
+    bookings: number;
+    attraction_purchases: number;
     participants: number;
   }>;
   weekly_trend: Array<{
@@ -135,9 +141,15 @@ export interface LocationAnalyticsResponse {
     max_capacity: number;
   }>;
   time_slot_performance: Array<{
-    slot: string;
+    hour: number;
+    label: string;
     bookings: number;
-    revenue: number;
+    tickets_sold: number;
+    participants: number;
+    booking_revenue: number;
+    attraction_revenue: number;
+    total_revenue: number;
+    total_transactions: number;
     avg_value: number;
   }>;
 }
