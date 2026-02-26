@@ -29,6 +29,7 @@ import { locationService } from '../../../services';
 import type { Location } from '../../../services/LocationService';
 import LocationSelector from '../../../components/admin/LocationSelector';
 import StandardButton from '../../../components/ui/StandardButton';
+import Pagination from '../../../components/ui/Pagination';
 
 const ManagePurchases = () => {
   const { themeColor, fullColor } = useThemeColor();
@@ -988,47 +989,16 @@ const ManagePurchases = () => {
         </div>
 
         {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="bg-white px-4 py-4 border-t border-gray-100">
-            <div className="flex items-center justify-between">
-              <div className="text-sm text-gray-600">
-                Showing <span className="font-medium">{indexOfFirstItem + 1}</span> to{' '}
-                <span className="font-medium">
-                  {Math.min(indexOfLastItem, filteredPurchases.length)}
-                </span>{' '}
-                of <span className="font-medium">{filteredPurchases.length}</span> results
-              </div>
-              <div className="flex gap-2">
-                <StandardButton
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => paginate(Math.max(1, currentPage - 1))}
-                  disabled={currentPage === 1}
-                >
-                  Previous
-                </StandardButton>
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                  <StandardButton
-                    key={page}
-                    variant={currentPage === page ? 'primary' : 'secondary'}
-                    size="sm"
-                    onClick={() => paginate(page)}
-                  >
-                    {page}
-                  </StandardButton>
-                ))}
-                <StandardButton
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => paginate(Math.min(totalPages, currentPage + 1))}
-                  disabled={currentPage === totalPages}
-                >
-                  Next
-                </StandardButton>
-              </div>
-            </div>
-          </div>
-        )}
+        <div className="bg-white px-4 py-4 border-t border-gray-100">
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={paginate}
+            totalItems={filteredPurchases.length}
+            showingFrom={indexOfFirstItem + 1}
+            showingTo={Math.min(indexOfLastItem, filteredPurchases.length)}
+          />
+        </div>
       </div>
       )}
 
@@ -1146,34 +1116,15 @@ const ManagePurchases = () => {
             )}
 
             {/* Trashed Pagination */}
-            {trashedTotalPages > 1 && (
-              <div className="bg-white px-4 py-4 border-t border-gray-100">
-                <div className="flex items-center justify-between">
-                  <div className="text-sm text-gray-600">
-                    Showing page <span className="font-medium">{trashedCurrentPage}</span> of{' '}
-                    <span className="font-medium">{trashedTotalPages}</span> ({trashedTotal} total)
-                  </div>
-                  <div className="flex gap-2">
-                    <StandardButton
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => loadTrashedPurchases(Math.max(1, trashedCurrentPage - 1))}
-                      disabled={trashedCurrentPage === 1}
-                    >
-                      Previous
-                    </StandardButton>
-                    <StandardButton
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => loadTrashedPurchases(Math.min(trashedTotalPages, trashedCurrentPage + 1))}
-                      disabled={trashedCurrentPage === trashedTotalPages}
-                    >
-                      Next
-                    </StandardButton>
-                  </div>
-                </div>
-              </div>
-            )}
+            <div className="bg-white px-4 py-4 border-t border-gray-100">
+              <Pagination
+                currentPage={trashedCurrentPage}
+                totalPages={trashedTotalPages}
+                onPageChange={(page) => loadTrashedPurchases(page)}
+                totalItems={trashedTotal}
+                itemsPerPage={itemsPerPage}
+              />
+            </div>
           </div>
         </>
       )}

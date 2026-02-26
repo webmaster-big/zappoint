@@ -35,6 +35,7 @@ import {
 import { Link } from 'react-router-dom';
 import { useThemeColor } from '../../hooks/useThemeColor';
 import StandardButton from '../../components/ui/StandardButton';
+import Pagination from '../../components/ui/Pagination';
 import CounterAnimation from '../../components/ui/CounterAnimation';
 import LocationSelector from '../../components/admin/LocationSelector';
 import bookingService from '../../services/bookingService';
@@ -1022,8 +1023,6 @@ const CompanyDashboard: React.FC = () => {
 
   // Pagination controls
   const paginate = (pageNumber: number) => setCurrentPage(pageNumber);
-  const nextPage = () => setCurrentPage(prev => Math.min(prev + 1, totalPages));
-  const prevPage = () => setCurrentPage(prev => Math.max(prev - 1, 1));
 
   // Payment modal handlers
   const handleOpenPaymentModal = () => {
@@ -2104,51 +2103,13 @@ const CompanyDashboard: React.FC = () => {
         {/* Pagination */}
         {filteredBookings.length > 0 && (
           <div className="flex items-center justify-between mt-4 md:mt-6">
-            <div className="text-sm text-gray-800">
-              Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, filteredBookings.length)} of {filteredBookings.length} results
-            </div>
-            <div className="flex space-x-2">
-              <StandardButton
-                variant="secondary"
-                size="sm"
-                onClick={prevPage}
-                disabled={currentPage === 1}
-              >
-                Previous
-              </StandardButton>
-              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                // Show pages around current page
-                let pageNum;
-                if (totalPages <= 5) {
-                  pageNum = i + 1;
-                } else if (currentPage <= 3) {
-                  pageNum = i + 1;
-                } else if (currentPage >= totalPages - 2) {
-                  pageNum = totalPages - 4 + i;
-                } else {
-                  pageNum = currentPage - 2 + i;
-                }
-                
-                return (
-                  <StandardButton
-                    key={pageNum}
-                    variant={currentPage === pageNum ? 'primary' : 'secondary'}
-                    size="sm"
-                    onClick={() => paginate(pageNum)}
-                  >
-                    {pageNum}
-                  </StandardButton>
-                );
-              })}
-              <StandardButton
-                variant="secondary"
-                size="sm"
-                onClick={nextPage}
-                disabled={currentPage === totalPages}
-              >
-                Next
-              </StandardButton>
-            </div>
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={paginate}
+              totalItems={filteredBookings.length}
+              itemsPerPage={itemsPerPage}
+            />
           </div>
         )}
       </div>}

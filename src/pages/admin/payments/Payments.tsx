@@ -14,8 +14,6 @@ import {
   DollarSign,
   FileText,
   ArrowUpDown,
-  ChevronLeft,
-  ChevronRight,
   Package,
   Ticket,
   Printer,
@@ -51,6 +49,7 @@ import { locationService } from '../../../services/LocationService';
 import { packageService } from '../../../services/PackageService';
 import LocationSelector from '../../../components/admin/LocationSelector';
 import StandardButton from '../../../components/ui/StandardButton';
+import Pagination from '../../../components/ui/Pagination';
 import Toast from '../../../components/ui/Toast';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
 import RefundModal from '../../../components/admin/payments/RefundModal';
@@ -1384,54 +1383,16 @@ const Payments: React.FC = () => {
 
         {/* Pagination */}
         {filteredPayments.length > 0 && (
-          <div className="px-6 py-4 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="text-sm text-gray-500">
-              Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, filteredPayments.length)} of {filteredPayments.length} payments
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => paginate(currentPage - 1)}
-                disabled={currentPage === 1}
-                className="p-2 rounded-lg border border-gray-200 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              
-              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                let pageNum;
-                if (totalPages <= 5) {
-                  pageNum = i + 1;
-                } else if (currentPage <= 3) {
-                  pageNum = i + 1;
-                } else if (currentPage >= totalPages - 2) {
-                  pageNum = totalPages - 4 + i;
-                } else {
-                  pageNum = currentPage - 2 + i;
-                }
-                
-                return (
-                  <button
-                    key={pageNum}
-                    onClick={() => paginate(pageNum)}
-                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                      currentPage === pageNum
-                        ? `bg-${fullColor} text-white`
-                        : `text-gray-600 hover:bg-${themeColor}-50`
-                    }`}
-                  >
-                    {pageNum}
-                  </button>
-                );
-              })}
-              
-              <button
-                onClick={() => paginate(currentPage + 1)}
-                disabled={currentPage === totalPages}
-                className="p-2 rounded-lg border border-gray-200 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
+          <div className="px-6 py-4 border-t border-gray-100">
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={paginate}
+              totalItems={filteredPayments.length}
+              showingFrom={indexOfFirstItem + 1}
+              showingTo={Math.min(indexOfLastItem, filteredPayments.length)}
+              itemLabel="payments"
+            />
           </div>
         )}
       </div>

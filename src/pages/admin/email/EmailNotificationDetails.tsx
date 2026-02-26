@@ -21,8 +21,6 @@ import {
   XCircle,
   AlertCircle,
   RefreshCcw,
-  ChevronLeft,
-  ChevronRight,
   X,
   Eye,
   RotateCcw
@@ -30,6 +28,7 @@ import {
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { emailNotificationService } from '../../../services/EmailNotificationService';
 import StandardButton from '../../../components/ui/StandardButton';
+import Pagination from '../../../components/ui/Pagination';
 import Toast from '../../../components/ui/Toast';
 
 import type { 
@@ -607,26 +606,12 @@ const EmailNotificationDetails: React.FC = () => {
 
                 {/* Logs Pagination */}
                 {logsTotalPages > 1 && (
-                  <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 bg-gray-50">
-                    <p className="text-sm text-gray-500">
-                      Page {logsPage} of {logsTotalPages}
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => setLogsPage(prev => Math.max(1, prev - 1))}
-                        disabled={logsPage === 1}
-                        className="p-2 rounded-lg border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
-                      >
-                        <ChevronLeft className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => setLogsPage(prev => Math.min(logsTotalPages, prev + 1))}
-                        disabled={logsPage === logsTotalPages}
-                        className="p-2 rounded-lg border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
-                      >
-                        <ChevronRight className="w-4 h-4" />
-                      </button>
-                    </div>
+                  <div className="px-4 py-3 border-t border-gray-200 bg-gray-50">
+                    <Pagination
+                      currentPage={logsPage}
+                      totalPages={logsTotalPages}
+                      onPageChange={setLogsPage}
+                    />
                   </div>
                 )}
               </>

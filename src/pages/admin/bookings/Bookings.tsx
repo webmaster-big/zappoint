@@ -33,6 +33,7 @@ import {
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import StandardButton from '../../../components/ui/StandardButton';
+import Pagination from '../../../components/ui/Pagination';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
 import type { BookingsPageBooking, BookingsPageFilterOptions, BookingsColumnVisibility, BookingsColumnKey } from '../../../types/Bookings.types';
 import { derivePaymentStatus, DEFAULT_COLUMN_ORDER } from '../../../types/Bookings.types';
@@ -3289,49 +3290,16 @@ const Bookings: React.FC = () => {
           </div>
 
           {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="bg-white px-6 py-4 border-t border-gray-100">
-              <div className="flex items-center justify-between">
-                <div className="text-sm text-gray-800">
-                  Showing <span className="font-medium">{indexOfFirstItem + 1}</span> to{' '}
-                  <span className="font-medium">
-                    {Math.min(indexOfLastItem, sortedBookings.length)}
-                  </span>{' '}
-                  of <span className="font-medium">{sortedBookings.length}</span> results
-                </div>
-                <div className="flex gap-2">
-                  <StandardButton
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => paginate(Math.max(1, currentPage - 1))}
-                    disabled={currentPage === 1}
-                  >
-                    Previous
-                  </StandardButton>
-                  
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                    <StandardButton
-                      key={page}
-                      variant={currentPage === page ? 'primary' : 'secondary'}
-                      size="sm"
-                      onClick={() => paginate(page)}
-                    >
-                      {page}
-                    </StandardButton>
-                  ))}
-                  
-                  <StandardButton
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => paginate(Math.min(totalPages, currentPage + 1))}
-                    disabled={currentPage === totalPages}
-                  >
-                    Next
-                  </StandardButton>
-                </div>
-              </div>
-            </div>
-          )}
+          <div className="bg-white px-6 py-4 border-t border-gray-100">
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={paginate}
+              totalItems={sortedBookings.length}
+              showingFrom={indexOfFirstItem + 1}
+              showingTo={Math.min(indexOfLastItem, sortedBookings.length)}
+            />
+          </div>
         </div>
         )}
 
@@ -3465,34 +3433,15 @@ const Bookings: React.FC = () => {
               )}
 
               {/* Trashed Pagination */}
-              {trashedTotalPages > 1 && (
-                <div className="bg-white px-6 py-4 border-t border-gray-100">
-                  <div className="flex items-center justify-between">
-                    <div className="text-sm text-gray-800">
-                      Showing page <span className="font-medium">{trashedCurrentPage}</span> of{' '}
-                      <span className="font-medium">{trashedTotalPages}</span> ({trashedTotal} total)
-                    </div>
-                    <div className="flex gap-2">
-                      <StandardButton
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => loadTrashedBookings(Math.max(1, trashedCurrentPage - 1))}
-                        disabled={trashedCurrentPage === 1}
-                      >
-                        Previous
-                      </StandardButton>
-                      <StandardButton
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => loadTrashedBookings(Math.min(trashedTotalPages, trashedCurrentPage + 1))}
-                        disabled={trashedCurrentPage === trashedTotalPages}
-                      >
-                        Next
-                      </StandardButton>
-                    </div>
-                  </div>
-                </div>
-              )}
+              <div className="bg-white px-6 py-4 border-t border-gray-100">
+                <Pagination
+                  currentPage={trashedCurrentPage}
+                  totalPages={trashedTotalPages}
+                  onPageChange={(page) => loadTrashedBookings(page)}
+                  totalItems={trashedTotal}
+                  itemsPerPage={itemsPerPage}
+                />
+              </div>
             </div>
           </>
         )}

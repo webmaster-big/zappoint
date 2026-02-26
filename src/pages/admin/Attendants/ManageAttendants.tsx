@@ -19,6 +19,7 @@ import {
   CheckCircle
 } from 'lucide-react';
 import StandardButton from '../../../components/ui/StandardButton';
+import Pagination from '../../../components/ui/Pagination';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
 import { API_BASE_URL } from '../../../utils/storage';
@@ -925,49 +926,16 @@ const ManageAttendants = () => {
         </div>
 
         {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="bg-white px-6 py-4 border-t border-gray-100">
-            <div className="flex items-center justify-between">
-              <div className="text-sm text-gray-800">
-                Showing <span className="font-medium">{indexOfFirstItem + 1}</span> to{' '}
-                <span className="font-medium">
-                  {Math.min(indexOfLastItem, filteredAttendants.length)}
-                </span>{' '}
-                of <span className="font-medium">{filteredAttendants.length}</span> results
-              </div>
-              <div className="flex gap-2">
-                <StandardButton
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => paginate(Math.max(1, currentPage - 1))}
-                  disabled={currentPage === 1}
-                >
-                  Previous
-                </StandardButton>
-                
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                  <StandardButton
-                    key={page}
-                    variant={currentPage === page ? 'primary' : 'secondary'}
-                    size="sm"
-                    onClick={() => paginate(page)}
-                  >
-                    {page}
-                  </StandardButton>
-                ))}
-                
-                <StandardButton
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => paginate(Math.min(totalPages, currentPage + 1))}
-                  disabled={currentPage === totalPages}
-                >
-                  Next
-                </StandardButton>
-              </div>
-            </div>
-          </div>
-        )}
+        <div className="bg-white px-6 py-4 border-t border-gray-100">
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={paginate}
+            totalItems={filteredAttendants.length}
+            showingFrom={indexOfFirstItem + 1}
+            showingTo={Math.min(indexOfLastItem, filteredAttendants.length)}
+          />
+        </div>
       </div>
 
       {/* Invitation Modal */}

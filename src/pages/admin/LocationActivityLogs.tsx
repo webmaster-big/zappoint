@@ -23,6 +23,7 @@ import {
   Info
 } from 'lucide-react';
 import StandardButton from '../../components/ui/StandardButton';
+import Pagination from '../../components/ui/Pagination';
 import type { 
   LocationActivityLogsActivityLog, 
   LocationActivityLogsFilterOptions, 
@@ -2032,66 +2033,17 @@ const LocationActivityLogs = () => {
         </div>
 
         {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="bg-white px-6 py-4 border-t border-gray-100">
-            <div className="flex items-center justify-between">
-              <div className="text-sm text-gray-800">
-                Showing <span className="font-medium">{indexOfFirstItem}</span> to{' '}
-                <span className="font-medium">
-                  {Math.min(indexOfLastItem, totalLogs)}
-                </span>{' '}
-                of <span className="font-medium">{totalLogs}</span> activities
-              </div>
-              <div className="flex items-center gap-2">
-                <StandardButton
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => paginate(Math.max(1, currentPage - 1))}
-                  disabled={currentPage === 1}
-                >
-                  Previous
-                </StandardButton>
-                
-                {/* Pagination buttons limited to 3 */}
-                {(() => {
-                  let start = 1;
-                  let end = totalPages;
-                  if (totalPages > 3) {
-                    if (currentPage <= 2) {
-                      start = 1;
-                      end = 3;
-                    } else if (currentPage >= totalPages - 1) {
-                      start = totalPages - 2;
-                      end = totalPages;
-                    } else {
-                      start = currentPage - 1;
-                      end = currentPage + 1;
-                    }
-                  }
-                  return Array.from({ length: end - start + 1 }, (_, i) => start + i).map((page) => (
-                    <StandardButton
-                      key={page}
-                      variant={currentPage === page ? 'primary' : 'secondary'}
-                      size="sm"
-                      onClick={() => paginate(page)}
-                    >
-                      {page}
-                    </StandardButton>
-                  ));
-                })()}
-                
-                <StandardButton
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => paginate(Math.min(totalPages, currentPage + 1))}
-                  disabled={currentPage === totalPages}
-                >
-                  Next
-                </StandardButton>
-              </div>
-            </div>
-          </div>
-        )}
+        <div className="bg-white px-6 py-4 border-t border-gray-100">
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={paginate}
+            totalItems={totalLogs}
+            showingFrom={indexOfFirstItem}
+            showingTo={Math.min(indexOfLastItem, totalLogs)}
+            itemLabel="activities"
+          />
+        </div>
       </div>
     </div>
   );

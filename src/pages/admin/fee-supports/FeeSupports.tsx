@@ -25,6 +25,7 @@ import { locationService } from '../../../services/LocationService';
 import { getStoredUser } from '../../../utils/storage';
 import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
+import Pagination from '../../../components/ui/Pagination';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
 import type { FeeSupport, FeeSupportListFilters, FeeSupportFormData } from '../../../types/FeeSupport.types';
 import type { Package as PackageType } from '../../../services/PackageService';
@@ -615,34 +616,15 @@ const FeeSupports: React.FC = () => {
 
         {/* Pagination */}
         {filteredFeeSupports.length > itemsPerPage && (
-          <div className="px-6 py-4 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="text-sm text-gray-500">
-              Showing {indexOfFirst + 1} to {Math.min(indexOfLast, filteredFeeSupports.length)} of {filteredFeeSupports.length}
-            </div>
-            <div className="flex items-center gap-2">
-              <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="p-2 rounded-lg border border-gray-200 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors">
-                <ArrowLeft className="w-4 h-4" />
-              </button>
-              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                let pageNum: number;
-                if (totalPages <= 5) pageNum = i + 1;
-                else if (currentPage <= 3) pageNum = i + 1;
-                else if (currentPage >= totalPages - 2) pageNum = totalPages - 4 + i;
-                else pageNum = currentPage - 2 + i;
-                return (
-                  <button
-                    key={pageNum}
-                    onClick={() => setCurrentPage(pageNum)}
-                    className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${currentPage === pageNum ? `bg-${fullColor} text-white` : 'text-gray-700 hover:bg-gray-50'}`}
-                  >
-                    {pageNum}
-                  </button>
-                );
-              })}
-              <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="p-2 rounded-lg border border-gray-200 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors">
-                <ArrowLeft className="w-4 h-4 rotate-180" />
-              </button>
-            </div>
+          <div className="px-6 py-4 border-t border-gray-100">
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+              totalItems={filteredFeeSupports.length}
+              showingFrom={indexOfFirst + 1}
+              showingTo={Math.min(indexOfLast, filteredFeeSupports.length)}
+            />
           </div>
         )}
       </div>

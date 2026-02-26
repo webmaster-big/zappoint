@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Search, Edit, Trash2, Utensils, Download, Upload, X, CheckSquare, Square, Filter, RefreshCcw, Link } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import StandardButton from '../../../components/ui/StandardButton';
+import Pagination from '../../../components/ui/Pagination';
 import { addOnService, locationService, packageService } from '../../../services';
 import type { CreateAddOnData, UpdateAddOnData } from '../../../services/AddOnService';
 import { addOnCacheService } from '../../../services/AddOnCacheService';
@@ -912,68 +913,16 @@ const ManageAddons = () => {
         )}
 
         {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-gray-100">
-            <div className="text-sm text-gray-700">
-              Showing <span className="font-medium">{indexOfFirstItem + 1}</span> to{' '}
-              <span className="font-medium">
-                {Math.min(indexOfLastItem, filteredAddons.length)}
-              </span>{' '}
-              of <span className="font-medium">{filteredAddons.length}</span> results
-            </div>
-            <div className="flex gap-2">
-              <StandardButton
-                onClick={() => paginate(Math.max(1, currentPage - 1))}
-                disabled={currentPage === 1}
-                variant="secondary"
-                size="sm"
-              >
-                Previous
-              </StandardButton>
-              
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
-                // Show first, last, current, and adjacent pages
-                const showPage = page === 1 || 
-                                page === totalPages || 
-                                (page >= currentPage - 1 && page <= currentPage + 1);
-                
-                // Show ellipsis
-                const showEllipsisBefore = page === currentPage - 2 && currentPage > 3;
-                const showEllipsisAfter = page === currentPage + 2 && currentPage < totalPages - 2;
-                
-                if (!showPage && !showEllipsisBefore && !showEllipsisAfter) return null;
-                
-                if (showEllipsisBefore || showEllipsisAfter) {
-                  return (
-                    <span key={page} className="px-3 py-2 text-gray-400">
-                      ...
-                    </span>
-                  );
-                }
-                
-                return (
-                  <StandardButton
-                    key={page}
-                    onClick={() => paginate(page)}
-                    variant={currentPage === page ? "primary" : "secondary"}
-                    size="sm"
-                  >
-                    {page}
-                  </StandardButton>
-                );
-              })}
-              
-              <StandardButton
-                onClick={() => paginate(Math.min(totalPages, currentPage + 1))}
-                disabled={currentPage === totalPages}
-                variant="secondary"
-                size="sm"
-              >
-                Next
-              </StandardButton>
-            </div>
-          </div>
-        )}
+        <div className="pt-4 border-t border-gray-100">
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={paginate}
+            totalItems={filteredAddons.length}
+            showingFrom={indexOfFirstItem + 1}
+            showingTo={Math.min(indexOfLastItem, filteredAddons.length)}
+          />
+        </div>
       </div>
 
       {/* Add/Edit Modal */}

@@ -8,8 +8,6 @@ import {
   Filter,
   Send,
   Eye,
-  ChevronLeft,
-  ChevronRight,
   CheckCircle,
   Clock,
   XCircle,
@@ -24,6 +22,7 @@ import { useThemeColor } from '../../../hooks/useThemeColor';
 import { emailCampaignService } from '../../../services/EmailCampaignService';
 import { locationService } from '../../../services/LocationService';
 import StandardButton from '../../../components/ui/StandardButton';
+import Pagination from '../../../components/ui/Pagination';
 import Toast from '../../../components/ui/Toast';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
 import { getStoredUser } from '../../../utils/storage';
@@ -549,29 +548,15 @@ const EmailCampaigns: React.FC = () => {
 
             {/* Pagination */}
             {totalPages > 1 && (
-              <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 bg-gray-50">
-                <p className="text-sm text-gray-500">
-                  Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalItems)} of {totalItems} campaigns
-                </p>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                    disabled={currentPage === 1}
-                    className="p-2 rounded-lg border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                  </button>
-                  <span className="text-sm text-gray-600">
-                    Page {currentPage} of {totalPages}
-                  </span>
-                  <button
-                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                    disabled={currentPage === totalPages}
-                    className="p-2 rounded-lg border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
-                </div>
+              <div className="px-4 py-3 border-t border-gray-200 bg-gray-50">
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={setCurrentPage}
+                  totalItems={totalItems}
+                  itemsPerPage={itemsPerPage}
+                  itemLabel="campaigns"
+                />
               </div>
             )}
           </>

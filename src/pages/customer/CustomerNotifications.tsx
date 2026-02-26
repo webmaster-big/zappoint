@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Bell, Check, X, Calendar, Gift, Info, CheckCircle, Clock, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { Bell, Check, X, Calendar, Gift, Info, CheckCircle, Clock } from 'lucide-react';
 import {
   customerNotificationService,
   type CustomerNotification,
   type CustomerNotificationType,
 } from '../../services/CustomerNotificationService';
 import Toast from '../../components/ui/Toast';
+import Pagination from '../../components/ui/Pagination';
 
 type FilterTab = 'all' | 'unread' | 'read';
 
@@ -472,68 +473,15 @@ const CustomerNotifications = () => {
                     <option key={size} value={size}>{size} / page</option>
                   ))}
                 </select>
-                <span className="text-gray-400">
-                  {((currentPage - 1) * pageSize) + 1}–{Math.min(currentPage * pageSize, totalItems)} of {totalItems}
-                </span>
               </div>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => setCurrentPage(1)}
-                  disabled={currentPage === 1}
-                  className="p-1.5 rounded-lg disabled:opacity-30 hover:bg-gray-100 transition"
-                  data-tooltip="First page"
-                >
-                  <ChevronsLeft size={14} className="text-gray-600" />
-                </button>
-                <button
-                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                  className="p-1.5 rounded-lg disabled:opacity-30 hover:bg-gray-100 transition"
-                  data-tooltip="Previous"
-                >
-                  <ChevronLeft size={14} className="text-gray-600" />
-                </button>
-                {Array.from({ length: lastPage }, (_, i) => i + 1)
-                  .filter(p => p === 1 || p === lastPage || Math.abs(p - currentPage) <= 1)
-                  .reduce<(number | string)[]>((acc, p, i, arr) => {
-                    if (i > 0 && p - (arr[i - 1] as number) > 1) acc.push('...');
-                    acc.push(p);
-                    return acc;
-                  }, [])
-                  .map((p, i) =>
-                    typeof p === 'string' ? (
-                      <span key={`dots-${i}`} className="px-1 text-gray-400 text-xs select-none">…</span>
-                    ) : (
-                      <button
-                        key={p}
-                        onClick={() => setCurrentPage(p)}
-                        className={`min-w-[28px] h-7 text-xs font-semibold rounded-lg transition ${
-                          currentPage === p
-                            ? 'bg-blue-700 text-white shadow-sm'
-                            : 'text-gray-600 hover:bg-gray-100'
-                        }`}
-                      >
-                        {p}
-                      </button>
-                    )
-                  )}
-                <button
-                  onClick={() => setCurrentPage(p => Math.min(lastPage, p + 1))}
-                  disabled={currentPage >= lastPage}
-                  className="p-1.5 rounded-lg disabled:opacity-30 hover:bg-gray-100 transition"
-                  data-tooltip="Next"
-                >
-                  <ChevronRight size={14} className="text-gray-600" />
-                </button>
-                <button
-                  onClick={() => setCurrentPage(lastPage)}
-                  disabled={currentPage >= lastPage}
-                  className="p-1.5 rounded-lg disabled:opacity-30 hover:bg-gray-100 transition"
-                  data-tooltip="Last page"
-                >
-                  <ChevronsRight size={14} className="text-gray-600" />
-                </button>
-              </div>
+              <Pagination
+                currentPage={currentPage}
+                totalPages={lastPage}
+                onPageChange={setCurrentPage}
+                totalItems={totalItems}
+                itemsPerPage={pageSize}
+                compact
+              />
             </div>
           )}
         </div>

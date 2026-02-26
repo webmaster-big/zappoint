@@ -22,6 +22,7 @@ import {
 
 import CounterAnimation from '../../../components/ui/CounterAnimation';
 import StandardButton from '../../../components/ui/StandardButton';
+import Pagination from '../../../components/ui/Pagination';
 import type {
   AttendantActivityLogsLog,
   AttendantActivityLogsFilterOptions,
@@ -1661,66 +1662,17 @@ const AttendantActivityLogs = () => {
         </div>
 
         {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="bg-white px-6 py-4 border-t border-gray-100">
-            <div className="flex items-center justify-between">
-              <div className="text-sm text-gray-800">
-                Showing <span className="font-medium">{indexOfFirstItem + 1}</span> to{' '}
-                <span className="font-medium">
-                  {Math.min(indexOfLastItem, totalLogs)}
-                </span>{' '}
-                of <span className="font-medium">{totalLogs}</span> activities
-              </div>
-              <div className="flex gap-2">
-                <StandardButton
-                  onClick={() => paginate(Math.max(1, currentPage - 1))}
-                  disabled={currentPage === 1}
-                  variant="secondary"
-                  size="sm"
-                >
-                  Previous
-                </StandardButton>
-                
-                {/* Pagination buttons limited to 3 */}
-                {(() => {
-                  let start = 1;
-                  let end = totalPages;
-                  if (totalPages > 3) {
-                    if (currentPage <= 2) {
-                      start = 1;
-                      end = 3;
-                    } else if (currentPage >= totalPages - 1) {
-                      start = totalPages - 2;
-                      end = totalPages;
-                    } else {
-                      start = currentPage - 1;
-                      end = currentPage + 1;
-                    }
-                  }
-                  return Array.from({ length: end - start + 1 }, (_, i) => start + i).map((page) => (
-                    <StandardButton
-                      key={page}
-                      onClick={() => paginate(page)}
-                      variant={currentPage === page ? 'primary' : 'secondary'}
-                      size="sm"
-                    >
-                      {page}
-                    </StandardButton>
-                  ));
-                })()}
-                
-                <StandardButton
-                  onClick={() => paginate(Math.min(totalPages, currentPage + 1))}
-                  disabled={currentPage === totalPages}
-                  variant="secondary"
-                  size="sm"
-                >
-                  Next
-                </StandardButton>
-              </div>
-            </div>
-          </div>
-        )}
+        <div className="bg-white px-6 py-4 border-t border-gray-100">
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={paginate}
+            totalItems={totalLogs}
+            showingFrom={indexOfFirstItem + 1}
+            showingTo={Math.min(indexOfLastItem, totalLogs)}
+            itemLabel="activities"
+          />
+        </div>
       </div>
     </div>
   );

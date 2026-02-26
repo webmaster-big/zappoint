@@ -16,6 +16,7 @@ import {
   ExternalLink
 } from 'lucide-react';
 import StandardButton from '../../components/ui/StandardButton';
+import Pagination from '../../components/ui/Pagination';
 import { useThemeColor } from '../../hooks/useThemeColor';
 import type { NotificationsNotification } from '../../types/Notifications.types';
 import { API_BASE_URL } from '../../utils/storage';
@@ -596,60 +597,14 @@ const Notifications = () => {
       {/* Pagination */}
       {totalPages > 1 && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mt-4">
-          <div className="flex items-center justify-between">
-            <div className="text-sm text-gray-800">
-              Showing <span className="font-medium">{indexOfFirstItem + 1}</span> to{' '}
-              <span className="font-medium">
-                {Math.min(indexOfLastItem, filteredNotifications.length)}
-              </span>{' '}
-              of <span className="font-medium">{filteredNotifications.length}</span> results
-            </div>
-            <div className="flex gap-1">
-              <StandardButton
-                variant="secondary"
-                size="sm"
-                onClick={() => paginate(Math.max(1, currentPage - 1))}
-                disabled={currentPage === 1}
-              >
-                Previous
-              </StandardButton>
-              
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
-                const showPage = page === 1 || 
-                                page === totalPages || 
-                                (page >= currentPage - 1 && page <= currentPage + 1);
-                
-                const showEllipsisBefore = page === currentPage - 2 && currentPage > 3;
-                const showEllipsisAfter = page === currentPage + 2 && currentPage < totalPages - 2;
-                
-                if (!showPage && !showEllipsisBefore && !showEllipsisAfter) return null;
-                
-                if (showEllipsisBefore || showEllipsisAfter) {
-                  return <span key={page} className="px-3 py-2 text-gray-400">...</span>;
-                }
-                
-                return (
-                  <StandardButton
-                    key={page}
-                    variant={currentPage === page ? 'primary' : 'secondary'}
-                    size="sm"
-                    onClick={() => paginate(page)}
-                  >
-                    {page}
-                  </StandardButton>
-                );
-              })}
-              
-              <StandardButton
-                variant="secondary"
-                size="sm"
-                onClick={() => paginate(Math.min(totalPages, currentPage + 1))}
-                disabled={currentPage === totalPages}
-              >
-                Next
-              </StandardButton>
-            </div>
-          </div>
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={paginate}
+            totalItems={filteredNotifications.length}
+            showingFrom={indexOfFirstItem + 1}
+            showingTo={Math.min(indexOfLastItem, filteredNotifications.length)}
+          />
         </div>
       )}
 

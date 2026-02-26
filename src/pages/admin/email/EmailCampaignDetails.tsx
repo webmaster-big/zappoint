@@ -14,9 +14,6 @@ import {
   AlertTriangle,
   RotateCcw,
   Trash2,
-  ChevronLeft,
-  ChevronRight,
-
   Calendar,
   User,
   MapPin,
@@ -25,6 +22,7 @@ import {
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { emailCampaignService } from '../../../services/EmailCampaignService';
 import StandardButton from '../../../components/ui/StandardButton';
+import Pagination from '../../../components/ui/Pagination';
 import Toast from '../../../components/ui/Toast';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
 
@@ -360,29 +358,15 @@ const EmailCampaignDetails: React.FC = () => {
 
                 {/* Logs Pagination */}
                 {totalLogsPages > 1 && (
-                  <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 bg-gray-50">
-                    <p className="text-sm text-gray-500">
-                      Showing {((logsPage - 1) * logsPerPage) + 1} to {Math.min(logsPage * logsPerPage, campaign.logs.length)} of {campaign.logs.length} logs
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => setLogsPage(prev => Math.max(1, prev - 1))}
-                        disabled={logsPage === 1}
-                        className="p-2 rounded-lg border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
-                      >
-                        <ChevronLeft className="w-4 h-4" />
-                      </button>
-                      <span className="text-sm text-gray-600">
-                        Page {logsPage} of {totalLogsPages}
-                      </span>
-                      <button
-                        onClick={() => setLogsPage(prev => Math.min(totalLogsPages, prev + 1))}
-                        disabled={logsPage === totalLogsPages}
-                        className="p-2 rounded-lg border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
-                      >
-                        <ChevronRight className="w-4 h-4" />
-                      </button>
-                    </div>
+                  <div className="px-4 py-3 border-t border-gray-200 bg-gray-50">
+                    <Pagination
+                      currentPage={logsPage}
+                      totalPages={totalLogsPages}
+                      onPageChange={setLogsPage}
+                      totalItems={campaign.logs.length}
+                      itemsPerPage={logsPerPage}
+                      itemLabel="logs"
+                    />
                   </div>
                 )}
               </div>

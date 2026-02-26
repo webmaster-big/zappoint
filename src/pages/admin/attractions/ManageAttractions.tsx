@@ -25,6 +25,7 @@ import { formatDurationDisplay } from '../../../utils/timeFormat';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
 import StandardButton from '../../../components/ui/StandardButton';
+import Pagination from '../../../components/ui/Pagination';
 import type {
   ManageAttractionsAttraction,
   ManageAttractionsFilterOptions,
@@ -1024,49 +1025,16 @@ const ManageAttractions = () => {
         </div>
 
         {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="bg-white px-6 py-4 border-t border-gray-100">
-            <div className="flex items-center justify-between">
-              <div className="text-sm text-gray-800">
-                Showing <span className="font-medium">{indexOfFirstItem + 1}</span> to{' '}
-                <span className="font-medium">
-                  {Math.min(indexOfLastItem, filteredAttractions.length)}
-                </span>{' '}
-                of <span className="font-medium">{filteredAttractions.length}</span> results
-              </div>
-              <div className="flex gap-2">
-                <StandardButton
-                  onClick={() => paginate(Math.max(1, currentPage - 1))}
-                  disabled={currentPage === 1}
-                  variant="secondary"
-                  size="sm"
-                >
-                  Previous
-                </StandardButton>
-                
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                  <StandardButton
-                    key={page}
-                    onClick={() => paginate(page)}
-                    variant={currentPage === page ? 'primary' : 'secondary'}
-                    size="sm"
-                  >
-                    {page}
-                  </StandardButton>
-                ))}
-                
-                <StandardButton
-                  onClick={() => paginate(Math.min(totalPages, currentPage + 1))}
-                  disabled={currentPage === totalPages}
-                  variant="secondary"
-                  size="sm"
-                >
-                  Next
-                </StandardButton>
-              </div>
-            </div>
-          </div>
-        )}
+        <div className="bg-white px-6 py-4 border-t border-gray-100">
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={paginate}
+            totalItems={filteredAttractions.length}
+            showingFrom={indexOfFirstItem + 1}
+            showingTo={Math.min(indexOfLastItem, filteredAttractions.length)}
+          />
+        </div>
       </div>
 
       {/* Export Modal */}

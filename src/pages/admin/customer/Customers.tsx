@@ -26,6 +26,7 @@ import {
   Calendar,
 } from 'lucide-react';
 import StandardButton from '../../../components/ui/StandardButton';
+import Pagination from '../../../components/ui/Pagination';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import contactService, { 
@@ -47,7 +48,7 @@ const CustomerListing: React.FC = () => {
   const [sourceFilter, setSourceFilter] = useState<string>('');
   const [sortBy, setSortBy] = useState<string>('created_at');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-  const [loading, setLoading] = useState(false);
+  const [_loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [totalContacts, setTotalContacts] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
@@ -1139,67 +1140,14 @@ const CustomerListing: React.FC = () => {
         {/* Pagination */}
         {totalPages > 1 && (
           <div className="bg-white px-6 py-4 border-t border-gray-100">
-            <div className="flex items-center justify-between">
-              <div className="text-sm text-gray-800">
-                {loading ? (
-                  <span className="flex items-center gap-2">
-                    <div className="animate-spin rounded-full h-3 w-3 border-2 border-gray-400 border-t-transparent"></div>
-                    Loading...
-                  </span>
-                ) : (
-                  <>
-                    Showing <span className="font-medium">{startIndex + 1}</span> to{' '}
-                    <span className="font-medium">
-                      {Math.min(startIndex + itemsPerPage, totalContacts)}
-                    </span>{' '}
-                    of <span className="font-medium">{totalContacts}</span> results
-                  </>
-                )}
-              </div>
-              <div className="flex gap-2">
-                <StandardButton
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => goToPage(currentPage - 1)}
-                  disabled={currentPage === 1 || loading}
-                >
-                  Previous
-                </StandardButton>
-                
-                {Array.from({ length: totalPages }, (_, i) => i + 1)
-                  .filter(page => {
-                    // Show first page, last page, and pages around current
-                    if (totalPages <= 7) return true;
-                    if (page === 1 || page === totalPages) return true;
-                    if (Math.abs(page - currentPage) <= 1) return true;
-                    return false;
-                  })
-                  .map((page, idx, arr) => (
-                    <React.Fragment key={page}>
-                      {idx > 0 && arr[idx - 1] !== page - 1 && (
-                        <span className="px-2 text-gray-400">...</span>
-                      )}
-                      <StandardButton
-                        variant={currentPage === page ? 'primary' : 'secondary'}
-                        size="sm"
-                        onClick={() => goToPage(page)}
-                        disabled={loading}
-                      >
-                        {page}
-                      </StandardButton>
-                    </React.Fragment>
-                  ))}
-                
-                <StandardButton
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => goToPage(currentPage + 1)}
-                  disabled={currentPage === totalPages || loading}
-                >
-                  Next
-                </StandardButton>
-              </div>
-            </div>
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={goToPage}
+              totalItems={totalContacts}
+              showingFrom={startIndex + 1}
+              showingTo={Math.min(startIndex + itemsPerPage, totalContacts)}
+            />
           </div>
         )}
       </div>

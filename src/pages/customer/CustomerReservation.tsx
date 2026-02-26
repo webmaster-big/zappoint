@@ -9,8 +9,6 @@ import {
   QrCode,
   ChevronDown,
   ChevronUp,
-  ChevronsLeft,
-  ChevronsRight,
   RefreshCcw,
   DollarSign,
   CheckCircle,
@@ -27,6 +25,7 @@ import { formatDurationDisplay, convertTo12Hour } from '../../utils/timeFormat';
 import SendInvitationsModal from '../../components/invitations/SendInvitationsModal';
 import InvitationTracker from '../../components/invitations/InvitationTracker';
 import Toast from '../../components/ui/Toast';
+import Pagination from '../../components/ui/Pagination';
 
 const CustomerReservations = () => {
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -37,7 +36,7 @@ const CustomerReservations = () => {
   const [sortBy, setSortBy] = useState<SortBy>('date');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(5);
+  const [pageSize] = useState(5);
   const [totalPages, setTotalPages] = useState(1);
   const [totalBookings, setTotalBookings] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -501,59 +500,15 @@ const CustomerReservations = () => {
 
           {/* Pagination */}
           {!loading && bookings.length > 0 && totalPages > 1 && (
-            <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-gray-400">{((currentPage - 1) * pageSize) + 1}–{Math.min(currentPage * pageSize, totalBookings)} of {totalBookings}</span>
-                <select
-                  value={pageSize}
-                  onChange={e => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
-                  className="border border-gray-200 rounded px-1.5 py-0.5 text-xs text-gray-500 bg-white focus:outline-none"
-                >
-                  {[5, 10, 20].map(size => (
-                    <option key={size} value={size}>{size} / page</option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                  className="p-1 rounded text-gray-400 hover:text-gray-700 disabled:opacity-25 transition"
-                >
-                  <ChevronsLeft size={13} />
-                </button>
-                {Array.from({ length: totalPages }, (_, i) => i + 1)
-                  .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
-                  .reduce<(number | string)[]>((acc, p, i, arr) => {
-                    if (i > 0 && p - (arr[i - 1] as number) > 1) acc.push('...');
-                    acc.push(p);
-                    return acc;
-                  }, [])
-                  .map((p, i) =>
-                    typeof p === 'string' ? (
-                      <span key={`dots-${i}`} className="px-0.5 text-gray-300 text-xs select-none">·</span>
-                    ) : (
-                      <button
-                        key={p}
-                        onClick={() => setCurrentPage(p)}
-                        className={`min-w-[24px] h-6 text-xs font-medium rounded transition ${
-                          currentPage === p
-                            ? 'bg-blue-700 text-white'
-                            : 'text-gray-500 hover:bg-gray-100'
-                        }`}
-                      >
-                        {p}
-                      </button>
-                    )
-                  )}
-                <button
-                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                  disabled={currentPage === totalPages}
-                  className="p-1 rounded text-gray-400 hover:text-gray-700 disabled:opacity-25 transition"
-                >
-                  <ChevronsRight size={13} />
-                </button>
-              </div>
+            <div className="mt-3 pt-3 border-t border-gray-100">
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+                totalItems={totalBookings}
+                itemsPerPage={pageSize}
+                compact
+              />
             </div>
           )}
         </div>

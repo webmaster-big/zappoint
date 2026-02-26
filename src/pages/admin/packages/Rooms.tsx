@@ -18,6 +18,7 @@ const DAYS_OF_WEEK = [
     { value: 'sunday', label: 'Sun' }
 ];
 import StandardButton from '../../../components/ui/StandardButton';
+import Pagination from '../../../components/ui/Pagination';
 import Toast from '../../../components/ui/Toast';
 import { roomService, locationService } from '../../../services';
 import { roomCacheService } from '../../../services/RoomCacheService';
@@ -890,40 +891,14 @@ const Rooms: React.FC = () => {
 
                 {/* Pagination */}
                 {!loading && totalPages > 1 && (
-                            <div className="flex items-center justify-center space-x-2 mt-6">
-                                <StandardButton
-                                    onClick={() => handlePageChange(currentPage - 1)}
-                                    disabled={currentPage === 1}
-                                    variant="secondary"
-                                    size="sm"
-                                >
-                                    Previous
-                                </StandardButton>
-                                
-                                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                                    const page = i + 1;
-                                    return (
-                                        <StandardButton
-                                            key={page}
-                                            onClick={() => handlePageChange(page)}
-                                            variant={page === currentPage ? "primary" : "secondary"}
-                                            size="sm"
-                                        >
-                                            {page}
-                                        </StandardButton>
-                                    );
-                                })}
-                                
-                                <StandardButton
-                                    onClick={() => handlePageChange(currentPage + 1)}
-                                    disabled={currentPage === totalPages}
-                                    variant="secondary"
-                                    size="sm"
-                                >
-                                    Next
-                                </StandardButton>
-                            </div>
-                        )}
+                    <div className="flex items-center justify-center mt-6">
+                        <Pagination
+                            currentPage={currentPage}
+                            totalPages={totalPages}
+                            onPageChange={handlePageChange}
+                        />
+                    </div>
+                )}
             </div>
 
             {/* Create Modal */}
