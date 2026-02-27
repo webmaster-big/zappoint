@@ -1001,13 +1001,29 @@ const BookPackage: React.FC = () => {
 
   // Synchronous ref guard to prevent multi-click duplicate submissions
   const isSubmittingRef = useRef(false);
+  const lastSubmitTimeRef = useRef(0);
 
   // Handle booking submission with payment processing
-  const handlePayNow = async () => {
+  const handlePayNow = async (e?: React.MouseEvent) => {
+    // Prevent event bubbling and default behavior
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+
     if (!pkg) return;
     // Prevent duplicate submissions (ref is synchronous, unlike state)
     if (isSubmittingRef.current) return;
+
+    // Cooldown: reject if last submission was less than 3 seconds ago
+    const now = Date.now();
+    if (now - lastSubmitTimeRef.current < 3000) {
+      console.warn('⚠️ Booking submission blocked (cooldown)');
+      return;
+    }
+
     isSubmittingRef.current = true;
+    lastSubmitTimeRef.current = now;
 
     // Validate signature and terms acceptance
     const stErrors: Record<string, string> = {};
@@ -2540,7 +2556,7 @@ const BookPackage: React.FC = () => {
                   <StandardButton
                     variant="primary"
                     size="md"
-                    onClick={handlePayNow}
+                    onClick={(e) => handlePayNow(e)}
                     disabled={isProcessingPayment || !cardNumber || !cardMonth || !cardYear || !cardCVV || !validateCardNumber(cardNumber)}
                     className="flex items-center justify-center flex-1 sm:flex-initial"
                   >
