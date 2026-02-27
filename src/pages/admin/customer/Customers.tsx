@@ -992,13 +992,14 @@ const CustomerListing: React.FC = () => {
                 <th scope="col" className="px-4 py-3 font-medium">Location</th>
                 <th scope="col" className="px-4 py-3 font-medium">Tags</th>
                 <th scope="col" className="px-4 py-3 font-medium">Status</th>
+                <th scope="col" className="px-4 py-3 font-medium">SMS</th>
                 <th scope="col" className="px-4 py-3 font-medium w-20">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {contacts.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="px-4 py-12 text-center">
+                  <td colSpan={11} className="px-4 py-12 text-center">
                     <div className="flex flex-col items-center justify-center">
                       <div className={`inline-flex p-4 rounded-full bg-${themeColor}-50 mb-4`}>
                         <Users className={`h-12 w-12 text-${themeColor}-400`} />
@@ -1107,6 +1108,13 @@ const CustomerListing: React.FC = () => {
                       >
                         <StatusBadge status={contact.status} />
                       </button>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      {contact.sms_consent ? (
+                        <span className="text-green-600 font-medium text-xs">Opted In</span>
+                      ) : (
+                        <span className="text-gray-400 text-xs">No</span>
+                      )}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm font-medium">
                       <div className="flex items-center gap-1">
@@ -1900,6 +1908,16 @@ const CustomerListing: React.FC = () => {
                       ) : (
                         <p className="text-sm text-gray-900">{selectedContactForView.phone || '—'}</p>
                       )}
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500">SMS Consent</label>
+                      <p className="text-sm text-gray-900">
+                        {selectedContactForView.sms_consent ? (
+                          <span className="text-green-600 font-medium">Opted In</span>
+                        ) : (
+                          <span className="text-gray-500">Not Opted In</span>
+                        )}
+                      </p>
                     </div>
                   </div>
                 </div>

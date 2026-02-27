@@ -141,7 +141,7 @@ const OnsiteBooking: React.FC = () => {
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [paymentError, setPaymentError] = useState('');
   const [authorizeApiLoginId, setAuthorizeApiLoginId] = useState('');
-  const [_authorizeClientKey, setAuthorizeClientKey] = useState('');
+  const [authorizeClientKey, setAuthorizeClientKey] = useState('');
   const [authorizeEnvironment, setAuthorizeEnvironment] = useState<'sandbox' | 'production'>('sandbox');
   const [showNoAuthAccountModal, setShowNoAuthAccountModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -1310,12 +1310,22 @@ const OnsiteBooking: React.FC = () => {
 
   // Synchronous ref guard to prevent multi-click duplicate submissions
   const isSubmittingRef = useRef(false);
+  const lastSubmitTimeRef = useRef(0);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     // Prevent duplicate submissions (ref is synchronous, unlike state)
     if (isSubmittingRef.current) return;
+
+    // Cooldown: reject if last submission was less than 3 seconds ago
+    const now = Date.now();
+    if (now - lastSubmitTimeRef.current < 3000) {
+      console.warn('⚠️ Booking submission blocked (cooldown)');
+      return;
+    }
+
     isSubmittingRef.current = true;
+    lastSubmitTimeRef.current = now;
     
     if (!selectedPackage) {
       setToast({ message: 'Please select a package', type: 'error' });
@@ -1341,6 +1351,11 @@ const OnsiteBooking: React.FC = () => {
       }
       if (!cardMonth || !cardYear || !cardCVV) {
         setPaymentError('Please fill in all card details');
+        isSubmittingRef.current = false;
+        return;
+      }
+      if (!authorizeApiLoginId) {
+        setPaymentError('Payment system not initialized. Please refresh the page.');
         isSubmittingRef.current = false;
         return;
       }
@@ -1475,11 +1490,12 @@ const OnsiteBooking: React.FC = () => {
       
       // Create booking data matching Laravel BookingController validation
       // room_id comes from the selected time slot (backend pre-assigns available room per slot)
+      const resolvedLocationId = selectedLocation || currentUser?.location_id || 1;
       const bookingData_request: ExtendedBookingData = {
         guest_name: `${bookingData.customer.firstName} ${bookingData.customer.lastName}`,
         guest_email: bookingData.customer.email,
         guest_phone: bookingData.customer.phone,
-        location_id: 1,
+        location_id: resolvedLocationId,
         package_id: selectedPackage.id,
         room_id: selectedRoomId || undefined,
         type: 'package' as const,
@@ -1539,6 +1555,7 @@ const OnsiteBooking: React.FC = () => {
 
       // ===== CREATE-FIRST FLOW FOR CARD PAYMENTS =====
       if (isCardPayment && amountPaid > 0) {
+        let createdBookingIdForCleanup: number | undefined;
         try {
           setIsProcessingPayment(true);
           setPaymentError('');
@@ -1556,6 +1573,7 @@ const OnsiteBooking: React.FC = () => {
           }
           
           bookingId = response.data.id;
+          createdBookingIdForCleanup = bookingId;
           referenceNumber = response.data.reference_number;
           customerId = response.data.customer_id;
           
@@ -1577,6 +1595,11 @@ const OnsiteBooking: React.FC = () => {
             last_name: bookingData.customer.lastName || '',
             email: bookingData.customer.email || '',
             phone: bookingData.customer.phone || '',
+            address: bookingData.guestAddress || '',
+            city: bookingData.guestCity || '',
+            state: bookingData.guestState || '',
+            zip: bookingData.guestZip || '',
+            country: bookingData.guestCountry || '',
           };
           
           // Step 3: Charge payment WITH payable_id — backend links payment + sends email + stores QR
@@ -1590,6 +1613,8 @@ const OnsiteBooking: React.FC = () => {
             {
               location_id: bookingData_request.location_id,
               amount: amountPaid,
+              order_id: `P${selectedPackage.id}-${Date.now().toString().slice(-8)}`,
+              description: `On-Site Booking: ${selectedPackage.name}`,
               customer_id: bookingData_request.customer_id || undefined,
               payable_id: bookingId,
               payable_type: PAYMENT_TYPE.BOOKING,
@@ -1597,8 +1622,8 @@ const OnsiteBooking: React.FC = () => {
               qr_code: qrCodeBase64,
             },
             authorizeApiLoginId,
-            undefined, // clientKey
-            customerData // Pass customer billing data
+            authorizeClientKey,
+            customerData
           );
           
           if (!paymentResult.success) {
@@ -1631,6 +1656,17 @@ const OnsiteBooking: React.FC = () => {
           console.log('✅ Payment charged and linked successfully:', paymentResult.transaction_id);
         } catch (paymentErr: any) {
           console.error('❌ Payment processing error:', paymentErr);
+          
+          // Clean up booking if it was created before the error
+          if (createdBookingIdForCleanup) {
+            try {
+              await bookingService.deleteBooking(createdBookingIdForCleanup);
+              await bookingCacheService.removeBookingFromCache(createdBookingIdForCleanup);
+              console.log('🗑️ Booking deleted due to payment processing error');
+            } catch (deleteErr) {
+              console.error('⚠️ Failed to delete booking after payment error:', deleteErr);
+            }
+          }
           
           // Check for HTTPS requirement error
           if (paymentErr?.message?.includes('HTTPS') || paymentErr?.message?.includes('https')) {

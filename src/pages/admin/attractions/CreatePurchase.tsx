@@ -70,7 +70,7 @@ const CreatePurchase = () => {
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [paymentError, setPaymentError] = useState('');
   const [authorizeApiLoginId, setAuthorizeApiLoginId] = useState('');
-  const [_authorizeClientKey, setAuthorizeClientKey] = useState('');
+  const [authorizeClientKey, setAuthorizeClientKey] = useState('');
   const [_authorizeEnvironment, setAuthorizeEnvironment] = useState<'sandbox' | 'production'>('sandbox');
   const [showNoAuthAccountModal, setShowNoAuthAccountModal] = useState(false);
   const [showEmptyModal, setShowEmptyModal] = useState(false);
@@ -671,13 +671,26 @@ const CreatePurchase = () => {
           qr_code: qrCodeData || undefined,
         };
         
-        const paymentResponse = await processCardPayment(
-          cardData,
-          paymentData,
-          authorizeApiLoginId,
-          undefined,
-          customerData
-        );
+        let paymentResponse;
+        try {
+          paymentResponse = await processCardPayment(
+            cardData,
+            paymentData,
+            authorizeApiLoginId,
+            authorizeClientKey,
+            customerData
+          );
+        } catch (paymentErr) {
+          // processCardPayment threw (tokenization or network error)
+          // Clean up the purchase since payment was not completed
+          try {
+            await attractionPurchaseService.deletePurchase(createdPurchase.id);
+            console.log('🗑️ Purchase deleted due to payment processing error');
+          } catch (deleteErr) {
+            console.error('⚠️ Failed to delete purchase after payment error:', deleteErr);
+          }
+          throw paymentErr; // Re-throw to outer catch for error display
+        }
         
         if (!paymentResponse.success) {
           // Payment failed - delete the purchase we just created

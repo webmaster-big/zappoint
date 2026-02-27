@@ -197,6 +197,9 @@ const PurchaseAttraction = () => {
   const [feeBreakdown, setFeeBreakdown] = useState<FeeBreakdown | null>(null);
   const [specialPricingBreakdown, setSpecialPricingBreakdown] = useState<SpecialPricingBreakdown | null>(null);
 
+  // SMS consent state
+  const [smsConsent, setSmsConsent] = useState<boolean>(false);
+
   // Scheduled date & time state
   const [scheduledDate, setScheduledDate] = useState<string>('');
   const [scheduledTime, setScheduledTime] = useState<string>('');
@@ -737,6 +740,7 @@ const PurchaseAttraction = () => {
         guest_name: `${customerInfo.firstName} ${customerInfo.lastName}`,
         guest_email: customerInfo.email,
         guest_phone: customerInfo.phone || undefined,
+        sms_consent: smsConsent,
         quantity: quantity,
         amount: totalAmount,
         amount_paid: totalAmount,
@@ -1215,6 +1219,22 @@ const PurchaseAttraction = () => {
                         placeholder="+1 (555) 123-4567"
                         className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition"
                       />
+                      {/* SMS Consent */}
+                      <label className="flex items-start gap-2 cursor-pointer mt-2">
+                        <input
+                          type="checkbox"
+                          checked={smsConsent}
+                          onChange={(e) => setSmsConsent(e.target.checked)}
+                          className="mt-1"
+                        />
+                        <span className="text-xs text-gray-500">
+                          I agree to receive automated delivery notifications and promotional text
+                          messages from Zap Zone at the phone number provided. Consent is not a
+                          condition of purchase. Message frequency varies. Message and data rates
+                          may apply. Reply STOP to cancel or HELP for help. View our{' '}
+                          <a href="https://zap-zone.com/terms-conditions/" className="text-blue-600 underline" target="_blank" rel="noopener noreferrer">Terms and Conditions</a>.
+                        </span>
+                      </label>
                     </div>
                   </div>
                   

@@ -46,6 +46,7 @@ export interface Contact {
   notes: string | null;
   status: 'active' | 'inactive';
   created_by: number | null;
+  sms_consent: boolean;
   created_at: string;
   updated_at: string;
   // Computed/Accessor fields from Laravel model
@@ -100,6 +101,7 @@ export interface ContactCreateData {
   source?: string;
   notes?: string;
   status?: 'active' | 'inactive';
+  sms_consent?: boolean;
 }
 
 export interface ContactUpdateData {
@@ -119,6 +121,7 @@ export interface ContactUpdateData {
   source?: string;
   notes?: string;
   status?: 'active' | 'inactive';
+  sms_consent?: boolean;
 }
 
 export interface BulkImportData {
