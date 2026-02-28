@@ -576,13 +576,13 @@ const PurchaseAttraction = () => {
   const totalAfterSpecialPricing = Math.max(0, baseTotal - specialPricingDiscount);
   const total = feeBreakdown ? feeBreakdown.total - specialPricingDiscount : totalAfterSpecialPricing;
 
-  // Fetch fee breakdown when attraction or quantity changes
+  // Fetch fee breakdown when attraction or quantity changes (debounced to prevent rapid API calls)
   useEffect(() => {
-    const fetchFeeBreakdown = async () => {
-      if (!attraction) {
-        setFeeBreakdown(null);
-        return;
-      }
+    if (!attraction) {
+      setFeeBreakdown(null);
+      return;
+    }
+    const timeoutId = setTimeout(async () => {
       try {
         const basePrice = calculateTotal();
         const response = await feeSupportService.getForEntity({
@@ -598,17 +598,17 @@ const PurchaseAttraction = () => {
         console.error('Error fetching fee breakdown:', error);
         setFeeBreakdown(null);
       }
-    };
-    fetchFeeBreakdown();
+    }, 500);
+    return () => clearTimeout(timeoutId);
   }, [attraction, quantity, selectedAddOns]);
 
-  // Fetch special pricing breakdown for attraction (use today's date for immediate purchases)
+  // Fetch special pricing breakdown for attraction (debounced, use today's date for immediate purchases)
   useEffect(() => {
-    const fetchSpecialPricing = async () => {
-      if (!attraction) {
-        setSpecialPricingBreakdown(null);
-        return;
-      }
+    if (!attraction) {
+      setSpecialPricingBreakdown(null);
+      return;
+    }
+    const timeoutId = setTimeout(async () => {
       try {
         // Use today's date for immediate attraction purchases
         const today = new Date().toISOString().split('T')[0];
@@ -628,8 +628,8 @@ const PurchaseAttraction = () => {
         console.error('Error fetching special pricing breakdown:', error);
         setSpecialPricingBreakdown(null);
       }
-    };
-    fetchSpecialPricing();
+    }, 500);
+    return () => clearTimeout(timeoutId);
   }, [attraction, quantity, selectedAddOns]);
 
   // Synchronous ref guard to prevent multi-click duplicate submissions

@@ -286,13 +286,13 @@ const BookPackage: React.FC = () => {
     fetchPackage();
   }, [packageId]);
 
-  // Fetch fee breakdown when package or pricing inputs change
+  // Fetch fee breakdown when package or pricing inputs change (debounced to prevent rapid API calls)
   useEffect(() => {
-    const fetchFeeBreakdown = async () => {
-      if (!pkg) {
-        setFeeBreakdown(null);
-        return;
-      }
+    if (!pkg) {
+      setFeeBreakdown(null);
+      return;
+    }
+    const timeoutId = setTimeout(async () => {
       try {
         // Calculate base price with proper min_participants / price_per_additional logic
         const pkgPrice = Number(pkg.price ?? 0);
@@ -328,17 +328,17 @@ const BookPackage: React.FC = () => {
         console.error('Error fetching fee breakdown:', error);
         setFeeBreakdown(null);
       }
-    };
-    fetchFeeBreakdown();
+    }, 500);
+    return () => clearTimeout(timeoutId);
   }, [pkg, participants, selectedAddOns, selectedAttractions]);
 
-  // Fetch special pricing breakdown when package and date are selected
+  // Fetch special pricing breakdown when package and date are selected (debounced)
   useEffect(() => {
-    const fetchSpecialPricing = async () => {
-      if (!pkg || !selectedDate) {
-        setSpecialPricingBreakdown(null);
-        return;
-      }
+    if (!pkg || !selectedDate) {
+      setSpecialPricingBreakdown(null);
+      return;
+    }
+    const timeoutId = setTimeout(async () => {
       try {
         const basePrice = Number(pkg.price ?? 0);
         const breakdown = await specialPricingService.getPriceBreakdown({
@@ -356,8 +356,8 @@ const BookPackage: React.FC = () => {
         console.error('Error fetching special pricing breakdown:', error);
         setSpecialPricingBreakdown(null);
       }
-    };
-    fetchSpecialPricing();
+    }, 500);
+    return () => clearTimeout(timeoutId);
   }, [pkg, selectedDate]);
   
   // Auto-fill form if customer is logged in
@@ -722,7 +722,7 @@ const BookPackage: React.FC = () => {
     }
     
     setAvailableDates(dates);
-  }, [pkg, selectedDate]);
+  }, [pkg]);
 
   // Fetch available time slots via SSE when date changes
   // Backend automatically finds available rooms for each time slot

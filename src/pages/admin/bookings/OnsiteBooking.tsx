@@ -306,13 +306,13 @@ const OnsiteBooking: React.FC = () => {
     }
   }, [isCompanyAdmin]);
 
-  // Fetch fee breakdown when package or pricing inputs change
+  // Fetch fee breakdown when package or pricing inputs change (debounced to prevent rapid API calls)
   useEffect(() => {
-    const fetchFeeBreakdown = async () => {
-      if (!selectedPackage) {
-        setFeeBreakdown(null);
-        return;
-      }
+    if (!selectedPackage) {
+      setFeeBreakdown(null);
+      return;
+    }
+    const timeoutId = setTimeout(async () => {
       try {
         const basePrice = calculateTotal();
         const response = await feeSupportService.getForEntity({
@@ -328,17 +328,17 @@ const OnsiteBooking: React.FC = () => {
         console.error('Error fetching fee breakdown:', error);
         setFeeBreakdown(null);
       }
-    };
-    fetchFeeBreakdown();
+    }, 500);
+    return () => clearTimeout(timeoutId);
   }, [selectedPackage, bookingData.participants, bookingData.selectedAttractions, bookingData.selectedAddOns, bookingData.giftCardCode, bookingData.promoCode, selectedLocation]);
 
-  // Fetch special pricing when package and date are selected
+  // Fetch special pricing when package and date are selected (debounced)
   useEffect(() => {
-    const fetchSpecialPricing = async () => {
-      if (!selectedPackage || !bookingData.date) {
-        setSpecialPricingBreakdown(null);
-        return;
-      }
+    if (!selectedPackage || !bookingData.date) {
+      setSpecialPricingBreakdown(null);
+      return;
+    }
+    const timeoutId = setTimeout(async () => {
       try {
         const basePrice = selectedPackage.price;
         const breakdown = await specialPricingService.getPriceBreakdown({
@@ -358,8 +358,8 @@ const OnsiteBooking: React.FC = () => {
         console.error('Error fetching special pricing:', error);
         setSpecialPricingBreakdown(null);
       }
-    };
-    fetchSpecialPricing();
+    }, 500);
+    return () => clearTimeout(timeoutId);
   }, [selectedPackage, bookingData.date, bookingData.time, selectedLocation]);
 
   // Load packages from backend
@@ -751,7 +751,7 @@ const OnsiteBooking: React.FC = () => {
     if (dates.length === 0) {
       console.warn('⚠️ No available dates found for this package!');
     }
-  }, [selectedPackage, bookingData.date]);
+  }, [selectedPackage]);
 
   // Fetch day offs for the selected location
   useEffect(() => {

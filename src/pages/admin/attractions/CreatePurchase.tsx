@@ -384,13 +384,13 @@ const CreatePurchase = () => {
   const totalAfterSpecialPricing = Math.max(0, currentTotal - specialPricingDiscount);
   const finalTotal = feeBreakdown ? feeBreakdown.total - specialPricingDiscount : totalAfterSpecialPricing;
 
-  // Fetch fee breakdown when attraction or pricing changes
+  // Fetch fee breakdown when attraction or pricing changes (debounced to prevent rapid API calls)
   useEffect(() => {
-    const fetchFeeBreakdown = async () => {
-      if (!selectedAttraction) {
-        setFeeBreakdown(null);
-        return;
-      }
+    if (!selectedAttraction) {
+      setFeeBreakdown(null);
+      return;
+    }
+    const timeoutId = setTimeout(async () => {
       try {
         const basePrice = calculateTotal();
         const response = await feeSupportService.getForEntity({
@@ -406,17 +406,17 @@ const CreatePurchase = () => {
         console.error('Error fetching fee breakdown:', error);
         setFeeBreakdown(null);
       }
-    };
-    fetchFeeBreakdown();
+    }, 500);
+    return () => clearTimeout(timeoutId);
   }, [selectedAttraction, quantity, discount, selectedLocation, selectedAddOns]);
 
-  // Fetch special pricing breakdown for attraction (use today's date for immediate purchases)
+  // Fetch special pricing breakdown for attraction (debounced, use today's date for immediate purchases)
   useEffect(() => {
-    const fetchSpecialPricing = async () => {
-      if (!selectedAttraction) {
-        setSpecialPricingBreakdown(null);
-        return;
-      }
+    if (!selectedAttraction) {
+      setSpecialPricingBreakdown(null);
+      return;
+    }
+    const timeoutId = setTimeout(async () => {
       try {
         // Use today's date for immediate attraction purchases
         const today = new Date().toISOString().split('T')[0];
@@ -436,8 +436,8 @@ const CreatePurchase = () => {
         console.error('Error fetching special pricing breakdown:', error);
         setSpecialPricingBreakdown(null);
       }
-    };
-    fetchSpecialPricing();
+    }, 500);
+    return () => clearTimeout(timeoutId);
   }, [selectedAttraction, quantity]);
 
   const handleAddToCart = (attraction: CreatePurchaseAttraction) => {
