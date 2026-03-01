@@ -1183,19 +1183,32 @@ const OnsiteBooking: React.FC = () => {
     if (!selectedPackage) return 0;
     
     const total = calculateTotal();
+    let baseDeposit = 0;
     
     // Check if package has partial payment percentage (priority)
     if (selectedPackage.partialPaymentPercentage != null && selectedPackage.partialPaymentPercentage > 0) {
-      return Math.round(total * (selectedPackage.partialPaymentPercentage / 100) * 100) / 100;
+      baseDeposit = Math.round(total * (selectedPackage.partialPaymentPercentage / 100) * 100) / 100;
     }
     
     // Check if package has partial payment fixed amount
-    if (selectedPackage.partialPaymentFixed != null && selectedPackage.partialPaymentFixed > 0) {
-      return Math.min(selectedPackage.partialPaymentFixed, total);
+    else if (selectedPackage.partialPaymentFixed != null && selectedPackage.partialPaymentFixed > 0) {
+      baseDeposit = Math.min(selectedPackage.partialPaymentFixed, total);
     }
     
-    // If both are null or 0, return 0 (no partial payment available)
-    return 0;
+    // If no partial payment configured, return 0
+    if (baseDeposit <= 0) return 0;
+    
+    // Add additive fees to the deposit amount
+    if (feeBreakdown && feeBreakdown.fees.length > 0) {
+      const additiveFees = feeBreakdown.fees
+        .filter(fee => fee.fee_application_type === 'additive')
+        .reduce((sum, fee) => sum + fee.fee_amount, 0);
+      baseDeposit += additiveFees;
+    }
+    
+    // Ensure deposit never exceeds the total
+    const effectiveTotal = feeBreakdown ? feeBreakdown.total : total;
+    return Math.min(baseDeposit, effectiveTotal);
   };
 
   const calculateTotal = () => {
@@ -3272,7 +3285,7 @@ const OnsiteBooking: React.FC = () => {
               <div className="flex-1">
                 <div className="font-medium text-sm text-gray-900">Partial Payment</div>
                 <div className="text-xs text-gray-600 mt-1">
-                  Pay ${calculatePartialAmount().toFixed(2)} now, remaining ${(calculateTotal() - calculatePartialAmount()).toFixed(2)} later
+                  Pay ${calculatePartialAmount().toFixed(2)} now, remaining ${((feeBreakdown ? feeBreakdown.total : calculateTotal()) - calculatePartialAmount()).toFixed(2)} later
                 </div>
               </div>
             </label>

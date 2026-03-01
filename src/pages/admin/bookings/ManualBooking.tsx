@@ -1933,7 +1933,11 @@ const ManualBooking: React.FC = () => {
                           onWheel={(e) => (e.target as HTMLInputElement).blur()}
                           step="0.01"
                           min="0"
-                          placeholder={`${Number(calculatedTotal || 0).toFixed(2)}`}
+                          placeholder={`${Number(
+                            feeBreakdown 
+                              ? feeBreakdown.total - (specialPricingBreakdown?.total_discount || 0)
+                              : (calculatedTotal || 0) - (specialPricingBreakdown?.total_discount || 0)
+                          ).toFixed(2)}`}
                           className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
                         />
                       </div>
@@ -1970,7 +1974,10 @@ const ManualBooking: React.FC = () => {
                       <div>
                         <label className="block text-xs font-medium text-gray-600 mb-1.5">Status</label>
                         {(() => {
-                          const calculatedTotal = form.totalAmount ? Number(form.totalAmount) : calculateTotal();
+                          const feeTotalForStatus = feeBreakdown 
+                            ? feeBreakdown.total - (specialPricingBreakdown?.total_discount || 0)
+                            : (form.totalAmount ? Number(form.totalAmount) : calculateTotal() - (specialPricingBreakdown?.total_discount || 0));
+                          const calculatedTotal = form.totalAmount ? Number(form.totalAmount) : feeTotalForStatus;
                           const amountPaid = form.paymentMethod === 'paylater' ? 0 : (form.amountPaid ? Number(form.amountPaid) : calculatedTotal);
                           const status = derivePaymentStatus(amountPaid, calculatedTotal);
                           const statusColors: Record<string, string> = {

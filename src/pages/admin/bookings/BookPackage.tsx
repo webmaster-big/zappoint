@@ -981,18 +981,31 @@ const BookPackage: React.FC = () => {
   const calculatePartialAmount = () => {
     if (!pkg) return 0;
     
+    let baseDeposit = 0;
+    
     // Check if package has partial payment percentage (priority)
     if (pkg.partial_payment_percentage != null && pkg.partial_payment_percentage > 0) {
-      return Math.round(total * (pkg.partial_payment_percentage / 100) * 100) / 100;
+      baseDeposit = Math.round(total * (pkg.partial_payment_percentage / 100) * 100) / 100;
     }
     
     // Check if package has partial payment fixed amount
-    if (pkg.partial_payment_fixed != null && pkg.partial_payment_fixed > 0) {
-      return Math.min(pkg.partial_payment_fixed, total);
+    else if (pkg.partial_payment_fixed != null && pkg.partial_payment_fixed > 0) {
+      baseDeposit = Math.min(pkg.partial_payment_fixed, total);
     }
     
-    // If both are null or 0, return 0 (no partial payment available)
-    return 0;
+    // If no partial payment configured, return 0
+    if (baseDeposit <= 0) return 0;
+    
+    // Add additive fees to the deposit amount
+    if (feeBreakdown && feeBreakdown.fees.length > 0) {
+      const additiveFees = feeBreakdown.fees
+        .filter(fee => fee.fee_application_type === 'additive')
+        .reduce((sum, fee) => sum + fee.fee_amount, 0);
+      baseDeposit += additiveFees;
+    }
+    
+    // Ensure deposit never exceeds the final total
+    return Math.min(baseDeposit, finalTotal);
   };
 
   // Format duration for display
@@ -1501,7 +1514,7 @@ const BookPackage: React.FC = () => {
                   <div className="flex justify-between text-sm sm:text-base">
                     <span className="text-gray-600">Remaining Balance:</span>
                     <span className="font-medium text-orange-600">${(
-                      paymentType === 'custom' ? total - customPaymentAmount : total - partialAmount
+                      paymentType === 'custom' ? finalTotal - customPaymentAmount : finalTotal - partialAmount
                     ).toFixed(2)}</span>
                   </div>
                 )}
@@ -2534,7 +2547,7 @@ const BookPackage: React.FC = () => {
                             Pay <span className="font-bold text-lg">${partialAmount.toFixed(2)}</span> now to secure your booking.
                           </p>
                           <p className="text-xs text-blue-700">
-                            The remaining <span className="font-semibold">${(total - partialAmount).toFixed(2)}</span> will be due on the day of your visit.
+                            The remaining <span className="font-semibold">${(finalTotal - partialAmount).toFixed(2)}</span> will be due on the day of your visit.
                           </p>
                         </div>
                       </div>
