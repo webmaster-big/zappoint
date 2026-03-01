@@ -1189,14 +1189,27 @@ const BookPackage: React.FC = () => {
       console.log('✅ Booking created, ID:', bookingId, 'Ref:', referenceNumber);
       
       // Step 2: Generate QR code
-      const qrCodeBase64 = await QRCode.toDataURL(referenceNumber, {
-        width: 300,
-        margin: 2,
-        color: {
-          dark: '#000000',
-          light: '#FFFFFF'
+      let qrCodeBase64: string;
+      try {
+        qrCodeBase64 = await QRCode.toDataURL(referenceNumber, {
+          width: 300,
+          margin: 2,
+          color: {
+            dark: '#000000',
+            light: '#FFFFFF'
+          }
+        });
+      } catch {
+        // QR generation failed — clean up the booking before it becomes orphaned
+        console.error('❌ QR generation failed, deleting booking:', bookingId);
+        try {
+          await bookingService.deleteBooking(bookingId);
+          console.log('🗑️ Booking deleted due to QR generation failure');
+        } catch (deleteErr) {
+          console.error('⚠️ Failed to delete booking after QR failure:', deleteErr);
         }
-      });
+        throw new Error('Failed to prepare your booking confirmation. No charges were made. Please try again.');
+      }
       
       // Step 3: Charge payment WITH payable_id — backend links payment + sends email + stores QR
       const paymentData = {
@@ -1213,13 +1226,27 @@ const BookPackage: React.FC = () => {
         qr_code: qrCodeBase64,
       };
       
-      const paymentResponse = await processCardPayment(
-        cardData,
-        paymentData,
-        authorizeApiLoginId,
-        authorizeClientKey,
-        customerData
-      );
+      let paymentResponse;
+      try {
+        paymentResponse = await processCardPayment(
+          cardData,
+          paymentData,
+          authorizeApiLoginId,
+          authorizeClientKey,
+          customerData
+        );
+      } catch (paymentErr) {
+        // processCardPayment threw (tokenization or network error)
+        // Clean up the booking since payment was not completed
+        console.error('❌ Payment processing error, deleting booking:', bookingId);
+        try {
+          await bookingService.deleteBooking(bookingId);
+          console.log('🗑️ Booking deleted due to payment processing error');
+        } catch (deleteErr) {
+          console.error('⚠️ Failed to delete booking after payment error:', deleteErr);
+        }
+        throw paymentErr; // Re-throw to outer catch for error display
+      }
       
       if (!paymentResponse.success) {
         // Payment failed — clean up the booking we created

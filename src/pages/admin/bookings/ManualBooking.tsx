@@ -782,12 +782,22 @@ const ManualBooking: React.FC = () => {
 
   // Synchronous ref guard to prevent multi-click duplicate submissions
   const isSubmittingRef = useRef(false);
+  const lastSubmitTimeRef = useRef(0);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     // Prevent duplicate submissions (ref is synchronous, unlike state)
     if (isSubmittingRef.current) return;
+
+    // Cooldown: reject if last submission was less than 3 seconds ago
+    const now = Date.now();
+    if (now - lastSubmitTimeRef.current < 3000) {
+      console.warn('⚠️ Booking submission blocked (cooldown)');
+      return;
+    }
+
     isSubmittingRef.current = true;
+    lastSubmitTimeRef.current = now;
     
     if (!form.customerName || !form.email || !form.packageId || !form.bookingDate || !form.bookingTime) {
       setToast({ message: 'Please fill in all required fields', type: 'error' });

@@ -694,7 +694,8 @@ const PurchaseAttraction = () => {
       setIsProcessingPayment(true);
       setPaymentError('');
 
-      const totalAmount = calculateTotal();
+      // Use the final total (includes fees + special pricing), matching what customer sees
+      const totalAmount = total;
 
       // Prepare card data
       const cardData = {
@@ -766,7 +767,12 @@ const PurchaseAttraction = () => {
       console.log('✅ Purchase created, ID:', createdPurchase.id);
 
       // Step 2: Generate QR code
-      const qrData = await generatePurchaseQRCode(createdPurchase.id);
+      let qrData = '';
+      try {
+        qrData = await generatePurchaseQRCode(createdPurchase.id);
+      } catch (qrError) {
+        console.error('⚠️ QR code generation failed:', qrError);
+      }
 
       // Step 3: Charge payment WITH payable_id — backend links payment + sends email + stores QR
       const paymentData = {
@@ -780,16 +786,30 @@ const PurchaseAttraction = () => {
         payable_id: createdPurchase.id,
         payable_type: PAYMENT_TYPE.ATTRACTION_PURCHASE,
         send_email: true,
-        qr_code: qrData,
+        qr_code: qrData || undefined,
       };
 
-      const paymentResponse = await processCardPayment(
-        cardData,
-        paymentData,
-        authorizeApiLoginId,
-        authorizeClientKey,
-        customerData
-      );
+      let paymentResponse;
+      try {
+        paymentResponse = await processCardPayment(
+          cardData,
+          paymentData,
+          authorizeApiLoginId,
+          authorizeClientKey,
+          customerData
+        );
+      } catch (paymentErr) {
+        // processCardPayment threw (tokenization or network error)
+        // Clean up the purchase since payment was not completed
+        console.error('❌ Payment processing error, deleting purchase:', createdPurchase.id);
+        try {
+          await attractionPurchaseService.deletePurchase(createdPurchase.id);
+          console.log('🗑️ Purchase deleted due to payment processing error');
+        } catch (deleteErr) {
+          console.error('⚠️ Failed to delete purchase after payment error:', deleteErr);
+        }
+        throw paymentErr; // Re-throw to outer catch for error display
+      }
       
       if (!paymentResponse.success) {
         // Payment failed — clean up the purchase we created
