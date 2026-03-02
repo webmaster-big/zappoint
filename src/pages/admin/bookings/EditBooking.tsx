@@ -567,7 +567,6 @@ const EditBooking: React.FC = () => {
         package_id: formData.packageId || undefined,
         room_id: formData.roomId || undefined,
         notes: formData.notes || undefined,
-        internal_notes: formData.internalNotes || undefined,
         send_notification: formData.sendNotification,
         applied_fees: appliedFees.length > 0 ? appliedFees : null,
         guest_of_honor_name: packageDetails?.has_guest_of_honor && formData.guestOfHonorName ? formData.guestOfHonorName : undefined,
@@ -580,7 +579,28 @@ const EditBooking: React.FC = () => {
         if (response.data) {
           await bookingCacheService.updateBookingInCache(response.data);
         }
-        
+
+        // Save internal notes via dedicated PATCH endpoint
+        try {
+          const notesValue = formData.internalNotes || null;
+          const notesRes = await bookingService.updateInternalNotes(
+            Number(originalBooking.id),
+            notesValue ?? ''
+          );
+          if (notesRes.success && notesRes.data) {
+            // Patch cache with updated internal notes
+            const cachedBooking = await bookingCacheService.getBookingFromCache(Number(originalBooking.id));
+            if (cachedBooking) {
+              await bookingCacheService.updateBookingInCache({
+                ...cachedBooking,
+                internal_notes: notesRes.data.internal_notes ?? formData.internalNotes,
+              });
+            }
+          }
+        } catch (notesError) {
+          console.error('⚠️ Failed to save internal notes:', notesError);
+        }
+
         // If send notification is enabled, generate QR and send via qrcode endpoint
         if (formData.sendNotification) {
           try {
@@ -1131,12 +1151,22 @@ const EditBooking: React.FC = () => {
               </div>
             )}
 
-            {/* Payment Summary */}
+            {/* Applied Fees Editor */}
             <div>
               <p className="text-sm text-gray-500 mb-3">Applied Fees</p>
-              <div className="space-y-2 mb-4">
+              <div className="space-y-3 mb-4">
                 {appliedFees.map((fee, index) => (
-                  <div key={index} className="flex items-center gap-2">
+                  <div key={index} className="border border-gray-200 rounded-lg p-3 bg-gray-50 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-gray-400 font-medium">Fee #{index + 1}</span>
+                      <button
+                        type="button"
+                        onClick={() => setAppliedFees(appliedFees.filter((_, i) => i !== index))}
+                        className="text-red-400 hover:text-red-600 text-xs font-medium"
+                      >
+                        Remove
+                      </button>
+                    </div>
                     <input
                       type="text"
                       placeholder="Fee name"
@@ -1146,43 +1176,38 @@ const EditBooking: React.FC = () => {
                         updated[index] = { ...updated[index], fee_name: e.target.value };
                         setAppliedFees(updated);
                       }}
-                      className="flex-1 border border-gray-300 rounded px-2 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                     />
-                    <div className="relative">
-                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        placeholder="0.00"
-                        value={fee.fee_amount}
+                    <div className="flex items-center gap-2">
+                      <div className="relative flex-1">
+                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          placeholder="0.00"
+                          value={fee.fee_amount}
+                          onChange={(e) => {
+                            const updated = [...appliedFees];
+                            updated[index] = { ...updated[index], fee_amount: parseFloat(e.target.value) || 0 };
+                            setAppliedFees(updated);
+                          }}
+                          className="w-full border border-gray-300 rounded pl-6 pr-2 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                        />
+                      </div>
+                      <select
+                        value={fee.fee_application_type}
                         onChange={(e) => {
                           const updated = [...appliedFees];
-                          updated[index] = { ...updated[index], fee_amount: parseFloat(e.target.value) || 0 };
+                          updated[index] = { ...updated[index], fee_application_type: e.target.value as 'additive' | 'inclusive' };
                           setAppliedFees(updated);
                         }}
-                        className="w-24 border border-gray-300 rounded pl-6 pr-2 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                      />
+                        className="border border-gray-300 rounded px-2 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                      >
+                        <option value="additive">Additive</option>
+                        <option value="inclusive">Inclusive</option>
+                      </select>
                     </div>
-                    <select
-                      value={fee.fee_application_type}
-                      onChange={(e) => {
-                        const updated = [...appliedFees];
-                        updated[index] = { ...updated[index], fee_application_type: e.target.value as 'additive' | 'inclusive' };
-                        setAppliedFees(updated);
-                      }}
-                      className="border border-gray-300 rounded px-2 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                    >
-                      <option value="additive">Additive</option>
-                      <option value="inclusive">Inclusive</option>
-                    </select>
-                    <button
-                      type="button"
-                      onClick={() => setAppliedFees(appliedFees.filter((_, i) => i !== index))}
-                      className="text-red-400 hover:text-red-600 text-sm font-medium"
-                    >
-                      ✕
-                    </button>
                   </div>
                 ))}
                 <button
@@ -1194,7 +1219,7 @@ const EditBooking: React.FC = () => {
                 </button>
                 {appliedFees.length > 0 && (
                   <div className="text-xs text-gray-500 text-right">
-                    Fees Total: ${appliedFees.reduce((sum, f) => sum + f.fee_amount, 0).toFixed(2)}
+                    Additive Fees: ${appliedFees.filter(f => f.fee_application_type === 'additive').reduce((sum, f) => sum + f.fee_amount, 0).toFixed(2)}
                   </div>
                 )}
               </div>
@@ -1266,19 +1291,33 @@ const EditBooking: React.FC = () => {
                   const originalTotal = Number(originalBooking?.total_amount || 0);
                   const calculatedTotal = packagePrice + attractionsTotal + addonsTotal;
                   
+                  // Sum additive fees (these add on top of the base total)
+                  const additiveFeeTotal = appliedFees
+                    .filter(f => f.fee_application_type === 'additive')
+                    .reduce((sum, f) => sum + f.fee_amount, 0);
+                  
                   // Use calculated total if package changed, otherwise use original
                   const isPackageChanged = formData.packageId !== originalBooking?.package_id;
-                  const displayTotal = isPackageChanged ? calculatedTotal : originalTotal;
+                  const baseTotal = isPackageChanged ? calculatedTotal : originalTotal;
+                  const displayTotal = baseTotal + additiveFeeTotal;
                   const balance = displayTotal - originalAmountPaid;
                   
                   return (
                     <>
+                      {/* Additive Fees Line Item */}
+                      {additiveFeeTotal > 0 && (
+                        <div className="flex justify-between pt-2 border-t border-gray-100">
+                          <span className="text-sm text-red-600">+ Additive Fees</span>
+                          <span className="font-medium text-red-600">${additiveFeeTotal.toFixed(2)}</span>
+                        </div>
+                      )}
+
                       {/* Total */}
                       <div className="flex justify-between pt-3 border-t border-gray-200">
                         <span className="text-sm font-semibold text-gray-900">Total Amount</span>
                         <span className="font-bold text-gray-900">
                           ${displayTotal.toFixed(2)}
-                          {isPackageChanged && (
+                          {(isPackageChanged || additiveFeeTotal > 0) && (
                             <span className="text-xs text-orange-600 ml-1">(Updated)</span>
                           )}
                         </span>
