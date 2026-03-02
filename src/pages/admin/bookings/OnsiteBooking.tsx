@@ -1199,17 +1199,8 @@ const OnsiteBooking: React.FC = () => {
     // If no partial payment configured, return 0
     if (baseDeposit <= 0) return 0;
     
-    // Add additive fees to the deposit amount
-    if (feeBreakdown && feeBreakdown.fees.length > 0) {
-      const additiveFees = feeBreakdown.fees
-        .filter(fee => fee.fee_application_type === 'additive')
-        .reduce((sum, fee) => sum + fee.fee_amount, 0);
-      baseDeposit += additiveFees;
-    }
-    
     // Ensure deposit never exceeds the total
-    const effectiveTotal = feeBreakdown ? feeBreakdown.total : total;
-    return Math.min(baseDeposit, effectiveTotal);
+    return Math.min(baseDeposit, total);
   };
 
   const calculateTotal = () => {
