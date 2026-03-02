@@ -2571,6 +2571,17 @@ const CompanyDashboard: React.FC = () => {
                       <span className="text-sm font-medium text-gray-900">${parseFloat(String(selectedBooking.amount_paid || 0)).toFixed(2)}</span>
                     </div>
                   )}
+                  {selectedBooking.applied_fees && selectedBooking.applied_fees.length > 0 && (
+                    <div className="pt-2 border-t border-gray-100">
+                      <p className="text-xs text-gray-500 mb-1">Applied Fees</p>
+                      {selectedBooking.applied_fees.map((fee: { fee_name: string; fee_amount: number; fee_application_type: string }, i: number) => (
+                        <div key={i} className="flex justify-between text-xs">
+                          <span className="text-gray-600">{fee.fee_name} <span className="text-gray-400">({fee.fee_application_type})</span></span>
+                          <span className="text-gray-900">${fee.fee_amount.toFixed(2)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 

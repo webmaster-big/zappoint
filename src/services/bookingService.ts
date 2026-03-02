@@ -98,6 +98,13 @@ export interface CreateBookingData {
     quantity: number;
     price_at_booking: number;
   }>;
+
+  // Applied fees snapshot
+  applied_fees?: Array<{
+    fee_name: string;
+    fee_amount: number;
+    fee_application_type: 'additive' | 'inclusive';
+  }> | null;
 }
 
 export interface UpdateBookingData {
@@ -137,6 +144,13 @@ export interface UpdateBookingData {
     quantity: number;
     price_at_booking: number;
   }>;
+
+  // Applied fees snapshot
+  applied_fees?: Array<{
+    fee_name: string;
+    fee_amount: number;
+    fee_application_type: 'additive' | 'inclusive';
+  }> | null;
 }
 
 export interface BookingFilters {
@@ -239,6 +253,11 @@ export interface Booking {
     };
   }>;
   payments?: unknown[];
+  applied_fees?: Array<{
+    fee_name: string;
+    fee_amount: number;
+    fee_application_type: 'additive' | 'inclusive';
+  }> | null;
 }
 
 export interface BookingResponse {

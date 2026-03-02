@@ -31,6 +31,7 @@ import type { FeeBreakdown } from '../../../types/FeeSupport.types';
 import PriceBreakdownDisplay from '../../../components/ui/PriceBreakdownDisplay';
 import { specialPricingService } from '../../../services/SpecialPricingService';
 import type { SpecialPricingBreakdown } from '../../../types/SpecialPricing.types';
+import { buildAppliedFees } from '../../../utils/fees';
 
 // Helper function to parse ISO date string (YYYY-MM-DD) in local timezone
 // Avoids UTC offset issues that cause date to show as previous day
@@ -1189,6 +1190,7 @@ const BookPackage: React.FC = () => {
         guest_zip: form.zip || undefined,
         guest_country: form.country || undefined,
         sms_consent: smsConsent,
+        applied_fees: buildAppliedFees(feeBreakdown).length > 0 ? buildAppliedFees(feeBreakdown) : null,
       };
       
       const response = await bookingService.createBooking(bookingData);

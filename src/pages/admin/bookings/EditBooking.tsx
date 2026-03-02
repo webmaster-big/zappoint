@@ -15,6 +15,7 @@ import timeSlotService, { type TimeSlot } from '../../../services/timeSlotServic
 import { dayOffService, type DayOff } from '../../../services/DayOffService';
 import DatePicker from '../../../components/ui/DatePicker';
 import { formatTimeTo12Hour } from '../../../utils/storage';
+import type { AppliedFee } from '../../../utils/fees';
 
 // Helper function to parse ISO date string (YYYY-MM-DD) in local timezone
 const parseLocalDate = (isoDateString: string): Date => {
@@ -91,6 +92,7 @@ const EditBooking: React.FC = () => {
   const [loadingTimeSlots, setLoadingTimeSlots] = useState(false);
   const [dayOffs, setDayOffs] = useState<Date[]>([]);
   const [dayOffsWithTime, setDayOffsWithTime] = useState<DayOffWithTime[]>([]);
+  const [appliedFees, setAppliedFees] = useState<AppliedFee[]>([]);
 
   // Load booking data and package details - try cache first for faster load
   useEffect(() => {
@@ -170,6 +172,11 @@ const EditBooking: React.FC = () => {
           guestOfHonorAge: bookingData.guest_of_honor_age ? String(bookingData.guest_of_honor_age) : '',
           guestOfHonorGender: bookingData.guest_of_honor_gender || '',
         });
+
+        // Load applied fees from booking
+        if (bookingData.applied_fees && Array.isArray(bookingData.applied_fees)) {
+          setAppliedFees(bookingData.applied_fees);
+        }
         
         // End loading state early - form can render while we load dropdown data
         setLoading(false);
@@ -562,6 +569,7 @@ const EditBooking: React.FC = () => {
         notes: formData.notes || undefined,
         internal_notes: formData.internalNotes || undefined,
         send_notification: formData.sendNotification,
+        applied_fees: appliedFees.length > 0 ? appliedFees : null,
         guest_of_honor_name: packageDetails?.has_guest_of_honor && formData.guestOfHonorName ? formData.guestOfHonorName : undefined,
         guest_of_honor_age: packageDetails?.has_guest_of_honor && formData.guestOfHonorAge ? parseInt(formData.guestOfHonorAge) : undefined,
         guest_of_honor_gender: packageDetails?.has_guest_of_honor && formData.guestOfHonorGender ? formData.guestOfHonorGender as 'male' | 'female' | 'other' : undefined,
@@ -1125,6 +1133,72 @@ const EditBooking: React.FC = () => {
 
             {/* Payment Summary */}
             <div>
+              <p className="text-sm text-gray-500 mb-3">Applied Fees</p>
+              <div className="space-y-2 mb-4">
+                {appliedFees.map((fee, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      placeholder="Fee name"
+                      value={fee.fee_name}
+                      onChange={(e) => {
+                        const updated = [...appliedFees];
+                        updated[index] = { ...updated[index], fee_name: e.target.value };
+                        setAppliedFees(updated);
+                      }}
+                      className="flex-1 border border-gray-300 rounded px-2 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                    <div className="relative">
+                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="0.00"
+                        value={fee.fee_amount}
+                        onChange={(e) => {
+                          const updated = [...appliedFees];
+                          updated[index] = { ...updated[index], fee_amount: parseFloat(e.target.value) || 0 };
+                          setAppliedFees(updated);
+                        }}
+                        className="w-24 border border-gray-300 rounded pl-6 pr-2 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                      />
+                    </div>
+                    <select
+                      value={fee.fee_application_type}
+                      onChange={(e) => {
+                        const updated = [...appliedFees];
+                        updated[index] = { ...updated[index], fee_application_type: e.target.value as 'additive' | 'inclusive' };
+                        setAppliedFees(updated);
+                      }}
+                      className="border border-gray-300 rounded px-2 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      <option value="additive">Additive</option>
+                      <option value="inclusive">Inclusive</option>
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => setAppliedFees(appliedFees.filter((_, i) => i !== index))}
+                      className="text-red-400 hover:text-red-600 text-sm font-medium"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setAppliedFees([...appliedFees, { fee_name: '', fee_amount: 0, fee_application_type: 'additive' }])}
+                  className={`text-xs text-${fullColor} hover:underline`}
+                >
+                  + Add Fee
+                </button>
+                {appliedFees.length > 0 && (
+                  <div className="text-xs text-gray-500 text-right">
+                    Fees Total: ${appliedFees.reduce((sum, f) => sum + f.fee_amount, 0).toFixed(2)}
+                  </div>
+                )}
+              </div>
+
               <p className="text-sm text-gray-500 mb-3">Payment Breakdown</p>
               <div className="space-y-2">
                 {/* Package Price */}

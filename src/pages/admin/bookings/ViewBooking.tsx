@@ -23,6 +23,7 @@ import { bookingCacheService } from '../../../services/BookingCacheService';
 import { getStoredUser } from '../../../utils/storage';
 import { formatDurationDisplay, convertTo12Hour, parseLocalDate, formatLocalDateTime } from '../../../utils/timeFormat';
 import StandardButton from '../../../components/ui/StandardButton';
+import { AppliedFeesDisplay } from '../../../components/AppliedFeesDisplay';
 
 const ViewBooking: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
@@ -459,6 +460,13 @@ const ViewBooking: React.FC = () => {
                     <p className="text-sm text-gray-500">Discount</p>
                     <p className="font-medium text-gray-900">${Number(booking.discount_amount).toFixed(2)}</p>
                   </div>
+                </div>
+              )}
+
+              {/* Applied Fees */}
+              {booking.applied_fees && booking.applied_fees.length > 0 && (
+                <div className="md:col-span-2">
+                  <AppliedFeesDisplay appliedFees={booking.applied_fees} />
                 </div>
               )}
 

@@ -1643,6 +1643,18 @@ const CalendarView: React.FC = () => {
                         <span className="text-sm text-red-600">-${Number(selectedBooking.discount_amount).toFixed(2)}</span>
                       </div>
                     )}
+
+                    {selectedBooking.applied_fees && selectedBooking.applied_fees.length > 0 && (
+                      <div className="space-y-1">
+                        <p className="text-xs font-medium text-gray-500">Fees</p>
+                        {selectedBooking.applied_fees.map((fee: { fee_name: string; fee_amount: number; fee_application_type: string }, i: number) => (
+                          <div key={i} className="flex justify-between items-center">
+                            <span className="text-xs text-gray-600">{fee.fee_name} <span className="text-gray-400">({fee.fee_application_type})</span></span>
+                            <span className="text-xs text-gray-900">${fee.fee_amount.toFixed(2)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                     
                     <div className="flex justify-between items-center pt-3 border-t border-gray-200">
                       <span className="text-base font-semibold text-gray-900">Total Amount</span>

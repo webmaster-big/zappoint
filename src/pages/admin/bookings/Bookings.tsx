@@ -126,6 +126,7 @@ const Bookings: React.FC = () => {
       guestZip: booking.guest_zip || booking.customer?.zip,
       guestCountry: booking.guest_country || booking.customer?.country,
       internal_notes: booking.internal_notes,
+      appliedFees: booking.applied_fees || null,
     };
   };
   const [bookings, setBookings] = useState<BookingsPageBooking[]>([]);
@@ -221,6 +222,7 @@ const Bookings: React.FC = () => {
       paymentStatus: true,         // Payment status
       totalAmount: true,           // Total amount
       amountPaid: true,            // Amount paid
+      fees: false,                 // Applied fees (hidden by default)
       
       // Guest of Honor
       guestOfHonor: false,         // Guest of honor (hidden by default)
@@ -485,6 +487,7 @@ const Bookings: React.FC = () => {
     paymentStatus: { label: 'Pay Status', isVisible: () => columnVisibility.paymentStatus },
     amountPaid: { label: 'Paid', isVisible: () => columnVisibility.amountPaid },
     totalAmount: { label: 'Total', isVisible: () => columnVisibility.totalAmount },
+    fees: { label: 'Fees', isVisible: () => columnVisibility.fees },
     guestOfHonor: { label: 'Guest of Honor', isVisible: () => columnVisibility.guestOfHonor },
     notes: { label: 'Notes', isVisible: () => columnVisibility.notes },
     specialRequests: { label: 'Requests', isVisible: () => columnVisibility.specialRequests },
@@ -691,6 +694,7 @@ const Bookings: React.FC = () => {
               location: booking.location?.name || 'N/A',
               locationId: booking.location_id,
               internal_notes: booking.internal_notes,
+              appliedFees: booking.applied_fees || null,
             };
           });
           
@@ -879,6 +883,10 @@ const Bookings: React.FC = () => {
           return (a.amountPaid - b.amountPaid) * dir;
         case 'totalAmount':
           return (a.totalAmount - b.totalAmount) * dir;
+        case 'fees':
+          const aFees = (a.appliedFees || []).reduce((s, f) => s + f.fee_amount, 0);
+          const bFees = (b.appliedFees || []).reduce((s, f) => s + f.fee_amount, 0);
+          return (aFees - bFees) * dir;
         case 'createdAt':
           return (new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime()) * dir;
         case 'updatedAt':
@@ -2045,6 +2053,21 @@ const Bookings: React.FC = () => {
         return (
           <td key={columnKey} className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
             ${typeof booking.totalAmount === 'number' && !isNaN(booking.totalAmount) ? booking.totalAmount.toFixed(2) : '0.00'}
+          </td>
+        );
+      case 'fees':
+        const fees = booking.appliedFees;
+        if (!fees || fees.length === 0) {
+          return (
+            <td key={columnKey} className="px-4 py-3 whitespace-nowrap text-sm text-gray-400">
+              —
+            </td>
+          );
+        }
+        const feesTotal = fees.reduce((sum, f) => sum + f.fee_amount, 0);
+        return (
+          <td key={columnKey} className="px-4 py-3 whitespace-nowrap text-sm text-gray-900" title={fees.map(f => `${f.fee_name}: $${f.fee_amount.toFixed(2)} (${f.fee_application_type})`).join(', ')}>
+            <span className="underline decoration-dotted cursor-help">${feesTotal.toFixed(2)}</span>
           </td>
         );
       case 'guestOfHonor':

@@ -42,6 +42,12 @@ export interface BookingsPageBooking {
   guestState?: string;
   guestZip?: string;
   guestCountry?: string;
+  // Applied fees
+  appliedFees?: Array<{
+    fee_name: string;
+    fee_amount: number;
+    fee_application_type: 'additive' | 'inclusive';
+  }> | null;
 }
 
 export interface BookingsPageFilterOptions {
@@ -90,6 +96,7 @@ export interface BookingsColumnVisibility {
   paymentStatus: boolean;         // Payment status
   totalAmount: boolean;           // Total amount
   amountPaid: boolean;            // Amount paid
+  fees: boolean;                  // Applied fees
   
   // Guest of Honor group
   guestOfHonor: boolean;          // Guest of honor info (name, age, gender)
@@ -119,6 +126,7 @@ export type BookingsColumnKey =
   | 'paymentStatus'
   | 'amountPaid'
   | 'totalAmount'
+  | 'fees'
   | 'guestOfHonor'
   | 'notes'
   | 'specialRequests'
@@ -141,6 +149,7 @@ export const DEFAULT_COLUMN_ORDER: BookingsColumnKey[] = [
   'paymentStatus',
   'amountPaid',
   'totalAmount',
+  'fees',
   'guestOfHonor',
   'notes',
   'specialRequests',

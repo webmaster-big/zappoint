@@ -28,6 +28,7 @@ import { createPayment, PAYMENT_TYPE } from '../../../services/PaymentService';
 import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
 import { getStoredUser } from '../../../utils/storage';
+import { AppliedFeesDisplay } from '../../../components/AppliedFeesDisplay';
 import { formatDurationDisplay, convertTo12Hour, parseLocalDate } from '../../../utils/timeFormat';
 
 interface ScanResult {
@@ -1038,6 +1039,13 @@ const CheckIn: React.FC = () => {
                       </div>
                     )}
 
+                    {/* Applied Fees */}
+                    {verifiedBooking.applied_fees && verifiedBooking.applied_fees.length > 0 && (
+                      <div className="col-span-full">
+                        <AppliedFeesDisplay appliedFees={verifiedBooking.applied_fees} />
+                      </div>
+                    )}
+
                     {verifiedBooking.payment_method && (
                       <div className="flex items-center gap-3">
                         <div className={`p-2 bg-${themeColor}-100 rounded-lg`}>
@@ -1520,6 +1528,13 @@ const CheckIn: React.FC = () => {
                           <p className="text-xs text-gray-500">Discount Amount</p>
                           <p className="font-medium text-gray-800">${Number(selectedBooking.discount_amount).toFixed(2)}</p>
                         </div>
+                      </div>
+                    )}
+
+                    {/* Applied Fees */}
+                    {selectedBooking.applied_fees && selectedBooking.applied_fees.length > 0 && (
+                      <div className="col-span-full">
+                        <AppliedFeesDisplay appliedFees={selectedBooking.applied_fees} />
                       </div>
                     )}
 

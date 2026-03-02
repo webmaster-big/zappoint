@@ -23,6 +23,7 @@ import type { FeeBreakdown } from '../../../types/FeeSupport.types';
 import PriceBreakdownDisplay from '../../../components/ui/PriceBreakdownDisplay';
 import { specialPricingService } from '../../../services/SpecialPricingService';
 import type { SpecialPricingBreakdown } from '../../../types/SpecialPricing.types';
+import { buildAppliedFees } from '../../../utils/fees';
 
 // Helper function to parse ISO date string (YYYY-MM-DD) in local timezone
 const parseLocalDate = (isoDateString: string): Date => {
@@ -944,6 +945,8 @@ const ManualBooking: React.FC = () => {
         // Only skip validation in flexible mode (for past date entries)
         skip_date_validation: bookingMode === 'flexible',
         is_manual_entry: true,
+        // Applied fees snapshot
+        applied_fees: buildAppliedFees(feeBreakdown).length > 0 ? buildAppliedFees(feeBreakdown) : null,
       };
 
       console.log('📤 Sending manual booking request:', bookingData);
