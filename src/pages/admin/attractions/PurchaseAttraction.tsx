@@ -35,6 +35,7 @@ import { specialPricingService } from '../../../services/SpecialPricingService';
 import type { SpecialPricingBreakdown } from '../../../types/SpecialPricing.types';
 import { dayOffService, type DayOff } from '../../../services/DayOffService';
 import ScheduleCalendar from '../../../components/ui/ScheduleCalendar';
+import { buildAppliedFees } from '../../../utils/fees';
 
 // Helper function to parse payment errors into user-friendly messages
 const getPaymentErrorMessage = (error: any): string => {
@@ -755,6 +756,7 @@ const PurchaseAttraction = () => {
         scheduled_time: scheduledTime || undefined,
         notes: `Attraction Purchase: ${attraction.name} (${quantity} ticket${quantity > 1 ? 's' : ''})`,
         additional_addons: additionalAddons.length > 0 ? additionalAddons : undefined,
+        applied_fees: buildAppliedFees(feeBreakdown).length > 0 ? buildAppliedFees(feeBreakdown) : null,
       };
 
       let response;

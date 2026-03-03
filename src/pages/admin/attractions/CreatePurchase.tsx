@@ -35,6 +35,7 @@ import { specialPricingService } from '../../../services/SpecialPricingService';
 import type { SpecialPricingBreakdown } from '../../../types/SpecialPricing.types';
 import { dayOffService, type DayOff } from '../../../services/DayOffService';
 import ScheduleCalendar from '../../../components/ui/ScheduleCalendar';
+import { buildAppliedFees } from '../../../utils/fees';
 
 const CreatePurchase = () => {
   const { themeColor, fullColor } = useThemeColor();
@@ -629,6 +630,7 @@ const CreatePurchase = () => {
         notes: notes || `Attraction Purchase: ${selectedAttraction.name} (${quantity} ticket${quantity > 1 ? 's' : ''})`,
         send_email: sendEmail,
         additional_addons: additionalAddons.length > 0 ? additionalAddons : undefined,
+        applied_fees: buildAppliedFees(feeBreakdown).length > 0 ? buildAppliedFees(feeBreakdown) : null,
       };
 
       const response = await attractionPurchaseService.createPurchase(purchaseData);

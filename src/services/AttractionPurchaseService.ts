@@ -91,6 +91,12 @@ export interface CreatePurchaseData {
     quantity: number;
     price_at_purchase: number;
   }>;
+  // Applied fees snapshot
+  applied_fees?: Array<{
+    fee_name: string;
+    fee_amount: number;
+    fee_application_type: 'additive' | 'inclusive';
+  }> | null;
 }
 
 export interface UpdatePurchaseData extends Partial<CreatePurchaseData> {
