@@ -18,6 +18,7 @@ import { useThemeColor } from '../../../hooks/useThemeColor';
 import { attractionPurchaseService } from '../../../services/AttractionPurchaseService';
 import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
+import { AppliedFeesDisplay } from '../../../components/AppliedFeesDisplay';
 import { getStoredUser } from '../../../utils/storage';
 
 const PurchaseDetails = () => {
@@ -360,6 +361,12 @@ const PurchaseDetails = () => {
                       {purchase.payment_id}
                     </p>
                   </div>
+                </div>
+              )}
+
+              {purchase.applied_fees && purchase.applied_fees.length > 0 && (
+                <div className="md:col-span-2">
+                  <AppliedFeesDisplay appliedFees={purchase.applied_fees} />
                 </div>
               )}
             </div>

@@ -62,6 +62,11 @@ export interface AttractionPurchase {
     last_name: string;
     email: string;
   };
+  applied_fees?: Array<{
+    fee_name: string;
+    fee_amount: number;
+    fee_application_type: 'additive' | 'inclusive';
+  }> | null;
 }
 
 export interface CreatePurchaseData {

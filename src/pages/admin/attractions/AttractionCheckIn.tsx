@@ -18,6 +18,7 @@ import {
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { attractionPurchaseService, type AttractionPurchase } from '../../../services/AttractionPurchaseService';
 import Toast from '../../../components/ui/Toast';
+import { AppliedFeesDisplay } from '../../../components/AppliedFeesDisplay';
 import StandardButton from '../../../components/ui/StandardButton';
 
 interface ScanResult {
@@ -689,6 +690,12 @@ const AttractionCheckIn = () => {
                       </div>
                     )}
                   </div>
+
+                  {verifiedPurchase.applied_fees && verifiedPurchase.applied_fees.length > 0 && (
+                    <div>
+                      <AppliedFeesDisplay appliedFees={verifiedPurchase.applied_fees} />
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -849,6 +856,12 @@ const AttractionCheckIn = () => {
                     </div>
                   </div>
                 </div>
+
+                {scanResult.purchase.applied_fees && scanResult.purchase.applied_fees.length > 0 && (
+                  <div>
+                    <AppliedFeesDisplay appliedFees={scanResult.purchase.applied_fees} />
+                  </div>
+                )}
               </div>
             )}
 
