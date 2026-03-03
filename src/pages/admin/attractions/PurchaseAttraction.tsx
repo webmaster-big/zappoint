@@ -744,6 +744,7 @@ const PurchaseAttraction = () => {
         sms_consent: smsConsent,
         quantity: quantity,
         amount: totalAmount,
+        total_amount: totalAmount, // Include fees in total_amount
         amount_paid: totalAmount,
         currency: 'USD',
         method: 'card',

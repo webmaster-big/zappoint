@@ -78,6 +78,7 @@ export interface CreatePurchaseData {
   notes?: string;
   // Optional fields for payment tracking
   amount?: number;
+  total_amount?: number; // Total amount including fees
   amount_paid?: number;
   currency?: string;
   method?: string;

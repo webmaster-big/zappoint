@@ -617,6 +617,7 @@ const CreatePurchase = () => {
         guest_phone: customerInfo.phone || undefined,
         quantity: quantity,
         amount: totalAmount,
+        total_amount: totalAmount, // Include fees in total_amount
         amount_paid: paymentMethod === 'paylater' ? 0 : (isCardPayment ? totalAmount : cashAmountPaid),
         currency: 'USD',
         method: paymentMethod === 'in-store' ? 'cash' : paymentMethod as 'card' | 'paylater' | 'authorize.net',
