@@ -29,6 +29,14 @@ export interface GoogleCalendarSyncResult {
   failed: number;
 }
 
+export interface GoogleCalendarResyncResult {
+  deleted: number;
+  created: number;
+  skipped: number;
+  failed: number;
+  errors: string[];
+}
+
 export interface GoogleCalendarSetCalendarData {
   location_id: number;
   calendar_id: string;

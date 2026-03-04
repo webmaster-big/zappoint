@@ -29,12 +29,14 @@ import {
   listGoogleCalendars,
   setGoogleCalendar,
   syncGoogleCalendar,
+  resyncGoogleCalendar,
   getAllGoogleCalendarConnections,
 } from '../../services/GoogleCalendarService';
 import type {
   GoogleCalendarStatus,
   GoogleCalendar,
   GoogleCalendarSyncResult,
+  GoogleCalendarResyncResult,
   GoogleCalendarConnection,
 } from '../../types/googleCalendar.types';
 
@@ -158,6 +160,8 @@ const Settings = () => {
   });
   const [gcalSyncing, setGcalSyncing] = useState(false);
   const [gcalSyncResult, setGcalSyncResult] = useState<GoogleCalendarSyncResult | null>(null);
+  const [gcalResyncing, setGcalResyncing] = useState(false);
+  const [gcalResyncResult, setGcalResyncResult] = useState<GoogleCalendarResyncResult | null>(null);
   const [gcalChangingCalendar, setGcalChangingCalendar] = useState(false);
   
   // Google Calendar - All Connections (company_admin)
@@ -264,6 +268,7 @@ const Settings = () => {
   const fetchGcalStatus = useCallback(async (locationId: number) => {
     setGcalLoading(true);
     setGcalSyncResult(null);
+    setGcalResyncResult(null);
     try {
       const response = await getGoogleCalendarStatus(locationId);
       if (response.success) {
@@ -324,6 +329,7 @@ const Settings = () => {
     setGcalStatus(null);
     setGcalCalendars([]);
     setGcalSyncResult(null);
+    setGcalResyncResult(null);
     if (locationId) {
       fetchGcalStatus(locationId);
     }
@@ -386,6 +392,7 @@ const Settings = () => {
         setGcalStatus(null);
         setGcalCalendars([]);
         setGcalSyncResult(null);
+        setGcalResyncResult(null);
         fetchGcalStatus(gcalSelectedLocationId);
       } else {
         alert(response.message || 'Failed to disconnect Google Calendar');
@@ -445,6 +452,41 @@ const Settings = () => {
       alert(error.response?.data?.message || 'Sync failed. Please try again.');
     } finally {
       setGcalSyncing(false);
+    }
+  };
+
+  const handleGcalResync = async () => {
+    if (!gcalSelectedLocationId) return;
+    
+    const confirmed = confirm(
+      'This will delete ALL existing calendar events for this location and recreate them. This may take a few minutes. Continue?'
+    );
+    if (!confirmed) return;
+    
+    setGcalResyncing(true);
+    setGcalResyncResult(null);
+    setGcalSyncResult(null);
+    try {
+      const response = await resyncGoogleCalendar({
+        location_id: gcalSelectedLocationId,
+        from_date: gcalSyncFromDate,
+      });
+      if (response.success) {
+        setGcalResyncResult(response.data);
+        setSuccessMessage(
+          `Resync complete: ${response.data.deleted} deleted, ${response.data.created} created`
+        );
+        setShowSuccess(true);
+        setTimeout(() => setShowSuccess(false), 3000);
+        fetchGcalStatus(gcalSelectedLocationId);
+      } else {
+        alert(response.message || 'Resync failed');
+      }
+    } catch (error: any) {
+      console.error('Error resyncing Google Calendar:', error);
+      alert(error.response?.data?.message || 'Resync failed. Please try again.');
+    } finally {
+      setGcalResyncing(false);
     }
   };
 
@@ -1150,12 +1192,38 @@ const Settings = () => {
                         variant="primary"
                         size="sm"
                         loading={gcalSyncing}
-                        disabled={gcalSyncing}
+                        disabled={gcalSyncing || gcalResyncing}
                         icon={RefreshCw}
                       >
                         Sync
                       </StandardButton>
                     </div>
+                  </div>
+                </div>
+
+                {/* Full Resync section */}
+                <div className="pt-3 border-t border-gray-200">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-medium text-gray-500">Fix Duplicates</span>
+                      <div className="relative group">
+                        <HelpCircle size={12} className="text-gray-400 cursor-help" />
+                        <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-64 bg-gray-900 text-white text-xs rounded-lg px-3 py-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 pointer-events-none shadow-lg">
+                          Full Resync deletes ALL existing calendar events and recreates them from scratch. Use this to fix duplicate events or incorrect event details. This may take 1-2 minutes.
+                          <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-x-[6px] border-x-transparent border-t-[6px] border-t-gray-900"></div>
+                        </div>
+                      </div>
+                    </div>
+                    <StandardButton
+                      onClick={handleGcalResync}
+                      variant="secondary"
+                      size="sm"
+                      loading={gcalResyncing}
+                      disabled={gcalSyncing || gcalResyncing}
+                      className="text-amber-700 border-amber-300 hover:bg-amber-50"
+                    >
+                      {gcalResyncing ? 'Resyncing...' : 'Full Resync'}
+                    </StandardButton>
                   </div>
                 </div>
 
@@ -1165,6 +1233,16 @@ const Settings = () => {
                     <span className="text-green-600 font-semibold">{gcalSyncResult.created}</span> created · {' '}
                     <span className="text-yellow-600 font-semibold">{gcalSyncResult.skipped}</span> skipped · {' '}
                     <span className="text-red-600 font-semibold">{gcalSyncResult.failed}</span> failed
+                  </div>
+                )}
+
+                {/* Resync result */}
+                {gcalResyncResult && (
+                  <div className="text-xs text-gray-600 px-3 py-2 bg-amber-50 rounded border border-amber-200">
+                    <span className="text-red-600 font-semibold">{gcalResyncResult.deleted}</span> deleted · {' '}
+                    <span className="text-green-600 font-semibold">{gcalResyncResult.created}</span> created · {' '}
+                    <span className="text-yellow-600 font-semibold">{gcalResyncResult.skipped}</span> skipped · {' '}
+                    <span className="text-red-600 font-semibold">{gcalResyncResult.failed}</span> failed
                   </div>
                 )}
               </div>

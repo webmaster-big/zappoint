@@ -5,6 +5,7 @@ import type {
   GoogleCalendarAuthUrl,
   GoogleCalendar,
   GoogleCalendarSyncResult,
+  GoogleCalendarResyncResult,
   GoogleCalendarSetCalendarData,
   GoogleCalendarSyncData,
   GoogleCalendarConnection,
@@ -120,6 +121,20 @@ export const syncSingleBooking = async (
 ): Promise<SettingsApiResponse> => {
   const response = await api.post<SettingsApiResponse>(
     `/google-calendar/sync/${bookingId}`
+  );
+  return response.data;
+};
+
+/**
+ * Full resync: Delete all existing calendar events and recreate them
+ * Useful for fixing duplicate events or incorrect event durations/colors
+ */
+export const resyncGoogleCalendar = async (
+  data: GoogleCalendarSyncData
+): Promise<SettingsApiResponse<GoogleCalendarResyncResult>> => {
+  const response = await api.post<SettingsApiResponse<GoogleCalendarResyncResult>>(
+    '/google-calendar/resync',
+    data
   );
   return response.data;
 };
