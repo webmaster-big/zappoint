@@ -66,6 +66,7 @@ const LocationActivityLogs = () => {
     dateRange: 'all',
     search: ''
   });
+  const [searchInput, setSearchInput] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(20);
   const [showFilters, setShowFilters] = useState(false);
@@ -992,6 +993,18 @@ const LocationActivityLogs = () => {
     initializeData();
   }, []); // Only run once on mount
 
+  // Debounce search input before updating filters
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      setFilters(prev => {
+        if (prev.search === searchInput) return prev;
+        return { ...prev, search: searchInput };
+      });
+      setCurrentPage(1);
+    }, 500);
+    return () => clearTimeout(timeoutId);
+  }, [searchInput]);
+
   // Reload logs when filters or location change (but not on page change for client-side filtering)
   useEffect(() => {
     if (locations.length > 0 || selectedLocation === 'all') {
@@ -1029,6 +1042,7 @@ const LocationActivityLogs = () => {
   };
 
   const clearFilters = () => {
+    setSearchInput('');
     setFilters({
       action: 'all',
       resourceType: 'all',
@@ -1791,8 +1805,8 @@ const LocationActivityLogs = () => {
             <input
               type="text"
               placeholder="Search activities, users, or locations..."
-              value={filters.search}
-              onChange={(e) => handleFilterChange('search', e.target.value)}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
               className={`pl-9 pr-3 py-1.5 border border-gray-200 rounded-lg w-full text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
             />
           </div>

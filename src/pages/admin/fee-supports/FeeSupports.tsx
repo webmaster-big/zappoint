@@ -22,6 +22,7 @@ import { feeSupportService } from '../../../services/FeeSupportService';
 import { packageCacheService } from '../../../services/PackageCacheService';
 import { attractionCacheService } from '../../../services/AttractionCacheService';
 import { locationService } from '../../../services/LocationService';
+import { eventService } from '../../../services/EventService';
 import { getStoredUser } from '../../../utils/storage';
 import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
@@ -44,8 +45,8 @@ const FeeSupports: React.FC = () => {
 
   // Pre-filter entity_type from URL query param (from Packages or Attractions pages)
   const entityTypeParam = searchParams.get('entity_type');
-  const initialEntityType: 'package' | 'attraction' | 'all' = 
-    entityTypeParam === 'package' || entityTypeParam === 'attraction' ? entityTypeParam : 'all';
+  const initialEntityType: 'package' | 'attraction' | 'event' | 'all' = 
+    entityTypeParam === 'package' || entityTypeParam === 'attraction' || entityTypeParam === 'event' ? entityTypeParam : 'all';
 
   const [feeSupports, setFeeSupports] = useState<FeeSupport[]>([]);
   const [filteredFeeSupports, setFilteredFeeSupports] = useState<FeeSupport[]>([]);
@@ -64,6 +65,7 @@ const FeeSupports: React.FC = () => {
   // Entity data for the modal
   const [packages, setPackages] = useState<Array<{ id: number; name: string }>>([]);
   const [attractions, setAttractions] = useState<Array<{ id: number; name: string }>>([]);
+  const [events, setEvents] = useState<Array<{ id: number; name: string }>>([]);
   const [locations, setLocations] = useState<Array<{ id: number; name: string }>>([]);
   const [loadingEntities, setLoadingEntities] = useState(false);
 
@@ -121,28 +123,33 @@ const FeeSupports: React.FC = () => {
   }, []);
 
   // Load entities using cache services for faster loading
-  const loadEntities = useCallback(async (entityType: 'package' | 'attraction') => {
+  const loadEntities = useCallback(async (entityType: 'package' | 'attraction' | 'event') => {
     setLoadingEntities(true);
     try {
       if (entityType === 'package') {
-        // Try cache first for instant loading
         const cachedPackages = await packageCacheService.getCachedPackages();
         if (cachedPackages && cachedPackages.length > 0) {
           setPackages(cachedPackages.map((p: PackageType) => ({ id: p.id, name: p.name })));
         } else {
-          // Fetch from API and cache
           const freshPackages = await packageCacheService.getPackages({ user_id: currentUser?.id });
           setPackages(freshPackages.map((p: PackageType) => ({ id: p.id, name: p.name })));
         }
-      } else {
-        // Try cache first for instant loading
+      } else if (entityType === 'attraction') {
         const cachedAttractions = await attractionCacheService.getCachedAttractions();
         if (cachedAttractions && cachedAttractions.length > 0) {
           setAttractions(cachedAttractions.map((a: Attraction) => ({ id: a.id, name: a.name })));
         } else {
-          // Fetch from API and cache
           const freshAttractions = await attractionCacheService.getAttractions({ user_id: currentUser?.id });
           setAttractions(freshAttractions.map((a: Attraction) => ({ id: a.id, name: a.name })));
+        }
+      } else if (entityType === 'event') {
+        const response = await eventService.getEvents({ user_id: currentUser?.id, is_active: true });
+        if (response.success && response.data) {
+          const activeEvents = (Array.isArray(response.data) ? response.data : []).filter(ev => {
+            const endDate = ev.end_date || ev.start_date;
+            return new Date(endDate) >= new Date(new Date().toISOString().split('T')[0]);
+          });
+          setEvents(activeEvents.map(ev => ({ id: ev.id, name: ev.name })));
         }
       }
     } catch {
@@ -372,6 +379,7 @@ const FeeSupports: React.FC = () => {
   const totalActive = feeSupports.filter(fs => fs.is_active).length;
   const totalPackageFees = feeSupports.filter(fs => fs.entity_type === 'package').length;
   const totalAttractionFees = feeSupports.filter(fs => fs.entity_type === 'attraction').length;
+  const totalEventFees = feeSupports.filter(fs => fs.entity_type === 'event').length;
 
   // Pagination
   const indexOfLast = currentPage * itemsPerPage;
@@ -380,9 +388,9 @@ const FeeSupports: React.FC = () => {
   const totalPages = Math.ceil(filteredFeeSupports.length / itemsPerPage);
 
   // Determine back path based on entity_type query
-  const backPath = initialEntityType === 'package' ? '/packages' : initialEntityType === 'attraction' ? '/attractions' : null;
+  const backPath = initialEntityType === 'package' ? '/packages' : initialEntityType === 'attraction' ? '/attractions' : initialEntityType === 'event' ? '/events' : null;
 
-  const entities = form.entity_type === 'package' ? packages : attractions;
+  const entities = form.entity_type === 'package' ? packages : form.entity_type === 'event' ? events : attractions;
 
   if (loading) {
     return (
@@ -404,7 +412,7 @@ const FeeSupports: React.FC = () => {
           )}
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Fee Supports</h1>
-            <p className="text-gray-600 mt-1">Manage additional fees for packages and attractions</p>
+            <p className="text-gray-600 mt-1">Manage additional fees for packages, attractions, and events</p>
           </div>
         </div>
         <div className="mt-4 sm:mt-0 flex gap-2">
@@ -420,6 +428,7 @@ const FeeSupports: React.FC = () => {
           { title: 'Total Fee Supports', value: feeSupports.length.toString(), sub: `${totalActive} active`, icon: DollarSign },
           { title: 'Package Fees', value: totalPackageFees.toString(), sub: 'Applied to packages', icon: PackageIcon },
           { title: 'Attraction Fees', value: totalAttractionFees.toString(), sub: 'Applied to attractions', icon: Ticket },
+          { title: 'Event Fees', value: totalEventFees.toString(), sub: 'Applied to events', icon: Layers },
         ].map((m, i) => {
           const Icon = m.icon;
           return (
@@ -476,6 +485,7 @@ const FeeSupports: React.FC = () => {
                   <option value="all">All Types</option>
                   <option value="package">Package</option>
                   <option value="attraction">Attraction</option>
+                  <option value="event">Event</option>
                 </select>
               </div>
               <div>
@@ -568,9 +578,9 @@ const FeeSupports: React.FC = () => {
                         </span>
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${fs.entity_type === 'package' ? `bg-${themeColor}-100 text-${fullColor}` : `bg-${themeColor}-100 text-${fullColor}`}`}>
-                          {fs.entity_type === 'package' ? <PackageIcon className="w-3 h-3" /> : <Ticket className="w-3 h-3" />}
-                          {fs.entity_type === 'package' ? 'Package' : 'Attraction'}
+                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${fs.entity_type === 'package' ? `bg-${themeColor}-100 text-${fullColor}` : fs.entity_type === 'event' ? 'bg-amber-100 text-amber-800' : `bg-${themeColor}-100 text-${fullColor}`}`}>
+                          {fs.entity_type === 'package' ? <PackageIcon className="w-3 h-3" /> : fs.entity_type === 'event' ? <Layers className="w-3 h-3" /> : <Ticket className="w-3 h-3" />}
+                          {fs.entity_type === 'package' ? 'Package' : fs.entity_type === 'event' ? 'Event' : 'Attraction'}
                         </span>
                       </td>
                       <td className="px-4 py-3">
@@ -749,7 +759,7 @@ const FeeSupports: React.FC = () => {
                   <h4 className="text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
                     <Layers className={`w-4 h-4 text-${fullColor}`} /> Apply To
                   </h4>
-                  <p className="text-xs text-gray-400 mb-4">Select which packages or attractions include this fee.</p>
+                  <p className="text-xs text-gray-400 mb-4">Select which packages, attractions, or events include this fee.</p>
                   
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Entity Type</label>
@@ -760,6 +770,7 @@ const FeeSupports: React.FC = () => {
                     >
                       <option value="package">Packages</option>
                       <option value="attraction">Attractions</option>
+                      <option value="event">Events</option>
                     </select>
                   </div>
 
@@ -767,7 +778,7 @@ const FeeSupports: React.FC = () => {
                   <div className="mt-4">
                     <div className="flex items-center justify-between mb-2">
                       <label className="text-sm font-medium text-gray-700">
-                        Select {form.entity_type === 'package' ? 'Packages' : 'Attractions'} <span className="text-red-500">*</span>
+                        Select {form.entity_type === 'package' ? 'Packages' : form.entity_type === 'event' ? 'Events' : 'Attractions'} <span className="text-red-500">*</span>
                       </label>
                       <button type="button" onClick={toggleSelectAllEntities} className={`text-xs text-${fullColor} hover:underline font-medium`}>
                         {form.entity_ids.length === entities.length ? 'Deselect All' : 'Select All'}
@@ -779,7 +790,7 @@ const FeeSupports: React.FC = () => {
                       </div>
                     ) : entities.length === 0 ? (
                       <div className="text-center py-6 text-gray-500 bg-gray-50 rounded-lg border border-gray-200 text-sm">
-                        No {form.entity_type === 'package' ? 'packages' : 'attractions'} found
+                        No {form.entity_type === 'package' ? 'packages' : form.entity_type === 'event' ? 'events' : 'attractions'} found
                       </div>
                     ) : (
                       <div className="max-h-40 overflow-y-auto bg-white rounded-lg border border-gray-200 divide-y divide-gray-100">

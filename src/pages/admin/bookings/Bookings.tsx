@@ -35,6 +35,7 @@ import { useThemeColor } from '../../../hooks/useThemeColor';
 import StandardButton from '../../../components/ui/StandardButton';
 import Pagination from '../../../components/ui/Pagination';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
+import DateRangeCalendar from '../../../components/ui/DateRangeCalendar';
 import type { BookingsPageBooking, BookingsPageFilterOptions, BookingsColumnVisibility, BookingsColumnKey } from '../../../types/Bookings.types';
 import { derivePaymentStatus, DEFAULT_COLUMN_ORDER } from '../../../types/Bookings.types';
 import bookingService from '../../../services/bookingService';
@@ -353,6 +354,7 @@ const Bookings: React.FC = () => {
   const [editValue, setEditValue] = useState<string>('');
   const [savingCell, setSavingCell] = useState<{ bookingId: string; field: string } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const filterVersionRef = useRef(0);
 
   // Package/Room selection modal states
   const [showPackageModal, setShowPackageModal] = useState(false);
@@ -644,10 +646,14 @@ const Bookings: React.FC = () => {
   };
 
   const applyFilters = async () => {
+    const currentVersion = ++filterVersionRef.current;
+
     // If search term exists, use backend search
     if (filters.search && filters.search.length >= 2) {
       try {
         const response = await bookingService.searchBookings(filters.search);
+        // Ignore stale results if filters changed while awaiting
+        if (currentVersion !== filterVersionRef.current) return;
         if (response.success && response.data) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const transformedResults = response.data.map((booking: any) => {
@@ -738,6 +744,8 @@ const Bookings: React.FC = () => {
         }
       } catch (error) {
         console.error('Error searching bookings:', error);
+        // Ignore stale errors if filters changed while awaiting
+        if (currentVersion !== filterVersionRef.current) return;
       }
     }
     
@@ -901,16 +909,6 @@ const Bookings: React.FC = () => {
     setFilters(prev => ({
       ...prev,
       [key]: value
-    }));
-  };
-
-  const handleDateRangeChange = (key: 'start' | 'end', value: string) => {
-    setFilters(prev => ({
-      ...prev,
-      dateRange: {
-        ...prev.dateRange,
-        [key]: value
-      }
     }));
   };
 
@@ -2839,6 +2837,10 @@ const Bookings: React.FC = () => {
                 onClick={() => setShowFilters(!showFilters)}
               >
                 Filters
+                {(() => {
+                  const count = [filters.status !== 'all', filters.payment !== 'all', filters.packageId !== 'all', filters.roomId !== 'all', filters.customerId !== 'all', !!filters.dateRange.start || !!filters.dateRange.end].filter(Boolean).length;
+                  return count > 0 ? <span className={`ml-1.5 inline-flex items-center justify-center w-4 h-4 text-[10px] font-bold rounded-full bg-${themeColor}-600 text-white`}>{count}</span> : null;
+                })()}
               </StandardButton>
               {/* Column Visibility Selector */}
               <div className="relative">
@@ -2980,10 +2982,53 @@ const Bookings: React.FC = () => {
             </div>
           </div>
 
+          {/* Active Filter Chips */}
+          {(() => {
+            const chips: { label: string; onClear: () => void }[] = [];
+            if (filters.status !== 'all') chips.push({ label: `Status: ${filters.status}`, onClear: () => handleFilterChange('status', 'all') });
+            if (filters.payment !== 'all') chips.push({ label: `Payment: ${filters.payment}`, onClear: () => handleFilterChange('payment', 'all') });
+            if (filters.packageId !== 'all') {
+              const pkg = filterPackages.find(p => p.id.toString() === filters.packageId);
+              chips.push({ label: `Package: ${pkg?.name || filters.packageId}`, onClear: () => handleFilterChange('packageId', 'all') });
+            }
+            if (filters.roomId !== 'all') {
+              const room = filterRooms.find(r => r.id.toString() === filters.roomId);
+              chips.push({ label: `Room: ${room?.name || filters.roomId}`, onClear: () => handleFilterChange('roomId', 'all') });
+            }
+            if (filters.customerId !== 'all') {
+              const customer = filterCustomers.find(c => c.id.toString() === filters.customerId);
+              chips.push({ label: `Customer: ${customer?.name || filters.customerId}`, onClear: () => handleFilterChange('customerId', 'all') });
+            }
+            if (filters.dateRange.start || filters.dateRange.end) {
+              const label = filters.dateRange.start && filters.dateRange.end
+                ? `Date: ${filters.dateRange.start} — ${filters.dateRange.end}`
+                : `Date: ${filters.dateRange.start || '...'} — ${filters.dateRange.end || '...'}`;
+              chips.push({ label, onClear: () => setFilters(prev => ({ ...prev, dateRange: { start: '', end: '' } })) });
+            }
+            if (chips.length === 0) return null;
+            return (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {chips.map((chip, i) => (
+                  <span key={i} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-${themeColor}-50 text-${themeColor}-700 border border-${themeColor}-200`}>
+                    {chip.label}
+                    <button type="button" onClick={chip.onClear} className={`hover:text-${themeColor}-900 ml-0.5`}>
+                      <X size={11} />
+                    </button>
+                  </span>
+                ))}
+                {chips.length > 1 && (
+                  <button type="button" onClick={clearFilters} className="text-xs text-gray-500 hover:text-gray-700 ml-1">
+                    Clear all
+                  </button>
+                )}
+              </div>
+            );
+          })()}
+
           {/* Advanced Filters */}
           {showFilters && (
             <div className="mt-3 p-3 bg-gray-50 rounded-lg">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-800 mb-1">Status</label>
                   <select
@@ -3011,21 +3056,18 @@ const Bookings: React.FC = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-800 mb-1">From Date</label>
-                  <input
-                    type="date"
-                    value={filters.dateRange.start}
-                    onChange={(e) => handleDateRangeChange('start', e.target.value)}
-                    className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-800 mb-1">To Date</label>
-                  <input
-                    type="date"
-                    value={filters.dateRange.end}
-                    onChange={(e) => handleDateRangeChange('end', e.target.value)}
-                    className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
+                  <label className="block text-xs font-medium text-gray-800 mb-1">Date Range</label>
+                  <DateRangeCalendar
+                    
+                    startDate={filters.dateRange.start}
+                    endDate={filters.dateRange.end}
+                    onChange={(start, end) => {
+                      setFilters(prev => ({
+                        ...prev,
+                        dateRange: { start, end }
+                      }));
+                    }}
+                    themeColor={themeColor}
                   />
                 </div>
               </div>

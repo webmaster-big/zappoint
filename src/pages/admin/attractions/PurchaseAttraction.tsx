@@ -603,7 +603,7 @@ const PurchaseAttraction = () => {
     return () => clearTimeout(timeoutId);
   }, [attraction, quantity, selectedAddOns]);
 
-  // Fetch special pricing breakdown for attraction (debounced, use today's date for immediate purchases)
+  // Fetch special pricing breakdown for attraction (debounced, use scheduled/visit date for pricing)
   useEffect(() => {
     if (!attraction) {
       setSpecialPricingBreakdown(null);
@@ -611,14 +611,14 @@ const PurchaseAttraction = () => {
     }
     const timeoutId = setTimeout(async () => {
       try {
-        // Use today's date for immediate attraction purchases
-        const today = new Date().toISOString().split('T')[0];
+        // Use the scheduled visit date if set, otherwise fall back to today
+        const pricingDate = scheduledDate || new Date().toISOString().split('T')[0];
         const basePrice = calculateTotal();
         const breakdown = await specialPricingService.getPriceBreakdown({
           entity_type: 'attraction',
           entity_id: Number(attraction.id),
           base_price: basePrice,
-          date: today,
+          date: pricingDate,
         });
         if (breakdown.has_special_pricing) {
           setSpecialPricingBreakdown(breakdown);
@@ -631,7 +631,7 @@ const PurchaseAttraction = () => {
       }
     }, 500);
     return () => clearTimeout(timeoutId);
-  }, [attraction, quantity, selectedAddOns]);
+  }, [attraction, quantity, selectedAddOns, scheduledDate]);
 
   // Synchronous ref guard to prevent multi-click duplicate submissions
   const isSubmittingRef = useRef(false);
@@ -645,6 +645,8 @@ const PurchaseAttraction = () => {
     }
 
     if (!attraction) return;
+    // Block if purchase already completed this session
+    if (purchaseComplete) return;
     // Prevent duplicate submissions (ref is synchronous, unlike state)
     if (isSubmittingRef.current) return;
 
@@ -652,6 +654,16 @@ const PurchaseAttraction = () => {
     const now = Date.now();
     if (now - lastSubmitTimeRef.current < 3000) {
       console.warn('⚠️ Purchase submission blocked (cooldown)');
+      return;
+    }
+
+    // localStorage-based dedup to survive page reloads
+    const dedupFingerprint = `${attraction.id}-${customerInfo.email}-${quantity}-${total.toFixed(2)}`;
+    const lastPurchaseKey = localStorage.getItem('_lastAttractionPurchaseKey');
+    const lastPurchaseTime = Number(localStorage.getItem('_lastAttractionPurchaseTime') || '0');
+    if (dedupFingerprint === lastPurchaseKey && now - lastPurchaseTime < 60000) {
+      console.warn('⚠️ Duplicate purchase blocked (localStorage dedup)');
+      setToast({ message: 'This purchase was already submitted. Please wait before trying again.', type: 'error' });
       return;
     }
 
@@ -832,6 +844,11 @@ const PurchaseAttraction = () => {
 
       setQrCodeImage(qrData);
       setToast({ message: 'Purchase confirmed! Receipt sent to your email.', type: 'success' });
+
+      // Mark purchase complete and store dedup fingerprint in localStorage
+      const dedupFp = `${attraction.id}-${customerInfo.email}-${quantity}-${total.toFixed(2)}`;
+      localStorage.setItem('_lastAttractionPurchaseKey', dedupFp);
+      localStorage.setItem('_lastAttractionPurchaseTime', Date.now().toString());
 
       setPurchaseComplete(true);
       setCurrentStep(4);
@@ -1610,7 +1627,7 @@ const PurchaseAttraction = () => {
                     <button
                       type="button"
                       onClick={handlePurchase}
-                      disabled={submitting || isProcessingPayment || !cardNumber || !cardMonth || !cardYear || !cardCVV || !validateCardNumber(cardNumber)}
+                      disabled={purchaseComplete || submitting || isProcessingPayment || !cardNumber || !cardMonth || !cardYear || !cardCVV || !validateCardNumber(cardNumber)}
                       className="py-2.5 md:py-3 px-3 md:px-6 rounded-lg bg-blue-800 text-white font-medium hover:bg-blue-900 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center text-xs md:text-base shadow-sm hover:shadow-md"
                     >
                       {isProcessingPayment ? (

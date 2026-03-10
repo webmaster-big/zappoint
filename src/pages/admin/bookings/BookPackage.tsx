@@ -1035,6 +1035,13 @@ const BookPackage: React.FC = () => {
     isSubmittingRef.current = true;
     lastSubmitTimeRef.current = now;
 
+    // Validate Guest of Honor name if package requires it
+    if (pkg.has_guest_of_honor && !form.guestOfHonorName.trim()) {
+      setSignatureTermsErrors({ guestOfHonor: 'Guest of Honor name is required.' });
+      isSubmittingRef.current = false;
+      return;
+    }
+
     // Validate signature and terms acceptance
     const stErrors: Record<string, string> = {};
     if (!signatureImage) {
@@ -2188,14 +2195,18 @@ const BookPackage: React.FC = () => {
                     </h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                       <div className="md:col-span-2">
-                        <label className="block font-medium mb-2 text-gray-800 text-sm">Guest of Honor Name</label>
+                        <label className="block font-medium mb-2 text-gray-800 text-sm">Guest of Honor Name <span className="text-red-500">*</span></label>
                         <input 
                           type="text" 
                           placeholder="Enter guest of honor name" 
-                          className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600" 
+                          className={`w-full rounded-lg border px-4 py-3 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600 ${signatureTermsErrors.guestOfHonor ? 'border-red-400' : 'border-gray-300'}`}
                           value={form.guestOfHonorName} 
-                          onChange={e => setForm(f => ({ ...f, guestOfHonorName: e.target.value }))} 
+                          onChange={e => {
+                            setForm(f => ({ ...f, guestOfHonorName: e.target.value }));
+                            if (e.target.value.trim()) setSignatureTermsErrors(prev => ({ ...prev, guestOfHonor: '' }));
+                          }} 
                         />
+                        {signatureTermsErrors.guestOfHonor && <p className="text-sm text-red-500 mt-1">{signatureTermsErrors.guestOfHonor}</p>}
                       </div>
                       <div>
                         <label className="block font-medium mb-2 text-gray-800 text-sm">Age</label>

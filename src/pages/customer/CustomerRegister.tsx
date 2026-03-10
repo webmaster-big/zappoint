@@ -452,7 +452,7 @@ const CustomerRegister = () => {
       {showTermsModal && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowTermsModal(false)}>
           <div className="bg-white rounded-xl max-w-lg w-full max-h-[80vh] overflow-hidden flex flex-col shadow-2xl" onClick={e => e.stopPropagation()}>
-            <div className="bg-gradient-to-r from-blue-700 to-indigo-600 px-5 py-3 flex items-center justify-between">
+            <div className="bg-gradient-to-r from-blue-800 to-blue-700 px-5 py-3 flex items-center justify-between">
               <h3 className="text-sm font-semibold text-white">Terms of Service</h3>
               <button onClick={() => setShowTermsModal(false)} className="p-1 hover:bg-white/15 rounded-md transition text-white">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
@@ -483,7 +483,7 @@ const CustomerRegister = () => {
       {showPrivacyModal && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowPrivacyModal(false)}>
           <div className="bg-white rounded-xl max-w-lg w-full max-h-[80vh] overflow-hidden flex flex-col shadow-2xl" onClick={e => e.stopPropagation()}>
-            <div className="bg-gradient-to-r from-blue-700 to-indigo-600 px-5 py-3 flex items-center justify-between">
+            <div className="bg-gradient-to-r from-blue-800 to-blue-700 px-5 py-3 flex items-center justify-between">
               <h3 className="text-sm font-semibold text-white">Privacy Policy</h3>
               <button onClick={() => setShowPrivacyModal(false)} className="p-1 hover:bg-white/15 rounded-md transition text-white">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>

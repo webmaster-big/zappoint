@@ -156,7 +156,7 @@ const CustomerGiftCards = () => {
       `}</style>
       <div className="min-h-screen bg-gray-50">
         {/* Hero Header */}
-        <section className="relative bg-gradient-to-br from-blue-900 via-blue-800 to-violet-700 text-white py-7 md:py-9 overflow-hidden">
+        <section className="relative bg-gradient-to-br from-blue-900 via-blue-800 to-blue-700 text-white py-7 md:py-9 overflow-hidden">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(255,255,255,0.08),transparent_60%)]"></div>
           <div className="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 animate-slide-up">
             <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
@@ -278,7 +278,7 @@ const CustomerGiftCards = () => {
                       role="button"
                       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') setShowDetailsModal(card); }}
                     >
-                      <div className="h-36 bg-gradient-to-br from-blue-800 via-blue-700 to-violet-600 flex items-center justify-center relative overflow-hidden">
+                      <div className="h-36 bg-gradient-to-br from-blue-800 via-blue-700 to-blue-600 flex items-center justify-center relative overflow-hidden">
                         <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.12),transparent_50%)]"></div>
                         <div className="text-center text-white relative z-10">
                           <Gift className="w-9 h-9 mx-auto mb-2 opacity-80 group-hover:scale-110 transition-transform duration-300" />
@@ -427,7 +427,7 @@ const CustomerGiftCards = () => {
           {showDetailsModal && (
             <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-backdrop-fade" onClick={() => setShowDetailsModal(null)}>
               <div className="rounded-xl max-w-lg w-full shadow-2xl animate-scale-in overflow-hidden" onClick={(e) => e.stopPropagation()}>
-                <div className="bg-gradient-to-r from-blue-900 via-blue-800 to-violet-700 p-5 text-white relative">
+                <div className="bg-gradient-to-r from-blue-900 via-blue-800 to-blue-700 p-5 text-white relative">
                     <div className="flex items-center justify-between mb-4">
                     <button
                     onClick={() => setShowDetailsModal(null)}
@@ -491,7 +491,7 @@ const CustomerGiftCards = () => {
           {showPaymentModal && (
             <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-backdrop-fade" onClick={() => setShowPaymentModal(null)}>
               <div className="rounded-xl max-w-md w-full shadow-2xl animate-scale-in overflow-hidden" onClick={(e) => e.stopPropagation()}>
-                <div className="bg-gradient-to-r from-blue-900 via-blue-800 to-violet-700 px-5 py-4 text-white text-center relative">
+                <div className="bg-gradient-to-r from-blue-900 via-blue-800 to-blue-700 px-5 py-4 text-white text-center relative">
                   <button
                     onClick={() => setShowPaymentModal(null)}
                     className="absolute top-3 right-3 p-1.5 hover:bg-white/15 rounded-lg transition text-white"

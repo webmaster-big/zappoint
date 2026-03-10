@@ -225,8 +225,8 @@ class AttractionPurchaseService {
       throw new Error('Purchase is already being processed. Please wait.');
     }
 
-    // Reject if an identical request completed less than 5 seconds ago
-    if (dedupKey === this._lastCreatePurchaseKey && now - this._lastCreatePurchaseTime < 5000) {
+    // Reject if an identical request completed less than 60 seconds ago
+    if (dedupKey === this._lastCreatePurchaseKey && now - this._lastCreatePurchaseTime < 60000) {
       console.warn('⚠️ Duplicate createPurchase blocked (cooldown)');
       throw new Error('A similar purchase was just created. Please wait a moment before trying again.');
     }

@@ -6,6 +6,7 @@
 export const PAYMENT_TYPE = {
   BOOKING: 'booking',
   ATTRACTION_PURCHASE: 'attraction_purchase',
+  EVENT_PURCHASE: 'event_purchase',
 } as const;
 
 export type PaymentPayableType = typeof PAYMENT_TYPE[keyof typeof PAYMENT_TYPE];
@@ -117,6 +118,27 @@ export interface PaymentAttractionPurchase {
   created_at?: string;
 }
 
+// Event purchase details returned from API
+export interface PaymentEventPurchase {
+  id: number;
+  reference_number?: string;
+  event_id?: number;
+  guest_name?: string;
+  guest_email?: string;
+  guest_phone?: string;
+  purchase_date?: string;
+  purchase_time?: string;
+  quantity?: number;
+  total_amount?: string | number;
+  amount_paid?: string | number;
+  status?: string;
+  payment_status?: string;
+  payment_method?: string;
+  location_id?: number;
+  customer_id?: number;
+  created_at?: string;
+}
+
 export type PaymentStatus = 'pending' | 'completed' | 'failed' | 'refunded' | 'voided';
 export type PaymentMethod = 'card' | 'cash' | 'authorize.net' | 'in-store';
 
@@ -144,6 +166,8 @@ export interface Payment {
   booking?: PaymentBooking | null;
   attractionPurchase?: PaymentAttractionPurchase | null;
   attraction_purchase?: PaymentAttractionPurchase | null;
+  eventPurchase?: PaymentEventPurchase | null;
+  event_purchase?: PaymentEventPurchase | null;
   customer?: {
     id: number;
     first_name: string;
@@ -156,7 +180,7 @@ export interface Payment {
     name: string;
   } | null;
   // Computed payable details (when loaded)
-  payable?: PaymentBooking | PaymentAttractionPurchase | null;
+  payable?: PaymentBooking | PaymentAttractionPurchase | PaymentEventPurchase | null;
   // Signature & Terms
   signature_image?: string | null;
   terms_accepted?: boolean | null;
@@ -190,6 +214,7 @@ export interface PaymentFilters {
   payable_type?: PaymentPayableType;
   booking_id?: number;
   attraction_purchase_id?: number;
+  event_purchase_id?: number;
   customer_id?: number;
   location_id?: number;
   status?: PaymentStatus;
@@ -225,7 +250,7 @@ export interface RefundResponse {
   remaining_balance: number;
   is_full_refund: boolean;
   payable_cancelled: boolean;
-  payable: PaymentBooking | PaymentAttractionPurchase | null;
+  payable: PaymentBooking | PaymentAttractionPurchase | PaymentEventPurchase | null;
 }
 
 /**
@@ -240,7 +265,7 @@ export interface VoidResponse {
   };
   void_amount: number;
   payable_cancelled: boolean;
-  payable: PaymentBooking | PaymentAttractionPurchase | null;
+  payable: PaymentBooking | PaymentAttractionPurchase | PaymentEventPurchase | null;
 }
 
 /**

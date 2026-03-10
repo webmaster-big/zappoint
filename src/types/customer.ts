@@ -191,7 +191,7 @@ export interface Notification {
 }
 
 // Booking types
-export type BookingType = 'attraction' | 'package';
+export type BookingType = 'attraction' | 'package' | 'event';
 
 export interface BookingData {
   type: BookingType;

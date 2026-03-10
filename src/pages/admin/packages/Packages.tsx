@@ -583,87 +583,49 @@ const Packages: React.FC = () => {
 
   return (
     <div className="px-6 py-8">
-      {/* Page Header with Action Buttons */}
-      <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      {/* Page Header */}
+      <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Packages</h1>
           <p className="text-gray-600 mt-1">Manage and view all your packages</p>
         </div>
-        <div className="flex items-center gap-2">
-          {/* Bulk Update Button - shows when packages are selected */}
-          {selectedForBulkUpdate.length > 0 && (
-            <StandardButton
-              variant="primary"
-              size="md"
-              icon={Clock}
-              onClick={() => setShowBulkMinNoticeModal(true)}
-            >
-              Set Advance Time ({selectedForBulkUpdate.length})
-            </StandardButton>
-          )}
-          <Link to="/fee-supports?entity_type=package">
-            <StandardButton
-              variant="secondary"
-              size="md"
-              icon={DollarSign}
-            >
-              Fee Supports
-            </StandardButton>
-          </Link>
-          <Link to="/special-pricings?entity_type=package">
-            <StandardButton
-              variant="secondary"
-              size="md"
-              icon={Percent}
-            >
-              Special Pricing
-            </StandardButton>
-          </Link>
-          <Link to="/packages/global-notes">
-            <StandardButton
-              variant="secondary"
-              size="md"
-              icon={FileText}
-            >
-              Notes
-            </StandardButton>
-          </Link>
+        <Link to="/packages/create">
           <StandardButton
-            variant="secondary"
+            variant="primary"
             size="md"
-            icon={Upload}
-            onClick={() => setShowImportModal(true)}
+            icon={Plus}
           >
-            Import
+            Create Package
           </StandardButton>
+        </Link>
+      </div>
+
+      {/* Action Buttons Row */}
+      <div className="mb-6 flex flex-wrap items-center gap-2">
+        {selectedForBulkUpdate.length > 0 && (
           <StandardButton
-            variant="secondary"
-            size="md"
-            icon={Download}
-            onClick={handleOpenExportModal}
-            disabled={packages.length === 0}
+            variant="primary"
+            size="sm"
+            icon={Clock}
+            onClick={() => setShowBulkMinNoticeModal(true)}
           >
-            Export
+            Set Advance Time ({selectedForBulkUpdate.length})
           </StandardButton>
-          <Link to="/packages/trashed">
-            <StandardButton
-              variant="ghost"
-              size="md"
-              icon={Trash2}
-            >
-              Deleted
-            </StandardButton>
-          </Link>
-          <Link to="/packages/create">
-            <StandardButton
-              variant="primary"
-              size="md"
-              icon={Plus}
-            >
-              Create Package
-            </StandardButton>
-          </Link>
-        </div>
+        )}
+        <Link to="/fee-supports?entity_type=package">
+          <StandardButton variant="secondary" size="sm" icon={DollarSign}>Fee Supports</StandardButton>
+        </Link>
+        <Link to="/special-pricings?entity_type=package">
+          <StandardButton variant="secondary" size="sm" icon={Percent}>Special Pricing</StandardButton>
+        </Link>
+        <Link to="/packages/global-notes">
+          <StandardButton variant="secondary" size="sm" icon={FileText}>Notes</StandardButton>
+        </Link>
+        <StandardButton variant="secondary" size="sm" icon={Upload} onClick={() => setShowImportModal(true)}>Import</StandardButton>
+        <StandardButton variant="secondary" size="sm" icon={Download} onClick={handleOpenExportModal} disabled={packages.length === 0}>Export</StandardButton>
+        <Link to="/packages/trashed">
+          <StandardButton variant="ghost" size="sm" icon={Trash2}>Deleted</StandardButton>
+        </Link>
       </div>
 
       {/* Main Content */}

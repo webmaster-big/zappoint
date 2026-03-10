@@ -537,6 +537,9 @@ const Notifications = () => {
                               {notification.metadata.attractionName && (
                                 <span>Attraction: {notification.metadata.attractionName}</span>
                               )}
+                              {notification.metadata.eventName && (
+                                <span>Event: {notification.metadata.eventName}</span>
+                              )}
                               {notification.metadata.amount && (
                                 <span className="flex items-center gap-1">
                                   <DollarSign className="h-3 w-3" />

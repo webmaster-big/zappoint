@@ -70,6 +70,7 @@ const normalizePayableType = (type?: string | null): PaymentPayableType | undefi
   const lower = type.toLowerCase();
   if (lower === PAYMENT_TYPE.BOOKING || lower.includes('booking')) return PAYMENT_TYPE.BOOKING;
   if (lower === PAYMENT_TYPE.ATTRACTION_PURCHASE || lower.includes('attractionpurchase') || lower.includes('attraction_purchase')) return PAYMENT_TYPE.ATTRACTION_PURCHASE;
+  if (lower === PAYMENT_TYPE.EVENT_PURCHASE || lower.includes('eventpurchase') || lower.includes('event_purchase')) return PAYMENT_TYPE.EVENT_PURCHASE;
   return type as PaymentPayableType;
 };
 
@@ -141,7 +142,8 @@ const Payments: React.FC = () => {
 
   const payableTypeConfig = {
     booking: { icon: Package, label: 'Package Booking', color: `bg-${themeColor}-100 text-${fullColor}` },
-    attraction_purchase: { icon: Ticket, label: 'Attraction Purchase', color: 'bg-purple-100 text-purple-800' }
+    attraction_purchase: { icon: Ticket, label: 'Attraction Purchase', color: 'bg-purple-100 text-purple-800' },
+    event_purchase: { icon: Calendar, label: 'Event Purchase', color: 'bg-amber-100 text-amber-800' }
   };
 
   // Calculate metrics
@@ -217,6 +219,7 @@ const Payments: React.FC = () => {
           // Get booking or attraction purchase details
           const booking = payment.booking;
           const attractionPurchase = payment.attractionPurchase || payment.attraction_purchase;
+          const eventPurchase = payment.eventPurchase || payment.event_purchase;
           
           // Determine customer name from payment relationships or booking/purchase
           let customerName = 'Guest';
@@ -231,6 +234,9 @@ const Payments: React.FC = () => {
           } else if (payableType === PAYMENT_TYPE.ATTRACTION_PURCHASE && attractionPurchase) {
             customerName = attractionPurchase.guest_name || 'Guest';
             customerEmail = attractionPurchase.guest_email || 'N/A';
+          } else if (payableType === PAYMENT_TYPE.EVENT_PURCHASE && eventPurchase) {
+            customerName = eventPurchase.guest_name || 'Guest';
+            customerEmail = eventPurchase.guest_email || 'N/A';
           }
           
           // Build reference string with more details
@@ -249,6 +255,12 @@ const Payments: React.FC = () => {
           } else if (payableType === PAYMENT_TYPE.ATTRACTION_PURCHASE) {
             payableReference = `Purchase #${payment.payable_id}`;
             payableDescription = 'Attraction Purchase';
+          } else if (payableType === PAYMENT_TYPE.EVENT_PURCHASE && eventPurchase) {
+            payableReference = eventPurchase.reference_number || `Event #${payment.payable_id}`;
+            payableDescription = `Event Purchase • Qty: ${eventPurchase.quantity || 1}`;
+          } else if (payableType === PAYMENT_TYPE.EVENT_PURCHASE) {
+            payableReference = `Event #${payment.payable_id}`;
+            payableDescription = 'Event Purchase';
           }
           
           return {
@@ -640,7 +652,7 @@ const Payments: React.FC = () => {
     const csvData = filteredPayments.map(payment => [
       payment.id,
       payment.transaction_id,
-      payment.payable_type === PAYMENT_TYPE.BOOKING ? 'Booking' : 'Attraction Purchase',
+      payment.payable_type === PAYMENT_TYPE.BOOKING ? 'Booking' : payment.payable_type === PAYMENT_TYPE.EVENT_PURCHASE ? 'Event Purchase' : 'Attraction Purchase',
       payment.customerName,
       payment.customerEmail,
       payment.amount.toFixed(2),
@@ -1040,10 +1052,11 @@ const Payments: React.FC = () => {
                   <option value="all">All Types</option>
                   <option value="booking">Bookings</option>
                   <option value="attraction_purchase">Attractions</option>
+                  <option value="event_purchase">Events</option>
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-800 mb-1">Date Range</label>
+                <label className="block text-xs font-medium text-gray-800 mb-1">Time Period</label>
                 <select
                   value={filters.dateRange}
                   onChange={(e) => handleFilterChange('dateRange', e.target.value)}
@@ -1341,6 +1354,8 @@ const Payments: React.FC = () => {
                                             navigate(`/bookings/${payment.payable_id}?from=payments`);
                                           } else if (payment.payable_type === PAYMENT_TYPE.ATTRACTION_PURCHASE) {
                                             navigate(`/attractions/purchases/${payment.payable_id}?from=payments`);
+                                          } else if (payment.payable_type === PAYMENT_TYPE.EVENT_PURCHASE) {
+                                            navigate(`/events/purchases/${payment.payable_id}?from=payments`);
                                           }
                                           setOpenActionsMenu(null);
                                         }}
@@ -1363,6 +1378,8 @@ const Payments: React.FC = () => {
                                   navigate(`/bookings/${payment.payable_id}?from=payments`);
                                 } else if (payment.payable_type === PAYMENT_TYPE.ATTRACTION_PURCHASE) {
                                   navigate(`/attractions/purchases/${payment.payable_id}?from=payments`);
+                                } else if (payment.payable_type === PAYMENT_TYPE.EVENT_PURCHASE) {
+                                  navigate(`/events/purchases/${payment.payable_id}?from=payments`);
                                 }
                               }}
                               className={`p-2 text-gray-400 hover:text-${themeColor}-600 hover:bg-${themeColor}-50 rounded-lg transition-colors`}
@@ -1530,6 +1547,7 @@ const Payments: React.FC = () => {
                         <option value="">All Types</option>
                         <option value="booking">Bookings</option>
                         <option value="attraction_purchase">Attractions</option>
+                        <option value="event_purchase">Events</option>
                       </select>
                     </div>
                     <div>

@@ -134,7 +134,7 @@ class SpecialPricingService {
    * This is used in booking flows to calculate automatic discounts
    */
   async getPriceBreakdown(params: {
-    entity_type: 'package' | 'attraction';
+    entity_type: 'package' | 'attraction' | 'event';
     entity_id: number;
     base_price: number;
     date?: string; // YYYY-MM-DD

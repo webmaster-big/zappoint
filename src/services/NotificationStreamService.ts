@@ -2,7 +2,7 @@ import { API_BASE_URL } from '../utils/storage';
 
 export interface StreamNotificationData {
   id: number;
-  type: 'booking' | 'attraction_purchase';
+  type: 'booking' | 'attraction_purchase' | 'event_purchase';
   reference_number?: string;
   customer_name: string;
   package_name?: string;
@@ -10,11 +10,13 @@ export interface StreamNotificationData {
   booking_date?: string;
   booking_time?: string;
   attraction_name?: string;
+  event_name?: string;
   quantity?: number;
   total_amount: number;
   status: string;
   payment_method?: string;
   purchase_date?: string;
+  purchase_time?: string;
   created_at: string;
   timestamp: string;
   user_id?: number;
@@ -23,7 +25,7 @@ export interface StreamNotificationData {
 
 export interface NotificationObject {
   id: string;
-  type: 'booking' | 'attraction_purchase';
+  type: 'booking' | 'attraction_purchase' | 'event_purchase';
   title: string;
   message: string;
   data: StreamNotificationData;
@@ -121,11 +123,20 @@ class NotificationStreamService {
    * Transform stream data to notification object
    */
   private transformToNotification(data: StreamNotificationData): NotificationObject {
-    const title = data.type === 'booking' ? 'New Booking' : 'New Attraction Purchase';
+    const title = data.type === 'booking' 
+      ? 'New Booking' 
+      : data.type === 'event_purchase' 
+        ? 'New Event Purchase' 
+        : 'New Attraction Purchase';
     
-    const message = data.type === 'booking'
-      ? `${data.customer_name} booked ${data.package_name || 'a package'} for ${this.formatBookingDate(data.booking_date || '')}`
-      : `${data.customer_name} purchased ${data.quantity}x ${data.attraction_name}`;
+    let message: string;
+    if (data.type === 'booking') {
+      message = `${data.customer_name} booked ${data.package_name || 'a package'} for ${this.formatBookingDate(data.booking_date || '')}`;
+    } else if (data.type === 'event_purchase') {
+      message = `${data.customer_name} purchased ${data.quantity}x ${data.event_name || 'event'}`;
+    } else {
+      message = `${data.customer_name} purchased ${data.quantity}x ${data.attraction_name}`;
+    }
 
     return {
       id: `${data.type}_${data.id}_${Date.now()}`,

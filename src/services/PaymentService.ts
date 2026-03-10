@@ -137,6 +137,19 @@ export const getPaymentsForAttractionPurchase = async (purchaseId: number): Prom
 };
 
 /**
+ * Get payments for a specific event purchase
+ * 
+ * @param purchaseId - Event purchase ID
+ * @returns List of payments for the event purchase
+ */
+export const getPaymentsForEventPurchase = async (purchaseId: number): Promise<PaginatedPaymentsResponse> => {
+  return getPayments({
+    payable_id: purchaseId,
+    payable_type: PAYMENT_TYPE.EVENT_PURCHASE,
+  });
+};
+
+/**
  * Update payment status
  * 
  * @param id - Payment ID
@@ -250,7 +263,7 @@ export const linkPaymentToPayable = async (
 export const linkPaymentWithRetry = async (
   paymentId: number,
   payableId: number,
-  payableType: 'booking' | 'attraction_purchase',
+  payableType: 'booking' | 'attraction_purchase' | 'event_purchase',
   maxRetries: number = 3,
   transactionId?: string
 ): Promise<LinkPayableResponse> => {
@@ -363,7 +376,7 @@ export const extractOriginalPaymentId = (notes: string | null | undefined): stri
  */
 export interface InvoiceExportFilters {
   payment_ids?: number[];
-  payable_type?: 'booking' | 'attraction_purchase';
+  payable_type?: 'booking' | 'attraction_purchase' | 'event_purchase';
   date?: string; // Single date Y-m-d
   start_date?: string;
   end_date?: string;
@@ -565,13 +578,11 @@ export const generateInvoicesReport = async (
     location_id?: number;
     status?: 'pending' | 'completed' | 'failed' | 'refunded';
     method?: 'card' | 'cash';
-    payable_type?: 'booking' | 'attraction_purchase';
-    customer_id?: number;
-    start_date?: string;
-    end_date?: string;
-    payment_ids?: number[];
+    payable_type?: 'booking' | 'attraction_purchase' | 'event_purchase';
+    date_from?: string;
+    date_to?: string;
   },
-  download: boolean = false
+  download: boolean = true
 ): Promise<void> => {
   return exportInvoices({
     ...filters,

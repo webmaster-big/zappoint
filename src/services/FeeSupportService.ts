@@ -109,7 +109,7 @@ class FeeSupportService {
    * This is the key endpoint for booking/purchase flows
    */
   async getForEntity(params: {
-    entity_type: 'package' | 'attraction';
+    entity_type: 'package' | 'attraction' | 'event';
     entity_id: number;
     base_price: number;
     location_id?: number;

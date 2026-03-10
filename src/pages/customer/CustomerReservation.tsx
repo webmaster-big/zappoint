@@ -145,7 +145,7 @@ const CustomerReservations = () => {
       case 'pending': return 'bg-amber-50 text-amber-700 border-amber-200';
       case 'cancelled': return 'bg-red-50 text-red-700 border-red-200';
       case 'completed': return 'bg-blue-50 text-blue-700 border-blue-200';
-      case 'checked-in': return 'bg-violet-50 text-violet-700 border-violet-200';
+      case 'checked-in': return 'bg-blue-50 text-blue-700 border-blue-200';
       default: return 'bg-gray-50 text-gray-700 border-gray-200';
     }
   };
@@ -156,7 +156,7 @@ const CustomerReservations = () => {
       case 'pending': return 'bg-amber-500';
       case 'cancelled': return 'bg-red-500';
       case 'completed': return 'bg-blue-500';
-      case 'checked-in': return 'bg-violet-500';
+      case 'checked-in': return 'bg-blue-500';
       default: return 'bg-gray-500';
     }
   };
@@ -193,7 +193,7 @@ const CustomerReservations = () => {
 
       <div className="min-h-screen bg-gray-50/80">
         {/* Compact Hero */}
-        <section className="relative bg-gradient-to-br from-blue-900 via-blue-800 to-violet-700 text-white py-6 md:py-8 overflow-hidden">
+        <section className="relative bg-gradient-to-br from-blue-900 via-blue-800 to-blue-700 text-white py-6 md:py-8 overflow-hidden">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(255,255,255,0.06),transparent_60%)]" />
           <div className="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 slide-up">
             <div className="flex items-end justify-between">
@@ -520,7 +520,7 @@ const CustomerReservations = () => {
           <div className="bg-white rounded-2xl max-w-lg w-full max-h-[85vh] overflow-hidden scale-in shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="max-h-[85vh] overflow-y-auto no-scrollbar">
               {/* Modal Header */}
-              <div className="sticky top-0 z-10 bg-gradient-to-r from-blue-900 via-blue-800 to-violet-700 px-5 py-4 text-white">
+              <div className="sticky top-0 z-10 bg-gradient-to-r from-blue-900 via-blue-800 to-blue-700 px-5 py-4 text-white">
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="text-base font-semibold" style={{ color: '#ffffff' }}>Booking Details</h3>

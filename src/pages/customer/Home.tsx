@@ -15,11 +15,42 @@ import {
   Sparkles
 } from 'lucide-react';
 import type { Attraction, Package as PackageType, BookingType } from '../../types/customer';
-import { customerService, type GroupedAttraction, type GroupedPackage } from '../../services/CustomerService';
+import { customerService, type GroupedAttraction, type GroupedPackage, type GroupedEvent } from '../../services/CustomerService';
 import { ASSET_URL } from '../../utils/storage';
 import { generateSlug, generateLocationSlug } from '../../utils/slug';
 import { convertTo12Hour, formatDurationDisplay, getUpcomingAttractionSessions, getUpcomingPackageSessions } from '../../utils/timeFormat';
 
+
+// Transformed event for display (from grouped API)
+interface DisplayEventLocation {
+  location_id: number;
+  location_name: string;
+  location_slug: string;
+  event_id: number;
+  address: string;
+  city: string;
+  state: string;
+  phone: string;
+}
+
+interface DisplayEvent {
+  id: number;
+  name: string;
+  description: string | null;
+  image: string | null;
+  date_type: 'one_time' | 'date_range';
+  start_date: string;
+  end_date: string | null;
+  time_start: string;
+  time_end: string;
+  interval_minutes: number;
+  max_bookings_per_slot: number | null;
+  price: string;
+  features: string[] | null;
+  availableLocations: string[];
+  locations: DisplayEventLocation[];
+  purchaseLinks: Array<{ location: string; url: string; event_id: number; location_id: number }>;
+}
 
 const EntertainmentLandingPage = () => {
   const [selectedLocation, setSelectedLocation] = useState('All Locations');
@@ -27,14 +58,17 @@ const EntertainmentLandingPage = () => {
   const [activeFilter, setActiveFilter] = useState<'all' | 'packages' | 'attractions'>('all');
   const [selectedAttraction, setSelectedAttraction] = useState<Attraction | null>(null);
   const [selectedPackage, setSelectedPackage] = useState<PackageType | null>(null);
+  const [selectedEvent, setSelectedEvent] = useState<DisplayEvent | null>(null);
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [showAttractionModal, setShowAttractionModal] = useState(false);
   const [showPackageModal, setShowPackageModal] = useState(false);
+  const [showEventModal, setShowEventModal] = useState(false);
   const [activeBookingType, setActiveBookingType] = useState<BookingType | null>(null);
   
   // Backend data
   const [attractions, setAttractions] = useState<Attraction[]>([]);
   const [packages, setPackages] = useState<PackageType[]>([]);
+  const [events, setEvents] = useState<DisplayEvent[]>([]);
   const [locations, setLocations] = useState<string[]>(['All Locations']);
   const [dataLoading, setDataLoading] = useState(true);
 
@@ -56,11 +90,20 @@ const EntertainmentLandingPage = () => {
   const loadData = async () => {
     try {
       setDataLoading(true);
-      // Fetch grouped attractions and packages from backend
-      const [attractionsResponse, packagesResponse] = await Promise.all([
+      // Fetch grouped attractions, packages, and events from backend
+      // Use allSettled so a failure in one endpoint doesn't prevent the others from loading
+      const [attractionsResult, packagesResult, eventsResult] = await Promise.allSettled([
         customerService.getGroupedAttractions(searchQuery || undefined),
         customerService.getGroupedPackages(searchQuery || undefined),
+        customerService.getGroupedEvents(searchQuery || undefined),
       ]);
+      const attractionsResponse = attractionsResult.status === 'fulfilled' ? attractionsResult.value : { success: false as const, data: [] };
+      const packagesResponse = packagesResult.status === 'fulfilled' ? packagesResult.value : { success: false as const, data: [] };
+      const eventsResponse = eventsResult.status === 'fulfilled' ? eventsResult.value : { success: false as const, data: [] };
+      if (eventsResult.status === 'rejected') console.error('Events API error:', eventsResult.reason);
+
+      // Collect all locations from all sources
+      const allLocations = new Set<string>();
 
       if (attractionsResponse.success && attractionsResponse.data) {
         // Transform grouped attractions to match component format
@@ -85,20 +128,26 @@ const EntertainmentLandingPage = () => {
         setAttractions(transformedAttractions);
 
         // Extract unique locations from attractions
-        const attractionLocations = new Set<string>();
         attractionsResponse.data.forEach((attr: GroupedAttraction) => {
-          attr.locations.forEach(loc => attractionLocations.add(loc.location_name));
+          attr.locations.forEach(loc => allLocations.add(loc.location_name));
         });
-        
-        // Add locations from packages too
-        if (packagesResponse.success && packagesResponse.data) {
-          packagesResponse.data.forEach((pkg: GroupedPackage) => {
-            pkg.locations.forEach(loc => attractionLocations.add(loc.location_name));
-          });
-        }
-
-        setLocations(['All Locations', ...Array.from(attractionLocations).sort()]);
       }
+
+      // Add locations from packages
+      if (packagesResponse.success && packagesResponse.data) {
+        packagesResponse.data.forEach((pkg: GroupedPackage) => {
+          pkg.locations.forEach(loc => allLocations.add(loc.location_name));
+        });
+      }
+
+      // Add locations from events
+      if (eventsResponse.success && eventsResponse.data) {
+        eventsResponse.data.forEach((evt: GroupedEvent) => {
+          evt.locations.forEach(loc => allLocations.add(loc.location_name));
+        });
+      }
+
+      setLocations(['All Locations', ...Array.from(allLocations).sort()]);
 
       if (packagesResponse.success && packagesResponse.data) {
         // Transform grouped packages to match component format
@@ -136,6 +185,45 @@ const EntertainmentLandingPage = () => {
         });
         setPackages(transformedPackages);
       }
+
+      if (eventsResponse.success && eventsResponse.data) {
+        // Transform grouped events to match component format
+        const transformedEvents: DisplayEvent[] = eventsResponse.data
+          .filter((evt: GroupedEvent) => {
+            // Only show upcoming events (end_date or start_date >= today)
+            // Slice to YYYY-MM-DD to handle both "2026-03-19" and "2026-03-19T00:00:00.000000Z" formats
+            const endDate = (evt.end_date || evt.start_date).substring(0, 10);
+            return new Date(endDate + 'T23:59:59') >= new Date();
+          })
+          .map((evt: GroupedEvent) => ({
+            id: evt.purchase_links[0]?.event_id || 0,
+            name: evt.name,
+            description: evt.description,
+            image: evt.image,
+            date_type: evt.date_type,
+            start_date: evt.start_date,
+            end_date: evt.end_date,
+            time_start: evt.time_start,
+            time_end: evt.time_end,
+            interval_minutes: evt.interval_minutes,
+            max_bookings_per_slot: evt.max_bookings_per_slot,
+            price: evt.price,
+            features: evt.features,
+            availableLocations: evt.locations.map(loc => loc.location_name),
+            locations: evt.locations.map(loc => ({
+              location_id: loc.location_id,
+              location_name: loc.location_name,
+              location_slug: loc.location_slug,
+              event_id: loc.event_id,
+              address: loc.address,
+              city: loc.city,
+              state: loc.state,
+              phone: loc.phone,
+            })),
+            purchaseLinks: evt.purchase_links,
+          }));
+        setEvents(transformedEvents);
+      }
     } catch (error) {
       console.error('Error loading data:', error);
     } finally {
@@ -171,6 +259,15 @@ const EntertainmentLandingPage = () => {
     const isSpecial = pkg.package_type && pkg.package_type !== 'regular';
     
     return matchesLocation && matchesSearch && isSpecial;
+  });
+
+  // Filter upcoming events
+  const filteredEvents = events.filter(evt => {
+    const matchesLocation = selectedLocation === 'All Locations' ||
+      evt.availableLocations.includes(selectedLocation);
+    const matchesSearch = evt.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (evt.description || '').toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesLocation && matchesSearch;
   });
 
   // Upgrade suggestion: find the next-tier-up package sharing at least one location
@@ -254,7 +351,29 @@ const EntertainmentLandingPage = () => {
     setShowLocationModal(true);
   };
 
+  const handleEventClick = (evt: DisplayEvent) => {
+    setSelectedEvent(evt);
+    setShowEventModal(true);
+  };
+
+  const handleBuyEventTickets = (evt: DisplayEvent) => {
+    setShowEventModal(false);
+    setSelectedEvent(evt);
+    setActiveBookingType('event');
+    setShowLocationModal(true);
+  };
+
   const handleLocationSelect = (location: string) => {
+    if (activeBookingType === 'event') {
+      if (!selectedEvent) return;
+      // Use the location's pre-generated slug if available, otherwise generate one
+      const locData = selectedEvent.locations.find(loc => loc.location_name === location);
+      const locationSlug = (locData?.location_slug || generateLocationSlug(location)).toLowerCase();
+      const eventSlug = generateSlug(selectedEvent.name, selectedEvent.id);
+      window.open(`${window.location.origin}/purchase/event/${locationSlug}/${eventSlug}`, '_blank');
+      return;
+    }
+
     // Get the selected item (attraction or package)
     const bookingItem = activeBookingType === 'attraction' ? selectedAttraction : selectedPackage;
     if (!bookingItem) return;
@@ -410,10 +529,10 @@ const EntertainmentLandingPage = () => {
               allowFullScreen={true}
             />
           </div>
-          <div className="absolute inset-0 bg-gradient-to-br from-blue-900/85 via-blue-800/75 to-violet-600/80"></div>
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-900/85 via-blue-800/75 to-blue-700/80"></div>
         </div>
         {/* Static Gradient Background for mobile */}
-        <div className="block md:hidden absolute inset-0 z-0 bg-gradient-to-br from-blue-900 via-blue-800 to-violet-700"></div>
+        <div className="block md:hidden absolute inset-0 z-0 bg-gradient-to-br from-blue-900 via-blue-800 to-blue-700"></div>
         
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <div className="mb-8 md:mb-10 animate-slide-up">
@@ -434,7 +553,7 @@ const EntertainmentLandingPage = () => {
           {/* Enhanced Search Bar */}
           <div className="max-w-3xl mx-auto px-2 animate-slide-up-delay">
             <div className="relative group">
-              <div className="absolute -inset-1.5 bg-gradient-to-r from-white/25 via-violet-300/25 to-blue-300/25 rounded-2xl blur-lg opacity-75 group-hover:opacity-100 transition duration-500"></div>
+              <div className="absolute -inset-1.5 bg-gradient-to-r from-white/25 via-blue-300/25 to-blue-300/25 rounded-2xl blur-lg opacity-75 group-hover:opacity-100 transition duration-500"></div>
               <div className="relative">
                 <Search className="absolute left-4 md:left-6 top-1/2 transform -translate-y-1/2 text-blue-800" size={20} />
                 <input
@@ -522,7 +641,7 @@ const EntertainmentLandingPage = () => {
                 </button>
                 <button
                   onClick={() => setActiveFilter('attractions')}
-                  className={`px-3.5 py-2 text-xs font-semibold uppercase tracking-wide transition-all duration-200 border-l border-gray-200 flex items-center gap-1.5 ${activeFilter === 'attractions' ? 'bg-violet-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
+                  className={`px-3.5 py-2 text-xs font-semibold uppercase tracking-wide transition-all duration-200 border-l border-gray-200 flex items-center gap-1.5 ${activeFilter === 'attractions' ? 'bg-blue-800 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
                 >
                   <Ticket size={12} />
                   Attractions
@@ -685,7 +804,7 @@ const EntertainmentLandingPage = () => {
                           className="absolute inset-0 w-full h-full object-contain group-hover:scale-105 transition-transform duration-500"
                         />
                       ) : (
-                        <div className="w-full h-full bg-gradient-to-br from-blue-800 to-violet-500 flex items-center justify-center text-white text-lg font-semibold">
+                        <div className="w-full h-full bg-gradient-to-br from-blue-700 to-blue-800 flex items-center justify-center text-white text-lg font-semibold">
                           {pkg.name}
                         </div>
                       )}
@@ -757,8 +876,8 @@ const EntertainmentLandingPage = () => {
             <div className="flex flex-col md:flex-row md:items-end md:justify-between mb-6 md:mb-10 gap-2">
               <div>
                 <h2 className="text-xl md:text-3xl font-bold text-gray-900 flex items-center gap-2 md:gap-3" id="attractions">
-                  <div className="p-2 bg-violet-50 rounded-xl">
-                    <Ticket className="w-5 h-5 md:w-6 md:h-6 text-violet-600" />
+                  <div className="p-2 bg-blue-50 rounded-xl">
+                    <Ticket className="w-5 h-5 md:w-6 md:h-6 text-blue-600" />
                   </div>
                   Individual Attractions
                 </h2>
@@ -799,7 +918,7 @@ const EntertainmentLandingPage = () => {
                           className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                         />
                       ) : (
-                        <div className="w-full h-full bg-gradient-to-br from-violet-500 to-blue-800 flex items-center justify-center text-white text-lg font-semibold">
+                        <div className="w-full h-full bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center text-white text-lg font-semibold">
                           {attraction.name}
                         </div>
                       )}
@@ -812,7 +931,7 @@ const EntertainmentLandingPage = () => {
                     </div>
                     
                     <div className="p-5 md:p-6">
-                      <h3 className="text-lg md:text-xl font-bold text-gray-900 mb-2 group-hover:text-violet-600 transition-colors">
+                      <h3 className="text-lg md:text-xl font-bold text-gray-900 mb-2 group-hover:text-blue-800 transition-colors">
                         {attraction.name}
                       </h3>
                       <p className="text-sm text-gray-500 mb-3 line-clamp-2 leading-relaxed">
@@ -831,7 +950,7 @@ const EntertainmentLandingPage = () => {
                             e.stopPropagation();
                             handleBuyTickets(attraction);
                           }}
-                          className="px-5 py-2.5 font-semibold rounded-lg transition-all flex items-center justify-center gap-2 text-sm bg-violet-600 hover:bg-violet-700 text-white shadow-md hover:shadow-lg cursor-pointer"
+                          className="px-5 py-2.5 font-semibold rounded-lg transition-all flex items-center justify-center gap-2 text-sm bg-blue-800 hover:bg-blue-900 text-white shadow-md hover:shadow-lg cursor-pointer"
                         >
                           <Ticket size={15} />
                           Buy Tickets
@@ -845,6 +964,98 @@ const EntertainmentLandingPage = () => {
             )}
           </section>
         )}
+
+        {/* Upcoming Events Section */}
+        <section className="mb-12 md:mb-20">
+          <div className="flex flex-col md:flex-row md:items-end md:justify-between mb-6 md:mb-10 gap-2">
+            <div>
+              <h2 className="text-xl md:text-3xl font-bold text-gray-900 flex items-center gap-2 md:gap-3" id="events">
+                <div className="p-2 bg-blue-50 rounded-xl">
+                  <Calendar className="w-5 h-5 md:w-6 md:h-6 text-blue-600" />
+                </div>
+                Upcoming Events
+              </h2>
+              <p className="text-gray-400 text-xs md:text-sm mt-1 ml-12">
+                Don't miss out on exciting events
+              </p>
+            </div>
+            {!dataLoading && (
+              <p className="text-gray-500 text-xs md:text-sm font-medium bg-gray-100 px-3 py-1.5 rounded-full">
+                {filteredEvents.length} event{filteredEvents.length !== 1 ? 's' : ''} available
+              </p>
+            )}
+          </div>
+
+          {dataLoading ? (
+            <div className="flex flex-col items-center justify-center py-16">
+              <img src="/Zap-Zone.png" alt="Loading" className="w-36 h-20 object-contain animate-bounce" />
+              <p className="text-gray-400 text-xs mt-3">Loading events...</p>
+            </div>
+          ) : filteredEvents.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-gray-500 text-sm md:text-lg">No upcoming events found matching your criteria.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 md:gap-7">
+              {filteredEvents.map((evt) => {
+                return (
+                  <div
+                    key={`${evt.name}-${evt.start_date}`}
+                    onClick={() => handleEventClick(evt)}
+                    className="bg-white border border-gray-100 rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer overflow-hidden card-hover group"
+                  >
+                    <div className="aspect-video bg-gray-50 relative overflow-hidden">
+                      {evt.image ? (
+                        <img
+                          src={getImageUrl(evt.image)}
+                          alt={evt.name}
+                          className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center text-white text-lg font-semibold">
+                          {evt.name}
+                        </div>
+                      )}
+                      <div className="absolute top-3 left-3">
+                        <span className="px-2.5 py-1 bg-white/90 backdrop-blur-sm text-gray-700 text-xs font-semibold rounded-lg shadow-sm">
+                          Event
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="p-5 md:p-6">
+                      <h3 className="text-lg md:text-xl font-bold text-gray-900 mb-2 group-hover:text-blue-800 transition-colors">
+                        {evt.name}
+                      </h3>
+                      {evt.description && (
+                        <p className="text-sm text-gray-500 mb-3 line-clamp-2 leading-relaxed">{evt.description}</p>
+                      )}
+
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                        <div>
+                          <span className="text-2xl font-extrabold text-gray-900">
+                            ${parseFloat(evt.price).toFixed(2)}
+                          </span>
+                          <span className="text-gray-400 text-xs ml-1">/ ticket</span>
+                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleBuyEventTickets(evt);
+                          }}
+                          className="px-5 py-2.5 font-semibold rounded-lg transition-all flex items-center justify-center gap-2 text-sm bg-blue-800 hover:bg-blue-900 text-white shadow-md hover:shadow-lg cursor-pointer"
+                        >
+                          <Ticket size={15} />
+                          Get Tickets
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
       </main>
 
       {/* Attraction Details Modal */}
@@ -864,7 +1075,7 @@ const EntertainmentLandingPage = () => {
           >
             {/* Modal Header */}
             <div className="sticky top-0 z-10">
-              <div className="relative h-28 md:h-32 bg-gradient-to-br from-violet-600 to-blue-800 rounded-t-2xl">
+              <div className="relative h-28 md:h-32 bg-gradient-to-br from-blue-700 to-blue-800 rounded-t-2xl">
                 <button
                   type="button"
                   onClick={() => setShowAttractionModal(false)}
@@ -1062,7 +1273,7 @@ const EntertainmentLandingPage = () => {
           >
             {/* Modal Header */}
             <div className="sticky top-0 z-10">
-              <div className="relative h-28 md:h-32 bg-gradient-to-br from-blue-800 to-violet-600 rounded-t-2xl">
+              <div className="relative h-28 md:h-32 bg-gradient-to-br from-blue-800 to-blue-700 rounded-t-2xl">
                 <button
                   type="button"
                   onClick={() => setShowPackageModal(false)}
@@ -1288,6 +1499,162 @@ const EntertainmentLandingPage = () => {
         </div>
       )}
 
+      {/* Event Details Modal */}
+      {showEventModal && selectedEvent && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 md:p-4 z-50 animate-backdrop-fade" onClick={() => setShowEventModal(false)}>
+          <div 
+            className="bg-white rounded-2xl max-w-md w-full max-h-[85vh] md:max-h-[80vh] overflow-y-auto modal-scroll shadow-2xl animate-scale-in relative scroll-indicator" 
+            onClick={(e) => e.stopPropagation()}
+            onScroll={(e) => {
+              const target = e.currentTarget;
+              if (target.scrollTop > 5) {
+                target.classList.add('scrolled-bottom');
+              } else {
+                target.classList.remove('scrolled-bottom');
+              }
+            }}
+          >
+            {/* Modal Header */}
+            <div className="sticky top-0 z-10">
+              <div className="relative h-28 md:h-32 bg-gradient-to-br from-blue-600 to-blue-800 rounded-t-2xl">
+                <button
+                  type="button"
+                  onClick={() => setShowEventModal(false)}
+                  className="absolute top-3 right-3 p-2 bg-white/90 backdrop-blur-sm hover:bg-white text-gray-900 transition-all shadow-lg z-20 rounded-full cursor-pointer"
+                >
+                  <X size={14} className="md:w-4 md:h-4" />
+                </button>
+                <div className="absolute inset-0 flex items-center justify-center px-6">
+                  <p className="text-lg md:text-2xl font-bold text-center line-clamp-2 text-white drop-shadow-md">{selectedEvent.name}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-5">
+              {/* Price & Date */}
+              <div className="flex items-center justify-between gap-3 mb-5 pb-5 border-b border-gray-100">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center">
+                    <DollarSign className="text-emerald-600" size={20} />
+                  </div>
+                  <div>
+                    <div className="text-xl md:text-2xl font-extrabold text-gray-900">${parseFloat(selectedEvent.price).toFixed(2)}</div>
+                    <div className="text-xs text-gray-400">per ticket</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="text-right">
+                    <div className="text-sm font-bold text-gray-900">
+                      {selectedEvent.date_type === 'one_time' ? 'One-Time' : 'Date Range'}
+                    </div>
+                    <div className="text-xs text-gray-400">Event Type</div>
+                  </div>
+                  <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center">
+                    <Calendar size={18} className="text-blue-600" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Description */}
+              {selectedEvent.description && (
+                <div className="mb-5">
+                  <h3 className="text-sm font-bold text-gray-900 mb-2">About</h3>
+                  <p className="text-xs md:text-sm text-gray-500 leading-relaxed">{selectedEvent.description}</p>
+                </div>
+              )}
+
+              {/* Date & Time Details */}
+              <div className="mb-5">
+                <h3 className="text-sm font-bold text-gray-900 mb-2 flex items-center gap-1.5">
+                  <Calendar size={14} className="text-blue-600" />
+                  Date & Time
+                </h3>
+                <div className="space-y-2">
+                  <div className="bg-blue-50/60 border border-blue-100 p-3 rounded-xl">
+                    <div className="flex items-center gap-1.5 text-xs text-gray-600 mb-1">
+                      <Calendar size={12} className="text-blue-600" />
+                      <span className="font-semibold">
+                        {(() => {
+                          const startStr = selectedEvent.start_date.substring(0, 10);
+                          const endStr = (selectedEvent.end_date || selectedEvent.start_date).substring(0, 10);
+                          return selectedEvent.date_type === 'one_time'
+                            ? new Date(startStr + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
+                            : `${new Date(startStr + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric' })} — ${new Date(endStr + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`;
+                        })()}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-xs text-gray-600">
+                      <Clock size={12} className="text-blue-600" />
+                      <span className="font-medium">{formatTime(selectedEvent.time_start)} – {formatTime(selectedEvent.time_end)} ({easternTimeAbbr})</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Features */}
+              {selectedEvent.features && selectedEvent.features.length > 0 && (
+                <div className="mb-5">
+                  <h3 className="text-sm font-bold text-gray-900 mb-2">What's Included</h3>
+                  <div className="space-y-1.5">
+                    {selectedEvent.features.map((f, i) => (
+                      <div key={i} className="flex items-center text-xs md:text-sm text-gray-600">
+                        <CheckCircle className="w-3.5 h-3.5 text-emerald-500 mr-2 flex-shrink-0" />
+                        <span>{f}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Available Locations */}
+              <div className="mb-5">
+                <h3 className="text-sm font-bold text-gray-900 mb-2">Locations</h3>
+                <div className="space-y-2">
+                  {selectedEvent.locations.map((loc) => (
+                    <div key={loc.location_id} className="flex items-start gap-2.5 px-3 py-2.5 bg-gray-50 rounded-xl">
+                      <MapPin size={14} className="text-blue-600 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <div className="text-xs font-semibold text-gray-900">{loc.location_name}</div>
+                        {loc.address && (
+                          <div className="text-xs text-gray-400">{loc.address}{loc.city ? `, ${loc.city}` : ''}{loc.state ? `, ${loc.state}` : ''}</div>
+                        )}
+                        {loc.phone && (
+                          <div className="text-xs text-gray-400 mt-0.5">{loc.phone}</div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="space-y-2.5">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleBuyEventTickets(selectedEvent);
+                  }}
+                  className="w-full py-3 font-semibold text-sm rounded-xl transition-all flex items-center justify-center gap-2 bg-blue-800 hover:bg-blue-900 text-white shadow-md hover:shadow-lg cursor-pointer"
+                >
+                  <Ticket size={16} />
+                  Get Tickets
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowEventModal(false);
+                  }}
+                  className="w-full py-2.5 border border-gray-200 text-gray-500 hover:bg-gray-50 rounded-xl transition text-sm"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Location Selection Modal */}
       {showLocationModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 z-50 animate-backdrop-fade" onClick={() => setShowLocationModal(false)}>
@@ -1297,7 +1664,7 @@ const EntertainmentLandingPage = () => {
                 Select Location
               </h3>
               <p className="text-xs text-gray-400">
-                Choose location for {activeBookingType === 'attraction' ? selectedAttraction?.name : selectedPackage?.name}
+                Choose location for {activeBookingType === 'attraction' ? selectedAttraction?.name : activeBookingType === 'event' ? selectedEvent?.name : selectedPackage?.name}
               </p>
             </div>
             
@@ -1305,6 +1672,8 @@ const EntertainmentLandingPage = () => {
               {locations.map(location => {
                 const availableLocations = activeBookingType === 'attraction' 
                   ? selectedAttraction?.availableLocations 
+                  : activeBookingType === 'event'
+                  ? selectedEvent?.availableLocations
                   : selectedPackage?.availableLocations;
                 
                 const isAvailable = availableLocations?.includes(location);

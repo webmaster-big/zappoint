@@ -80,6 +80,14 @@ import EmailNotificationDetails from "./pages/admin/email/EmailNotificationDetai
 import FeeSupports from "./pages/admin/fee-supports/FeeSupports";
 import SpecialPricings from "./pages/admin/special-pricing/SpecialPricings";
 import RsvpPage from "./pages/public/RsvpPage";
+import Events from "./pages/admin/events/Events";
+import CreateEvent from "./pages/admin/events/CreateEvent";
+import EditEvent from "./pages/admin/events/EditEvent";
+import OnsitePurchaseEvent from "./pages/admin/events/OnsitePurchaseEvent";
+import EventPurchases from "./pages/admin/events/EventPurchases";
+import ViewEventPurchase from "./pages/admin/events/ViewEventPurchase";
+import PurchaseEvent from "./pages/customer/PurchaseEvent";
+import PurchasedEvents from "./pages/customer/PurchasedEvents";
 
 // Redirect /settings/google-calendar to the correct role-based settings page
 const GoogleCalendarRedirect = () => {
@@ -124,6 +132,8 @@ function App() {
         <Route path="/home" element={<Home />} />
         <Route path="/book/package/:location/:slug" element={<BookPackage />} />
         <Route path="/purchase/attraction/:location/:slug" element={<PurchaseAttraction />} />
+        <Route path="/purchase/event/:location/:slug" element={<PurchaseEvent />} />
+        <Route path="/events/:eventId/purchase" element={<PurchaseEvent />} />
         <Route path="/rsvp/:token" element={<RsvpPage />} />
         
         {/* Customer Routes */}
@@ -131,6 +141,7 @@ function App() {
           <Route path="/" element={<EntertainmentLandingPage />} />
           <Route path="/customer/reservations" element={<CustomerProtectedRoute><CustomerReservations /></CustomerProtectedRoute>} />
           <Route path="/customer/gift-cards" element={<CustomerProtectedRoute><CustomerGiftCards /></CustomerProtectedRoute>} />
+          <Route path="/customer/events" element={<CustomerProtectedRoute><PurchasedEvents /></CustomerProtectedRoute>} />
           <Route path="/customer/notifications" element={<CustomerProtectedRoute><CustomerNotifications /></CustomerProtectedRoute>} />
         </Route>
         
@@ -151,6 +162,14 @@ function App() {
           <Route path="/attractions/purchases/:id" element={<PurchaseDetails />} />
           <Route path="/attractions/purchases/create" element={<CreatePurchase />} />
           <Route path="/attractions/check-in" element={<AttractionCheckIn />} />
+          
+          {/* Events Routes - All authenticated users */}
+          <Route path="/events" element={<Events />} />
+          <Route path="/events/create" element={<CreateEvent />} />
+          <Route path="/events/:id/edit" element={<EditEvent />} />
+          <Route path="/events/onsite-purchase" element={<OnsitePurchaseEvent />} />
+          <Route path="/events/purchases" element={<EventPurchases />} />
+          <Route path="/events/purchases/:id" element={<ViewEventPurchase />} />
           
           {/* Packages Routes - All authenticated users */}
           <Route path="/packages/create" element={<CreatePackage />} />

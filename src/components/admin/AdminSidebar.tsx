@@ -37,7 +37,8 @@ import {
   Mail,
   Send,
   Percent,
-  Coins
+  Coins,
+  CalendarCheck
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -142,6 +143,12 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
           { label: 'Create Purchase', href: '/attractions/purchases/create', icon: Plus },
           { label: 'Check-in Scanner', href: '/attractions/check-in', icon: ScanLine }
         ]},
+        { label: 'Events', icon: CalendarCheck, section: 'Events', items: [
+          { label: 'Manage Events', href: '/events', icon: List },
+          { label: 'Create Event', href: '/events/create', icon: Plus },
+          { label: 'Event Purchases', href: '/events/purchases', icon: ShoppingCart },
+          { label: 'Onsite Purchase', href: '/events/onsite-purchase', icon: ScanLine }
+        ]},
         { label: 'Bookings', icon: Calendar, section: 'Bookings', items: [
           { label: 'Calendar View', href: '/bookings/calendar', icon: CalendarDays },
           { label: 'Space Schedule', href: '/bookings/space-schedule', icon: LayoutGrid },
@@ -183,6 +190,12 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
           { label: 'Manage Purchases', href: '/attractions/purchases', icon: ShoppingCart },
           { label: 'Create Purchase', href: '/attractions/purchases/create', icon: Plus },
           { label: 'Check-in Scanner', href: '/attractions/check-in', icon: ScanLine }
+        ]},
+        { label: 'Events', icon: CalendarCheck, section: 'Events', items: [
+          { label: 'Manage Events', href: '/events', icon: List },
+          { label: 'Create Event', href: '/events/create', icon: Plus },
+          { label: 'Event Purchases', href: '/events/purchases', icon: ShoppingCart },
+          { label: 'Onsite Purchase', href: '/events/onsite-purchase', icon: ScanLine }
         ]},
         { label: 'Bookings', icon: Calendar, section: 'Bookings', items: [
           { label: 'Calendar View', href: '/bookings/calendar', icon: CalendarDays },
@@ -236,6 +249,12 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
           { label: 'Manage Purchases', href: '/attractions/purchases', icon: ShoppingCart },
           { label: 'Create Purchase', href: '/attractions/purchases/create', icon: Plus },
           { label: 'Check-in Scanner', href: '/attractions/check-in', icon: ScanLine }
+        ]},
+        { label: 'Events', icon: CalendarCheck, section: 'Events', items: [
+          { label: 'Manage Events', href: '/events', icon: List },
+          { label: 'Create Event', href: '/events/create', icon: Plus },
+          { label: 'Event Purchases', href: '/events/purchases', icon: ShoppingCart },
+          { label: 'Onsite Purchase', href: '/events/onsite-purchase', icon: ScanLine }
         ]},
         { label: 'Bookings', icon: Calendar, section: 'Bookings', items: [
           { label: 'Calendar View', href: '/bookings/calendar', icon: CalendarDays },
@@ -1112,7 +1131,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
                             border: `1px solid ${getThemeColorValue()}30`
                           }}
                         >
-                          {toastData.type === 'booking' ? 'Booking' : 'Purchase'}
+                          {toastData.type === 'booking' ? 'Booking' : toastData.type === 'event_purchase' ? 'Event' : 'Purchase'}
                         </span>
                         <span className="text-xs font-medium text-gray-400">• Just now</span>
                       </div>

@@ -172,10 +172,10 @@ const CustomerNotifications = () => {
     switch (type) {
       case 'booking': return 'text-blue-600 bg-blue-50';
       case 'payment': return 'text-emerald-600 bg-emerald-50';
-      case 'promotion': return 'text-purple-600 bg-purple-50';
-      case 'gift_card': return 'text-pink-600 bg-pink-50';
+      case 'promotion': return 'text-blue-600 bg-blue-50';
+      case 'gift_card': return 'text-blue-600 bg-blue-50';
       case 'reminder': return 'text-amber-600 bg-amber-50';
-      case 'attraction': return 'text-indigo-600 bg-indigo-50';
+      case 'attraction': return 'text-blue-600 bg-blue-50';
       default: return 'text-gray-600 bg-gray-50';
     }
   };
@@ -212,7 +212,7 @@ const CustomerNotifications = () => {
 
       <div className="min-h-screen bg-gray-50/80">
         {/* Hero */}
-        <section className="relative bg-gradient-to-br from-blue-900 via-blue-800 to-violet-700 text-white py-6 md:py-8 overflow-hidden">
+        <section className="relative bg-gradient-to-br from-blue-900 via-blue-800 to-blue-700 text-white py-6 md:py-8 overflow-hidden">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(255,255,255,0.06),transparent_60%)]" />
           <div className="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 slide-up">
             <div className="flex items-end justify-between">

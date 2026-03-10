@@ -185,6 +185,49 @@ export interface GroupedPackage {
   package_type?: string;
 }
 
+// Types for grouped events
+export interface GroupedEventLocation {
+  location_id: number;
+  location_name: string;
+  location_slug: string;
+  event_id: number;
+  address: string;
+  city: string;
+  state: string;
+  phone: string;
+  add_ons: Array<{
+    id: number;
+    name: string;
+    price: string;
+    description?: string;
+    image?: string;
+  }>;
+}
+
+export interface EventPurchaseLink {
+  location: string;
+  url: string;
+  event_id: number;
+  location_id: number;
+}
+
+export interface GroupedEvent {
+  name: string;
+  description: string | null;
+  image: string | null;
+  date_type: 'one_time' | 'date_range';
+  start_date: string;
+  end_date: string | null;
+  time_start: string;
+  time_end: string;
+  interval_minutes: number;
+  max_bookings_per_slot: number | null;
+  price: string;
+  features: string[] | null;
+  locations: GroupedEventLocation[];
+  purchase_links: EventPurchaseLink[];
+}
+
 /**
  * Customer Service
  * Handles all customer-related API calls
@@ -223,6 +266,15 @@ class CustomerService {
   async getGroupedPackages(search?: string): Promise<ApiResponse<GroupedPackage[]>> {
     const params = search ? { search } : {};
     const response = await api.get('/packages/grouped-by-name', { params });
+    return response.data;
+  }
+
+  /**
+   * Get events grouped by name with all available locations
+   */
+  async getGroupedEvents(search?: string): Promise<ApiResponse<GroupedEvent[]>> {
+    const params = search ? { search } : {};
+    const response = await api.get('/events/grouped-by-name', { params });
     return response.data;
   }
 

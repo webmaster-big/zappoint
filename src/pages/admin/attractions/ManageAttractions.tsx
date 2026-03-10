@@ -690,12 +690,12 @@ const ManageAttractions = () => {
   return (
     <div className="px-6 py-8">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Manage Attractions</h1>
-          <p className="text-gray-600 mt-2">View and manage all attractions in your facility</p>
+          <p className="text-gray-600 mt-1">View and manage all attractions</p>
         </div>
-        <div className="mt-4 sm:mt-0 flex gap-2">
+        <div className="mt-4 sm:mt-0 flex items-center gap-2">
           {isCompanyAdmin && (
             <LocationSelector
               variant="compact"
@@ -707,41 +707,6 @@ const ManageAttractions = () => {
               showAllOption={true}
             />
           )}
-          <Link to="/fee-supports?entity_type=attraction">
-            <StandardButton
-              variant="secondary"
-              size="md"
-              icon={DollarSign}
-            >
-              Fee Supports
-            </StandardButton>
-          </Link>
-          <Link to="/special-pricings?entity_type=attraction">
-            <StandardButton
-              variant="secondary"
-              size="md"
-              icon={Percent}
-            >
-              Special Pricing
-            </StandardButton>
-          </Link>
-          <StandardButton
-            onClick={() => setShowImportModal(true)}
-            variant="secondary"
-            size="md"
-            icon={Upload}
-          >
-            Import
-          </StandardButton>
-          <StandardButton
-            onClick={handleOpenExportModal}
-            disabled={attractions.length === 0}
-            variant="secondary"
-            size="md"
-            icon={Download}
-          >
-            Export
-          </StandardButton>
           <StandardButton
             onClick={() => window.location.href = "/attractions/create"}
             variant="primary"
@@ -750,6 +715,18 @@ const ManageAttractions = () => {
             New Attraction
           </StandardButton>
         </div>
+      </div>
+
+      {/* Action Buttons Row */}
+      <div className="mb-6 flex flex-wrap items-center gap-2">
+        <Link to="/fee-supports?entity_type=attraction">
+          <StandardButton variant="secondary" size="sm" icon={DollarSign}>Fee Supports</StandardButton>
+        </Link>
+        <Link to="/special-pricings?entity_type=attraction">
+          <StandardButton variant="secondary" size="sm" icon={Percent}>Special Pricing</StandardButton>
+        </Link>
+        <StandardButton onClick={() => setShowImportModal(true)} variant="secondary" size="sm" icon={Upload}>Import</StandardButton>
+        <StandardButton onClick={handleOpenExportModal} disabled={attractions.length === 0} variant="secondary" size="sm" icon={Download}>Export</StandardButton>
       </div>
 
       {/* Metrics Grid */}

@@ -58,6 +58,7 @@ const AttendantActivityLogs = () => {
     dateRange: 'all',
     search: ''
   });
+  const [searchInput, setSearchInput] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(20);
   const [showFilters, setShowFilters] = useState(false);
@@ -847,6 +848,18 @@ const AttendantActivityLogs = () => {
     }
   }, [filters, currentPage, loadLogs, userLocationId]);
 
+  // Debounce search input before updating filters
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      setFilters(prev => {
+        if (prev.search === searchInput) return prev;
+        return { ...prev, search: searchInput };
+      });
+      setCurrentPage(1);
+    }, 500);
+    return () => clearTimeout(timeoutId);
+  }, [searchInput]);
+
   const determineSeverity = (action: string): 'info' | 'success' | 'warning' | 'error' => {
     if (action.includes('delete') || action.includes('reject')) return 'error';
     if (action.includes('create') || action.includes('approve') || action.includes('purchase')) return 'success';
@@ -863,6 +876,7 @@ const AttendantActivityLogs = () => {
   };
 
   const clearFilters = () => {
+    setSearchInput('');
     setFilters({
       action: 'all',
       resourceType: 'all',
@@ -1443,8 +1457,8 @@ const AttendantActivityLogs = () => {
             <input
               type="text"
               placeholder="Search activities..."
-              value={filters.search}
-              onChange={(e) => handleFilterChange('search', e.target.value)}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
               className={`pl-9 pr-3 py-1.5 border border-gray-200 rounded-lg w-full text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
             />
           </div>

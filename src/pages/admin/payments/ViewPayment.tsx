@@ -196,9 +196,10 @@ const ViewPayment: React.FC = () => {
 
   // Determine payable type and details
   const payableType = payment.payable_type || (payment.booking_id ? 'App\\Models\\Booking' : null);
-  const isBooking = payableType?.includes('Booking');
+  const isBooking = payableType?.includes('Booking') && !payableType?.includes('Event');
   const isPurchase = payableType?.includes('AttractionPurchase');
-  const payableData = payment.booking || payment.attractionPurchase || payment.attraction_purchase || payment.payable;
+  const isEventPurchase = payableType?.includes('EventPurchase') || payableType?.includes('event_purchase');
+  const payableData = payment.booking || payment.attractionPurchase || payment.attraction_purchase || payment.eventPurchase || payment.event_purchase || payment.payable;
 
   return (
     <div className="px-6 py-8 animate-fade-in-up">
@@ -251,6 +252,15 @@ const ViewPayment: React.FC = () => {
               >
                 <Ticket className="h-4 w-4" />
                 View Purchase
+              </Link>
+            )}
+            {isEventPurchase && payableData && (
+              <Link
+                to={`/events/purchases/${payment.payable_id}`}
+                className={`flex items-center gap-2 px-4 py-2 bg-${themeColor}-600 text-white rounded-lg hover:bg-${themeColor}-700`}
+              >
+                <Calendar className="h-4 w-4" />
+                View Event Purchase
               </Link>
             )}
           </div>
@@ -437,7 +447,7 @@ const ViewPayment: React.FC = () => {
           {payableData && (
             <div className="p-6 border-b border-gray-100">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                {isBooking ? 'Booking Information' : 'Purchase Information'}
+                {isBooking ? 'Booking Information' : isEventPurchase ? 'Event Purchase Information' : 'Purchase Information'}
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {isBooking && payment.booking && (
@@ -508,6 +518,59 @@ const ViewPayment: React.FC = () => {
                             <div>
                               <p className="text-sm text-gray-500">Guest Name</p>
                               <p className="font-medium text-gray-900">{purchase?.guest_name || 'N/A'}</p>
+                            </div>
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </>
+                )}
+                {isEventPurchase && (payment.eventPurchase || payment.event_purchase) && (
+                  <>
+                    {(() => {
+                      const purchase = payment.eventPurchase || payment.event_purchase;
+                      return (
+                        <>
+                          <div className="flex items-start gap-3">
+                            <div className={`p-2 bg-${themeColor}-100 rounded-lg`}>
+                              <Calendar className={`h-5 w-5 text-${fullColor}`} />
+                            </div>
+                            <div>
+                              <p className="text-sm text-gray-500">Reference Number</p>
+                              <p className="font-medium text-gray-900">{purchase?.reference_number || 'N/A'}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-start gap-3">
+                            <div className={`p-2 bg-${themeColor}-100 rounded-lg`}>
+                              <User className={`h-5 w-5 text-${fullColor}`} />
+                            </div>
+                            <div>
+                              <p className="text-sm text-gray-500">Guest Name</p>
+                              <p className="font-medium text-gray-900">{purchase?.guest_name || 'N/A'}</p>
+                            </div>
+                          </div>
+                          {purchase?.purchase_date && (
+                            <div className="flex items-start gap-3">
+                              <div className={`p-2 bg-${themeColor}-100 rounded-lg`}>
+                                <Calendar className={`h-5 w-5 text-${fullColor}`} />
+                              </div>
+                              <div>
+                                <p className="text-sm text-gray-500">Purchase Date</p>
+                                <p className="font-medium text-gray-900">
+                                  {parseLocalDate(purchase.purchase_date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+                                </p>
+                              </div>
+                            </div>
+                          )}
+                          <div className="flex items-start gap-3">
+                            <div className={`p-2 bg-${themeColor}-100 rounded-lg`}>
+                              <DollarSign className={`h-5 w-5 text-${fullColor}`} />
+                            </div>
+                            <div>
+                              <p className="text-sm text-gray-500">Purchase Total</p>
+                              <p className="font-medium text-gray-900">
+                                ${Number(purchase?.total_amount || 0).toFixed(2)}
+                              </p>
                             </div>
                           </div>
                         </>

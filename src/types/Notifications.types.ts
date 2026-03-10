@@ -18,5 +18,6 @@ export interface NotificationsNotification {
     amount?: number;
     packageName?: string;
     attractionName?: string;
+    eventName?: string;
   };
 }

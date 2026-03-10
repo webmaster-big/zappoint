@@ -411,7 +411,7 @@ const CreatePurchase = () => {
     return () => clearTimeout(timeoutId);
   }, [selectedAttraction, quantity, discount, selectedLocation, selectedAddOns]);
 
-  // Fetch special pricing breakdown for attraction (debounced, use today's date for immediate purchases)
+  // Fetch special pricing breakdown for attraction (debounced, use scheduled/visit date for pricing)
   useEffect(() => {
     if (!selectedAttraction) {
       setSpecialPricingBreakdown(null);
@@ -419,14 +419,14 @@ const CreatePurchase = () => {
     }
     const timeoutId = setTimeout(async () => {
       try {
-        // Use today's date for immediate attraction purchases
-        const today = new Date().toISOString().split('T')[0];
+        // Use the scheduled visit date if set, otherwise fall back to today
+        const pricingDate = scheduledDate || new Date().toISOString().split('T')[0];
         const basePrice = selectedAttraction.price * quantity;
         const breakdown = await specialPricingService.getPriceBreakdown({
           entity_type: 'attraction',
           entity_id: Number(selectedAttraction.id),
           base_price: basePrice,
-          date: today,
+          date: pricingDate,
         });
         if (breakdown.has_special_pricing) {
           setSpecialPricingBreakdown(breakdown);
@@ -439,7 +439,7 @@ const CreatePurchase = () => {
       }
     }, 500);
     return () => clearTimeout(timeoutId);
-  }, [selectedAttraction, quantity]);
+  }, [selectedAttraction, quantity, scheduledDate]);
 
   const handleAddToCart = (attraction: CreatePurchaseAttraction) => {
     setSelectedAttraction(attraction);

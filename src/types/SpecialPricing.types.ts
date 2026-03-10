@@ -7,7 +7,7 @@
 
 export type DiscountType = 'fixed' | 'percentage';
 export type RecurrenceType = 'one_time' | 'weekly' | 'monthly';
-export type EntityType = 'package' | 'attraction' | 'all';
+export type EntityType = 'package' | 'attraction' | 'event' | 'all';
 
 export interface SpecialPricing {
   id: number;

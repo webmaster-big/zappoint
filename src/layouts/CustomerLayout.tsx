@@ -143,6 +143,12 @@ const CustomerLayout = () => {
                     >
                       Gift Cards
                     </Link>
+                    <Link
+                      to="/customer/events"
+                      className={`px-2 py-1 font-medium text-sm transition-colors ${location.pathname.startsWith('/customer/events') ? 'text-blue-800 border-b-2 border-blue-800' : 'text-gray-700 hover:text-blue-800'}`}
+                    >
+                      My Events
+                    </Link>
                   </>
                 )}
               </nav>
@@ -257,6 +263,13 @@ const CustomerLayout = () => {
                         className={`px-4 py-2 font-medium text-sm transition-colors ${location.pathname.startsWith('/customer/gift-cards') ? 'text-blue-800 bg-blue-50' : 'text-gray-700 hover:text-blue-800 hover:bg-blue-50'}`}
                       >
                         Gift Cards
+                      </Link>
+                      <Link
+                        to="/customer/events"
+                        onClick={() => setMobileMenuOpen(false)}
+                        className={`px-4 py-2 font-medium text-sm transition-colors ${location.pathname.startsWith('/customer/events') ? 'text-blue-800 bg-blue-50' : 'text-gray-700 hover:text-blue-800 hover:bg-blue-50'}`}
+                      >
+                        My Events
                       </Link>
                     </>
                   )}

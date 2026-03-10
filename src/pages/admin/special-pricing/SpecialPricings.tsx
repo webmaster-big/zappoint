@@ -25,6 +25,7 @@ import { useThemeColor } from '../../../hooks/useThemeColor';
 import { specialPricingService } from '../../../services/SpecialPricingService';
 import { packageCacheService } from '../../../services/PackageCacheService';
 import { attractionCacheService } from '../../../services/AttractionCacheService';
+import { eventService } from '../../../services/EventService';
 import { locationService } from '../../../services/LocationService';
 import { getStoredUser } from '../../../utils/storage';
 import Toast from '../../../components/ui/Toast';
@@ -73,8 +74,8 @@ const SpecialPricings: React.FC = () => {
 
   // Pre-filter entity_type from URL query param
   const entityTypeParam = searchParams.get('entity_type');
-  const initialEntityType: 'package' | 'attraction' | 'all' =
-    entityTypeParam === 'package' || entityTypeParam === 'attraction' ? entityTypeParam : 'all';
+  const initialEntityType: 'package' | 'attraction' | 'event' | 'all' =
+    entityTypeParam === 'package' || entityTypeParam === 'attraction' || entityTypeParam === 'event' ? entityTypeParam : 'all';
 
   const [specialPricings, setSpecialPricings] = useState<SpecialPricing[]>([]);
   const [filteredSpecialPricings, setFilteredSpecialPricings] = useState<SpecialPricing[]>([]);
@@ -93,6 +94,7 @@ const SpecialPricings: React.FC = () => {
   // Entity data for the modal
   const [packages, setPackages] = useState<Array<{ id: number; name: string }>>([]);
   const [attractions, setAttractions] = useState<Array<{ id: number; name: string }>>([]);
+  const [events, setEvents] = useState<Array<{ id: number; name: string }>>([]);
   const [locations, setLocations] = useState<Array<{ id: number; name: string }>>([]);
   const [loadingEntities, setLoadingEntities] = useState(false);
 
@@ -159,7 +161,7 @@ const SpecialPricings: React.FC = () => {
   }, []);
 
   // Load entities using cache services
-  const loadEntities = useCallback(async (entityType: 'package' | 'attraction' | 'all') => {
+  const loadEntities = useCallback(async (entityType: 'package' | 'attraction' | 'event' | 'all') => {
     setLoadingEntities(true);
     try {
       if (entityType === 'package' || entityType === 'all') {
@@ -178,6 +180,18 @@ const SpecialPricings: React.FC = () => {
         } else {
           const freshAttractions = await attractionCacheService.getAttractions({ user_id: currentUser?.id });
           setAttractions(freshAttractions.map((a: Attraction) => ({ id: a.id, name: a.name })));
+        }
+      }
+      if (entityType === 'event' || entityType === 'all') {
+        const response = await eventService.getEvents();
+        if (response.success && response.data) {
+          const today = new Date().toISOString().split('T')[0];
+          const activeEvents = response.data.filter((e: { is_active?: boolean; end_date?: string }) => {
+            if (e.is_active === false) return false;
+            if (e.end_date && e.end_date < today) return false;
+            return true;
+          });
+          setEvents(activeEvents.map((e: { id: number; name: string }) => ({ id: e.id, name: e.name })));
         }
       }
     } catch {
@@ -447,13 +461,14 @@ const SpecialPricings: React.FC = () => {
   const totalPages = Math.ceil(filteredSpecialPricings.length / itemsPerPage);
 
   // Back path
-  const backPath = initialEntityType === 'package' ? '/packages' : initialEntityType === 'attraction' ? '/attractions' : null;
+  const backPath = initialEntityType === 'package' ? '/packages' : initialEntityType === 'attraction' ? '/attractions' : initialEntityType === 'event' ? '/events' : null;
 
   // Entities for selection
   const getEntitiesForSelection = () => {
     if (form.entity_type === 'package') return packages;
     if (form.entity_type === 'attraction') return attractions;
-    return [...packages.map(p => ({ ...p, type: 'package' })), ...attractions.map(a => ({ ...a, type: 'attraction' }))];
+    if (form.entity_type === 'event') return events;
+    return [...packages.map(p => ({ ...p, type: 'package' })), ...attractions.map(a => ({ ...a, type: 'attraction' })), ...events.map(e => ({ ...e, type: 'event' }))];
   };
 
   const entities = getEntitiesForSelection();
@@ -549,6 +564,7 @@ const SpecialPricings: React.FC = () => {
                   <option value="all">All Types</option>
                   <option value="package">Package</option>
                   <option value="attraction">Attraction</option>
+                  <option value="event">Event</option>
                 </select>
               </div>
               <div>
@@ -651,12 +667,14 @@ const SpecialPricings: React.FC = () => {
                         <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
                           sp.entity_type === 'package' ? `bg-${themeColor}-100 text-${fullColor}` :
                           sp.entity_type === 'attraction' ? `bg-${themeColor}-100 text-${fullColor}` :
+                          sp.entity_type === 'event' ? 'bg-amber-100 text-amber-800' :
                           'bg-gray-100 text-gray-600'
                         }`}>
                           {sp.entity_type === 'package' ? <PackageIcon className="w-3 h-3" /> :
                            sp.entity_type === 'attraction' ? <Ticket className="w-3 h-3" /> :
+                           sp.entity_type === 'event' ? <Calendar className="w-3 h-3" /> :
                            <Layers className="w-3 h-3" />}
-                          {sp.entity_type === 'package' ? 'Package' : sp.entity_type === 'attraction' ? 'Attraction' : 'All'}
+                          {sp.entity_type === 'package' ? 'Package' : sp.entity_type === 'attraction' ? 'Attraction' : sp.entity_type === 'event' ? 'Event' : 'All'}
                         </span>
                       </td>
                       <td className="px-4 py-3">
@@ -974,9 +992,10 @@ const SpecialPricings: React.FC = () => {
                       onChange={(e) => handleFormChange('entity_type', e.target.value)}
                       className={`w-full border border-gray-200 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 outline-none`}
                     >
-                      <option value="all">All (Packages & Attractions)</option>
+                      <option value="all">All (Packages, Attractions & Events)</option>
                       <option value="package">Packages Only</option>
                       <option value="attraction">Attractions Only</option>
+                      <option value="event">Events Only</option>
                     </select>
                   </div>
 
@@ -985,7 +1004,7 @@ const SpecialPricings: React.FC = () => {
                     <div className="mt-4">
                       <div className="flex items-center justify-between mb-2">
                         <label className="text-sm font-medium text-gray-700">
-                          Select {form.entity_type === 'package' ? 'Packages' : 'Attractions'}
+                          Select {form.entity_type === 'package' ? 'Packages' : form.entity_type === 'event' ? 'Events' : 'Attractions'}
                         </label>
                         <span className="text-xs text-gray-500">Empty = All</span>
                       </div>
@@ -995,7 +1014,7 @@ const SpecialPricings: React.FC = () => {
                         </div>
                       ) : entities.length === 0 ? (
                         <div className="text-center py-6 text-gray-500 bg-gray-50 rounded-lg border border-gray-200 text-sm">
-                          No {form.entity_type === 'package' ? 'packages' : 'attractions'} found
+                          No {form.entity_type === 'package' ? 'packages' : form.entity_type === 'event' ? 'events' : 'attractions'} found
                         </div>
                       ) : (
                         <div className="max-h-40 overflow-y-auto bg-white rounded-lg border border-gray-200 divide-y divide-gray-100">

@@ -1,11 +1,11 @@
-import React, { useState } from "react";
-import TermsContent from "./TermsContent";
+import React from "react";
 
 interface TermsAndConditionsCheckboxProps {
   checked: boolean;
   onChange: (checked: boolean) => void;
   required?: boolean;
   error?: string;
+  tosUrl?: string;
 }
 
 const TermsAndConditionsCheckbox: React.FC<TermsAndConditionsCheckboxProps> = ({
@@ -13,9 +13,8 @@ const TermsAndConditionsCheckbox: React.FC<TermsAndConditionsCheckboxProps> = ({
   onChange,
   required = true,
   error,
+  tosUrl = "https://zap-zone.com/terms-conditions/",
 }) => {
-  const [isModalOpen, setIsModalOpen] = useState(false);
-
   return (
     <>
       {/* Checkbox */}
@@ -29,57 +28,18 @@ const TermsAndConditionsCheckbox: React.FC<TermsAndConditionsCheckboxProps> = ({
         />
         <label htmlFor="terms_accepted" className="text-sm text-gray-700 leading-5 select-none">
           I agree to the{" "}
-          <button
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              setIsModalOpen(true);
-            }}
+          <a
+            href={tosUrl}
+            target="_blank"
+            rel="noopener noreferrer"
             className="text-blue-600 underline hover:text-blue-800 font-medium"
           >
             Terms &amp; Conditions
-          </button>
+          </a>
           {required && <span className="text-red-500 ml-0.5">*</span>}
         </label>
       </div>
       {error && <p className="text-sm text-red-500 mt-1 ml-7">{error}</p>}
-
-      {/* Terms & Conditions Modal (read-only) */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between px-6 py-4">
-              <h2 className="text-xl font-bold text-gray-900">
-                Terms &amp; Conditions
-              </h2>
-              <button
-                type="button"
-                onClick={() => setIsModalOpen(false)}
-                className="text-gray-400 hover:text-gray-600 text-2xl leading-none"
-              >
-                &times;
-              </button>
-            </div>
-
-            {/* Modal Body — Scrollable */}
-            <div className="px-6 py-4 overflow-y-auto flex-1 text-sm text-gray-700 leading-relaxed space-y-6">
-              <TermsContent />
-            </div>
-
-            {/* Modal Footer */}
-            <div className="px-6 py-4 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setIsModalOpen(false)}
-                className="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 };
