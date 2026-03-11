@@ -688,9 +688,9 @@ const EditAttraction = () => {
                       <button
                         type="button"
                         onClick={() => setDisplayCapacityToCustomers(!displayCapacityToCustomers)}
-                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${displayCapacityToCustomers ? 'bg-green-500' : 'bg-gray-300'}`}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${displayCapacityToCustomers ? 'bg-green-500' : 'bg-gray-300'}`}
                       >
-                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${displayCapacityToCustomers ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${displayCapacityToCustomers ? 'translate-x-6' : 'translate-x-1'}`} />
                       </button>
                       <label className="text-sm text-gray-700">Display capacity to customers</label>
                     </div>
