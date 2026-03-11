@@ -21,6 +21,7 @@ export interface PurchaseAttractionAttraction {
   duration: string;
   durationUnit: string;
   maxCapacity: number;
+  displayCapacityToCustomers?: boolean;
   price: number;
   pricingType: 'per_person' | 'fixed' | 'per_group' | 'per_hour' | 'per_game';
   images: string[];

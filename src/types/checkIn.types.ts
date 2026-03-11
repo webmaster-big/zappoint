@@ -21,4 +21,9 @@ export interface CheckInBooking {
   activity?: string;
   notes?: string;
   checkInTime?: string;
+  checked_in_by?: number;
+  checked_in_by_user?: {
+    id: number;
+    name: string;
+  };
 }

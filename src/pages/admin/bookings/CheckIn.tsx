@@ -1396,6 +1396,11 @@ const CheckIn: React.FC = () => {
                           Check-in time: {new Date(selectedBooking.checked_in_at).toLocaleString()}
                         </p>
                       )}
+                      {selectedBooking.checked_in_by_user && (
+                        <p className="text-xs text-green-600 mt-0.5">
+                          Checked in by: {selectedBooking.checked_in_by_user.name}
+                        </p>
+                      )}
                     </div>
                   </div>
                 )}

@@ -9,7 +9,7 @@ import StandardButton from '../../../components/ui/StandardButton';
 import LocationSelector from '../../../components/admin/LocationSelector';
 import { getStoredUser } from '../../../utils/storage';
 import type { CreateEventData } from '../../../types/event.types';
-import { Plus, Trash2, GripVertical, X, Calendar, Clock, Image, DollarSign, MapPin, Star, Package } from 'lucide-react';
+import { Plus, Trash2, GripVertical, X, Calendar, Clock, DollarSign, MapPin, Star, Package } from 'lucide-react';
 
 const CreateEvent = () => {
   const navigate = useNavigate();
@@ -261,26 +261,33 @@ const CreateEvent = () => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Event Image</label>
-            <div className="flex items-center gap-4">
-              {imagePreview ? (
-                <div className="relative">
-                  <img src={imagePreview} alt="Preview" className="w-24 h-24 rounded-lg object-cover" />
+            <label className="block font-semibold mb-2 text-base text-neutral-800">Event Image</label>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleImageUpload}
+              className={`block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-${themeColor}-50 file:text-${fullColor} hover:file:bg-${themeColor}-100`}
+            />
+            <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
+              <p className="text-xs text-blue-800 font-medium">Recommended: 16:9 aspect ratio (1280×720 or 1920×1080 pixels)</p>
+              <p className="text-xs text-blue-600 mt-1">Images will be cropped to fit the display area. Center your subject for best results.</p>
+            </div>
+            <p className="text-xs text-gray-500 mt-1">Max file size: 20MB. Use optimized images for faster loading.</p>
+            {imagePreview && (
+              <div className="mt-4">
+                <p className="text-xs text-gray-600 mb-2 font-medium">Preview (as customers will see it):</p>
+                <div className="relative w-full aspect-video rounded-md border border-gray-200 overflow-hidden bg-gray-100">
+                  <img src={imagePreview} alt="Preview" className="absolute inset-0 w-full h-full object-cover" />
                   <button
                     type="button"
                     onClick={() => { setImage(''); setImagePreview(''); }}
-                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-0.5"
+                    className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center opacity-90 hover:opacity-100 transition-opacity text-xs"
                   >
-                    <X className="h-3 w-3" />
+                    ×
                   </button>
                 </div>
-              ) : (
-                <label className="w-24 h-24 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center cursor-pointer hover:border-blue-400 transition">
-                  <Image className="h-6 w-6 text-gray-400" />
-                  <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
-                </label>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </div>
 

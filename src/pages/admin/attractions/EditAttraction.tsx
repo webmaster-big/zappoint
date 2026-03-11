@@ -63,6 +63,7 @@ const EditAttraction = () => {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [isActive, setIsActive] = useState<boolean>(false);
+  const [displayCapacityToCustomers, setDisplayCapacityToCustomers] = useState(true);
 
   // Add-on state
   const [addOns, setAddOns] = useState<{ id: number; name: string; price: number }[]>([]);
@@ -133,6 +134,7 @@ const EditAttraction = () => {
                 end_time: '17:00'
               }],
         });
+        setDisplayCapacityToCustomers(attraction.display_capacity_to_customers ?? true);
         
         // Preserve the current active status
         setIsActive(attraction.is_active ?? true);
@@ -379,6 +381,7 @@ const EditAttraction = () => {
         is_active: isActive,
         addon_ids: selectedAddOns.map(name => addOns.find(a => a.name === name)?.id).filter(Boolean) as number[],
         add_ons_order: selectedAddOns,
+        display_capacity_to_customers: displayCapacityToCustomers,
       };
 
       console.log('Updating attraction data:', attractionData);
@@ -681,6 +684,17 @@ const EditAttraction = () => {
                       placeholder="e.g., 10"
                       required
                     />
+                    <div className="flex items-center gap-3 mt-3">
+                      <button
+                        type="button"
+                        onClick={() => setDisplayCapacityToCustomers(!displayCapacityToCustomers)}
+                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${displayCapacityToCustomers ? 'bg-green-500' : 'bg-gray-300'}`}
+                      >
+                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${displayCapacityToCustomers ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                      </button>
+                      <label className="text-sm text-gray-700">Display capacity to customers</label>
+                    </div>
+                    <p className="text-xs text-gray-400 mt-1">When unchecked, customers will not see the capacity on the attraction page</p>
                   </div>
 
                   <div>

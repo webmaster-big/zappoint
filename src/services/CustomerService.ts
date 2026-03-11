@@ -113,6 +113,7 @@ export interface GroupedAttraction {
   pricing_type: string;
   category: string;
   max_capacity: number;
+  display_capacity_to_customers?: boolean;
   duration: number;
   duration_unit: string;
   image: string | string[];

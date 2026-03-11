@@ -1788,9 +1788,19 @@ const AttendantDashboard: React.FC = () => {
                        </button>
                      )}
                      {selectedBooking.status?.toLowerCase() === 'checked-in' && (
-                       <div className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg">
-                         <CheckCircle size={15} />
-                         Checked In
+                       <div className="flex-1 flex flex-col items-center gap-1">
+                         <div className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg">
+                           <CheckCircle size={15} />
+                           Checked In
+                         </div>
+                         {selectedBooking.checked_in_at && (
+                           <p className="text-xs text-emerald-600">
+                             {new Date(selectedBooking.checked_in_at).toLocaleString()}
+                             {selectedBooking.checked_in_by_user && (
+                               <span> by {selectedBooking.checked_in_by_user.name}</span>
+                             )}
+                           </p>
+                         )}
                        </div>
                      )}
                    </div>
@@ -1811,7 +1821,7 @@ const AttendantDashboard: React.FC = () => {
                            onClick={async () => {
                              setCheckInLoading(true);
                              try {
-                               await bookingService.checkInBooking(selectedBooking.reference_number);
+                               await bookingService.checkInBooking(selectedBooking.reference_number, getStoredUser()?.id);
                                setSelectedBooking({ ...selectedBooking, status: 'checked-in' });
                                setAllBookings(prev => prev.map(b => b.id === selectedBooking.id ? { ...b, status: 'checked-in' } : b));
                                setShowCheckInConfirm(false);

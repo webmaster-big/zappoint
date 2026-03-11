@@ -43,6 +43,12 @@ export interface BookingsPageBooking {
   guestZip?: string;
   guestCountry?: string;
   // Applied fees
+  checked_in_at?: string;
+  checked_in_by?: number;
+  checked_in_by_user?: {
+    id: number;
+    name: string;
+  };
   appliedFees?: Array<{
     fee_name: string;
     fee_amount: number;

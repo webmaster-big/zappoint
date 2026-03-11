@@ -18,6 +18,12 @@ export interface AttractionPurchasesPurchase {
   locationId?: number;
   scheduledDate?: string | null;
   scheduledTime?: string | null;
+  checked_in_at?: string;
+  checked_in_by?: number;
+  checked_in_by_user?: {
+    id: number;
+    name: string;
+  };
 }
 
 export interface AttractionPurchasesFilterOptions {

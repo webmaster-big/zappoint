@@ -64,6 +64,7 @@ export interface Attraction {
   price: number;
   minAge: number;
   capacity: number;
+  displayCapacityToCustomers?: boolean;
   rating: number;
   image: string;
   category: 'adventure' | 'technology' | 'sports' | 'games' | string;

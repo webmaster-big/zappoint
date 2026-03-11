@@ -293,6 +293,7 @@ const ManageAttractions = () => {
               status: attr.is_active ? 'active' : 'inactive',
               createdAt: attr.created_at,
               availability: typeof attr.availability === 'object' ? attr.availability as Record<string, boolean> : {},
+              displayCapacityToCustomers: attr.display_capacity_to_customers ?? true,
             }));
           setAttractions(converted);
         }
@@ -351,6 +352,7 @@ const ManageAttractions = () => {
               saturday: true,
               sunday: true
             },
+            displayCapacityToCustomers: attr.display_capacity_to_customers ?? true,
           }));
         setAttractions(convertedAttractions);
         setLoading(false);
@@ -407,6 +409,7 @@ const ManageAttractions = () => {
           saturday: true,
           sunday: true
         },
+        displayCapacityToCustomers: attr.display_capacity_to_customers ?? true,
       }));
 
       setAttractions(convertedAttractions);
@@ -640,6 +643,7 @@ const ManageAttractions = () => {
           status: createResponse.data.is_active ? 'active' : 'inactive',
           createdAt: createResponse.data.created_at,
           availability: typeof createResponse.data.availability === 'object' ? createResponse.data.availability as Record<string, boolean> : {},
+          displayCapacityToCustomers: createResponse.data.display_capacity_to_customers ?? true,
         };
         setAttractions(prev => [newAttraction, ...prev]);
 
@@ -920,6 +924,9 @@ const ManageAttractions = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {attraction.maxCapacity} people
+                      {!attraction.displayCapacityToCustomers && (
+                        <span className="ml-1 text-xs text-gray-400" title="Hidden from customers">(hidden)</span>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {attraction.duration === '0' || !attraction.duration ? 'Unlimited' : formatDurationDisplay(parseFloat(attraction.duration), attraction.durationUnit)}

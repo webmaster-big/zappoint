@@ -20,6 +20,7 @@ import { attractionPurchaseService, type AttractionPurchase } from '../../../ser
 import Toast from '../../../components/ui/Toast';
 import { AppliedFeesDisplay } from '../../../components/AppliedFeesDisplay';
 import StandardButton from '../../../components/ui/StandardButton';
+import { getStoredUser } from '../../../utils/storage';
 
 interface ScanResult {
   purchaseId: number;
@@ -253,7 +254,7 @@ const AttractionCheckIn = () => {
       const authToken = getAuthToken();
       console.log('🔐 Check-in Auth Token:', authToken ? 'Present' : 'Missing');
       
-      const checkInResponse = await attractionPurchaseService.checkInPurchase(verifiedPurchase.id);
+      const checkInResponse = await attractionPurchaseService.checkInPurchase(verifiedPurchase.id, getStoredUser()?.id);
       
       if (checkInResponse.success) {
         setScanResult({
@@ -853,6 +854,14 @@ const AttractionCheckIn = () => {
                       }`}>
                         {scanResult.purchase.status === 'checked-in' ? 'Checked In' : scanResult.purchase.status.charAt(0).toUpperCase() + scanResult.purchase.status.slice(1)}
                       </p>
+                      {scanResult.purchase.checked_in_at && (
+                        <p className="text-xs text-green-600 mt-0.5">
+                          {new Date(scanResult.purchase.checked_in_at).toLocaleString()}
+                          {scanResult.purchase.checked_in_by_user && (
+                            <span> by {scanResult.purchase.checked_in_by_user.name}</span>
+                          )}
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>

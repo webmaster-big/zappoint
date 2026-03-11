@@ -217,6 +217,11 @@ export interface Booking {
   guest_of_honor_age?: number;
   guest_of_honor_gender?: 'male' | 'female' | 'other';
   checked_in_at?: string;
+  checked_in_by?: number;
+  checked_in_by_user?: {
+    id: number;
+    name: string;
+  };
   completed_at?: string;
   cancelled_at?: string;
   deleted_at?: string; // Soft delete timestamp

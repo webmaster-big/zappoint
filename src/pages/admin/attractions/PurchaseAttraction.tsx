@@ -206,6 +206,7 @@ const PurchaseAttraction = () => {
   const [scheduledTime, setScheduledTime] = useState<string>('');
   const [availableTimeSlots, setAvailableTimeSlots] = useState<string[]>([]);
   const [dayOffDates, setDayOffDates] = useState<Set<string>>(new Set());
+  const [scheduleError, setScheduleError] = useState<string>('');
 
   const dayNumberToName = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -404,6 +405,7 @@ const PurchaseAttraction = () => {
           price: attr.price,
           pricingType: attr.pricing_type as 'per_person' | 'fixed' | 'per_group' | 'per_hour' | 'per_game',
           maxCapacity: attr.max_capacity,
+          displayCapacityToCustomers: attr.display_capacity_to_customers ?? true,
           duration: attr.duration?.toString() || '',
           durationUnit: attr.duration_unit || 'minutes',
           location: attr.location?.name || '', // Use attraction's location or URL param
@@ -669,6 +671,13 @@ const PurchaseAttraction = () => {
 
     isSubmittingRef.current = true;
     lastSubmitTimeRef.current = now;
+
+    // Validate scheduled visit date/time
+    if (!scheduledDate || !scheduledTime) {
+      setToast({ message: 'Please select a visit date and time before purchasing.', type: 'error' });
+      isSubmittingRef.current = false;
+      return;
+    }
 
     // Validate signature and terms acceptance
     const stErrors: Record<string, string> = {};
@@ -1058,19 +1067,26 @@ const PurchaseAttraction = () => {
                     </div>
                   </div>
 
-                  {/* Schedule Selection */}
-                  {getAttractionAvailability().length > 0 && (
-                    <ScheduleCalendar
-                      availability={getAttractionAvailability()}
-                      dayOffDates={dayOffDates}
-                      scheduledDate={scheduledDate}
-                      scheduledTime={scheduledTime}
-                      availableTimeSlots={availableTimeSlots}
-                      onDateSelect={(dateStr) => setScheduledDate(dateStr)}
-                      onTimeSelect={(time) => setScheduledTime(time)}
-                      themeColor="blue"
-                    />
-                  )}
+                  {/* Schedule Selection - Required */}
+                  <div>
+                    <div className="flex items-center gap-1 mb-1">
+                      <label className="block font-medium text-gray-800 text-xs md:text-sm uppercase tracking-wide">Schedule Visit</label>
+                      <span className="text-red-500 text-xs">*</span>
+                    </div>
+                    <p className="text-xs text-gray-500 mb-3">Please select your preferred visit date and time so staff can anticipate your arrival.</p>
+                    {getAttractionAvailability().length > 0 && (
+                      <ScheduleCalendar
+                        availability={getAttractionAvailability()}
+                        dayOffDates={dayOffDates}
+                        scheduledDate={scheduledDate}
+                        scheduledTime={scheduledTime}
+                        availableTimeSlots={availableTimeSlots}
+                        onDateSelect={(dateStr) => { setScheduledDate(dateStr); setScheduleError(''); }}
+                        onTimeSelect={(time) => { setScheduledTime(time); setScheduleError(''); }}
+                        themeColor="blue"
+                      />
+                    )}
+                  </div>
 
                   {/* Add-ons Selection */}
                   {attraction.addOns && attraction.addOns.length > 0 && (
@@ -1143,11 +1159,20 @@ const PurchaseAttraction = () => {
                     </div>
                   )}
                   
+                  {scheduleError && (
+                    <p className="text-sm text-red-500 mt-1">{scheduleError}</p>
+                  )}
+
                   <div className="flex justify-end">
                     <StandardButton
                       variant="primary"
                       size="md"
                       onClick={() => {
+                        if (!scheduledDate || !scheduledTime) {
+                          setScheduleError('Please select a visit date and time before continuing.');
+                          return;
+                        }
+                        setScheduleError('');
                         setCurrentStep(2);
                         window.scrollTo({ top: 0, behavior: 'smooth' });
                       }}
@@ -1648,8 +1673,8 @@ const PurchaseAttraction = () => {
                             </>
                           ) : (
                             <>
-                              <span className="hidden sm:inline">Pay ${calculateTotal().toFixed(2)}</span>
-                              <span className="sm:hidden">${calculateTotal().toFixed(2)}</span>
+                              <span className="hidden sm:inline">Pay ${total.toFixed(2)}</span>
+                              <span className="sm:hidden">${total.toFixed(2)}</span>
                             </>
                           )}
                         </>
@@ -1725,7 +1750,7 @@ const PurchaseAttraction = () => {
                       </div>
                       <div className="pt-3 mt-3 flex justify-between">
                         <span className="text-gray-900 font-semibold">Total Paid:</span>
-                        <span className="text-lg font-bold text-green-600">${calculateTotal().toFixed(2)}</span>
+                        <span className="text-lg font-bold text-green-600">${total.toFixed(2)}</span>
                       </div>
                     </div>
                   </div>
@@ -1870,15 +1895,17 @@ const PurchaseAttraction = () => {
                     </div>
                   </div>
                   
-                  <div className="flex items-start gap-2">
-                    <div className="p-2 bg-blue-50 rounded-xl">
-                      <Users className="h-4 w-4 text-blue-600" />
+                  {attraction.displayCapacityToCustomers !== false && (
+                    <div className="flex items-start gap-2">
+                      <div className="p-2 bg-blue-50 rounded-xl">
+                        <Users className="h-4 w-4 text-blue-600" />
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-400">Capacity</p>
+                        <p className="text-sm font-medium text-gray-900">Up to {attraction.maxCapacity}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-xs text-gray-400">Capacity</p>
-                      <p className="text-sm font-medium text-gray-900">Up to {attraction.maxCapacity}</p>
-                    </div>
-                  </div>
+                  )}
                   
                   <div className="flex items-start gap-2">
                     <div className="p-2 bg-blue-50 rounded-xl">
@@ -2065,15 +2092,17 @@ const PurchaseAttraction = () => {
                     </p>
                   </div>
                 </div>
-                <div className="flex items-start gap-2">
-                  <div className="p-2 bg-blue-50 rounded-xl">
-                    <Users className="h-4 w-4 text-blue-600" />
+                {attraction.displayCapacityToCustomers !== false && (
+                  <div className="flex items-start gap-2">
+                    <div className="p-2 bg-blue-50 rounded-xl">
+                      <Users className="h-4 w-4 text-blue-600" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-400">Capacity</p>
+                      <p className="text-sm font-medium text-gray-900">Up to {attraction.maxCapacity}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-xs text-gray-400">Capacity</p>
-                    <p className="text-sm font-medium text-gray-900">Up to {attraction.maxCapacity}</p>
-                  </div>
-                </div>
+                )}
                 <div className="flex items-start gap-2">
                   <div className="p-2 bg-blue-50 rounded-xl">
                     <DollarSign className="h-4 w-4 text-blue-600" />
@@ -2316,7 +2345,7 @@ const PurchaseAttraction = () => {
                 )}
                 <div className="flex justify-between pt-3 mt-3 text-sm sm:text-base">
                   <span className="text-gray-600 font-semibold">Total Paid:</span>
-                  <span className="font-bold text-green-600 text-lg sm:text-xl">${calculateTotal().toFixed(2)}</span>
+                  <span className="font-bold text-green-600 text-lg sm:text-xl">${total.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Payment Method:</span>

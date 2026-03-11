@@ -2287,7 +2287,8 @@ const Bookings: React.FC = () => {
         selectedBookings.map(async (id) => {
           let response;
           if (newStatus === 'checked-in') {
-            response = await bookingService.checkInBooking(id);
+            const userId = getStoredUser()?.id;
+            response = await bookingService.checkInBooking(id, userId);
           } else if (newStatus === 'cancelled') {
             response = await bookingService.cancelBooking(Number(id));
           } else {

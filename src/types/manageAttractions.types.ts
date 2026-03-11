@@ -17,6 +17,7 @@ export interface ManageAttractionsAttraction {
   status: 'active' | 'inactive' | 'maintenance';
   createdAt: string;
   availability: Record<string, boolean>;
+  displayCapacityToCustomers?: boolean;
 }
 
 export interface ManageAttractionsFilterOptions {

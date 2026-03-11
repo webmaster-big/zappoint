@@ -41,6 +41,12 @@ export interface AttractionPurchase {
   scheduled_date?: string; // Customer's chosen date to use the ticket
   scheduled_time?: string; // Customer's chosen time slot
   notes?: string;
+  checked_in_at?: string;
+  checked_in_by?: number;
+  checked_in_by_user?: {
+    id: number;
+    name: string;
+  };
   created_by?: number;
   created_at: string;
   updated_at: string;
@@ -314,8 +320,12 @@ class AttractionPurchaseService {
   /**
    * Check-in / Mark purchase as used by scanning QR code
    */
-  async checkInPurchase(id: number): Promise<ApiResponse<AttractionPurchase>> {
-    const response = await api.patch(`/attraction-purchases/${id}/check-in`);
+  async checkInPurchase(id: number, userId?: number): Promise<ApiResponse<AttractionPurchase>> {
+    const payload: { user_id?: number } = {};
+    if (userId) {
+      payload.user_id = userId;
+    }
+    const response = await api.patch(`/attraction-purchases/${id}/check-in`, payload);
     return response.data;
   }
 

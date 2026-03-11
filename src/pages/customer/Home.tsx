@@ -115,6 +115,7 @@ const EntertainmentLandingPage = () => {
             price: attr.price,
             minAge: attr.min_age,
             capacity: attr.max_capacity,
+            displayCapacityToCustomers: attr.display_capacity_to_customers ?? true,
             rating: attr.rating || 4.5,
             image: Array.isArray(attr.image) ? attr.image[0] : attr.image,
             category: attr.category,
@@ -1121,13 +1122,15 @@ const EntertainmentLandingPage = () => {
 
               {/* Details Grid */}
               <div className="grid grid-cols-2 gap-3 mb-5">
-                <div className="bg-gray-50 p-3 rounded-xl">
-                  <div className="flex items-center gap-1.5 text-gray-400 mb-1">
-                    <Users size={12} />
-                    <span className="text-xs font-medium">Capacity</span>
+                {(selectedAttraction.displayCapacityToCustomers !== false) && (
+                  <div className="bg-gray-50 p-3 rounded-xl">
+                    <div className="flex items-center gap-1.5 text-gray-400 mb-1">
+                      <Users size={12} />
+                      <span className="text-xs font-medium">Capacity</span>
+                    </div>
+                    <div className="text-sm font-bold text-gray-900">{selectedAttraction.capacity} people</div>
                   </div>
-                  <div className="text-sm font-bold text-gray-900">{selectedAttraction.capacity} people</div>
-                </div>
+                )}
                 <div className="bg-gray-50 p-3 rounded-xl">
                   <div className="flex items-center gap-1.5 text-gray-400 mb-1">
                     <Ticket size={12} />
