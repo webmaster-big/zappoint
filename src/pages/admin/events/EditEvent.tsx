@@ -82,8 +82,8 @@ const EditEvent = () => {
         setDescription(event.description || '');
         setImagePreview(event.image || '');
         setDateType(event.date_type || 'one_time');
-        setStartDate(event.start_date || '');
-        setEndDate(event.end_date || '');
+        setStartDate(event.start_date ? event.start_date.substring(0, 10) : '');
+        setEndDate(event.end_date ? event.end_date.substring(0, 10) : '');
         setTimeStart(event.time_start ? event.time_start.substring(0, 5) : '09:00');
         setTimeEnd(event.time_end ? event.time_end.substring(0, 5) : '17:00');
         setIntervalMinutes(event.interval_minutes || 60);
@@ -212,8 +212,8 @@ const EditEvent = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
+      <div className="min-h-screen flex items-center justify-center">
+        <div className={`animate-spin rounded-full h-12 w-12 border-b-2 border-${fullColor}`}></div>
       </div>
     );
   }
@@ -612,7 +612,7 @@ const EditEvent = () => {
               <Clock className="w-4 h-4 text-gray-500" />
               <span className="font-semibold">Time:</span>
               <span className="text-neutral-800 text-sm">
-                {formatTimeDisplay(timeStart)} \u2013 {formatTimeDisplay(timeEnd)}
+                {formatTimeDisplay(timeStart)} {"\u2013"} {formatTimeDisplay(timeEnd)}
               </span>
             </div>
 
