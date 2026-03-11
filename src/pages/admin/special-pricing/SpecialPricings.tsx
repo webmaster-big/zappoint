@@ -186,7 +186,7 @@ const SpecialPricings: React.FC = () => {
         const response = await eventService.getEvents();
         if (response.success && response.data) {
           const today = new Date().toISOString().split('T')[0];
-          const activeEvents = response.data.filter((e: { is_active?: boolean; end_date?: string }) => {
+          const activeEvents = response.data.filter((e) => {
             if (e.is_active === false) return false;
             if (e.end_date && e.end_date < today) return false;
             return true;

@@ -99,7 +99,7 @@ export interface SpecialPricingFormData {
 }
 
 export interface SpecialPricingListFilters {
-  entity_type: 'all' | 'package' | 'attraction';
+  entity_type: 'all' | 'package' | 'attraction' | 'event';
   recurrence_type: 'all' | 'one_time' | 'weekly' | 'monthly';
   discount_type: 'all' | 'fixed' | 'percentage';
   status: 'all' | 'active' | 'inactive';
