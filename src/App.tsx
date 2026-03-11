@@ -87,7 +87,8 @@ import OnsitePurchaseEvent from "./pages/admin/events/OnsitePurchaseEvent";
 import EventPurchases from "./pages/admin/events/EventPurchases";
 import ViewEventPurchase from "./pages/admin/events/ViewEventPurchase";
 import PurchaseEvent from "./pages/customer/PurchaseEvent";
-import PurchasedEvents from "./pages/customer/PurchasedEvents";
+import MyEvents from "./pages/customer/MyEvents";
+import MyAttractions from "./pages/customer/MyAttractions";
 
 // Redirect /settings/google-calendar to the correct role-based settings page
 const GoogleCalendarRedirect = () => {
@@ -140,8 +141,9 @@ function App() {
         <Route element={<CustomerLayout />}>
           <Route path="/" element={<EntertainmentLandingPage />} />
           <Route path="/customer/reservations" element={<CustomerProtectedRoute><CustomerReservations /></CustomerProtectedRoute>} />
+          <Route path="/customer/attractions" element={<CustomerProtectedRoute><MyAttractions /></CustomerProtectedRoute>} />
+          <Route path="/customer/events" element={<CustomerProtectedRoute><MyEvents /></CustomerProtectedRoute>} />
           <Route path="/customer/gift-cards" element={<CustomerProtectedRoute><CustomerGiftCards /></CustomerProtectedRoute>} />
-          <Route path="/customer/events" element={<CustomerProtectedRoute><PurchasedEvents /></CustomerProtectedRoute>} />
           <Route path="/customer/notifications" element={<CustomerProtectedRoute><CustomerNotifications /></CustomerProtectedRoute>} />
         </Route>
         

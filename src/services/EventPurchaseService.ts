@@ -101,6 +101,12 @@ class EventPurchaseService {
     const response = await api.get('/event-purchases/customer', { params: { customer_id: customerId, ...filters } });
     return response.data;
   }
+
+  /** Get customer's event purchases by email (public, no auth required) */
+  async getCustomerPurchasesByEmail(email: string, filters?: Record<string, unknown>): Promise<{ success: boolean; data: { purchases: EventPurchase[]; pagination: { current_page: number; last_page: number; per_page: number; total: number } } }> {
+    const response = await api.get('/event-purchases/customer', { params: { guest_email: email, ...filters } });
+    return response.data;
+  }
 }
 
 export const eventPurchaseService = new EventPurchaseService();

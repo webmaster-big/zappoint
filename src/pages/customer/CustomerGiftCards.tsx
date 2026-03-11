@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Gift, Calendar, Copy, Check, MapPin, X } from 'lucide-react';
+import { Gift, Calendar, Copy, Check, MapPin, X, Construction } from 'lucide-react';
 import {
   customerGiftCardService,
   type CustomerGiftCard,
@@ -20,6 +20,14 @@ const CustomerGiftCards = () => {
   const [search, setSearch] = useState('');
   const [selectedLocationId, setSelectedLocationId] = useState<number | ''>('');
   const [locations, setLocations] = useState<LocationOption[]>([]);
+  const [showComingSoon, setShowComingSoon] = useState(false);
+
+  // Check if on production domain
+  useEffect(() => {
+    if (window.location.hostname === 'booking.zap-zone.com') {
+      setShowComingSoon(true);
+    }
+  }, []);
 
   // Available cards
   const [availableCards, setAvailableCards] = useState<CustomerGiftCard[]>([]);
@@ -156,24 +164,23 @@ const CustomerGiftCards = () => {
       `}</style>
       <div className="min-h-screen bg-gray-50">
         {/* Hero Header */}
-        <section className="relative bg-gradient-to-br from-blue-900 via-blue-800 to-blue-700 text-white py-7 md:py-9 overflow-hidden">
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(255,255,255,0.08),transparent_60%)]"></div>
+        <section className="relative bg-gradient-to-br from-blue-900 via-blue-800 to-blue-700 text-white py-6 md:py-8 overflow-hidden">
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(255,255,255,0.06),transparent_60%)]"></div>
           <div className="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 animate-slide-up">
-            <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
+            <div className="flex items-end justify-between">
               <div>
-                <div className="flex items-center gap-2 mb-1.5">
-                  <div className="p-1.5 bg-white/10 backdrop-blur-md rounded-lg border border-white/15">
-                    <Gift className="w-4 h-4 text-white" />
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="p-1.5 bg-white/10 backdrop-blur rounded-lg border border-white/10">
+                    <Gift className="w-3.5 h-3.5" />
                   </div>
-                  <p className="text-blue-200/80 text-xs font-medium uppercase tracking-wider">Gift Cards</p>
+                  <span className="text-blue-200/70 text-xs font-semibold uppercase tracking-widest">Gift Cards</span>
                 </div>
-                <h1 className="text-xl md:text-2xl font-semibold text-white mb-0.5" style={{ color: 'white' }}>Gift Cards</h1>
-                <p className="text-blue-200/70 text-base">View, redeem, and manage your gift cards</p>
+                <h1 className="text-xl font-bold" style={{ color: 'white' }}>Gift Cards</h1>
+                <p className="text-blue-200/60 text-sm mt-0.5">View, redeem, and manage your gift cards</p>
               </div>
               <div className="flex items-center gap-3">
-                <span className="text-white/50 text-sm">{availableCards.length} available</span>
-                <span className="w-px h-4 bg-white/15"></span>
-                <span className="text-white/50 text-sm">{ownedCards.length} owned</span>
+                <span className="text-xs font-medium bg-white/10 border border-white/10 backdrop-blur px-3 py-1 rounded-full text-blue-100">{availableCards.length} available</span>
+                <span className="text-xs font-medium bg-white/10 border border-white/10 backdrop-blur px-3 py-1 rounded-full text-blue-100">{ownedCards.length} owned</span>
               </div>
             </div>
           </div>
@@ -563,6 +570,27 @@ const CustomerGiftCards = () => {
 
         </div>
       </div>
+
+      {/* Coming Soon Popup - only on production */}
+      {showComingSoon && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-backdrop-fade">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-scale-in" onClick={e => e.stopPropagation()}>
+            <div className="bg-gradient-to-r from-blue-900 via-blue-800 to-blue-700 px-6 py-5 text-center">
+              <Construction className="w-10 h-10 mx-auto mb-2 text-white opacity-90" />
+              <h2 className="text-lg font-bold text-white">Coming Soon</h2>
+            </div>
+            <div className="p-6 text-center">
+              <p className="text-gray-600 text-sm mb-5">This feature is currently under development and not yet available. Stay tuned for updates!</p>
+              <button
+                onClick={() => setShowComingSoon(false)}
+                className="w-full bg-blue-800 hover:bg-blue-900 text-white font-medium py-2.5 rounded-lg transition-all text-sm"
+              >
+                Got it
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };

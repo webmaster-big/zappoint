@@ -56,6 +56,12 @@ export interface AttractionPurchase {
     name: string;
     price: number;
     pricing_type: string;
+    category?: string;
+    duration?: number;
+    duration_unit?: string;
+    image?: string | string[];
+    location_id?: number;
+    location?: { id: number; name: string };
     availability?: Array<{
       day: string;
       start_time: string;
@@ -67,7 +73,17 @@ export interface AttractionPurchase {
     first_name: string;
     last_name: string;
     email: string;
+    phone?: string;
   };
+  add_ons?: Array<{
+    id: number;
+    name: string;
+    price?: number;
+    pivot?: {
+      quantity?: number;
+      price_at_purchase?: number;
+    };
+  }>;
   applied_fees?: Array<{
     fee_name: string;
     fee_amount: number;
@@ -302,6 +318,14 @@ class AttractionPurchaseService {
    */
   async getPurchasesByAttraction(attractionId: number): Promise<ApiResponse<AttractionPurchase[]>> {
     const response = await api.get(`/attraction-purchases/attraction/${attractionId}`);
+    return response.data;
+  }
+
+  /**
+   * Get customer's attraction purchases by email (public, no auth required)
+   */
+  async getCustomerPurchasesByEmail(email: string, filters?: Record<string, unknown>): Promise<{ success: boolean; data: { purchases: AttractionPurchase[]; pagination: { current_page: number; last_page: number; per_page: number; total: number } } }> {
+    const response = await api.get('/attraction-purchases/customer', { params: { guest_email: email, ...filters } });
     return response.data;
   }
 

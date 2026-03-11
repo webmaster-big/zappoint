@@ -14,6 +14,7 @@ import {
   AlertCircle,
   Ticket,
   Users,
+  Construction,
 } from 'lucide-react';
 import { eventPurchaseService } from '../../services/EventPurchaseService';
 import { getImageUrl } from '../../utils/storage';
@@ -21,7 +22,7 @@ import Toast from '../../components/ui/Toast';
 import Pagination from '../../components/ui/Pagination';
 import type { EventPurchase } from '../../types/event.types';
 
-const PurchasedEvents = () => {
+const MyEvents = () => {
   const [purchases, setPurchases] = useState<EventPurchase[]>([]);
   const [selectedPurchase, setSelectedPurchase] = useState<EventPurchase | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
@@ -35,6 +36,13 @@ const PurchasedEvents = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const [showComingSoon, setShowComingSoon] = useState(false);
+
+  useEffect(() => {
+    if (window.location.hostname === 'booking.zap-zone.com') {
+      setShowComingSoon(true);
+    }
+  }, []);
 
   const customerData = (() => {
     try {
@@ -51,7 +59,7 @@ const PurchasedEvents = () => {
   }, [currentPage, statusFilter, sortOrder, searchTerm]);
 
   const fetchPurchases = async () => {
-    if (!customerData?.id) {
+    if (!customerData?.email) {
       setError('Please log in to view your event tickets');
       setLoading(false);
       return;
@@ -68,11 +76,10 @@ const PurchasedEvents = () => {
       if (statusFilter !== 'all') filters.status = statusFilter;
       if (searchTerm) filters.search = searchTerm;
 
-      const res = await eventPurchaseService.getCustomerPurchases(customerData.id, filters);
-      const resData = res as unknown as Record<string, unknown>;
-      const list = (Array.isArray(res.data) ? res.data : (resData.purchases || [])) as EventPurchase[];
+      const res = await eventPurchaseService.getCustomerPurchasesByEmail(customerData.email, filters);
+      const list = res.data?.purchases || [];
       setPurchases(list);
-      const pagination = resData.pagination as Record<string, number> | undefined;
+      const pagination = res.data?.pagination;
       setTotalPages(pagination?.last_page || 1);
       setTotalItems(pagination?.total || list.length);
     } catch {
@@ -97,7 +104,7 @@ const PurchasedEvents = () => {
       case 'pending': return 'bg-amber-50 text-amber-700 border-amber-200';
       case 'cancelled': return 'bg-red-50 text-red-700 border-red-200';
       case 'completed': return 'bg-blue-50 text-blue-700 border-blue-200';
-      case 'checked_in': return 'bg-blue-50 text-blue-700 border-blue-200';
+      case 'checked_in': case 'checked-in': return 'bg-blue-50 text-blue-700 border-blue-200';
       default: return 'bg-gray-50 text-gray-700 border-gray-200';
     }
   };
@@ -108,7 +115,7 @@ const PurchasedEvents = () => {
       case 'pending': return 'bg-amber-500';
       case 'cancelled': return 'bg-red-500';
       case 'completed': return 'bg-blue-500';
-      case 'checked_in': return 'bg-blue-500';
+      case 'checked_in': case 'checked-in': return 'bg-blue-500';
       default: return 'bg-gray-500';
     }
   };
@@ -306,10 +313,10 @@ const PurchasedEvents = () => {
                           </div>
 
                           <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-gray-500">
-                            {purchase.event?.location && (
+                            {purchase.location && (
                               <span className="inline-flex items-center gap-1.5">
                                 <MapPin size={13} className="text-gray-400" />
-                                {purchase.event.location.name}
+                                {purchase.location.name}
                               </span>
                             )}
                             <span className="inline-flex items-center gap-1.5">
@@ -405,7 +412,7 @@ const PurchasedEvents = () => {
                                     <span className="text-gray-600">
                                       {addon.name}
                                       {addon.pivot?.quantity && addon.pivot.quantity > 1 && (
-                                        <span className="text-gray-400 ml-1">×{addon.pivot.quantity}</span>
+                                        <span className="text-gray-400 ml-1">{"\u00D7"}{addon.pivot.quantity}</span>
                                       )}
                                     </span>
                                     <span className="text-gray-700 font-medium">
@@ -426,7 +433,7 @@ const PurchasedEvents = () => {
                               <div className="flex flex-wrap gap-2">
                                 {purchase.event.features.map((f, i) => (
                                   <span key={i} className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-50 text-blue-700 text-xs font-medium rounded-full">
-                                    ✓ {f}
+                                    {"\u2713"} {f}
                                   </span>
                                 ))}
                               </div>
@@ -477,9 +484,9 @@ const PurchasedEvents = () => {
                   )}
                   <div>
                     <h3 className="font-semibold text-gray-900 text-lg">{selectedPurchase.event?.name || 'Event'}</h3>
-                    {selectedPurchase.event?.location && (
+                    {selectedPurchase.location && (
                       <p className="text-sm text-gray-500 flex items-center gap-1 mt-1">
-                        <MapPin size={13} /> {selectedPurchase.event.location.name}
+                        <MapPin size={13} /> {selectedPurchase.location.name}
                       </p>
                     )}
                     <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 text-xs font-medium rounded-full mt-2 ${getStatusColor(selectedPurchase.status)}`}>
@@ -547,7 +554,7 @@ const PurchasedEvents = () => {
                       <div key={addon.id} className="flex justify-between bg-gray-50 px-3 py-2 rounded-lg text-sm">
                         <span className="text-gray-600">
                           {addon.name}
-                          {addon.pivot?.quantity && addon.pivot.quantity > 1 && <span className="text-gray-400 ml-1">×{addon.pivot.quantity}</span>}
+                          {addon.pivot?.quantity && addon.pivot.quantity > 1 && <span className="text-gray-400 ml-1">{"\u00D7"}{addon.pivot.quantity}</span>}
                         </span>
                         <span className="font-medium text-gray-700">
                           ${addon.pivot?.price_at_purchase
@@ -571,8 +578,29 @@ const PurchasedEvents = () => {
           </div>
         </div>
       )}
+
+      {/* Coming Soon Popup - only on production */}
+      {showComingSoon && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="bg-gradient-to-r from-blue-900 via-blue-800 to-blue-700 px-6 py-5 text-center">
+              <Construction className="w-10 h-10 mx-auto mb-2 text-white opacity-90" />
+              <h2 className="text-lg font-bold text-white">Coming Soon</h2>
+            </div>
+            <div className="p-6 text-center">
+              <p className="text-gray-600 text-sm mb-5">This feature is currently under development and not yet available. Stay tuned for updates!</p>
+              <button
+                onClick={() => setShowComingSoon(false)}
+                className="w-full bg-blue-800 hover:bg-blue-900 text-white font-medium py-2.5 rounded-lg transition-all text-sm"
+              >
+                Got it
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };
 
-export default PurchasedEvents;
+export default MyEvents;

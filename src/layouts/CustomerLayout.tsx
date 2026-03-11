@@ -8,6 +8,7 @@ import {
 import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
 import customerService from '../services/CustomerService';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
+import Toast from '../components/ui/Toast';
 
 interface CustomerUser {
   id: number;
@@ -26,6 +27,7 @@ const CustomerLayout = () => {
   const [customerUser, setCustomerUser] = useState<CustomerUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [showToast, setShowToast] = useState(false);
 
 
 
@@ -124,30 +126,35 @@ const CustomerLayout = () => {
             
                 {customerUser && (
                   <>
-                      <Link
-                  to="/"
-                  className={`px-2 py-1 font-medium text-sm transition-colors ${location.pathname === '/' ? 'text-blue-800 border-b-2 border-blue-800' : 'text-gray-700 hover:text-blue-800'}`}
-                >
-                  Home
-                </Link>
+                    <Link
+                      to="/"
+                      className={`px-2 py-1 font-medium text-sm transition-colors ${location.pathname === '/' ? 'text-blue-800 border-b-2 border-blue-800' : 'text-gray-700 hover:text-blue-800'}`}
+                    >
+                      Home
+                    </Link>
                     <Link
                       to="/customer/reservations"
                       className={`px-2 py-1 font-medium text-sm transition-colors ${location.pathname.startsWith('/customer/reservations') ? 'text-blue-800 border-b-2 border-blue-800' : 'text-gray-700 hover:text-blue-800'}`}
                     >
                       Reservations
                     </Link>
-                   
                     <Link
-                      to="/customer/gift-cards"
-                      className={`px-2 py-1 font-medium text-sm transition-colors ${location.pathname.startsWith('/customer/gift-cards') ? 'text-blue-800 border-b-2 border-blue-800' : 'text-gray-700 hover:text-blue-800'}`}
+                      to="/customer/attractions"
+                      className={`px-2 py-1 font-medium text-sm transition-colors ${location.pathname.startsWith('/customer/attractions') ? 'text-blue-800 border-b-2 border-blue-800' : 'text-gray-700 hover:text-blue-800'}`}
                     >
-                      Gift Cards
+                      My Attractions
                     </Link>
                     <Link
                       to="/customer/events"
                       className={`px-2 py-1 font-medium text-sm transition-colors ${location.pathname.startsWith('/customer/events') ? 'text-blue-800 border-b-2 border-blue-800' : 'text-gray-700 hover:text-blue-800'}`}
                     >
                       My Events
+                    </Link>
+                    <Link
+                      to="/customer/gift-cards"
+                      className={`px-2 py-1 font-medium text-sm transition-colors ${location.pathname.startsWith('/customer/gift-cards') ? 'text-blue-800 border-b-2 border-blue-800' : 'text-gray-700 hover:text-blue-800'}`}
+                    >
+                      Gift Cards
                     </Link>
                   </>
                 )}
@@ -180,7 +187,10 @@ const CustomerLayout = () => {
                           <p className="text-sm font-medium text-gray-900">{customerUser.name}</p>
                           <p className="text-sm text-gray-500 truncate">{customerUser.email}</p>
                         </div>
-                        <button className="w-full flex items-center space-x-2 px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 transition-colors">
+                        <button 
+                          className="w-full flex items-center space-x-2 px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 transition-colors"
+                          onClick={() => { setShowToast(true); setTimeout(() => setShowToast(false), 3000); }}
+                        >
                           <span>Account Settings</span>
                         </button>
                         <button 
@@ -244,12 +254,12 @@ const CustomerLayout = () => {
                   {customerUser && (
                     <>
                       <Link
-                    to="/"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className={`px-4 py-2 font-medium text-sm transition-colors ${location.pathname === '/' ? 'text-blue-800 bg-blue-50' : 'text-gray-700 hover:text-blue-800 hover:bg-blue-50'}`}
-                  >
-                    Home
-                  </Link>
+                        to="/"
+                        onClick={() => setMobileMenuOpen(false)}
+                        className={`px-4 py-2 font-medium text-sm transition-colors ${location.pathname === '/' ? 'text-blue-800 bg-blue-50' : 'text-gray-700 hover:text-blue-800 hover:bg-blue-50'}`}
+                      >
+                        Home
+                      </Link>
                       <Link
                         to="/customer/reservations"
                         onClick={() => setMobileMenuOpen(false)}
@@ -258,11 +268,11 @@ const CustomerLayout = () => {
                         Reservations
                       </Link>
                       <Link
-                        to="/customer/gift-cards"
+                        to="/customer/attractions"
                         onClick={() => setMobileMenuOpen(false)}
-                        className={`px-4 py-2 font-medium text-sm transition-colors ${location.pathname.startsWith('/customer/gift-cards') ? 'text-blue-800 bg-blue-50' : 'text-gray-700 hover:text-blue-800 hover:bg-blue-50'}`}
+                        className={`px-4 py-2 font-medium text-sm transition-colors ${location.pathname.startsWith('/customer/attractions') ? 'text-blue-800 bg-blue-50' : 'text-gray-700 hover:text-blue-800 hover:bg-blue-50'}`}
                       >
-                        Gift Cards
+                        My Attractions
                       </Link>
                       <Link
                         to="/customer/events"
@@ -271,20 +281,26 @@ const CustomerLayout = () => {
                       >
                         My Events
                       </Link>
+                      <Link
+                        to="/customer/gift-cards"
+                        onClick={() => setMobileMenuOpen(false)}
+                        className={`px-4 py-2 font-medium text-sm transition-colors ${location.pathname.startsWith('/customer/gift-cards') ? 'text-blue-800 bg-blue-50' : 'text-gray-700 hover:text-blue-800 hover:bg-blue-50'}`}
+                      >
+                        Gift Cards
+                      </Link>
                     </>
                   )}
                 </div>
-                
-
-                
-                {/* Mobile Auth Buttons - Conditional Rendering */}
                 {customerUser ? (
                   <div className="space-y-2 pt-2">
                     <div className="px-4 py-2 border-b border-blue-200">
                       <p className="font-medium text-gray-900">{customerUser.name}</p>
                       <p className="text-sm text-gray-500">{customerUser.email}</p>
                     </div>
-                    <button className="w-full flex items-center justify-center space-x-2 px-4 py-2 border border-blue-800 text-gray-700 font-medium hover:bg-blue-50 transition-colors">
+                    <button 
+                      className="w-full flex items-center justify-center space-x-2 px-4 py-2 border border-blue-800 text-gray-700 font-medium hover:bg-blue-50 transition-colors"
+                      onClick={() => { setShowToast(true); setTimeout(() => setShowToast(false), 3000); }}
+                    >
                       <span>Account Settings</span>
                     </button>
                     <button 
@@ -336,6 +352,14 @@ const CustomerLayout = () => {
       <main>
         <Outlet />
       </main>
+
+      {showToast && (
+        <Toast
+          message="Account Settings is not yet available."
+          type="info"
+          onClose={() => setShowToast(false)}
+        />
+      )}
     </div>
   );
 };
