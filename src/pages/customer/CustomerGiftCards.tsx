@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Gift, Calendar, Copy, Check, MapPin, X, Construction } from 'lucide-react';
 import {
   customerGiftCardService,
@@ -21,6 +22,7 @@ const CustomerGiftCards = () => {
   const [selectedLocationId, setSelectedLocationId] = useState<number | ''>('');
   const [locations, setLocations] = useState<LocationOption[]>([]);
   const [showComingSoon, setShowComingSoon] = useState(false);
+  const navigate = useNavigate();
 
   // Check if on production domain
   useEffect(() => {
@@ -576,13 +578,13 @@ const CustomerGiftCards = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-backdrop-fade">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-scale-in" onClick={e => e.stopPropagation()}>
             <div className="bg-gradient-to-r from-blue-900 via-blue-800 to-blue-700 px-6 py-5 text-center">
-              <Construction className="w-10 h-10 mx-auto mb-2 text-white opacity-90" />
+              <Construction className="w-10 h-10 mx-auto mb-2 text-white" strokeWidth={2} />
               <h2 className="text-lg font-bold text-white">Coming Soon</h2>
             </div>
             <div className="p-6 text-center">
               <p className="text-gray-600 text-sm mb-5">This feature is currently under development and not yet available. Stay tuned for updates!</p>
               <button
-                onClick={() => setShowComingSoon(false)}
+                onClick={() => { setShowComingSoon(false); navigate('/'); }}
                 className="w-full bg-blue-800 hover:bg-blue-900 text-white font-medium py-2.5 rounded-lg transition-all text-sm"
               >
                 Got it
