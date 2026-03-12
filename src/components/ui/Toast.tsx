@@ -17,7 +17,7 @@ const typeStyles = {
 const iconMap = {
   success: <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />,
   error: <AlertTriangle className="w-5 h-5 text-rose-500 shrink-0" />,
-  info: <Info className="w-5 h-5 text-purple-500 shrink-0" />,
+  info: <Info className="w-5 h-5 text-blue-600 shrink-0" />,
 };
 
 

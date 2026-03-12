@@ -542,7 +542,7 @@ const EntertainmentLandingPage = () => {
               <span className="text-xs md:text-sm font-semibold tracking-wide">Premium Entertainment Experience</span>
             </div>
             
-            <p className="text-3xl sm:text-4xl md:text-5xl lg:text-7xl font-extrabold mb-5 md:mb-7 text-white leading-tight drop-shadow-lg">
+            <p className="text-3xl sm:text-4xl md:text-5xl lg:text-7xl font-extrabold mb-5 md:mb-7 text-white leading-tight drop-shadow-3xl">
               Unleash the Fun at ZapZone!
             </p>
             <p className="text-sm sm:text-base md:text-lg lg:text-xl mb-8 md:mb-12 text-blue-100/90 max-w-3xl mx-auto leading-relaxed px-2">
@@ -551,7 +551,7 @@ const EntertainmentLandingPage = () => {
             </p>
           </div>
           
-          {/* Enhanced Search Bar */}
+          {/* Enhanced Searc h Bar */}
           <div className="max-w-3xl mx-auto px-2 animate-slide-up-delay">
             <div className="relative group">
               <div className="absolute -inset-1.5 bg-gradient-to-r from-white/25 via-blue-300/25 to-blue-300/25 rounded-2xl blur-lg opacity-75 group-hover:opacity-100 transition duration-500"></div>
