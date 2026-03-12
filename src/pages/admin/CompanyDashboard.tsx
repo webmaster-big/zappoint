@@ -31,6 +31,7 @@ import {
   Save,
   Loader2,
   CheckCircle,
+  Ticket,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useThemeColor } from '../../hooks/useThemeColor';
@@ -107,6 +108,7 @@ const CompanyDashboard: React.FC = () => {
   // All data (unfiltered) for location performance
   const [allWeeklyBookings, setAllWeeklyBookings] = useState<any[]>([]);
   const [allTicketPurchases, setAllTicketPurchases] = useState<any[]>([]);
+  const [recentEventPurchases, setRecentEventPurchases] = useState<any[]>([]);
   // Location stats from API (for company_admin)
   const [apiLocationStats, setApiLocationStats] = useState<any>(null);
   const [metrics, setMetrics] = useState({
@@ -121,6 +123,9 @@ const CompanyDashboard: React.FC = () => {
     bookingRevenue: 0,
     purchaseRevenue: 0,
     totalPurchases: 0,
+    eventPurchaseRevenue: 0,
+    totalEventPurchases: 0,
+    totalEventTickets: 0,
   });
 
   // Get dates for the current week - moved up to avoid dependency issues
@@ -556,6 +561,9 @@ const CompanyDashboard: React.FC = () => {
           if (cachedData.recentPurchases) {
             setAllTicketPurchases(cachedData.recentPurchases);
           }
+          if (cachedData.recentEventPurchases) {
+            setRecentEventPurchases(cachedData.recentEventPurchases);
+          }
           setLoading(false);
         }
         
@@ -611,12 +619,18 @@ const CompanyDashboard: React.FC = () => {
           await attractionPurchaseCacheService.cachePurchases(metricsResponse.recentPurchases as any);
           console.log('🎫 [CompanyDashboard] Ticket purchases updated:', metricsResponse.recentPurchases.length);
         }
+
+        // Update event purchases from API response
+        if (metricsResponse.recentEventPurchases && metricsResponse.recentEventPurchases.length > 0) {
+          setRecentEventPurchases(metricsResponse.recentEventPurchases);
+        }
         
         // Step 4: Cache the fresh data for next time (with timeframe)
         await metricsCacheService.cacheMetrics('company', {
           metrics: metricsResponse.metrics,
           locationStats: metricsResponse.locationStats,
           recentPurchases: metricsResponse.recentPurchases,
+          recentEventPurchases: metricsResponse.recentEventPurchases,
         }, selectedLocation, metricsTimeframe);
         
         console.log('✅ [CompanyDashboard] Metrics cached successfully for timeframe:', metricsTimeframe);
@@ -731,7 +745,7 @@ const CompanyDashboard: React.FC = () => {
     {
       title: 'Total Revenue',
       value: `$${metrics.totalRevenue.toFixed(2)}`,
-      change: `Bookings: $${metrics.bookingRevenue.toFixed(2)} | Tickets: $${metrics.purchaseRevenue.toFixed(2)}`,
+      change: `Bookings: $${metrics.bookingRevenue.toFixed(2)} | Tickets: $${metrics.purchaseRevenue.toFixed(2)}${metrics.eventPurchaseRevenue > 0 ? ` | Events: $${metrics.eventPurchaseRevenue.toFixed(2)}` : ''}`,
       trend: 'up',
       icon: DollarSign,
       accent: `bg-${themeColor}-100 text-${fullColor}`,
@@ -749,7 +763,7 @@ const CompanyDashboard: React.FC = () => {
     {
       title: 'Avg. Booking Value',
       value: metrics.totalBookings > 0 ? `$${(metrics.bookingRevenue / metrics.totalBookings).toFixed(2)}` : '$0.00',
-      change: `${metrics.totalPurchases} tickets sold`,
+      change: `${metrics.totalPurchases} tickets${metrics.totalEventTickets > 0 ? ` • ${metrics.totalEventTickets} event tickets` : ''} sold`,
       trend: 'up',
       icon: CreditCard,
       accent: `bg-${themeColor}-100 text-${fullColor}`,
@@ -1218,7 +1232,7 @@ const CompanyDashboard: React.FC = () => {
                       </div>
                       <div>
                         <div className="font-bold text-gray-900 text-lg">{typedStats.name}</div>
-                        <div className="text-xs text-gray-500">{typedStats.bookings} bookings • {typedStats.purchases} tickets • {typedStats.participants} guests</div>
+                        <div className="text-xs text-gray-500">{typedStats.bookings} bookings • {typedStats.purchases} tickets{typedStats.eventPurchases ? ` • ${typedStats.eventPurchases} events` : ''} • {typedStats.participants} guests</div>
                       </div>
                     </div>
                     <div className="text-right min-w-[120px]">
@@ -1249,7 +1263,7 @@ const CompanyDashboard: React.FC = () => {
               <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {displayedLocations.map(([locationId, stats]) => {
-                    const typedStats = stats as { name: string; bookings: number; purchases: number; participants: number; revenue: number; utilization: number };
+                    const typedStats = stats as { name: string; bookings: number; purchases: number; participants: number; revenue: number; utilization: number; eventPurchases?: number; eventTickets?: number; bookingRevenue?: number; purchaseRevenue?: number; eventPurchaseRevenue?: number };
                     return (
                     <div key={locationId} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow bg-gray-50">
                       <div className="flex items-center justify-between mb-2">
@@ -1265,6 +1279,12 @@ const CompanyDashboard: React.FC = () => {
                           <div className="text-xs text-gray-500">Tickets</div>
                           <div className={`font-bold text-lg text-${fullColor}`}>{typedStats.purchases}</div>
                         </div>
+                        {typedStats.eventPurchases !== undefined && typedStats.eventPurchases > 0 && (
+                          <div className="flex-1">
+                            <div className="text-xs text-gray-500">Events</div>
+                            <div className={`font-bold text-lg text-${fullColor}`}>{typedStats.eventPurchases}</div>
+                          </div>
+                        )}
                       </div>
                       <div className="flex items-center gap-4 mb-2">
                         <div className="flex-1">
@@ -2766,6 +2786,56 @@ const CompanyDashboard: React.FC = () => {
                 </StandardButton>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Recent Event Purchases */}
+      {recentEventPurchases.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm p-4 md:p-6 border border-gray-100">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 md:mb-6">
+            <h2 className="text-lg md:text-xl font-bold text-gray-900 flex items-center gap-2">
+              <Ticket className={`w-5 h-5 md:w-6 md:h-6 text-${fullColor}`} /> Recent Event Purchases
+            </h2>
+            <Link to="/events/purchases" className={`px-4 py-2 text-sm bg-${themeColor}-100 text-${fullColor} rounded-lg hover:bg-${themeColor}-200 transition`}>
+              View All
+            </Link>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="text-xs text-gray-500 uppercase bg-gray-50 border-b">
+                <tr>
+                  <th className="px-4 py-3 font-medium">Customer</th>
+                  <th className="px-4 py-3 font-medium">Event</th>
+                  <th className="px-4 py-3 font-medium">Qty</th>
+                  <th className="px-4 py-3 font-medium">Amount</th>
+                  <th className="px-4 py-3 font-medium">Paid</th>
+                  <th className="px-4 py-3 font-medium">Date</th>
+                  <th className="px-4 py-3 font-medium">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {recentEventPurchases.slice(0, 5).map((purchase: any) => (
+                  <tr key={purchase.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3 text-sm font-medium text-gray-900">{purchase.customer_name || 'Guest'}</td>
+                    <td className="px-4 py-3 text-sm text-gray-900">{purchase.event_name || 'N/A'}</td>
+                    <td className="px-4 py-3 text-sm text-gray-900">{purchase.quantity}</td>
+                    <td className="px-4 py-3 text-sm font-medium text-gray-900">${Number(purchase.total_amount || 0).toFixed(2)}</td>
+                    <td className="px-4 py-3 text-sm text-gray-900">${Number(purchase.amount_paid || 0).toFixed(2)}</td>
+                    <td className="px-4 py-3 text-sm text-gray-900">{purchase.purchase_date ? formatLocalDateTime(purchase.purchase_date, { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A'}</td>
+                    <td className="px-4 py-3">
+                      <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                        purchase.status === 'confirmed' || purchase.status === 'completed' ? 'bg-emerald-100 text-emerald-800' :
+                        purchase.status === 'pending' ? 'bg-amber-100 text-amber-800' :
+                        purchase.status === 'cancelled' ? 'bg-rose-100 text-rose-800' : 'bg-gray-100 text-gray-800'
+                      }`}>
+                        {purchase.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}

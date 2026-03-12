@@ -94,6 +94,7 @@ const LocationManagerDashboard: React.FC = () => {
   const [weeklyBookings, setWeeklyBookings] = useState<any[]>([]);
   const [dailyBookings, setDailyBookings] = useState<any[]>([]);
   const [ticketPurchases, setTicketPurchases] = useState<any[]>([]);
+  const [recentEventPurchases, setRecentEventPurchases] = useState<any[]>([]);
   const [metrics, setMetrics] = useState({
     totalBookings: 0,
     totalRevenue: 0,
@@ -106,6 +107,9 @@ const LocationManagerDashboard: React.FC = () => {
     bookingRevenue: 0,
     purchaseRevenue: 0,
     totalPurchases: 0,
+    eventPurchaseRevenue: 0,
+    totalEventPurchases: 0,
+    totalEventTickets: 0,
   });
 
   // Get dates for the current week
@@ -290,6 +294,9 @@ const LocationManagerDashboard: React.FC = () => {
           if (cachedData.recentPurchases) {
             setTicketPurchases(cachedData.recentPurchases);
           }
+          if (cachedData.recentEventPurchases) {
+            setRecentEventPurchases(cachedData.recentEventPurchases);
+          }
           setLoading(false);
         }
 
@@ -337,6 +344,11 @@ const LocationManagerDashboard: React.FC = () => {
           // Also update the purchase cache
           await attractionPurchaseCacheService.cachePurchases(metricsResponse.recentPurchases as any);
         }
+
+        // Set recent event purchases from API response
+        if (metricsResponse.recentEventPurchases) {
+          setRecentEventPurchases(metricsResponse.recentEventPurchases as any);
+        }
         
         if (metricsResponse.locationDetails) {
           console.log('📍 Location details from API:', metricsResponse.locationDetails.name);
@@ -346,6 +358,7 @@ const LocationManagerDashboard: React.FC = () => {
         await metricsCacheService.cacheMetrics('manager', {
           metrics: metricsResponse.metrics,
           recentPurchases: metricsResponse.recentPurchases || [],
+          recentEventPurchases: metricsResponse.recentEventPurchases || [],
         }, locationId, metricsTimeframe);
         
         // Update timeframe description from API
@@ -665,7 +678,7 @@ const LocationManagerDashboard: React.FC = () => {
     {
       title: 'Total Revenue',
       value: `$${metrics.totalRevenue.toFixed(2)}`,
-      change: `${timeframeDescription}`,
+      change: `Bookings: $${metrics.bookingRevenue.toFixed(2)} • Tickets: $${metrics.purchaseRevenue.toFixed(2)}${metrics.eventPurchaseRevenue > 0 ? ` • Events: $${metrics.eventPurchaseRevenue.toFixed(2)}` : ''} • ${timeframeDescription}`,
       icon: DollarSign,
       accent: `bg-${themeColor}-100 text-${fullColor}`,
     },
@@ -686,7 +699,7 @@ const LocationManagerDashboard: React.FC = () => {
     {
       title: 'Avg Booking',
       value: metrics.totalBookings > 0 ? `$${(metrics.bookingRevenue / metrics.totalBookings).toFixed(2)}` : '$0.00',
-      change: `${metrics.totalPurchases} tickets sold • ${timeframeDescription}`,
+      change: `${metrics.totalPurchases} tickets sold${metrics.totalEventTickets > 0 ? ` • ${metrics.totalEventTickets} event tickets` : ''} • ${timeframeDescription}`,
       icon: TrendingUp,
       accent: `bg-${themeColor}-100 text-${fullColor}`,
     },
@@ -1548,6 +1561,57 @@ const LocationManagerDashboard: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Recent Event Purchases Table */}
+      {recentEventPurchases.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
+            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <CalendarDays className={`w-5 h-5 text-${fullColor}`} /> Recent Event Purchases
+            </h2>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="text-xs text-gray-500 uppercase bg-gray-50 border-b">
+                <tr>
+                  <th className="px-4 py-3 font-medium">Customer</th>
+                  <th className="px-4 py-3 font-medium">Event</th>
+                  <th className="px-4 py-3 font-medium">Qty</th>
+                  <th className="px-4 py-3 font-medium">Amount</th>
+                  <th className="px-4 py-3 font-medium">Paid</th>
+                  <th className="px-4 py-3 font-medium">Date</th>
+                  <th className="px-4 py-3 font-medium">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {recentEventPurchases.map((ep: any) => (
+                  <tr key={ep.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3 font-medium text-gray-900">{ep.customer_name || 'Guest'}</td>
+                    <td className="px-4 py-3 text-gray-900">{ep.event_name || 'Event'}</td>
+                    <td className="px-4 py-3 text-center">{ep.quantity}</td>
+                    <td className="px-4 py-3 font-bold text-gray-900">${parseFloat(String(ep.total_amount || 0)).toFixed(2)}</td>
+                    <td className="px-4 py-3 text-gray-700">${parseFloat(String(ep.amount_paid || 0)).toFixed(2)}</td>
+                    <td className="px-4 py-3 text-gray-500">
+                      {formatLocalDateTime(ep.purchase_date || ep.created_at, { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`px-2 py-1 text-xs font-medium rounded-full capitalize ${
+                        ep.status === 'completed' ? 'bg-green-100 text-green-700' :
+                        ep.status === 'confirmed' ? 'bg-blue-100 text-blue-700' :
+                        ep.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                        ep.status === 'cancelled' ? 'bg-red-100 text-red-700' :
+                        'bg-gray-100 text-gray-700'
+                      }`}>
+                        {ep.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* All Bookings table removed — use Manage Bookings page instead */}
       {false && <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">

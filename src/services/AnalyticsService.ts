@@ -41,12 +41,12 @@ export interface CompanyAnalyticsParams {
 
 export interface ExportAnalyticsParams extends LocationAnalyticsParams {
   format?: 'json' | 'csv';
-  sections?: ('metrics' | 'revenue' | 'packages' | 'attractions' | 'timeslots')[];
+  sections?: ('metrics' | 'revenue' | 'packages' | 'attractions' | 'timeslots' | 'events')[];
 }
 
 export interface ExportCompanyAnalyticsParams extends CompanyAnalyticsParams {
   format?: 'json' | 'csv';
-  sections?: ('metrics' | 'revenue' | 'packages' | 'attractions' | 'locations')[];
+  sections?: ('metrics' | 'revenue' | 'packages' | 'attractions' | 'locations' | 'events')[];
 }
 
 export interface LocationAnalyticsResponse {
@@ -95,6 +95,16 @@ export interface LocationAnalyticsResponse {
       total: number;
       info: string;
     };
+    event_ticket_sales?: {
+      value: number;
+      change: string;
+      trend: 'up' | 'down';
+    };
+    active_events?: {
+      value: number;
+      total: number;
+      info: string;
+    };
   };
   hourly_revenue: Array<{
     hour: number;
@@ -102,6 +112,7 @@ export interface LocationAnalyticsResponse {
     revenue: number;
     bookings: number;
     attraction_purchases: number;
+    event_purchases?: number;
   }>;
   daily_revenue: Array<{
     day: string;
@@ -110,6 +121,7 @@ export interface LocationAnalyticsResponse {
     bookings: number;
     attraction_purchases: number;
     participants: number;
+    event_purchases?: number;
   }>;
   weekly_trend: Array<{
     week: string;
@@ -118,6 +130,7 @@ export interface LocationAnalyticsResponse {
     revenue: number;
     bookings: number;
     tickets: number;
+    event_tickets?: number;
   }>;
   package_performance: Array<{
     id: number;
@@ -151,6 +164,17 @@ export interface LocationAnalyticsResponse {
     total_revenue: number;
     total_transactions: number;
     avg_value: number;
+    event_tickets_sold?: number;
+    event_revenue?: number;
+  }>;
+  event_performance?: Array<{
+    id: number;
+    name: string;
+    date_type: string;
+    purchases: number;
+    tickets_sold: number;
+    revenue: number;
+    price: number;
   }>;
 }
 
@@ -199,6 +223,15 @@ export interface CompanyAnalyticsResponse {
       value: number;
       info: string;
     };
+    event_ticket_purchases?: {
+      value: number;
+      change: string;
+      trend: 'up' | 'down';
+    };
+    active_events?: {
+      value: number;
+      info: string;
+    };
   };
   revenue_trend: Array<{
     month: string;
@@ -220,6 +253,7 @@ export interface CompanyAnalyticsResponse {
   peak_hours: Array<{
     hour: string;
     bookings: number;
+    event_purchases?: number;
   }>;
   daily_performance: Array<{
     day: string;
@@ -233,6 +267,12 @@ export interface CompanyAnalyticsResponse {
     color: string;
   }>;
   top_attractions: Array<{
+    id: number;
+    name: string;
+    tickets_sold: number;
+    revenue: number;
+  }>;
+  top_events?: Array<{
     id: number;
     name: string;
     tickets_sold: number;

@@ -15,6 +15,7 @@ import {
   FileSpreadsheet,
   Receipt,
   X,
+  CalendarDays,
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
@@ -56,10 +57,11 @@ const CustomerAnalytics: React.FC = () => {
   const [analyticsData, setAnalyticsData] = useState<CustomerAnalyticsAnalyticsData | null>(null);
   const [topActivities, setTopActivities] = useState<any[]>([]);
   const [topPackages, setTopPackages] = useState<any[]>([]);
+  const [topEvents, setTopEvents] = useState<any[]>([]);
   const [recentCustomers, setRecentCustomers] = useState<any[]>([]);
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportFormat, setExportFormat] = useState<'csv' | 'pdf' | 'receipt'>('csv');
-  const [exportSections, setExportSections] = useState<string[]>(['customers', 'revenue', 'bookings', 'activities', 'packages']);
+  const [exportSections, setExportSections] = useState<string[]>(['customers', 'revenue', 'bookings', 'activities', 'packages', 'events']);
   const [isExporting, setIsExporting] = useState(false);
   const [exportDateRange, setExportDateRange] = useState<'7d' | '30d' | '90d' | '1y' | 'all' | 'custom' | ''>('all');
   const [exportLocation, setExportLocation] = useState<number | null>(null);
@@ -120,6 +122,7 @@ const CustomerAnalytics: React.FC = () => {
         setAnalyticsData(response.data.analyticsData);
         setTopActivities(response.data.topActivities);
         setTopPackages(response.data.topPackages);
+        setTopEvents(response.data.topEvents || []);
         setRecentCustomers(response.data.recentCustomers);
       }
     } catch (error) {
@@ -670,6 +673,40 @@ const CustomerAnalytics: React.FC = () => {
         </div>
       </div>
 
+      {/* Top Events Table */}
+      {topEvents.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm p-3 sm:p-6 border border-gray-100 mt-4">
+          <div className="flex items-center gap-2 mb-4">
+            <CalendarDays className={`w-5 h-5 text-${themeColor}-600`} />
+            <h3 className="text-lg font-semibold text-gray-900">Top 5 Most Purchased Events by Customer</h3>
+            <div className="group relative">
+              <Info className="w-4 h-4 text-gray-400 cursor-help" />
+              <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
+                Shows which events are most popular among your top customers. Helps identify trending events.
+              </div>
+            </div>
+          </div>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-200">
+                <th className="text-left py-3 font-medium text-gray-600">Customer</th>
+                <th className="text-left py-3 font-medium text-gray-600">Event</th>
+                <th className="text-left py-3 font-medium text-gray-600">Purchases</th>
+              </tr>
+            </thead>
+            <tbody>
+              {topEvents.map((event, index) => (
+                <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
+                  <td className="py-3">{event.customer}</td>
+                  <td className="py-3">{event.event}</td>
+                  <td className="py-3 font-medium">{event.purchases}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
       {/* Recent Customers Table */}
   <div className="bg-white rounded-xl shadow-sm p-3 sm:p-6 border border-gray-100">
         <div className="flex items-center justify-between mb-6">
@@ -855,7 +892,8 @@ const CustomerAnalytics: React.FC = () => {
                   { id: 'revenue', label: 'Revenue', icon: DollarSign },
                   { id: 'bookings', label: 'Bookings', icon: Activity },
                   { id: 'activities', label: 'Activities', icon: TrendingUp },
-                  { id: 'packages', label: 'Packages', icon: Star }
+                  { id: 'packages', label: 'Packages', icon: Star },
+                  { id: 'events', label: 'Events', icon: CalendarDays },
                 ].map((section) => {
                   const Icon = section.icon;
                   return (

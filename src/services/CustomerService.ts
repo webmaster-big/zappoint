@@ -45,6 +45,9 @@ export interface CustomerListItem {
   total_bookings: number;
   total_purchase_tickets: number;
   total_ticket_quantity: number;
+  total_event_purchases?: number;
+  total_event_tickets?: number;
+  event_purchase_spent?: number;
   status?: string;
   satisfaction?: number;
   tags?: string[];
@@ -404,6 +407,7 @@ class CustomerService {
       };
       topActivities: Array<{ customer: string; activity: string; purchases: number }>;
       topPackages: Array<{ customer: string; package: string; bookings: number }>;
+      topEvents?: Array<{ customer: string; event: string; purchases: number }>;
       recentCustomers: Array<{
         id: string;
         name: string;

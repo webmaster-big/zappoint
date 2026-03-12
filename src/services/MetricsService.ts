@@ -13,6 +13,9 @@ export interface DashboardMetrics {
   bookingRevenue: number;
   purchaseRevenue: number;
   totalPurchases: number;
+  eventPurchaseRevenue: number;
+  totalEventPurchases: number;
+  totalEventTickets: number;
 }
 
 export type TimeframeType = 'last_24h' | 'last_7d' | 'last_30d' | 'all_time' | 'custom';
@@ -45,6 +48,11 @@ export interface LocationStats {
     revenue: number;
     participants: number;
     utilization: number;
+    eventPurchases?: number;
+    eventTickets?: number;
+    bookingRevenue?: number;
+    purchaseRevenue?: number;
+    eventPurchaseRevenue?: number;
   };
 }
 
@@ -58,10 +66,23 @@ export interface LocationDetails {
   email: string;
 }
 
+export interface RecentEventPurchase {
+  id: number;
+  customer_name: string;
+  event_name: string;
+  quantity: number;
+  total_amount: number;
+  amount_paid: number;
+  status: string;
+  purchase_date: string;
+  created_at: string;
+}
+
 export interface DashboardResponse {
   timeframe: TimeframeInfo;
   metrics: DashboardMetrics;
   recentPurchases: RecentPurchase[];
+  recentEventPurchases?: RecentEventPurchase[];
   locationStats?: LocationStats; // Only for company_admin
   locationDetails?: LocationDetails; // Only for manager/attendant
 }
@@ -88,6 +109,7 @@ export interface AttendantResponse {
   timeframe: TimeframeInfo;
   metrics: DashboardMetrics;
   recentPurchases: RecentPurchase[];
+  recentEventPurchases?: RecentEventPurchase[];
   recentBookings: RecentBooking[];
 }
 

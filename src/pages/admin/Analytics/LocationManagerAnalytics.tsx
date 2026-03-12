@@ -11,6 +11,7 @@ import {
   Info,
   Activity,
   Loader2,
+  CalendarDays,
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
@@ -41,7 +42,7 @@ const LocationManagerAnalytics: React.FC = () => {
   const [isExporting, setIsExporting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [analyticsData, setAnalyticsData] = useState<LocationAnalyticsResponse | null>(null);
-  const [selectedSections, setSelectedSections] = useState<('packages' | 'metrics' | 'revenue' | 'attractions' | 'timeslots')[]>(['metrics', 'revenue', 'packages', 'attractions', 'timeslots']);
+  const [selectedSections, setSelectedSections] = useState<('packages' | 'metrics' | 'revenue' | 'attractions' | 'timeslots' | 'events')[]>(['metrics', 'revenue', 'packages', 'attractions', 'timeslots', 'events']);
   const [exportFormat, setExportFormat] = useState<'json' | 'csv'>('json');
   
   // TODO: Get location_id from authenticated user's location
@@ -113,7 +114,7 @@ const LocationManagerAnalytics: React.FC = () => {
     }
   };
 
-  type SectionType = 'packages' | 'metrics' | 'revenue' | 'attractions' | 'timeslots';
+  type SectionType = 'packages' | 'metrics' | 'revenue' | 'attractions' | 'timeslots' | 'events';
 
   const toggleSection = (sectionId: SectionType) => {
     setSelectedSections(prev =>
@@ -134,7 +135,7 @@ const LocationManagerAnalytics: React.FC = () => {
     );
   }
 
-  const { location, key_metrics, hourly_revenue, daily_revenue, weekly_trend, package_performance, attraction_performance, time_slot_performance } = analyticsData;
+  const { location, key_metrics, hourly_revenue, daily_revenue, weekly_trend, package_performance, attraction_performance, time_slot_performance, event_performance } = analyticsData;
 
   // Format daily_revenue with readable date labels (e.g. "Mon, Jan 27")
   const formattedDailyRevenue = daily_revenue.map(d => ({
@@ -154,6 +155,8 @@ const LocationManagerAnalytics: React.FC = () => {
     { label: 'Total Visitors', value: key_metrics.total_visitors.value, icon: Users, change: key_metrics.total_visitors.change + ' vs last period', trend: key_metrics.total_visitors.trend },
     { label: 'Active Packages', value: key_metrics.active_packages.value, icon: Package, change: `${key_metrics.active_packages.value} of ${key_metrics.active_packages.total} active`, trend: 'up', info: key_metrics.active_packages.info },
     { label: 'Active Attractions', value: key_metrics.active_attractions.value, icon: Activity, change: `${key_metrics.active_attractions.value} of ${key_metrics.active_attractions.total} active`, trend: 'up', info: key_metrics.active_attractions.info },
+    ...(key_metrics.event_ticket_sales ? [{ label: 'Event Ticket Sales', value: key_metrics.event_ticket_sales.value, icon: CalendarDays, change: key_metrics.event_ticket_sales.change + ' vs last period', trend: key_metrics.event_ticket_sales.trend }] : []),
+    ...(key_metrics.active_events ? [{ label: 'Active Events', value: key_metrics.active_events.value, icon: CalendarDays, change: `${key_metrics.active_events.value} of ${key_metrics.active_events.total} active`, trend: 'up' as const, info: key_metrics.active_events.info }] : []),
   ];
 
   return (
@@ -273,6 +276,7 @@ const LocationManagerAnalytics: React.FC = () => {
                       <p className="text-gray-600">Revenue: <span className="font-medium text-gray-900">${Number(data.revenue).toLocaleString()}</span></p>
                       <p className="text-gray-600">Bookings: <span className="font-medium text-gray-900">{data.bookings}</span></p>
                       <p className="text-gray-600">Attraction Purchases: <span className="font-medium text-gray-900">{data.attraction_purchases}</span></p>
+                      {data.event_purchases > 0 && <p className="text-gray-600">Event Purchases: <span className="font-medium text-gray-900">{data.event_purchases}</span></p>}
                     </div>
                   );
                 }}
@@ -281,6 +285,9 @@ const LocationManagerAnalytics: React.FC = () => {
               <Line yAxisId="left" type="monotone" dataKey="revenue" stroke={`var(--color-${themeColor}-500)`} strokeWidth={2} name="Revenue ($)" />
               <Line yAxisId="right" type="monotone" dataKey="bookings" stroke="#10b981" strokeWidth={2} name="Bookings" />
               <Line yAxisId="right" type="monotone" dataKey="attraction_purchases" stroke="#f59e0b" strokeWidth={2} name="Attraction Purchases" />
+              {hourly_revenue.some(h => h.event_purchases && h.event_purchases > 0) && (
+                <Line yAxisId="right" type="monotone" dataKey="event_purchases" stroke="#8b5cf6" strokeWidth={2} name="Event Purchases" />
+              )}
             </LineChart>
           </ResponsiveContainer>
         </div>
@@ -315,6 +322,7 @@ const LocationManagerAnalytics: React.FC = () => {
                       <p className="text-gray-600">Revenue: <span className="font-medium text-gray-900">${Number(data.revenue).toLocaleString()}</span></p>
                       <p className="text-gray-600">Bookings: <span className="font-medium text-gray-900">{data.bookings}</span></p>
                       <p className="text-gray-600">Attraction Purchases: <span className="font-medium text-gray-900">{data.attraction_purchases}</span></p>
+                      {data.event_purchases > 0 && <p className="text-gray-600">Event Purchases: <span className="font-medium text-gray-900">{data.event_purchases}</span></p>}
                       <p className="text-gray-600">Participants: <span className="font-medium text-gray-900">{data.participants}</span></p>
                     </div>
                   );
@@ -324,6 +332,9 @@ const LocationManagerAnalytics: React.FC = () => {
               <Area yAxisId="left" type="monotone" dataKey="revenue" stroke={`var(--color-${themeColor}-500)`} fill={`var(--color-${themeColor}-500)`} fillOpacity={0.1} name="Revenue ($)" />
               <Area yAxisId="right" type="monotone" dataKey="bookings" stroke="#10b981" fill="#10b981" fillOpacity={0.1} name="Bookings" />
               <Area yAxisId="right" type="monotone" dataKey="attraction_purchases" stroke="#f59e0b" fill="#f59e0b" fillOpacity={0.1} name="Attraction Purchases" />
+              {formattedDailyRevenue.some(d => d.event_purchases && d.event_purchases > 0) && (
+                <Area yAxisId="right" type="monotone" dataKey="event_purchases" stroke="#8b5cf6" fill="#8b5cf6" fillOpacity={0.1} name="Event Purchases" />
+              )}
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -444,6 +455,7 @@ const LocationManagerAnalytics: React.FC = () => {
                       <p className="text-gray-600">Revenue: <span className="font-medium text-gray-900">${Number(data.revenue).toLocaleString()}</span></p>
                       <p className="text-gray-600">Bookings: <span className="font-medium text-gray-900">{data.bookings}</span></p>
                       <p className="text-gray-600">Tickets Sold: <span className="font-medium text-gray-900">{data.tickets}</span></p>
+                      {data.event_tickets > 0 && <p className="text-gray-600">Event Tickets: <span className="font-medium text-gray-900">{data.event_tickets}</span></p>}
                     </div>
                   );
                 }}
@@ -452,6 +464,9 @@ const LocationManagerAnalytics: React.FC = () => {
               <Line yAxisId="left" type="monotone" dataKey="revenue" stroke={`var(--color-${themeColor}-500)`} strokeWidth={2} name="Revenue ($)" />
               <Line yAxisId="right" type="monotone" dataKey="bookings" stroke="#10b981" strokeWidth={2} name="Bookings" />
               <Line yAxisId="right" type="monotone" dataKey="tickets" stroke="#f59e0b" strokeWidth={2} name="Tickets Sold" />
+              {weekly_trend.some(w => w.event_tickets && w.event_tickets > 0) && (
+                <Line yAxisId="right" type="monotone" dataKey="event_tickets" stroke="#8b5cf6" strokeWidth={2} name="Event Tickets" />
+              )}
             </LineChart>
           </ResponsiveContainer>
         </div>
@@ -486,8 +501,10 @@ const LocationManagerAnalytics: React.FC = () => {
                       <p className="text-gray-600">Total Revenue: <span className="font-medium text-gray-900">${Number(data.total_revenue).toLocaleString()}</span></p>
                       <p className="text-gray-600 ml-3">Booking Revenue: <span className="font-medium text-gray-900">${Number(data.booking_revenue).toLocaleString()}</span></p>
                       <p className="text-gray-600 ml-3">Attraction Revenue: <span className="font-medium text-gray-900">${Number(data.attraction_revenue).toLocaleString()}</span></p>
+                      {data.event_revenue > 0 && <p className="text-gray-600 ml-3">Event Revenue: <span className="font-medium text-gray-900">${Number(data.event_revenue).toLocaleString()}</span></p>}
                       <p className="text-gray-600">Bookings: <span className="font-medium text-gray-900">{data.bookings}</span></p>
                       <p className="text-gray-600">Tickets Sold: <span className="font-medium text-gray-900">{data.tickets_sold}</span></p>
+                      {data.event_tickets_sold > 0 && <p className="text-gray-600">Event Tickets: <span className="font-medium text-gray-900">{data.event_tickets_sold}</span></p>}
                       <p className="text-gray-600">Participants: <span className="font-medium text-gray-900">{data.participants}</span></p>
                       <p className="text-gray-600">Total Transactions: <span className="font-medium text-gray-900">{data.total_transactions}</span></p>
                       <p className="text-gray-600">Avg Value: <span className="font-medium text-gray-900">${Number(data.avg_value).toLocaleString()}</span></p>
@@ -559,6 +576,42 @@ const LocationManagerAnalytics: React.FC = () => {
         </div>
       </div>
 
+      {/* Event Performance Table */}
+      {event_performance && event_performance.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm p-3 sm:p-6 border border-gray-100">
+          <div className="flex items-center gap-2 mb-4">
+            <CalendarDays className={`w-5 h-5 text-${themeColor}-600`} />
+            <h3 className="text-lg font-semibold text-gray-900">Event Performance</h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-200">
+                  <th className="text-left py-3 font-medium text-gray-600">Event</th>
+                  <th className="text-left py-3 font-medium text-gray-600">Type</th>
+                  <th className="text-left py-3 font-medium text-gray-600">Purchases</th>
+                  <th className="text-left py-3 font-medium text-gray-600">Tickets Sold</th>
+                  <th className="text-left py-3 font-medium text-gray-600">Revenue</th>
+                  <th className="text-left py-3 font-medium text-gray-600">Price</th>
+                </tr>
+              </thead>
+              <tbody>
+                {event_performance.map((event, index) => (
+                  <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
+                    <td className="py-3 font-medium">{event.name}</td>
+                    <td className="py-3 capitalize">{event.date_type}</td>
+                    <td className="py-3">{event.purchases}</td>
+                    <td className="py-3">{event.tickets_sold}</td>
+                    <td className="py-3">${Number(event.revenue).toLocaleString()}</td>
+                    <td className="py-3">${Number(event.price).toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {/* Export Modal */}
       {showExportModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -622,6 +675,7 @@ const LocationManagerAnalytics: React.FC = () => {
                     { id: 'packages', label: 'Package Performance' },
                     { id: 'attractions', label: 'Attraction Data' },
                     { id: 'timeslots', label: 'Time Slot Analysis' },
+                    { id: 'events', label: 'Event Performance' },
                   ] as { id: SectionType; label: string }[]).map(section => (
                     <label key={section.id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded">
                       <input

@@ -15,6 +15,7 @@ import {
   Loader2,
   Building2,
   Boxes,
+  CalendarDays,
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
@@ -138,7 +139,7 @@ const CompanyAnalytics: React.FC = () => {
     );
   }
 
-  const { company, key_metrics, revenue_trend, location_performance, package_distribution, peak_hours, daily_performance, booking_status, top_attractions, available_locations } = analyticsData;
+  const { company, key_metrics, revenue_trend, location_performance, package_distribution, peak_hours, daily_performance, booking_status, top_attractions, available_locations, top_events } = analyticsData;
   
   // All available locations for filter (from API response)
   const allLocations = available_locations || location_performance.map(loc => ({
@@ -368,6 +369,48 @@ const CompanyAnalytics: React.FC = () => {
             </div>
           </div>
         </div>
+        {key_metrics.event_ticket_purchases && (
+          <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <p className="text-sm font-medium text-gray-600">Event Tickets</p>
+                <div className="text-2xl font-bold text-gray-900 mt-1">
+                  <CounterAnimation
+                    value={key_metrics.event_ticket_purchases.value}
+                    className="text-2xl font-bold text-gray-900"
+                  />
+                </div>
+                <p className={`text-xs mt-1 ${key_metrics.event_ticket_purchases.change.includes('+') ? 'text-green-600' : 'text-red-600'}`}>
+                  {key_metrics.event_ticket_purchases.change}
+                </p>
+              </div>
+              <div className={`p-2 bg-${themeColor}-50 rounded-lg`}>
+                <CalendarDays className={`w-5 h-5 text-${themeColor}-600`} />
+              </div>
+            </div>
+          </div>
+        )}
+        {key_metrics.active_events && (
+          <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <p className="text-sm font-medium text-gray-600">Active Events</p>
+                <div className="text-2xl font-bold text-gray-900 mt-1">
+                  <CounterAnimation
+                    value={key_metrics.active_events.value}
+                    className="text-2xl font-bold text-gray-900"
+                  />
+                </div>
+                <p className="text-xs mt-1 text-gray-600">
+                  {key_metrics.active_events.info}
+                </p>
+              </div>
+              <div className={`p-2 bg-${themeColor}-50 rounded-lg`}>
+                <CalendarDays className={`w-5 h-5 text-${themeColor}-600`} />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Charts Grid - 2 columns */}
@@ -479,8 +522,23 @@ const CompanyAnalytics: React.FC = () => {
               <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
               <XAxis dataKey="hour" stroke="#6b7280" />
               <YAxis stroke="#6b7280" />
-              <Tooltip />
-              <Bar dataKey="bookings" fill={`var(--color-${themeColor}-500)`} radius={[4, 4, 0, 0]} />
+              <Tooltip
+                content={({ active, payload }) => {
+                  if (!active || !payload?.length) return null;
+                  const data = payload[0].payload;
+                  return (
+                    <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-3 text-sm">
+                      <p className="font-semibold text-gray-900 mb-2">{data.hour}</p>
+                      <p className="text-gray-600">Bookings: <span className="font-medium text-gray-900">{data.bookings}</span></p>
+                      {data.event_purchases > 0 && <p className="text-gray-600">Event Purchases: <span className="font-medium text-gray-900">{data.event_purchases}</span></p>}
+                    </div>
+                  );
+                }}
+              />
+              <Bar dataKey="bookings" fill={`var(--color-${themeColor}-500)`} radius={[4, 4, 0, 0]} name="Bookings" />
+              {peak_hours.some(h => h.event_purchases && h.event_purchases > 0) && (
+                <Bar dataKey="event_purchases" fill="#8b5cf6" radius={[4, 4, 0, 0]} name="Event Purchases" />
+              )}
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -602,6 +660,36 @@ const CompanyAnalytics: React.FC = () => {
           </table>
         </div>
       </div>
+
+      {/* Top Events Table */}
+      {top_events && top_events.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm p-3 sm:p-6 border border-gray-100">
+          <div className="flex items-center gap-2 mb-4">
+            <CalendarDays className={`w-5 h-5 text-${themeColor}-600`} />
+            <h3 className="text-lg font-semibold text-gray-900">Top Events</h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-200">
+                  <th className="text-left py-3 font-medium text-gray-600">Event</th>
+                  <th className="text-left py-3 font-medium text-gray-600">Tickets Sold</th>
+                  <th className="text-left py-3 font-medium text-gray-600">Revenue</th>
+                </tr>
+              </thead>
+              <tbody>
+                {top_events.map((event, index) => (
+                  <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
+                    <td className="py-3 font-medium">{event.name}</td>
+                    <td className="py-3">{event.tickets_sold}</td>
+                    <td className="py-3">${Number(event.revenue).toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Export Modal */}
       {showExportModal && (
