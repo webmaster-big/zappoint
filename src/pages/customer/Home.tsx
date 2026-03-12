@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
   MapPin, 
   Calendar, 
@@ -15,7 +15,8 @@ import {
   Sparkles
 } from 'lucide-react';
 import type { Attraction, Package as PackageType, BookingType } from '../../types/customer';
-import { customerService, type GroupedAttraction, type GroupedPackage, type GroupedEvent } from '../../services/CustomerService';
+import { type GroupedAttraction, type GroupedPackage, type GroupedEvent } from '../../services/CustomerService';
+import { customerDataCacheService } from '../../services/CustomerDataCacheService';
 import { ASSET_URL } from '../../utils/storage';
 import { generateSlug, generateLocationSlug } from '../../utils/slug';
 import { convertTo12Hour, formatDurationDisplay, getUpcomingAttractionSessions, getUpcomingPackageSessions } from '../../utils/timeFormat';
@@ -72,165 +73,149 @@ const EntertainmentLandingPage = () => {
   const [locations, setLocations] = useState<string[]>(['All Locations']);
   const [dataLoading, setDataLoading] = useState(true);
 
-  // Load data from backend on mount
-  useEffect(() => {
-    loadData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  // Process raw grouped data into component state
+  const processData = useCallback((
+    attractionsData: GroupedAttraction[],
+    packagesData: GroupedPackage[],
+    eventsData: GroupedEvent[],
+  ) => {
+    const allLocations = new Set<string>();
+
+    // Transform attractions
+    const transformedAttractions: Attraction[] = attractionsData.map((attr: GroupedAttraction) => {
+      attr.locations.forEach(loc => allLocations.add(loc.location_name));
+      return {
+        id: attr.purchase_links[0]?.attraction_id || 0,
+        name: attr.name,
+        description: attr.description,
+        price: attr.price,
+        minAge: attr.min_age,
+        capacity: attr.max_capacity,
+        displayCapacityToCustomers: attr.display_capacity_to_customers ?? true,
+        rating: attr.rating || 4.5,
+        image: Array.isArray(attr.image) ? attr.image[0] : attr.image,
+        category: attr.category,
+        availableLocations: attr.locations.map(loc => loc.location_name),
+        duration: !attr.duration || attr.duration === 0 || String(attr.duration) === '0' ? 'Unlimited' : formatDurationDisplay(attr.duration, attr.duration_unit),
+        pricingType: attr.pricing_type,
+        purchaseLinks: attr.purchase_links,
+        availability: attr.availability,
+      };
+    });
+    setAttractions(transformedAttractions);
+
+    // Transform packages
+    packagesData.forEach((pkg: GroupedPackage) => {
+      pkg.locations.forEach(loc => allLocations.add(loc.location_name));
+    });
+    const transformedPackages: PackageType[] = packagesData.map((pkg: GroupedPackage) => {
+      const minGuests = pkg.min_participants || 1;
+      const maxGuests = pkg.max_guests || minGuests;
+      const participantsText = maxGuests > minGuests
+        ? `Starts at ${minGuests} guests (up to ${maxGuests})`
+        : `${minGuests} guests`;
+      return {
+        id: pkg.booking_links[0]?.package_id || 0,
+        name: pkg.name,
+        description: pkg.description,
+        price: pkg.price,
+        duration: !pkg.duration || pkg.duration === 0 || String(pkg.duration) === '0' ? 'Unlimited' : formatDurationDisplay(pkg.duration, pkg.duration_unit),
+        participants: participantsText,
+        includes: [],
+        rating: 4.8,
+        image: Array.isArray(pkg.image) ? pkg.image[0] : pkg.image,
+        category: pkg.category,
+        availableLocations: pkg.locations.map(loc => loc.location_name),
+        bookingLinks: pkg.booking_links,
+        availability_schedules: pkg.availability_schedules,
+        package_type: pkg.package_type || 'regular',
+        min_participants: pkg.min_participants,
+        max_guests: pkg.max_guests,
+        price_per_additional: pkg.price_per_additional,
+      };
+    });
+    setPackages(transformedPackages);
+
+    // Transform events (filter to upcoming only)
+    eventsData.forEach((evt: GroupedEvent) => {
+      evt.locations.forEach(loc => allLocations.add(loc.location_name));
+    });
+    const transformedEvents: DisplayEvent[] = eventsData
+      .filter((evt: GroupedEvent) => {
+        const endDate = (evt.end_date || evt.start_date).substring(0, 10);
+        return new Date(endDate + 'T23:59:59') >= new Date();
+      })
+      .map((evt: GroupedEvent) => ({
+        id: evt.purchase_links[0]?.event_id || 0,
+        name: evt.name,
+        description: evt.description,
+        image: evt.image,
+        date_type: evt.date_type,
+        start_date: evt.start_date,
+        end_date: evt.end_date,
+        time_start: evt.time_start,
+        time_end: evt.time_end,
+        interval_minutes: evt.interval_minutes,
+        max_bookings_per_slot: evt.max_bookings_per_slot,
+        price: evt.price,
+        features: evt.features,
+        availableLocations: evt.locations.map(loc => loc.location_name),
+        locations: evt.locations.map(loc => ({
+          location_id: loc.location_id,
+          location_name: loc.location_name,
+          location_slug: loc.location_slug,
+          event_id: loc.event_id,
+          address: loc.address,
+          city: loc.city,
+          state: loc.state,
+          phone: loc.phone,
+        })),
+        purchaseLinks: evt.purchase_links,
+      }));
+    setEvents(transformedEvents);
+
+    setLocations(['All Locations', ...Array.from(allLocations).sort()]);
   }, []);
 
-  // Reload data when search changes (with debounce)
+  // Load data: cache-first, then background sync
   useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      loadData();
-    }, 500);
-    return () => clearTimeout(timeoutId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchQuery]);
+    let cancelled = false;
 
-  const loadData = async () => {
-    try {
-      setDataLoading(true);
-      // Fetch grouped attractions, packages, and events from backend
-      // Use allSettled so a failure in one endpoint doesn't prevent the others from loading
-      const [attractionsResult, packagesResult, eventsResult] = await Promise.allSettled([
-        customerService.getGroupedAttractions(searchQuery || undefined),
-        customerService.getGroupedPackages(searchQuery || undefined),
-        customerService.getGroupedEvents(searchQuery || undefined),
-      ]);
-      const attractionsResponse = attractionsResult.status === 'fulfilled' ? attractionsResult.value : { success: false as const, data: [] };
-      const packagesResponse = packagesResult.status === 'fulfilled' ? packagesResult.value : { success: false as const, data: [] };
-      const eventsResponse = eventsResult.status === 'fulfilled' ? eventsResult.value : { success: false as const, data: [] };
-      if (eventsResult.status === 'rejected') console.error('Events API error:', eventsResult.reason);
+    const loadData = async () => {
+      try {
+        // Step 1: Try cache first for instant render
+        const cached = await customerDataCacheService.getCachedAll();
+        if (cached && !cancelled) {
+          processData(cached.attractions, cached.packages, cached.events);
+          setDataLoading(false);
+        }
 
-      // Collect all locations from all sources
-      const allLocations = new Set<string>();
-
-      if (attractionsResponse.success && attractionsResponse.data) {
-        // Transform grouped attractions to match component format
-        const transformedAttractions: Attraction[] = attractionsResponse.data.map((attr: GroupedAttraction) => {
-          return {
-            id: attr.purchase_links[0]?.attraction_id || 0,
-            name: attr.name,
-            description: attr.description,
-            price: attr.price,
-            minAge: attr.min_age,
-            capacity: attr.max_capacity,
-            displayCapacityToCustomers: attr.display_capacity_to_customers ?? true,
-            rating: attr.rating || 4.5,
-            image: Array.isArray(attr.image) ? attr.image[0] : attr.image,
-            category: attr.category,
-            availableLocations: attr.locations.map(loc => loc.location_name),
-            duration: !attr.duration || attr.duration === 0 || String(attr.duration) === '0' ? 'Unlimited' : formatDurationDisplay(attr.duration, attr.duration_unit),
-            pricingType: attr.pricing_type,
-            purchaseLinks: attr.purchase_links,
-            availability: attr.availability,
-          };
-        });
-        setAttractions(transformedAttractions);
-
-        // Extract unique locations from attractions
-        attractionsResponse.data.forEach((attr: GroupedAttraction) => {
-          attr.locations.forEach(loc => allLocations.add(loc.location_name));
-        });
+        // Step 2: Always fetch fresh data in background
+        const fresh = await customerDataCacheService.fetchAndCache();
+        if (!cancelled) {
+          processData(fresh.attractions, fresh.packages, fresh.events);
+          setDataLoading(false);
+        }
+      } catch (error) {
+        console.error('Error loading data:', error);
+        if (!cancelled) setDataLoading(false);
       }
+    };
 
-      // Add locations from packages
-      if (packagesResponse.success && packagesResponse.data) {
-        packagesResponse.data.forEach((pkg: GroupedPackage) => {
-          pkg.locations.forEach(loc => allLocations.add(loc.location_name));
-        });
+    loadData();
+    return () => { cancelled = true; };
+  }, [processData]);
+
+  // Listen for cache updates (e.g. from other tabs or navigation)
+  useEffect(() => {
+    const unsubscribe = customerDataCacheService.onCacheUpdate((event: CustomEvent) => {
+      if (event.detail?.source === 'api' && event.detail?.data) {
+        const { attractions: a, packages: p, events: e } = event.detail.data;
+        processData(a, p, e);
       }
-
-      // Add locations from events
-      if (eventsResponse.success && eventsResponse.data) {
-        eventsResponse.data.forEach((evt: GroupedEvent) => {
-          evt.locations.forEach(loc => allLocations.add(loc.location_name));
-        });
-      }
-
-      setLocations(['All Locations', ...Array.from(allLocations).sort()]);
-
-      if (packagesResponse.success && packagesResponse.data) {
-        // Transform grouped packages to match component format
-        const transformedPackages: PackageType[] = packagesResponse.data.map((pkg: GroupedPackage) => {
-          // Format participants display with fallbacks
-          const minGuests = pkg.min_participants || 1;
-          const maxGuests = pkg.max_guests || minGuests;
-          
-          let participantsText: string;
-          if (maxGuests > minGuests) {
-            participantsText = `Starts at ${minGuests} guests (up to ${maxGuests})`;
-          } else {
-            participantsText = `${minGuests} guests`;
-          }
-          
-          return {
-            id: pkg.booking_links[0]?.package_id || 0,
-            name: pkg.name,
-            description: pkg.description,
-            price: pkg.price,
-            duration: !pkg.duration || pkg.duration === 0 || String(pkg.duration) === '0' ? 'Unlimited' : formatDurationDisplay(pkg.duration, pkg.duration_unit),
-            participants: participantsText,
-            includes: [], // This would need to be added to backend if needed
-            rating: 4.8, // Default rating, backend doesn't return this yet
-            image: Array.isArray(pkg.image) ? pkg.image[0] : pkg.image,
-            category: pkg.category,
-            availableLocations: pkg.locations.map(loc => loc.location_name),
-            bookingLinks: pkg.booking_links,
-            availability_schedules: pkg.availability_schedules,
-            package_type: pkg.package_type || 'regular',
-            min_participants: pkg.min_participants,
-            max_guests: pkg.max_guests,
-            price_per_additional: pkg.price_per_additional,
-          };
-        });
-        setPackages(transformedPackages);
-      }
-
-      if (eventsResponse.success && eventsResponse.data) {
-        // Transform grouped events to match component format
-        const transformedEvents: DisplayEvent[] = eventsResponse.data
-          .filter((evt: GroupedEvent) => {
-            // Only show upcoming events (end_date or start_date >= today)
-            // Slice to YYYY-MM-DD to handle both "2026-03-19" and "2026-03-19T00:00:00.000000Z" formats
-            const endDate = (evt.end_date || evt.start_date).substring(0, 10);
-            return new Date(endDate + 'T23:59:59') >= new Date();
-          })
-          .map((evt: GroupedEvent) => ({
-            id: evt.purchase_links[0]?.event_id || 0,
-            name: evt.name,
-            description: evt.description,
-            image: evt.image,
-            date_type: evt.date_type,
-            start_date: evt.start_date,
-            end_date: evt.end_date,
-            time_start: evt.time_start,
-            time_end: evt.time_end,
-            interval_minutes: evt.interval_minutes,
-            max_bookings_per_slot: evt.max_bookings_per_slot,
-            price: evt.price,
-            features: evt.features,
-            availableLocations: evt.locations.map(loc => loc.location_name),
-            locations: evt.locations.map(loc => ({
-              location_id: loc.location_id,
-              location_name: loc.location_name,
-              location_slug: loc.location_slug,
-              event_id: loc.event_id,
-              address: loc.address,
-              city: loc.city,
-              state: loc.state,
-              phone: loc.phone,
-            })),
-            purchaseLinks: evt.purchase_links,
-          }));
-        setEvents(transformedEvents);
-      }
-    } catch (error) {
-      console.error('Error loading data:', error);
-    } finally {
-      setDataLoading(false);
-    }
-  };
+    });
+    return () => unsubscribe();
+  }, [processData]);
   const filteredAttractions = attractions.filter(attraction => {
     const matchesLocation = selectedLocation === 'All Locations' || 
       attraction.availableLocations.includes(selectedLocation);
