@@ -26,6 +26,7 @@ import SendInvitationsModal from '../../components/invitations/SendInvitationsMo
 import InvitationTracker from '../../components/invitations/InvitationTracker';
 import Toast from '../../components/ui/Toast';
 import Pagination from '../../components/ui/Pagination';
+import { AppliedFeesDisplay } from '../../components/AppliedFeesDisplay';
 
 const CustomerReservations = () => {
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -652,6 +653,11 @@ const CustomerReservations = () => {
                         {selectedBooking.payment_status}
                       </span>
                     </div>
+                    {selectedBooking.applied_fees && selectedBooking.applied_fees.length > 0 && (
+                      <div className="pt-2.5 border-t border-gray-200">
+                        <AppliedFeesDisplay appliedFees={selectedBooking.applied_fees} />
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -689,6 +695,19 @@ const CustomerReservations = () => {
                     </p>
                   </div>
                 )}
+
+                {/* Scheduled Time Highlight */}
+                <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-4 text-center">
+                  <div className="flex items-center justify-center gap-2 mb-1">
+                    <Clock size={18} className="text-blue-600" />
+                    <span className="text-lg font-bold text-blue-800">
+                      Scheduled for {convertTo12Hour(selectedBooking.booking_time)}
+                    </span>
+                  </div>
+                  <p className="text-sm text-blue-600">
+                    {new Date(selectedBooking.booking_date.split('T')[0] + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                  </p>
+                </div>
               </div>
 
               {/* Modal Footer */}

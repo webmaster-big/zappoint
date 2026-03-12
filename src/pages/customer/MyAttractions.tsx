@@ -16,10 +16,12 @@ import {
   Zap,
   Users,
   Construction,
+  Download,
 } from 'lucide-react';
 import { attractionPurchaseService } from '../../services/AttractionPurchaseService';
 import type { AttractionPurchase } from '../../services/AttractionPurchaseService';
 import { getImageUrl } from '../../utils/storage';
+import { generatePurchaseQRCode } from '../../utils/qrcode';
 import Toast from '../../components/ui/Toast';
 import Pagination from '../../components/ui/Pagination';
 
@@ -122,6 +124,21 @@ const MyAttractions = () => {
 
   const formatStatusLabel = (status: string) =>
     status.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+
+  const handleDownloadQRCode = async (purchase: AttractionPurchase) => {
+    try {
+      const qrCodeDataURL = await generatePurchaseQRCode(purchase.id);
+      const link = document.createElement('a');
+      link.href = qrCodeDataURL;
+      link.download = `attraction-ticket-${purchase.id}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setToast({ message: 'QR Code downloaded successfully!', type: 'success' });
+    } catch {
+      setToast({ message: 'Failed to generate QR code', type: 'error' });
+    }
+  };
 
   return (
     <>
@@ -353,6 +370,14 @@ const MyAttractions = () => {
 
                         {/* Actions */}
                         <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            onClick={() => handleDownloadQRCode(purchase)}
+                            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium border border-blue-200 text-blue-700 rounded-lg hover:bg-blue-50 transition"
+                            title="Download QR Code"
+                          >
+                            <Download size={14} />
+                            QR Code
+                          </button>
                           <button
                             onClick={() => { setSelectedPurchase(purchase); setShowDetailsModal(true); }}
                             className="inline-flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition"
@@ -608,6 +633,32 @@ const MyAttractions = () => {
                   <p className="text-sm text-gray-600 bg-gray-50 rounded-lg p-3">{selectedPurchase.notes}</p>
                 </div>
               )}
+
+              {/* Scheduled Time Highlight */}
+              {selectedPurchase.scheduled_time && (
+                <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-4 text-center">
+                  <div className="flex items-center justify-center gap-2 mb-1">
+                    <Clock size={18} className="text-blue-600" />
+                    <span className="text-lg font-bold text-blue-800">
+                      Scheduled for {formatTime(selectedPurchase.scheduled_time)}
+                    </span>
+                  </div>
+                  {selectedPurchase.scheduled_date && (
+                    <p className="text-sm text-blue-600">
+                      {new Date(selectedPurchase.scheduled_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Download QR Code */}
+              <button
+                onClick={() => handleDownloadQRCode(selectedPurchase)}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-700 hover:bg-blue-800 text-white font-medium rounded-xl transition-all text-sm"
+              >
+                <Download size={16} />
+                Download QR Code
+              </button>
             </div>
           </div>
         </div>

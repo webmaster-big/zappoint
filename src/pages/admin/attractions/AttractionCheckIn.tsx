@@ -21,6 +21,7 @@ import Toast from '../../../components/ui/Toast';
 import { AppliedFeesDisplay } from '../../../components/AppliedFeesDisplay';
 import StandardButton from '../../../components/ui/StandardButton';
 import { getStoredUser } from '../../../utils/storage';
+import { convertTo12Hour } from '../../../utils/timeFormat';
 
 interface ScanResult {
   purchaseId: number;
@@ -173,6 +174,23 @@ const AttractionCheckIn = () => {
       }
 
       const purchase = verifyResponse.data;
+
+      // If verify endpoint doesn't return schedule fields, fetch full purchase data
+      if (!purchase.scheduled_date || !purchase.scheduled_time) {
+        try {
+          const fullPurchaseResponse = await attractionPurchaseService.getPurchase(purchaseId);
+          if (fullPurchaseResponse.success && fullPurchaseResponse.data) {
+            const raw = fullPurchaseResponse.data;
+            // Normalize scheduled_date — may come back as full ISO datetime, extract date part only
+            purchase.scheduled_date = raw.scheduled_date
+              ? raw.scheduled_date.split('T')[0]
+              : purchase.scheduled_date;
+            purchase.scheduled_time = raw.scheduled_time ?? purchase.scheduled_time;
+          }
+        } catch (e) {
+          console.warn('Could not fetch full purchase data for schedule fields:', e);
+        }
+      }
 
       // Check if already checked in
       if (purchase.status === 'checked-in') {
@@ -394,6 +412,51 @@ const AttractionCheckIn = () => {
           </div>
         </div>
 
+        {/* Check-In Result Banner */}
+        {scanResult && (
+          <div className={`mb-6 rounded-xl overflow-hidden shadow-sm border flex items-center justify-between ${
+            scanResult.success 
+              ? 'border-green-200 bg-green-50' 
+              : 'border-red-200 bg-red-50'
+          }`}>
+            <div className="flex items-center gap-3 px-4 py-3">
+              {scanResult.success ? (
+                <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0" />
+              ) : (
+                <XCircle className="h-5 w-5 text-red-600 flex-shrink-0" />
+              )}
+              <div>
+                <span className={`font-semibold text-sm ${
+                  scanResult.success ? 'text-green-800' : 'text-red-800'
+                }`}>
+                  {scanResult.success ? 'Check-In Successful!' : 'Check-In Failed'}
+                </span>
+                <span className="text-sm text-gray-600 ml-2">{scanResult.message}</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 px-4 py-3">
+              <StandardButton
+                variant="primary"
+                size="sm"
+                icon={Camera}
+                onClick={() => {
+                  resetScan();
+                  startScanning();
+                }}
+              >
+                Scan Next
+              </StandardButton>
+              <StandardButton
+                variant="ghost"
+                size="sm"
+                onClick={resetScan}
+              >
+                Reset
+              </StandardButton>
+            </div>
+          </div>
+        )}
+
         {/* Scanner Section */}
         <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
           {/* QR Scanner Container */}
@@ -500,6 +563,26 @@ const AttractionCheckIn = () => {
 
               {/* Modal Body */}
               <div className="p-6">
+                {/* Scheduled Time Prompt Banner */}
+                {(verifiedPurchase.scheduled_time || verifiedPurchase.scheduled_date) && (
+                  <div className="mb-4 p-4 bg-blue-50 border-2 border-blue-300 rounded-xl text-center">
+                    <div className="flex items-center justify-center gap-2 mb-1">
+                      <Clock className="h-6 w-6 text-blue-600" />
+                      <span className="text-lg font-bold text-blue-800">
+                        Scheduled for {verifiedPurchase.scheduled_time ? convertTo12Hour(verifiedPurchase.scheduled_time) : 'No time set'}
+                      </span>
+                    </div>
+                    {verifiedPurchase.scheduled_date && (
+                      <p className="text-sm text-blue-600">
+                        {new Date(verifiedPurchase.scheduled_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                      </p>
+                    )}
+                    {verifiedPurchase.status === 'confirmed' && (
+                      <p className="text-sm text-blue-700 mt-2 font-medium">Would you like to check this person in now?</p>
+                    )}
+                  </div>
+                )}
+
                 {/* Status Alert */}
                 {verifiedPurchase.status === 'checked-in' && (
                   <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
@@ -607,6 +690,21 @@ const AttractionCheckIn = () => {
 
                     <div className="flex items-center gap-3">
                       <div className={`p-2 bg-${themeColor}-100 rounded-lg`}>
+                        <Calendar className={`h-5 w-5 text-${fullColor}`} />
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-500">Schedule</p>
+                        <p className="font-medium text-gray-800">
+                          {verifiedPurchase.scheduled_date
+                            ? new Date(verifiedPurchase.scheduled_date + 'T00:00:00').toLocaleDateString()
+                            : '—'}
+                          {verifiedPurchase.scheduled_time ? ` at ${convertTo12Hour(verifiedPurchase.scheduled_time)}` : ''}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <div className={`p-2 bg-${themeColor}-100 rounded-lg`}>
                         <Ticket className={`h-5 w-5 text-${fullColor}`} />
                       </div>
                       <div>
@@ -702,32 +800,33 @@ const AttractionCheckIn = () => {
 
               {/* Modal Footer - Action Buttons */}
               <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 p-6 flex gap-4">
-                <StandardButton
-                  variant="secondary"
-                  size="md"
-                  onClick={handleCancelCheckIn}
-                  fullWidth
-                >
-                  Cancel
-                </StandardButton>
-                
-                {verifiedPurchase.status === 'confirmed' && (
+                {verifiedPurchase.status === 'confirmed' ? (
+                  <>
+                    <StandardButton
+                      variant="danger"
+                      size="md"
+                      icon={XCircle}
+                      onClick={handleCancelCheckIn}
+                      fullWidth
+                    >
+                      Deny
+                    </StandardButton>
+                    
+                    <StandardButton
+                      variant="success"
+                      size="md"
+                      onClick={handleConfirmCheckIn}
+                      disabled={processing}
+                      loading={processing}
+                      icon={CheckCircle}
+                      fullWidth
+                    >
+                      {processing ? 'Approving...' : 'Approve'}
+                    </StandardButton>
+                  </>
+                ) : (
                   <StandardButton
-                    variant="primary"
-                    size="md"
-                    onClick={handleConfirmCheckIn}
-                    disabled={processing}
-                    loading={processing}
-                    icon={CheckCircle}
-                    fullWidth
-                  >
-                    {processing ? 'Checking In...' : 'Confirm Check-In'}
-                  </StandardButton>
-                )}
-                
-                {verifiedPurchase.status !== 'confirmed' && (
-                  <StandardButton
-                    variant="primary"
+                    variant="secondary"
                     size="md"
                     onClick={handleCancelCheckIn}
                     fullWidth
@@ -736,166 +835,6 @@ const AttractionCheckIn = () => {
                   </StandardButton>
                 )}
               </div>
-            </div>
-          </div>
-        )}
-
-        {/* Final Result Display (After Check-in) */}
-        {scanResult && (
-          <div className={`bg-white rounded-xl shadow-sm p-6`}>
-            <div className="flex items-start gap-4 mb-6">
-              {scanResult.success ? (
-                <div className={`p-3 bg-${themeColor}-100 rounded-full`}>
-                  <CheckCircle className={`h-8 w-8 text-${fullColor}`} />
-                </div>
-              ) : (
-                <div className="p-3 bg-red-100 rounded-full">
-                  <XCircle className="h-8 w-8 text-red-600" />
-                </div>
-              )}
-              
-              <div className="flex-1">
-                <h3 className={`text-xl font-bold mb-1 ${
-                  scanResult.success ? `text-${fullColor}` : 'text-red-600'
-                }`}>
-                  {scanResult.success ? 'Check-In Successful!' : 'Check-In Failed'}
-                </h3>
-                <p className="text-gray-600">{scanResult.message}</p>
-              </div>
-            </div>
-
-            {/* Purchase Details */}
-            {scanResult.purchase && scanResult.purchase.id && (
-              <div className="space-y-4 mb-6 p-4 bg-gray-50 rounded-lg">
-                <h4 className="font-semibold text-gray-800 mb-3">Ticket Details</h4>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="flex items-center gap-3">
-                    <Ticket className="h-5 w-5 text-gray-400" />
-                    <div>
-                      <p className="text-xs text-gray-500">Purchase ID</p>
-                      <p className="font-medium text-gray-800">#{scanResult.purchase.id}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <User className="h-5 w-5 text-gray-400" />
-                    <div>
-                      <p className="text-xs text-gray-500">Customer</p>
-                      <p className="font-medium text-gray-800">
-                        {scanResult.purchase.guest_name || 
-                         (scanResult.purchase.customer ? 
-                          `${scanResult.purchase.customer.first_name} ${scanResult.purchase.customer.last_name}` : 
-                          'Walk-in Customer')}
-                      </p>
-                    </div>
-                  </div>
-
-                  {scanResult.purchase.attraction && (
-                    <div className="flex items-center gap-3">
-                      <Ticket className="h-5 w-5 text-gray-400" />
-                      <div>
-                        <p className="text-xs text-gray-500">Attraction</p>
-                        <p className="font-medium text-gray-800">{scanResult.purchase.attraction.name}</p>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="flex items-center gap-3">
-                    <Calendar className="h-5 w-5 text-gray-400" />
-                    <div>
-                      <p className="text-xs text-gray-500">Purchase Date</p>
-                      <p className="font-medium text-gray-800">
-                        {new Date(scanResult.purchase.purchase_date).toLocaleDateString()}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <DollarSign className="h-5 w-5 text-gray-400" />
-                    <div>
-                      <p className="text-xs text-gray-500">Total Amount</p>
-                      <p className="font-medium text-gray-800">${Number(scanResult.purchase.total_amount).toFixed(2)}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <Ticket className="h-5 w-5 text-gray-400" />
-                    <div>
-                      <p className="text-xs text-gray-500">Quantity</p>
-                      <p className="font-medium text-gray-800">{scanResult.purchase.quantity}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3 col-span-full">
-                    <CheckCircle className={`h-5 w-5 ${
-                      scanResult.purchase.status === 'checked-in' 
-                        ? 'text-green-600' 
-                        : scanResult.purchase.status === 'confirmed'
-                        ? 'text-blue-600'
-                        : scanResult.purchase.status === 'cancelled'
-                        ? 'text-red-600'
-                        : scanResult.purchase.status === 'refunded'
-                        ? 'text-purple-600'
-                        : 'text-yellow-600'
-                    }`} />
-                    <div>
-                      <p className="text-xs text-gray-500">Status</p>
-                      <p className={`font-medium ${
-                        scanResult.purchase.status === 'checked-in' 
-                          ? 'text-green-600' 
-                          : scanResult.purchase.status === 'confirmed'
-                          ? 'text-blue-600'
-                          : scanResult.purchase.status === 'cancelled'
-                          ? 'text-red-600'
-                          : scanResult.purchase.status === 'refunded'
-                          ? 'text-purple-600'
-                          : 'text-yellow-600'
-                      }`}>
-                        {scanResult.purchase.status === 'checked-in' ? 'Checked In' : scanResult.purchase.status.charAt(0).toUpperCase() + scanResult.purchase.status.slice(1)}
-                      </p>
-                      {scanResult.purchase.checked_in_at && (
-                        <p className="text-xs text-green-600 mt-0.5">
-                          {new Date(scanResult.purchase.checked_in_at).toLocaleString()}
-                          {scanResult.purchase.checked_in_by_user && (
-                            <span> by {scanResult.purchase.checked_in_by_user.name}</span>
-                          )}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {scanResult.purchase.applied_fees && scanResult.purchase.applied_fees.length > 0 && (
-                  <div>
-                    <AppliedFeesDisplay appliedFees={scanResult.purchase.applied_fees} />
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Actions */}
-            <div className="flex gap-4">
-              <StandardButton
-                variant="primary"
-                size="md"
-                onClick={() => {
-                  resetScan();
-                  startScanning();
-                }}
-                icon={Camera}
-                fullWidth
-              >
-                Scan Next Ticket
-              </StandardButton>
-              
-              <StandardButton
-                variant="secondary"
-                size="md"
-                onClick={resetScan}
-              >
-                Reset
-              </StandardButton>
             </div>
           </div>
         )}

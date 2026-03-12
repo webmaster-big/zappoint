@@ -562,6 +562,13 @@ const CreatePurchase = () => {
     isSubmittingRef.current = true;
     lastSubmitTimeRef.current = now;
 
+    // Validate scheduled visit date/time
+    if (!scheduledDate || !scheduledTime) {
+      setToast({ message: 'Please select a visit date and time before purchasing.', type: 'error' });
+      isSubmittingRef.current = false;
+      return;
+    }
+
     // Validate card information if payment method is authorize.net
     if (paymentMethod === 'authorize.net') {
       if (!cardNumber || !cardMonth || !cardYear || !cardCVV) {
@@ -1144,8 +1151,9 @@ const CreatePurchase = () => {
                   <div className="mt-6 pt-5 border-t border-gray-100">
                     <div className="flex items-center gap-2 mb-3">
                       <Calendar className="h-4 w-4 text-gray-500" />
-                      <h3 className="text-sm font-medium text-gray-700">Schedule</h3>
+                      <h3 className="text-sm font-medium text-gray-700">Schedule <span className="text-red-500">*</span></h3>
                     </div>
+                    <p className="text-xs text-gray-500 mb-3">A visit date and time are required.</p>
                     <ScheduleCalendar
                       availability={getAttractionAvailability()}
                       dayOffDates={dayOffDates}

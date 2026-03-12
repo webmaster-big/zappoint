@@ -647,6 +647,51 @@ const CheckIn: React.FC = () => {
           </div>
         </div>
 
+        {/* Check-In Result Banner */}
+        {scanResult && (
+          <div className={`mb-6 rounded-xl overflow-hidden shadow-sm border flex items-center justify-between ${
+            scanResult.success 
+              ? 'border-green-200 bg-green-50' 
+              : 'border-red-200 bg-red-50'
+          }`}>
+            <div className="flex items-center gap-3 px-4 py-3">
+              {scanResult.success ? (
+                <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0" />
+              ) : (
+                <XCircle className="h-5 w-5 text-red-600 flex-shrink-0" />
+              )}
+              <div>
+                <span className={`font-semibold text-sm ${
+                  scanResult.success ? 'text-green-800' : 'text-red-800'
+                }`}>
+                  {scanResult.success ? 'Check-In Successful!' : 'Check-In Failed'}
+                </span>
+                <span className="text-sm text-gray-600 ml-2">{scanResult.message}</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 px-4 py-3">
+              <StandardButton
+                variant="primary"
+                size="sm"
+                icon={Camera}
+                onClick={() => {
+                  resetScan();
+                  startScanning();
+                }}
+              >
+                Scan Next
+              </StandardButton>
+              <StandardButton
+                variant="ghost"
+                size="sm"
+                onClick={resetScan}
+              >
+                Reset
+              </StandardButton>
+            </div>
+          </div>
+        )}
+
         {/* Scanner Section */}
         <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
           {/* QR Scanner Container */}
@@ -890,6 +935,22 @@ const CheckIn: React.FC = () => {
 
               {/* Modal Body */}
               <div className="p-6">
+                {/* Scheduled Time Prompt Banner */}
+                <div className="mb-4 p-4 bg-blue-50 border-2 border-blue-300 rounded-xl text-center">
+                  <div className="flex items-center justify-center gap-2 mb-1">
+                    <Clock className="h-6 w-6 text-blue-600" />
+                    <span className="text-lg font-bold text-blue-800">
+                      Scheduled for {convertTo12Hour(verifiedBooking.booking_time)}
+                    </span>
+                  </div>
+                  <p className="text-sm text-blue-600">
+                    {parseLocalDate(verifiedBooking.booking_date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                  </p>
+                  {verifiedBooking.status === 'confirmed' && (
+                    <p className="text-sm text-blue-700 mt-2 font-medium">Would you like to check this person in now?</p>
+                  )}
+                </div>
+
                 {/* Status Alerts */}
                 {(() => {
                   console.log('Verified Booking Status:', verifiedBooking.status);
@@ -1271,96 +1332,72 @@ const CheckIn: React.FC = () => {
 
               {/* Modal Footer */}
               <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 p-4 sm:p-6 flex gap-2 sm:gap-3">
-                <StandardButton
-                  variant="secondary"
-                  size="sm"
-                  onClick={handleCancelCheckIn}
-                  className="flex-1"
-                >
-                  Cancel
-                </StandardButton>
-                
-                {/* Show payment button if not fully paid */}
-                {verifiedBooking.payment_status !== 'paid' && (
-                  <StandardButton
-                    variant="primary"
-                    size="sm"
-                    icon={DollarSign}
-                    onClick={() => handleOpenPaymentModal(verifiedBooking)}
-                    disabled={processing || processingPayment}
-                    className="flex-1"
-                  >
-                    Add Payment
-                  </StandardButton>
+                {verifiedBooking.status === 'confirmed' ? (
+                  <>
+                    <StandardButton
+                      variant="danger"
+                      size="sm"
+                      icon={XCircle}
+                      onClick={handleCancelCheckIn}
+                      className="flex-1"
+                    >
+                      Deny
+                    </StandardButton>
+                    
+                    {/* Show payment button if not fully paid */}
+                    {verifiedBooking.payment_status !== 'paid' && (
+                      <StandardButton
+                        variant="primary"
+                        size="sm"
+                        icon={DollarSign}
+                        onClick={() => handleOpenPaymentModal(verifiedBooking)}
+                        disabled={processing || processingPayment}
+                        className="flex-1"
+                      >
+                        Add Payment
+                      </StandardButton>
+                    )}
+                    
+                    {/* Approve button - staff decides to check in */}
+                    <StandardButton
+                      variant="success"
+                      size="sm"
+                      icon={processing ? RefreshCw : CheckCircle}
+                      onClick={handleConfirmCheckIn}
+                      disabled={processing}
+                      loading={processing}
+                      className="flex-1"
+                    >
+                      {processing ? 'Approving...' : 'Approve'}
+                    </StandardButton>
+                  </>
+                ) : (
+                  <>
+                    <StandardButton
+                      variant="secondary"
+                      size="sm"
+                      onClick={handleCancelCheckIn}
+                      className="flex-1"
+                    >
+                      Cancel
+                    </StandardButton>
+                    
+                    {/* Show payment button if not fully paid */}
+                    {verifiedBooking.payment_status !== 'paid' && (
+                      <StandardButton
+                        variant="primary"
+                        size="sm"
+                        icon={DollarSign}
+                        onClick={() => handleOpenPaymentModal(verifiedBooking)}
+                        disabled={processing || processingPayment}
+                        className="flex-1"
+                      >
+                        Add Payment
+                      </StandardButton>
+                    )}
+                  </>
                 )}
-                
-                {/* Check-in button - always show for confirmed bookings */}
-                <StandardButton
-                  variant="success"
-                  size="sm"
-                  icon={processing ? RefreshCw : CheckCircle}
-                  onClick={handleConfirmCheckIn}
-                  disabled={processing}
-                  loading={processing}
-                  className="flex-1"
-                >
-                  {processing ? 'Checking In...' : 'Check-In'}
-                </StandardButton>
               </div>
-            </div>
-          </div>
-        )}
-
-        {/* Final Result Display (After successful check-in) */}
-        {scanResult && (
-          <div className={`bg-white rounded-xl shadow-sm p-10 mb-6 mt-6 ${
-            scanResult.success 
-              ? `border-${themeColor}-500` 
-              : 'border-red-500'
-          }`}>
-            <div className="flex items-start gap-4 mb-6">
-              {scanResult.success ? (
-                <div className={`p-3 bg-${themeColor}-100 rounded-full`}>
-                  <CheckCircle className={`h-8 w-8 text-${fullColor}`} />
-                </div>
-              ) : (
-                <div className="p-3 bg-red-100 rounded-full">
-                  <XCircle className="h-8 w-8 text-red-600" />
-                </div>
-              )}
-              
-              <div className="flex-1">
-                <h3 className={`text-xl font-bold mb-1 ${
-                  scanResult.success ? `text-${fullColor}` : 'text-red-600'
-                }`}>
-                  {scanResult.success ? 'Check-In Successful!' : 'Check-In Failed'}
-                </h3>
-                <p className="text-gray-600">{scanResult.message}</p>
-              </div>
-            </div>
-
-            {/* Actions */}
-            <div className="flex gap-4">
-              <StandardButton
-                variant="primary"
-                size="md"
-                icon={Camera}
-                onClick={() => {
-                  resetScan();
-                  startScanning();
-                }}
-                className="flex-1"
-              >
-                Scan Next Booking
-              </StandardButton>
-              
-              <StandardButton
-                variant="secondary"
-                size="md"
-                onClick={resetScan}
-              >
-                Reset
-              </StandardButton>
             </div>
           </div>
         )}

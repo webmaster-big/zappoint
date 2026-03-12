@@ -11,7 +11,10 @@ import {
   Clock,
   Ticket,
   DollarSign,
-  FileText
+  FileText,
+  QrCode,
+  Download,
+  X
 } from 'lucide-react';
 import { formatDurationDisplay, formatLocalDateTime, convertTo12Hour } from '../../../utils/timeFormat';
 import { useThemeColor } from '../../../hooks/useThemeColor';
@@ -20,6 +23,7 @@ import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
 import { AppliedFeesDisplay } from '../../../components/AppliedFeesDisplay';
 import { getStoredUser } from '../../../utils/storage';
+import { generatePurchaseQRCode } from '../../../utils/qrcode';
 
 const PurchaseDetails = () => {
   const { id } = useParams<{ id: string }>();
@@ -67,6 +71,8 @@ const PurchaseDetails = () => {
   const [purchase, setPurchase] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const [qrCodeData, setQrCodeData] = useState<string | null>(null);
+  const [showQRModal, setShowQRModal] = useState(false);
 
   const statusConfig = {
     confirmed: { color: 'bg-blue-100 text-blue-800', icon: CheckCircle, label: 'Confirmed' },
@@ -88,6 +94,15 @@ const PurchaseDetails = () => {
       console.log('🔐 Loading purchase details - Auth Token:', authToken ? 'Present' : 'Missing');
       const response = await attractionPurchaseService.getPurchase(Number(id));
       setPurchase(response.data);
+      // Generate QR code
+      if (response.data?.id) {
+        try {
+          const qrCode = await generatePurchaseQRCode(response.data.id);
+          setQrCodeData(qrCode);
+        } catch (qrErr) {
+          console.error('QR code generation failed:', qrErr);
+        }
+      }
     } catch (error) {
       console.error('Error loading purchase details:', error);
       setToast({ message: 'Failed to load purchase details', type: 'error' });
@@ -159,6 +174,16 @@ const PurchaseDetails = () => {
               <h1 className="text-3xl font-bold text-gray-900">Purchase Details</h1>
               <p className="text-gray-600 mt-1">Purchase ID: #{purchase.id}</p>
             </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <StandardButton
+              variant="primary"
+              icon={QrCode}
+              onClick={() => setShowQRModal(true)}
+              disabled={!qrCodeData}
+            >
+              View QR Code
+            </StandardButton>
           </div>
         </div>
 
@@ -390,6 +415,47 @@ const PurchaseDetails = () => {
             type={toast.type}
             onClose={() => setToast(null)}
           />
+        </div>
+      )}
+
+      {/* QR Code Modal */}
+      {showQRModal && qrCodeData && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowQRModal(false)}>
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold text-gray-900">Attraction Ticket QR Code</h3>
+              <button onClick={() => setShowQRModal(false)} className="p-1.5 hover:bg-gray-100 rounded-lg transition">
+                <X className="w-5 h-5 text-gray-400" />
+              </button>
+            </div>
+            
+            <div className="flex flex-col items-center">
+              <img 
+                src={qrCodeData} 
+                alt="Attraction Ticket QR Code" 
+                className="w-64 h-64 mb-4 border-2 border-gray-200 rounded-lg"
+              />
+              <p className="text-sm text-gray-600 mb-2 text-center">
+                Purchase ID: <span className="font-semibold">#{purchase.id}</span>
+              </p>
+              {purchase.attraction?.name && (
+                <p className="text-sm text-gray-500 mb-4 text-center">{purchase.attraction.name}</p>
+              )}
+              <StandardButton
+                variant="primary"
+                icon={Download}
+                onClick={() => {
+                  const link = document.createElement('a');
+                  link.download = `attraction-ticket-${purchase.id}.png`;
+                  link.href = qrCodeData;
+                  link.click();
+                }}
+                fullWidth
+              >
+                Download QR Code
+              </StandardButton>
+            </div>
+          </div>
         </div>
       )}
     </div>
