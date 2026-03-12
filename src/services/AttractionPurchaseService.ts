@@ -89,6 +89,13 @@ export interface AttractionPurchase {
     fee_amount: number;
     fee_application_type: 'additive' | 'inclusive';
   }> | null;
+  applied_discounts?: Array<{
+    discount_name: string;
+    discount_amount: number;
+    discount_type: 'fixed' | 'percentage';
+    original_price: number;
+    special_pricing_id: number | null;
+  }> | null;
 }
 
 export interface CreatePurchaseData {
@@ -107,6 +114,7 @@ export interface CreatePurchaseData {
   amount?: number;
   total_amount?: number; // Total amount including fees
   amount_paid?: number;
+  discount_amount?: number;
   currency?: string;
   method?: string;
   status?: 'pending' | 'confirmed' | 'checked-in' | 'cancelled' | 'refunded';
@@ -123,6 +131,14 @@ export interface CreatePurchaseData {
     fee_name: string;
     fee_amount: number;
     fee_application_type: 'additive' | 'inclusive';
+  }> | null;
+  // Applied discounts snapshot
+  applied_discounts?: Array<{
+    discount_name: string;
+    discount_amount: number;
+    discount_type: 'fixed' | 'percentage';
+    original_price: number;
+    special_pricing_id: number | null;
   }> | null;
 }
 

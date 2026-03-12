@@ -19,6 +19,7 @@ import { useThemeColor } from '../../../hooks/useThemeColor';
 import { attractionPurchaseService, type AttractionPurchase } from '../../../services/AttractionPurchaseService';
 import Toast from '../../../components/ui/Toast';
 import { AppliedFeesDisplay } from '../../../components/AppliedFeesDisplay';
+import { AppliedDiscountsDisplay } from '../../../components/AppliedDiscountsDisplay';
 import StandardButton from '../../../components/ui/StandardButton';
 import { getStoredUser } from '../../../utils/storage';
 import { convertTo12Hour } from '../../../utils/timeFormat';
@@ -793,6 +794,12 @@ const AttractionCheckIn = () => {
                   {verifiedPurchase.applied_fees && verifiedPurchase.applied_fees.length > 0 && (
                     <div>
                       <AppliedFeesDisplay appliedFees={verifiedPurchase.applied_fees} />
+                    </div>
+                  )}
+
+                  {(verifiedPurchase as any).applied_discounts && (verifiedPurchase as any).applied_discounts.length > 0 && (
+                    <div>
+                      <AppliedDiscountsDisplay appliedDiscounts={(verifiedPurchase as any).applied_discounts} />
                     </div>
                   )}
                 </div>

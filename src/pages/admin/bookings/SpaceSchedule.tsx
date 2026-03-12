@@ -1176,6 +1176,17 @@ const SpaceSchedule = () => {
                         ))}
                       </div>
                     )}
+                    {(selectedBooking as any).applied_discounts && (selectedBooking as any).applied_discounts.length > 0 && (
+                      <div className="mt-2 pt-2 border-t border-gray-100">
+                        <p className="text-xs text-gray-500 mb-1">Discounts</p>
+                        {(selectedBooking as any).applied_discounts.map((d: { discount_name: string; discount_amount: number; discount_type: string }, i: number) => (
+                          <div key={i} className="flex justify-between text-xs">
+                            <span className="text-gray-600">{d.discount_name} <span className="text-gray-400">({d.discount_type})</span></span>
+                            <span className="text-green-600">-${d.discount_amount.toFixed(2)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

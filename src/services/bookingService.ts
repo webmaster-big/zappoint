@@ -105,6 +105,15 @@ export interface CreateBookingData {
     fee_amount: number;
     fee_application_type: 'additive' | 'inclusive';
   }> | null;
+
+  // Applied discounts snapshot
+  applied_discounts?: Array<{
+    discount_name: string;
+    discount_amount: number;
+    discount_type: 'fixed' | 'percentage';
+    original_price: number;
+    special_pricing_id: number | null;
+  }> | null;
 }
 
 export interface UpdateBookingData {
@@ -150,6 +159,15 @@ export interface UpdateBookingData {
     fee_name: string;
     fee_amount: number;
     fee_application_type: 'additive' | 'inclusive';
+  }> | null;
+
+  // Applied discounts snapshot
+  applied_discounts?: Array<{
+    discount_name: string;
+    discount_amount: number;
+    discount_type: 'fixed' | 'percentage';
+    original_price: number;
+    special_pricing_id: number | null;
   }> | null;
 }
 

@@ -41,6 +41,7 @@ import { specialPricingService } from '../../../services/SpecialPricingService';
 import type { SpecialPricingBreakdown } from '../../../types/SpecialPricing.types';
 import PriceBreakdownDisplay from '../../../components/ui/PriceBreakdownDisplay';
 import { buildAppliedFees } from '../../../utils/fees';
+import { buildAppliedDiscounts } from '../../../utils/discounts';
 
 // Helper function to parse ISO date string (YYYY-MM-DD) in local timezone
 // Avoids UTC offset issues that cause date to show as previous day
@@ -1541,6 +1542,9 @@ const OnsiteBooking: React.FC = () => {
         sent_email_to_staff: sendEmailToStaff,
         // Applied fees snapshot
         applied_fees: buildAppliedFees(feeBreakdown).length > 0 ? buildAppliedFees(feeBreakdown) : null,
+        // Applied discounts snapshot
+        discount_amount: specialPricingBreakdown?.has_special_pricing ? specialPricingBreakdown.total_discount : undefined,
+        applied_discounts: buildAppliedDiscounts(specialPricingBreakdown).length > 0 ? buildAppliedDiscounts(specialPricingBreakdown) : null,
       };
       
       console.log('📤 Sending on-site booking request:', bookingData_request);

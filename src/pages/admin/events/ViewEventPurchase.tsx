@@ -19,6 +19,8 @@ import { useThemeColor } from '../../../hooks/useThemeColor';
 import { eventPurchaseService } from '../../../services/EventPurchaseService';
 import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
+import { AppliedFeesDisplay } from '../../../components/AppliedFeesDisplay';
+import { AppliedDiscountsDisplay } from '../../../components/AppliedDiscountsDisplay';
 import type { EventPurchase } from '../../../types/event.types';
 import { getStoredUser } from '../../../utils/storage';
 
@@ -365,6 +367,20 @@ const ViewEventPurchase = () => {
                     <p className="text-sm text-gray-500">Discount</p>
                     <p className="font-medium text-green-600">-${Number(purchase.discount_amount).toFixed(2)}</p>
                   </div>
+                </div>
+              )}
+
+              {/* Applied Fees */}
+              {purchase.applied_fees && purchase.applied_fees.length > 0 && (
+                <div className="md:col-span-2">
+                  <AppliedFeesDisplay appliedFees={purchase.applied_fees} />
+                </div>
+              )}
+
+              {/* Applied Discounts */}
+              {purchase.applied_discounts && purchase.applied_discounts.length > 0 && (
+                <div className="md:col-span-2">
+                  <AppliedDiscountsDisplay appliedDiscounts={purchase.applied_discounts} />
                 </div>
               )}
             </div>

@@ -29,6 +29,7 @@ import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
 import { getStoredUser } from '../../../utils/storage';
 import { AppliedFeesDisplay } from '../../../components/AppliedFeesDisplay';
+import { AppliedDiscountsDisplay } from '../../../components/AppliedDiscountsDisplay';
 import { formatDurationDisplay, convertTo12Hour, parseLocalDate } from '../../../utils/timeFormat';
 
 interface ScanResult {
@@ -1107,6 +1108,13 @@ const CheckIn: React.FC = () => {
                       </div>
                     )}
 
+                    {/* Applied Discounts */}
+                    {(verifiedBooking as any).applied_discounts && (verifiedBooking as any).applied_discounts.length > 0 && (
+                      <div className="col-span-full">
+                        <AppliedDiscountsDisplay appliedDiscounts={(verifiedBooking as any).applied_discounts} />
+                      </div>
+                    )}
+
                     {verifiedBooking.payment_method && (
                       <div className="flex items-center gap-3">
                         <div className={`p-2 bg-${themeColor}-100 rounded-lg`}>
@@ -1577,6 +1585,13 @@ const CheckIn: React.FC = () => {
                     {selectedBooking.applied_fees && selectedBooking.applied_fees.length > 0 && (
                       <div className="col-span-full">
                         <AppliedFeesDisplay appliedFees={selectedBooking.applied_fees} />
+                      </div>
+                    )}
+
+                    {/* Applied Discounts */}
+                    {(selectedBooking as any).applied_discounts && (selectedBooking as any).applied_discounts.length > 0 && (
+                      <div className="col-span-full">
+                        <AppliedDiscountsDisplay appliedDiscounts={(selectedBooking as any).applied_discounts} />
                       </div>
                     )}
 

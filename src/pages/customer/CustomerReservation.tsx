@@ -27,6 +27,7 @@ import InvitationTracker from '../../components/invitations/InvitationTracker';
 import Toast from '../../components/ui/Toast';
 import Pagination from '../../components/ui/Pagination';
 import { AppliedFeesDisplay } from '../../components/AppliedFeesDisplay';
+import { AppliedDiscountsDisplay } from '../../components/AppliedDiscountsDisplay';
 
 const CustomerReservations = () => {
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -656,6 +657,11 @@ const CustomerReservations = () => {
                     {selectedBooking.applied_fees && selectedBooking.applied_fees.length > 0 && (
                       <div className="pt-2.5 border-t border-gray-200">
                         <AppliedFeesDisplay appliedFees={selectedBooking.applied_fees} />
+                      </div>
+                    )}
+                    {(selectedBooking as any).applied_discounts && (selectedBooking as any).applied_discounts.length > 0 && (
+                      <div className="pt-2.5 border-t border-gray-200">
+                        <AppliedDiscountsDisplay appliedDiscounts={(selectedBooking as any).applied_discounts} />
                       </div>
                     )}
                   </div>

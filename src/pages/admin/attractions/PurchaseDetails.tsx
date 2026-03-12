@@ -22,6 +22,7 @@ import { attractionPurchaseService } from '../../../services/AttractionPurchaseS
 import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
 import { AppliedFeesDisplay } from '../../../components/AppliedFeesDisplay';
+import { AppliedDiscountsDisplay } from '../../../components/AppliedDiscountsDisplay';
 import { getStoredUser } from '../../../utils/storage';
 import { generatePurchaseQRCode } from '../../../utils/qrcode';
 
@@ -392,6 +393,12 @@ const PurchaseDetails = () => {
               {purchase.applied_fees && purchase.applied_fees.length > 0 && (
                 <div className="md:col-span-2">
                   <AppliedFeesDisplay appliedFees={purchase.applied_fees} />
+                </div>
+              )}
+
+              {(purchase as any).applied_discounts && (purchase as any).applied_discounts.length > 0 && (
+                <div className="md:col-span-2">
+                  <AppliedDiscountsDisplay appliedDiscounts={(purchase as any).applied_discounts} />
                 </div>
               )}
             </div>

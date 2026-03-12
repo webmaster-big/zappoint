@@ -58,6 +58,7 @@ export interface EventPurchase {
   notes: string | null;
   special_requests: string | null;
   applied_fees: Array<{ fee_name: string; fee_amount: number; fee_application_type: string }> | null;
+  applied_discounts: Array<{ discount_name: string; discount_amount: number; discount_type: string; original_price: number; special_pricing_id: number | null }> | null;
   checked_in_at: string | null;
   completed_at: string | null;
   cancelled_at: string | null;
@@ -128,6 +129,13 @@ export interface CreateEventPurchaseData {
     fee_name: string;
     fee_amount: number;
     fee_application_type: string;
+  }> | null;
+  applied_discounts?: Array<{
+    discount_name: string;
+    discount_amount: number;
+    discount_type: 'fixed' | 'percentage';
+    original_price: number;
+    special_pricing_id: number | null;
   }> | null;
   add_ons?: Array<{
     add_on_id: number;

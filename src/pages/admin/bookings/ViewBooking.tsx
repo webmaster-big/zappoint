@@ -24,6 +24,7 @@ import { getStoredUser } from '../../../utils/storage';
 import { formatDurationDisplay, convertTo12Hour, parseLocalDate, formatLocalDateTime } from '../../../utils/timeFormat';
 import StandardButton from '../../../components/ui/StandardButton';
 import { AppliedFeesDisplay } from '../../../components/AppliedFeesDisplay';
+import { AppliedDiscountsDisplay } from '../../../components/AppliedDiscountsDisplay';
 
 const ViewBooking: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
@@ -467,6 +468,13 @@ const ViewBooking: React.FC = () => {
               {booking.applied_fees && booking.applied_fees.length > 0 && (
                 <div className="md:col-span-2">
                   <AppliedFeesDisplay appliedFees={booking.applied_fees} />
+                </div>
+              )}
+
+              {/* Applied Discounts */}
+              {(booking as any).applied_discounts && (booking as any).applied_discounts.length > 0 && (
+                <div className="md:col-span-2">
+                  <AppliedDiscountsDisplay appliedDiscounts={(booking as any).applied_discounts} />
                 </div>
               )}
 

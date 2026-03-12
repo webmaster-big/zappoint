@@ -16,6 +16,7 @@ import { dayOffService, type DayOff } from '../../../services/DayOffService';
 import DatePicker from '../../../components/ui/DatePicker';
 import { formatTimeTo12Hour } from '../../../utils/storage';
 import type { AppliedFee } from '../../../utils/fees';
+import type { AppliedDiscount } from '../../../utils/discounts';
 
 // Helper function to parse ISO date string (YYYY-MM-DD) in local timezone
 const parseLocalDate = (isoDateString: string): Date => {
@@ -93,6 +94,7 @@ const EditBooking: React.FC = () => {
   const [dayOffs, setDayOffs] = useState<Date[]>([]);
   const [dayOffsWithTime, setDayOffsWithTime] = useState<DayOffWithTime[]>([]);
   const [appliedFees, setAppliedFees] = useState<AppliedFee[]>([]);
+  const [appliedDiscounts, setAppliedDiscounts] = useState<AppliedDiscount[]>([]);
 
   // Load booking data and package details - try cache first for faster load
   useEffect(() => {
@@ -176,6 +178,11 @@ const EditBooking: React.FC = () => {
         // Load applied fees from booking
         if (bookingData.applied_fees && Array.isArray(bookingData.applied_fees)) {
           setAppliedFees(bookingData.applied_fees);
+        }
+
+        // Load applied discounts from booking
+        if ((bookingData as any).applied_discounts && Array.isArray((bookingData as any).applied_discounts)) {
+          setAppliedDiscounts((bookingData as any).applied_discounts);
         }
         
         // End loading state early - form can render while we load dropdown data
@@ -569,6 +576,8 @@ const EditBooking: React.FC = () => {
         notes: formData.notes || undefined,
         send_notification: formData.sendNotification,
         applied_fees: appliedFees.length > 0 ? appliedFees : null,
+        applied_discounts: appliedDiscounts.length > 0 ? appliedDiscounts : null,
+        discount_amount: originalBooking.discount_amount ? Number(originalBooking.discount_amount) : undefined,
         guest_of_honor_name: packageDetails?.has_guest_of_honor && formData.guestOfHonorName ? formData.guestOfHonorName : undefined,
         guest_of_honor_age: packageDetails?.has_guest_of_honor && formData.guestOfHonorAge ? parseInt(formData.guestOfHonorAge) : undefined,
         guest_of_honor_gender: packageDetails?.has_guest_of_honor && formData.guestOfHonorGender ? formData.guestOfHonorGender as 'male' | 'female' | 'other' : undefined,

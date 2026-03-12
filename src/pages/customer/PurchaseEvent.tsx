@@ -28,6 +28,7 @@ import TermsAndConditionsCheckbox from '../../components/TermsAndConditionsCheck
 import StandardButton from '../../components/ui/StandardButton';
 import type { FeeBreakdown } from '../../types/FeeSupport.types';
 import { buildAppliedFees } from '../../utils/fees';
+import { buildAppliedDiscounts } from '../../utils/discounts';
 import { feeSupportService } from '../../services/FeeSupportService';
 import { specialPricingService } from '../../services/SpecialPricingService';
 import type { SpecialPricingBreakdown } from '../../types/SpecialPricing.types';
@@ -582,6 +583,7 @@ const PurchaseEvent = () => {
           special_requests: specialRequests || undefined,
           send_email: false,
           applied_fees: buildAppliedFees(feeBreakdown).length > 0 ? buildAppliedFees(feeBreakdown) : undefined,
+          applied_discounts: buildAppliedDiscounts(specialPricingBreakdown).length > 0 ? buildAppliedDiscounts(specialPricingBreakdown) : undefined,
           add_ons: addOnsPayload.length > 0 ? addOnsPayload : undefined,
         });
       } catch (createErr) {
