@@ -341,6 +341,7 @@ const CreateAttraction = () => {
         addon_ids: selectedAddOns.map(name => addOns.find(a => a.name === name)?.id).filter(Boolean) as number[],
         add_ons_order: selectedAddOns,
         display_capacity_to_customers: displayCapacityToCustomers,
+        display_order: formData.displayOrder ? Number(formData.displayOrder) : 0,
       };
 
       const authToken = getAuthToken();
@@ -895,6 +896,23 @@ const CreateAttraction = () => {
                     </div>
                   </div>
                 )}
+              </div>
+            </div>
+
+            {/* Display Order */}
+            <div className="bg-white rounded-xl border border-gray-200 p-6">
+              <h3 className="text-lg font-bold text-gray-800 mb-4">Display Order</h3>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Order Position</label>
+                <input
+                  type="number"
+                  min={0}
+                  value={formData.displayOrder ?? '0'}
+                  onChange={(e) => setFormData(prev => ({ ...prev, displayOrder: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="0"
+                />
+                <p className="text-xs text-gray-500 mt-1">Lower numbers appear first on the store page.</p>
               </div>
             </div>
 

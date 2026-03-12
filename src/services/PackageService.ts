@@ -58,6 +58,7 @@ export interface Package {
   created_at: string;
   updated_at: string;
   deleted_at?: string | null;
+  display_order?: number;
   location?: {
     id: number;
     name: string;
@@ -99,7 +100,7 @@ export interface PackageFilters {
   package_type?: string;
   is_active?: boolean;
   search?: string;
-  sort_by?: 'id' | 'name' | 'price' | 'created_at' | 'category';
+  sort_by?: 'id' | 'name' | 'price' | 'created_at' | 'category' | 'display_order';
   sort_order?: 'asc' | 'desc';
   per_page?: number;
   page?: number;
@@ -155,6 +156,7 @@ export interface CreatePackageData {
   addon_ids?: (number | undefined)[];
   promo_ids?: (number | undefined)[];
   gift_card_ids?: (number | undefined)[];
+  display_order?: number;
 }
 
 export type UpdatePackageData = Partial<CreatePackageData>;
@@ -371,6 +373,14 @@ class PackageService {
       package_ids: packageIds,
       min_booking_notice_hours: minBookingNoticeHours,
     });
+    return response.data;
+  }
+
+  /**
+   * Reorder packages (bulk update display_order)
+   */
+  async reorderPackages(items: { id: number; display_order: number }[]): Promise<ApiResponse<null>> {
+    const response = await api.post('/packages/reorder', { items });
     return response.data;
   }
 }

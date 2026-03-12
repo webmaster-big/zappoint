@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Users, Tag, Search, Download, Upload, X, CheckSquare, Square, Pencil, Trash2, MapPin, Eye, Power, Plus, FileText, Clock, Copy, DollarSign, Percent } from "lucide-react";
+import { Users, Tag, Search, Download, Upload, X, CheckSquare, Square, Pencil, Trash2, MapPin, Eye, Power, Plus, FileText, Clock, Copy, DollarSign, Percent, GripVertical } from "lucide-react";
 import StandardButton from '../../../components/ui/StandardButton';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { packageService, type Package, type CreatePackageData } from '../../../services';
@@ -39,6 +39,7 @@ const Packages: React.FC = () => {
   const [bulkMinNoticeHours, setBulkMinNoticeHours] = useState<string>("");
   const [bulkUpdating, setBulkUpdating] = useState(false);
   const [duplicatingId, setDuplicatingId] = useState<number | null>(null);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
   // Load user data from localStorage
   useEffect(() => {
@@ -217,6 +218,9 @@ const Packages: React.FC = () => {
       } else if (sortBy === 'category') {
         aValue = (a.category || '').toLowerCase();
         bValue = (b.category || '').toLowerCase();
+      } else if (sortBy === 'display_order') {
+        aValue = a.display_order ?? 0;
+        bValue = b.display_order ?? 0;
       }
 
       if (sortOrder === 'asc') {
@@ -243,6 +247,45 @@ const Packages: React.FC = () => {
     }, [] as Array<{ id: number; name: string }>);
   
   const isCompanyAdmin = userData?.role === 'company_admin';
+
+  // Drag-and-drop reorder handlers
+  const handleDragStart = (index: number) => {
+    setDraggedIndex(index);
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === index) return;
+
+    setFilteredPackages(prev => {
+      const updated = [...prev];
+      const draggedItem = updated[draggedIndex];
+      updated.splice(draggedIndex, 1);
+      updated.splice(index, 0, draggedItem);
+      setDraggedIndex(index);
+      return updated;
+    });
+  };
+
+  const handleDragEnd = async () => {
+    setDraggedIndex(null);
+    const reorderItems = filteredPackages.map((pkg, idx) => ({
+      id: pkg.id,
+      display_order: idx,
+    }));
+    try {
+      await packageService.reorderPackages(reorderItems);
+      setPackages(prev =>
+        prev.map(pkg => {
+          const reordered = reorderItems.find(r => r.id === pkg.id);
+          return reordered ? { ...pkg, display_order: reordered.display_order } : pkg;
+        })
+      );
+      alert('Display order updated successfully!');
+    } catch {
+      alert('Failed to update display order. Please try again.');
+    }
+  };
 
   // Export functionality
   const handleOpenExportModal = () => {
@@ -692,6 +735,7 @@ const Packages: React.FC = () => {
                 <option value="name">Sort: Name</option>
                 <option value="price">Sort: Price</option>
                 <option value="category">Sort: Category</option>
+                <option value="display_order">Sort: Display Order</option>
               </select>
               <StandardButton
                 onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
@@ -749,9 +793,13 @@ const Packages: React.FC = () => {
               )}
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {filteredPackages.map((pkg) => (
+            {filteredPackages.map((pkg, index) => (
               <div 
                 key={pkg.id} 
+                draggable
+                onDragStart={() => handleDragStart(index)}
+                onDragOver={(e) => handleDragOver(e, index)}
+                onDragEnd={handleDragEnd}
                 className={`border-2 rounded-lg overflow-hidden hover:shadow-lg hover:scale-105 transition-all bg-white ${
                   selectedForBulkUpdate.includes(pkg.id) 
                     ? `border-${fullColor} ring-2 ring-${themeColor}-100` 
@@ -760,6 +808,10 @@ const Packages: React.FC = () => {
               >
                 <div className="p-4">
                   <div className="flex justify-between items-start mb-3">
+                    {/* Drag handle */}
+                    <div className="cursor-grab mr-1 flex-shrink-0 mt-0.5">
+                      <GripVertical className="w-4 h-4 text-gray-400" />
+                    </div>
                     {/* Checkbox for bulk selection */}
                     <button
                       onClick={() => handleSelectForBulkUpdate(pkg.id)}

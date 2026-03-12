@@ -19,7 +19,8 @@ import {
   Square,
   Link2,
   Copy,
-  Percent
+  Percent,
+  GripVertical
 } from 'lucide-react';
 import { formatDurationDisplay } from '../../../utils/timeFormat';
 import { useThemeColor } from '../../../hooks/useThemeColor';
@@ -79,6 +80,7 @@ const ManageAttractions = () => {
   const [importData, setImportData] = useState<string>("");
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
   // Export/Import handlers
   const handleOpenExportModal = () => {
@@ -294,6 +296,7 @@ const ManageAttractions = () => {
               createdAt: attr.created_at,
               availability: typeof attr.availability === 'object' ? attr.availability as Record<string, boolean> : {},
               displayCapacityToCustomers: attr.display_capacity_to_customers ?? true,
+              displayOrder: attr.display_order ?? 0,
             }));
           setAttractions(converted);
         }
@@ -353,6 +356,7 @@ const ManageAttractions = () => {
               sunday: true
             },
             displayCapacityToCustomers: attr.display_capacity_to_customers ?? true,
+            displayOrder: attr.display_order ?? 0,
           }));
         setAttractions(convertedAttractions);
         setLoading(false);
@@ -410,6 +414,7 @@ const ManageAttractions = () => {
           sunday: true
         },
         displayCapacityToCustomers: attr.display_capacity_to_customers ?? true,
+        displayOrder: attr.display_order ?? 0,
       }));
 
       setAttractions(convertedAttractions);
@@ -445,6 +450,9 @@ const ManageAttractions = () => {
       result = result.filter(attraction => attraction.category === filters.category);
     }
 
+    // Sort by display order
+    result.sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
+
     setFilteredAttractions(result);
   };
 
@@ -461,6 +469,49 @@ const ManageAttractions = () => {
       category: 'all',
       search: ''
     });
+  };
+
+  // Drag-and-drop reorder handlers
+  const handleDragStart = (index: number) => {
+    setDraggedIndex(index);
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === index) return;
+
+    setFilteredAttractions(prev => {
+      const updated = [...prev];
+      const draggedItem = updated[draggedIndex];
+      updated.splice(draggedIndex, 1);
+      updated.splice(index, 0, draggedItem);
+      setDraggedIndex(index);
+      return updated;
+    });
+  };
+
+  const handleDragEnd = async () => {
+    setDraggedIndex(null);
+    // Persist new order to backend
+    const reorderItems = filteredAttractions.map((attr, idx) => ({
+      id: Number(attr.id),
+      display_order: idx,
+    }));
+    try {
+      await attractionService.reorderAttractions(reorderItems);
+      // Update local state with new display orders
+      setAttractions(prev =>
+        prev.map(attr => {
+          const reordered = reorderItems.find(r => r.id === Number(attr.id));
+          return reordered ? { ...attr, displayOrder: reordered.display_order } : attr;
+        })
+      );
+      setToast({ message: 'Display order updated', type: 'success' });
+    } catch {
+      setToast({ message: 'Failed to update display order', type: 'error' });
+      // Re-apply filters to reset order from source of truth
+      applyFilters();
+    }
   };
 
   const handleSelectAttraction = (id: string) => {
@@ -868,6 +919,7 @@ const ManageAttractions = () => {
           <table className="w-full text-sm text-left">
             <thead className="text-xs text-gray-800 uppercase bg-gray-50 border-b">
               <tr>
+                <th scope="col" className="px-2 py-4 font-medium w-10"></th>
                 <th scope="col" className="px-6 py-4 font-medium w-12">
                   <input
                     type="checkbox"
@@ -889,13 +941,23 @@ const ManageAttractions = () => {
             <tbody className="divide-y divide-gray-100">
               {currentAttractions.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-6 py-8 text-center text-gray-800">
+                  <td colSpan={10} className="px-6 py-8 text-center text-gray-800">
                     No attractions found
                   </td>
                 </tr>
               ) : (
-                currentAttractions.map((attraction) => (
-                  <tr key={attraction.id} className="hover:bg-gray-50">
+                currentAttractions.map((attraction, index) => (
+                  <tr
+                    key={attraction.id}
+                    className="hover:bg-gray-50"
+                    draggable
+                    onDragStart={() => handleDragStart(index)}
+                    onDragOver={(e) => handleDragOver(e, index)}
+                    onDragEnd={handleDragEnd}
+                  >
+                    <td className="px-2 py-4 whitespace-nowrap cursor-grab">
+                      <GripVertical className="h-4 w-4 text-gray-400" />
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <input
                         type="checkbox"

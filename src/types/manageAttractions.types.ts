@@ -18,6 +18,7 @@ export interface ManageAttractionsAttraction {
   createdAt: string;
   availability: Record<string, boolean>;
   displayCapacityToCustomers?: boolean;
+  displayOrder?: number;
 }
 
 export interface ManageAttractionsFilterOptions {

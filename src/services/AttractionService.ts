@@ -56,7 +56,7 @@ export interface AttractionFilters {
   category?: string;
   is_active?: boolean;
   search?: string;
-  sort_by?: 'name' | 'price' | 'created_at' | 'category' | 'rating';
+  sort_by?: 'name' | 'price' | 'created_at' | 'category' | 'rating' | 'display_order';
   sort_order?: 'asc' | 'desc';
   per_page?: number;
   page?: number;
@@ -88,6 +88,7 @@ export interface CreateAttractionData {
   addon_ids?: number[];
   add_ons_order?: string[];
   display_capacity_to_customers?: boolean;
+  display_order?: number;
 }
 
 export type UpdateAttractionData = Partial<CreateAttractionData>;
@@ -189,6 +190,14 @@ class AttractionService {
     failed_count: number;
   }> & { errors?: Array<{ index: number; name: string; error: string }> }> {
     const response = await api.post('/attractions/bulk-import', data);
+    return response.data;
+  }
+
+  /**
+   * Reorder attractions (bulk update display_order)
+   */
+  async reorderAttractions(items: { id: number; display_order: number }[]): Promise<ApiResponse<null>> {
+    const response = await api.post('/attractions/reorder', { items });
     return response.data;
   }
 }

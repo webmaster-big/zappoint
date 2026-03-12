@@ -20,4 +20,5 @@ export interface CreateAttractionsFormData {
   embedCode: string;
   availability: AttractionAvailabilitySchedule[];
   id?: string;
+  displayOrder?: string;
 }

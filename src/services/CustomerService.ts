@@ -106,6 +106,25 @@ export interface AttractionAvailabilitySchedule {
   end_time: string;
 }
 
+export interface SpecialPricingDiscount {
+  special_pricing_id: number;
+  name: string;
+  description?: string;
+  discount_label: string;
+  discount_type: string;
+  discount_amount: number;
+  is_stackable: boolean;
+  recurrence_display?: string;
+}
+
+export interface SpecialPricing {
+  original_price: number;
+  discounted_price: number;
+  total_discount: number;
+  has_special_pricing: boolean;
+  discounts_applied: SpecialPricingDiscount[];
+}
+
 export interface GroupedAttraction {
   name: string;
   description: string;
@@ -122,6 +141,8 @@ export interface GroupedAttraction {
   locations: GroupedAttractionLocation[];
   purchase_links: AttractionPurchaseLink[];
   availability?: AttractionAvailabilitySchedule[];
+  display_order?: number;
+  special_pricing?: SpecialPricing;
 }
 
 // Types for grouped packages
@@ -184,6 +205,8 @@ export interface GroupedPackage {
   booking_links: PackageBookingLink[];
   availability_schedules?: PackageAvailabilitySchedule[];
   package_type?: string;
+  display_order?: number;
+  special_pricing?: SpecialPricing;
 }
 
 // Types for grouped events
@@ -247,8 +270,10 @@ class CustomerService {
   /**
    * Get attractions grouped by name with all available locations
    */
-  async getGroupedAttractions(search?: string): Promise<ApiResponse<GroupedAttraction[]>> {
-    const params = search ? { search } : {};
+  async getGroupedAttractions(search?: string, date?: string): Promise<ApiResponse<GroupedAttraction[]>> {
+    const params: Record<string, string> = {};
+    if (search) params.search = search;
+    if (date) params.date = date;
     const response = await api.get('/attractions/grouped', { params });
     return response.data;
   }
@@ -264,8 +289,10 @@ class CustomerService {
   /**
    * Get packages grouped by name with all available locations
    */
-  async getGroupedPackages(search?: string): Promise<ApiResponse<GroupedPackage[]>> {
-    const params = search ? { search } : {};
+  async getGroupedPackages(search?: string, date?: string): Promise<ApiResponse<GroupedPackage[]>> {
+    const params: Record<string, string> = {};
+    if (search) params.search = search;
+    if (date) params.date = date;
     const response = await api.get('/packages/grouped-by-name', { params });
     return response.data;
   }

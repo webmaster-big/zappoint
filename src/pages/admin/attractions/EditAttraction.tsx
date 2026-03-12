@@ -64,6 +64,7 @@ const EditAttraction = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [isActive, setIsActive] = useState<boolean>(false);
   const [displayCapacityToCustomers, setDisplayCapacityToCustomers] = useState(true);
+  const [displayOrder, setDisplayOrder] = useState<string>('0');
 
   // Add-on state
   const [addOns, setAddOns] = useState<{ id: number; name: string; price: number }[]>([]);
@@ -135,6 +136,7 @@ const EditAttraction = () => {
               }],
         });
         setDisplayCapacityToCustomers(attraction.display_capacity_to_customers ?? true);
+        setDisplayOrder(attraction.display_order?.toString() || '0');
         
         // Preserve the current active status
         setIsActive(attraction.is_active ?? true);
@@ -382,6 +384,7 @@ const EditAttraction = () => {
         addon_ids: selectedAddOns.map(name => addOns.find(a => a.name === name)?.id).filter(Boolean) as number[],
         add_ons_order: selectedAddOns,
         display_capacity_to_customers: displayCapacityToCustomers,
+        display_order: displayOrder ? Number(displayOrder) : 0,
       };
 
       console.log('Updating attraction data:', attractionData);
@@ -944,12 +947,29 @@ const EditAttraction = () => {
               </div>
             </div>
 
+            {/* Display Order */}
+            <div className="bg-white rounded-xl border border-gray-200 p-6">
+              <h3 className="text-lg font-bold text-gray-800 mb-4">Display Order</h3>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Order Position</label>
+                <input
+                  type="number"
+                  min={0}
+                  value={displayOrder}
+                  onChange={(e) => setDisplayOrder(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="0"
+                />
+                <p className="text-xs text-gray-500 mt-1">Lower numbers appear first on the store page.</p>
+              </div>
+            </div>
+
             {/* Form Actions */}
             <div className="flex gap-3 pt-6 border-t border-gray-200">
               <StandardButton
                 variant="secondary"
                 size="lg"
-                onClick={() => navigate('/attractions')}
+                onClick={() => navigate('/manage-attractions')}
                 disabled={isSubmitting}
                 fullWidth
               >

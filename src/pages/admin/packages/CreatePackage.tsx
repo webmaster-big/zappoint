@@ -250,6 +250,7 @@ const CreatePackage: React.FC = () => {
         
         // NEW: Replace old availability fields with schedules array
         availability_schedules: [] as AvailabilitySchedule[],
+        displayOrder: "0",
     });
 
 
@@ -636,6 +637,7 @@ const CreatePackage: React.FC = () => {
                 }).filter(Boolean),
                 // Store add-ons order for display (uses add-on names)
                 add_ons_order: form.addOns,
+                display_order: form.displayOrder ? parseInt(form.displayOrder) : 0,
                 promo_ids: form.promos.map(code => {
                     const found = promos.find(p => p.code === code);
                     return found?.id;

@@ -100,6 +100,7 @@ const EntertainmentLandingPage = () => {
         pricingType: attr.pricing_type,
         purchaseLinks: attr.purchase_links,
         availability: attr.availability,
+        special_pricing: attr.special_pricing,
       };
     });
     setAttractions(transformedAttractions);
@@ -132,6 +133,7 @@ const EntertainmentLandingPage = () => {
         min_participants: pkg.min_participants,
         max_guests: pkg.max_guests,
         price_per_additional: pkg.price_per_additional,
+        special_pricing: pkg.special_pricing,
       };
     });
     setPackages(transformedPackages);
@@ -220,7 +222,7 @@ const EntertainmentLandingPage = () => {
     const matchesLocation = selectedLocation === 'All Locations' || 
       attraction.availableLocations.includes(selectedLocation);
     const matchesSearch = attraction.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      attraction.description.toLowerCase().includes(searchQuery.toLowerCase());
+      (attraction.description || '').toLowerCase().includes(searchQuery.toLowerCase());
     
     return matchesLocation && matchesSearch;
   });
@@ -230,18 +232,17 @@ const EntertainmentLandingPage = () => {
     const matchesLocation = selectedLocation === 'All Locations' || 
       pkg.availableLocations.includes(selectedLocation);
     const matchesSearch = pkg.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      pkg.description.toLowerCase().includes(searchQuery.toLowerCase());
-    const isRegular = !pkg.package_type || pkg.package_type === 'regular';
+      (pkg.description || '').toLowerCase().includes(searchQuery.toLowerCase());
     
-    return matchesLocation && matchesSearch && isRegular;
+    return matchesLocation && matchesSearch;
   });
 
-  // Filter special packages (non-regular: custom, holiday, seasonal, special)
+  // Filter special packages (non-regular: custom, holiday, seasonal, special) — used for the highlighted section at the top
   const filteredSpecialPackages = packages.filter(pkg => {
     const matchesLocation = selectedLocation === 'All Locations' || 
       pkg.availableLocations.includes(selectedLocation);
     const matchesSearch = pkg.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      pkg.description.toLowerCase().includes(searchQuery.toLowerCase());
+      (pkg.description || '').toLowerCase().includes(searchQuery.toLowerCase());
     const isSpecial = pkg.package_type && pkg.package_type !== 'regular';
     
     return matchesLocation && matchesSearch && isSpecial;
@@ -383,6 +384,10 @@ const EntertainmentLandingPage = () => {
     return convertTo12Hour(time);
   };
 
+  // Strip unnecessary decimal zeros from discount labels: "10.00%" → "10%", "10.50%" → "10.5%"
+  const formatDiscountLabel = (label: string) =>
+    label.replace(/([\d.]+)(%)/g, (_, num, suffix) => parseFloat(num) + suffix);
+
   // Dynamically determine whether Michigan is currently on EST or EDT.
   // America/Detroit is UTC-5 in winter (EST) and UTC-4 in summer (EDT).
   const easternTimeAbbr = (() => {
@@ -500,6 +505,62 @@ const EntertainmentLandingPage = () => {
         .scroll-indicator.scrolled-bottom::before {
           opacity: 0 !important;
           display: none;
+        }
+        
+        /* Special pricing bottom overlay banner */
+        .discount-overlay {
+          position: absolute;
+          bottom: 0;
+          left: 0;
+          right: 0;
+          background: linear-gradient(to top, rgba(0,0,0,0.82) 0%, rgba(0,0,0,0.45) 60%, transparent 100%);
+          padding: 24px 10px 10px;
+          display: flex;
+          flex-wrap: wrap;
+          gap: 5px;
+          align-items: flex-end;
+          pointer-events: none;
+          z-index: 5;
+        }
+        .discount-pill {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          color: white;
+          font-weight: 700;
+          letter-spacing: 0.4px;
+          text-transform: uppercase;
+          border-radius: 999px;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          max-width: calc(100% - 12px);
+          flex-shrink: 1;
+        }
+        .discount-pill-primary {
+          background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+          font-size: 12px;
+          padding: 6px 14px;
+          box-shadow: 0 2px 12px rgba(5, 150, 105, 0.55);
+        }
+        .discount-pill-secondary {
+          background: rgba(13, 148, 136, 0.88);
+          backdrop-filter: blur(6px);
+          font-size: 11px;
+          padding: 5px 12px;
+          box-shadow: 0 1px 6px rgba(0,0,0,0.25);
+        }
+        .discount-pill-more {
+          display: inline-flex;
+          align-items: center;
+          background: rgba(255,255,255,0.18);
+          backdrop-filter: blur(6px);
+          border: 1px solid rgba(255,255,255,0.35);
+          color: white;
+          font-size: 11px;
+          font-weight: 600;
+          padding: 5px 11px;
+          border-radius: 999px;
         }
       `}</style>
       {/* Hero Section */}
@@ -655,8 +716,8 @@ const EntertainmentLandingPage = () => {
               </p>
             </div>
 
-            <div className={`grid gap-5 ${filteredSpecialPackages.length === 1 ? 'grid-cols-1 max-w-2xl mx-auto' : 'grid-cols-1 md:grid-cols-2'}`}>
-              {filteredSpecialPackages.slice(0, 2).map(pkg => {
+            <div className={`grid gap-5 ${filteredSpecialPackages.length === 1 ? 'grid-cols-1 max-w-2xl mx-auto' : filteredSpecialPackages.length === 2 ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'}`}>
+              {filteredSpecialPackages.map(pkg => {
                 // Get display config for package type
                 const typeConfig: Record<string, { label: string; bgColor: string; textColor: string }> = {
                   holiday: { label: 'HOLIDAY', bgColor: 'bg-red-600', textColor: 'text-white' },
@@ -684,6 +745,20 @@ const EntertainmentLandingPage = () => {
                         ) : (
                           <div className="w-full h-full bg-gradient-to-br from-gray-900 to-gray-700 flex items-center justify-center text-white text-lg font-bold">
                             {pkg.name}
+                          </div>
+                        )}
+                        {/* Discount Overlay Banner */}
+                        {pkg.special_pricing?.has_special_pricing && pkg.special_pricing.discounts_applied.length > 0 && (
+                          <div className="discount-overlay">
+                            {pkg.special_pricing.discounts_applied.slice(0, 2).map((d, i) => (
+                              <span key={i} className={`discount-pill ${i === 0 ? 'discount-pill-primary' : 'discount-pill-secondary'}`}>
+                                <Sparkles size={i === 0 ? 12 : 10} />
+                                <span>{d.name}: {formatDiscountLabel(d.discount_label)}</span>
+                              </span>
+                            ))}
+                            {pkg.special_pricing.discounts_applied.length > 2 && (
+                              <span className="discount-pill-more">+{pkg.special_pricing.discounts_applied.length - 2} more</span>
+                            )}
                           </div>
                         )}
                         {/* Type Badge */}
@@ -719,9 +794,19 @@ const EntertainmentLandingPage = () => {
                         
                         <div className="flex items-center justify-between">
                           <div>
-                            <span className="text-2xl md:text-3xl font-extrabold text-gray-900">
-                              ${pkg.price}
-                            </span>
+                            {pkg.special_pricing?.has_special_pricing ? (
+                              <div className="flex items-center gap-2">
+                                <span className="text-base text-gray-400 line-through font-semibold">${pkg.special_pricing.original_price}</span>
+                                <span className="text-emerald-500 text-lg font-bold">→</span>
+                                <span className="text-2xl md:text-3xl font-extrabold text-emerald-600">
+                                  ${pkg.special_pricing.discounted_price}
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-2xl md:text-3xl font-extrabold text-gray-900">
+                                ${pkg.price}
+                              </span>
+                            )}
                           </div>
                           <button
                             onClick={(e) => {
@@ -794,6 +879,20 @@ const EntertainmentLandingPage = () => {
                           {pkg.name}
                         </div>
                       )}
+                      {/* Discount Overlay Banner */}
+                      {pkg.special_pricing?.has_special_pricing && pkg.special_pricing.discounts_applied.length > 0 && (
+                        <div className="discount-overlay">
+                          {pkg.special_pricing.discounts_applied.slice(0, 2).map((d, i) => (
+                            <span key={i} className={`discount-pill ${i === 0 ? 'discount-pill-primary' : 'discount-pill-secondary'}`}>
+                              <Sparkles size={i === 0 ? 12 : 10} />
+                              <span>{d.name}: {formatDiscountLabel(d.discount_label)}</span>
+                            </span>
+                          ))}
+                          {pkg.special_pricing.discounts_applied.length > 2 && (
+                            <span className="discount-pill-more">+{pkg.special_pricing.discounts_applied.length - 2} more</span>
+                          )}
+                        </div>
+                      )}
                       {/* Category Badge */}
                       <div className="absolute top-3 left-3">
                         <span className="px-2.5 py-1 bg-white/90 backdrop-blur-sm text-gray-700 text-xs font-semibold rounded-lg shadow-sm capitalize">
@@ -832,10 +931,23 @@ const EntertainmentLandingPage = () => {
                       
                       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                         <div>
-                          <span className="text-2xl md:text-2xl font-extrabold text-gray-900">
-                            ${pkg.price}
-                          </span>
-                          <span className="text-gray-400 text-xs ml-1">/ package</span>
+                          {pkg.special_pricing?.has_special_pricing ? (
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm text-gray-400 line-through font-semibold">${pkg.special_pricing.original_price}</span>
+                              <span className="text-emerald-500 font-bold">→</span>
+                              <span className="text-2xl font-extrabold text-emerald-600">
+                                ${pkg.special_pricing.discounted_price}
+                              </span>
+                              <span className="text-gray-400 text-xs">/ package</span>
+                            </div>
+                          ) : (
+                            <>
+                              <span className="text-2xl font-extrabold text-gray-900">
+                                ${pkg.price}
+                              </span>
+                              <span className="text-gray-400 text-xs ml-1">/ package</span>
+                            </>
+                          )}
                         </div>
                         <button
                           onClick={(e) => {
@@ -908,6 +1020,20 @@ const EntertainmentLandingPage = () => {
                           {attraction.name}
                         </div>
                       )}
+                      {/* Discount Overlay Banner */}
+                      {attraction.special_pricing?.has_special_pricing && attraction.special_pricing.discounts_applied.length > 0 && (
+                        <div className="discount-overlay">
+                          {attraction.special_pricing.discounts_applied.slice(0, 2).map((d, i) => (
+                            <span key={i} className={`discount-pill ${i === 0 ? 'discount-pill-primary' : 'discount-pill-secondary'}`}>
+                              <Sparkles size={i === 0 ? 12 : 10} />
+                              <span>{d.name}: {formatDiscountLabel(d.discount_label)}</span>
+                            </span>
+                          ))}
+                          {attraction.special_pricing.discounts_applied.length > 2 && (
+                            <span className="discount-pill-more">+{attraction.special_pricing.discounts_applied.length - 2} more</span>
+                          )}
+                        </div>
+                      )}
                       {/* Category Badge */}
                       <div className="absolute top-3 left-3">
                         <span className="px-2.5 py-1 bg-white/90 backdrop-blur-sm text-gray-700 text-xs font-semibold rounded-lg shadow-sm capitalize">
@@ -926,10 +1052,23 @@ const EntertainmentLandingPage = () => {
 
                       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                         <div>
-                          <span className="text-2xl font-extrabold text-gray-900">
-                            ${attraction.price}
-                          </span>
-                          <span className="text-gray-400 text-xs ml-1">/ person</span>
+                          {attraction.special_pricing?.has_special_pricing ? (
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm text-gray-400 line-through font-semibold">${attraction.special_pricing.original_price}</span>
+                              <span className="text-emerald-500 font-bold">→</span>
+                              <span className="text-2xl font-extrabold text-emerald-600">
+                                ${attraction.special_pricing.discounted_price}
+                              </span>
+                              <span className="text-gray-400 text-xs">/ person</span>
+                            </div>
+                          ) : (
+                            <>
+                              <span className="text-2xl font-extrabold text-gray-900">
+                                ${attraction.price}
+                              </span>
+                              <span className="text-gray-400 text-xs ml-1">/ person</span>
+                            </>
+                          )}
                         </div>
                         <button
                           onClick={(e) => {
@@ -1084,8 +1223,18 @@ const EntertainmentLandingPage = () => {
                     <DollarSign className="text-emerald-600" size={20} />
                   </div>
                   <div>
-                    <div className="text-xl md:text-2xl font-extrabold text-gray-900">${selectedAttraction.price}</div>
-                    <div className="text-xs text-gray-400">per person</div>
+                    {selectedAttraction.special_pricing?.has_special_pricing ? (
+                      <>
+                        <div className="text-sm text-gray-400 line-through">${selectedAttraction.special_pricing.original_price}</div>
+                        <div className="text-xl md:text-2xl font-extrabold text-emerald-600">${selectedAttraction.special_pricing.discounted_price}</div>
+                        <div className="text-xs text-gray-400">per person</div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="text-xl md:text-2xl font-extrabold text-gray-900">${selectedAttraction.price}</div>
+                        <div className="text-xs text-gray-400">per person</div>
+                      </>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
@@ -1098,6 +1247,31 @@ const EntertainmentLandingPage = () => {
                   </div>
                 </div>
               </div>
+
+              {/* Active Discounts */}
+              {selectedAttraction.special_pricing?.has_special_pricing && selectedAttraction.special_pricing.discounts_applied.length > 0 && (
+                <div className="mb-5 bg-emerald-50 border border-emerald-100 rounded-xl p-3">
+                  <h3 className="text-xs font-bold text-emerald-800 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                    Active Discounts
+                  </h3>
+                  <div className="space-y-1.5">
+                    {selectedAttraction.special_pricing.discounts_applied.map((d, i) => (
+                      <div key={i} className="flex items-center justify-between bg-white rounded-lg px-3 py-2">
+                        <div>
+                          <div className="text-sm font-semibold text-gray-900">{d.name}</div>
+                          {d.description && <div className="text-xs text-gray-500">{d.description}</div>}
+                          {d.recurrence_display && <div className="text-[11px] text-gray-400 mt-0.5">{d.recurrence_display}</div>}
+                        </div>
+                        <span className="text-sm font-bold text-emerald-600">{formatDiscountLabel(d.discount_label)}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-2 pt-2 border-t border-emerald-200 flex items-center justify-between text-xs">
+                    <span className="text-emerald-700 font-medium">Total Savings</span>
+                    <span className="text-emerald-700 font-bold">{Math.round(selectedAttraction.special_pricing.total_discount)}% off</span>
+                  </div>
+                </div>
+              )}
 
               {/* Description */}
               <div className="mb-5">
@@ -1284,8 +1458,18 @@ const EntertainmentLandingPage = () => {
                     <DollarSign className="text-emerald-600" size={20} />
                   </div>
                   <div>
-                    <div className="text-xl md:text-2xl font-extrabold text-gray-900">${selectedPackage.price}</div>
-                    <div className="text-xs text-gray-400">package</div>
+                    {selectedPackage.special_pricing?.has_special_pricing ? (
+                      <>
+                        <div className="text-sm text-gray-400 line-through">${selectedPackage.special_pricing.original_price}</div>
+                        <div className="text-xl md:text-2xl font-extrabold text-emerald-600">${selectedPackage.special_pricing.discounted_price}</div>
+                        <div className="text-xs text-gray-400">package</div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="text-xl md:text-2xl font-extrabold text-gray-900">${selectedPackage.price}</div>
+                        <div className="text-xs text-gray-400">package</div>
+                      </>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
@@ -1298,6 +1482,31 @@ const EntertainmentLandingPage = () => {
                   </div>
                 </div>
               </div>
+
+              {/* Active Discounts */}
+              {selectedPackage.special_pricing?.has_special_pricing && selectedPackage.special_pricing.discounts_applied.length > 0 && (
+                <div className="mb-5 bg-emerald-50 border border-emerald-100 rounded-xl p-3">
+                  <h3 className="text-xs font-bold text-emerald-800 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                    Active Discounts
+                  </h3>
+                  <div className="space-y-1.5">
+                    {selectedPackage.special_pricing.discounts_applied.map((d, i) => (
+                      <div key={i} className="flex items-center justify-between bg-white rounded-lg px-3 py-2">
+                        <div>
+                          <div className="text-sm font-semibold text-gray-900">{d.name}</div>
+                          {d.description && <div className="text-xs text-gray-500">{d.description}</div>}
+                          {d.recurrence_display && <div className="text-[11px] text-gray-400 mt-0.5">{d.recurrence_display}</div>}
+                        </div>
+                        <span className="text-sm font-bold text-emerald-600">{formatDiscountLabel(d.discount_label)}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-2 pt-2 border-t border-emerald-200 flex items-center justify-between text-xs">
+                    <span className="text-emerald-700 font-medium">Total Savings</span>
+                    <span className="text-emerald-700 font-bold">{Math.round(selectedPackage.special_pricing.total_discount)}% off</span>
+                  </div>
+                </div>
+              )}
 
               {/* Description */}
               <div className="mb-5">

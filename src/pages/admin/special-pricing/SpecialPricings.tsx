@@ -652,16 +652,28 @@ const SpecialPricings: React.FC = () => {
                         </span>
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
-                          sp.recurrence_type === 'one_time' ? `bg-${themeColor}-100 text-${fullColor}` :
-                          sp.recurrence_type === 'weekly' ? 'bg-gray-100 text-gray-600' :
-                          'bg-gray-100 text-gray-600'
-                        }`}>
-                          {sp.recurrence_type === 'one_time' ? <Calendar className="w-3 h-3" /> :
-                           sp.recurrence_type === 'weekly' ? <Repeat className="w-3 h-3" /> :
-                           <Repeat className="w-3 h-3" />}
-                          {formatRecurrence(sp)}
-                        </span>
+                        <div>
+                          <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                            sp.recurrence_type === 'one_time' ? `bg-${themeColor}-100 text-${fullColor}` :
+                            sp.recurrence_type === 'weekly' ? 'bg-gray-100 text-gray-600' :
+                            'bg-gray-100 text-gray-600'
+                          }`}>
+                            {sp.recurrence_type === 'one_time' ? <Calendar className="w-3 h-3" /> :
+                             sp.recurrence_type === 'weekly' ? <Repeat className="w-3 h-3" /> :
+                             <Repeat className="w-3 h-3" />}
+                            {formatRecurrence(sp)}
+                          </span>
+                          {(sp.time_start || sp.time_end) && (
+                            <p className="text-[11px] text-gray-400 mt-1 pl-0.5">
+                              🕐 {sp.time_start?.slice(0, 5) || '—'} – {sp.time_end?.slice(0, 5) || '—'}
+                            </p>
+                          )}
+                          {sp.recurrence_type !== 'one_time' && (sp.start_date || sp.end_date) && (
+                            <p className="text-[11px] text-gray-400 mt-0.5 pl-0.5">
+                              📅 {sp.start_date ? new Date(sp.start_date + 'T00:00:00').toLocaleDateString() : 'No start'} – {sp.end_date ? new Date(sp.end_date + 'T00:00:00').toLocaleDateString() : 'No end'}
+                            </p>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-3">
                         <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${

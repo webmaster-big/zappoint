@@ -73,6 +73,7 @@ export interface Attraction {
   pricingType?: string;
   purchaseLinks?: AttractionPurchaseLink[];
   availability?: AttractionAvailabilitySchedule[];
+  special_pricing?: import('../services/CustomerService').SpecialPricing;
 }
 
 // Package types
@@ -101,6 +102,7 @@ export interface Package {
   min_participants?: number;
   max_guests?: number;
   price_per_additional?: number;
+  special_pricing?: import('../services/CustomerService').SpecialPricing;
 }
 
 // Reservation types

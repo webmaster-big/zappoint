@@ -102,6 +102,7 @@ const EditPackage: React.FC = () => {
         bookingWindowDays: "", // Max days in advance for booking (1-365)
         minBookingNoticeHours: "", // Min hours in advance for booking (0-8760)
         isActive: false, // Preserve active/inactive status on edit
+        displayOrder: "0",
     });
 
     // Image preview state
@@ -343,6 +344,7 @@ const EditPackage: React.FC = () => {
                     bookingWindowDays: String(pkg.booking_window_days || ""),
                     minBookingNoticeHours: String(pkg.min_booking_notice_hours || ""),
                     isActive: pkg.is_active ?? false,
+                    displayOrder: String(pkg.display_order || "0"),
                 });
 
                 if (pkg.image) {
@@ -778,6 +780,7 @@ const EditPackage: React.FC = () => {
                 // Store add-ons order for display (uses add-on names)
                 add_ons_order: form.addOns,
                 is_active: form.isActive,
+                display_order: form.displayOrder ? parseInt(form.displayOrder) : 0,
             };
 
             console.log("Updating package with data:", updateData);
@@ -2116,6 +2119,20 @@ const EditPackage: React.FC = () => {
                                 </div>
                             )}
                             <p className="text-xs text-gray-500 mt-3">Optional: Customers can access this invitation template after booking.</p>
+                        </div>
+
+                        {/* Display Order */}
+                        <div className="bg-white rounded-xl border border-gray-200 p-5">
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">Display Order</label>
+                            <input
+                                type="number"
+                                min={0}
+                                value={form.displayOrder}
+                                onChange={(e) => setForm(f => ({ ...f, displayOrder: e.target.value }))}
+                                className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                placeholder="0"
+                            />
+                            <p className="text-xs text-gray-500 mt-1">Lower numbers appear first on the store page.</p>
                         </div>
                         
                         <div className="flex gap-2 mt-6">
