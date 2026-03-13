@@ -195,15 +195,13 @@ const SpecialPricings: React.FC = () => {
         if (eventList.length === 0 && Array.isArray(response)) {
           eventList = response as unknown as typeof eventList;
         }
-        if (response.success) {
-          const today = new Date().toISOString().split('T')[0];
-          const activeEvents = eventList.filter((e) => {
-            if (e.is_active === false) return false;
-            if (e.end_date && e.end_date < today) return false;
-            return true;
-          });
-          setEvents(activeEvents.map((e: { id: number; name: string }) => ({ id: e.id, name: e.name })));
-        }
+        const today = new Date().toISOString().split('T')[0];
+        const activeEvents = eventList.filter((e) => {
+          if (e.is_active === false) return false;
+          if (e.end_date && e.end_date < today) return false;
+          return true;
+        });
+        setEvents(activeEvents.map((e: { id: number; name: string }) => ({ id: e.id, name: e.name })));
       }
     } catch {
       console.error('Failed to load entities');

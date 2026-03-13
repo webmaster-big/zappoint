@@ -7,7 +7,7 @@ import { addOnService } from '../../../services/AddOnService';
 import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
 import LocationSelector from '../../../components/admin/LocationSelector';
-import { getStoredUser } from '../../../utils/storage';
+import { getStoredUser, getImageUrl } from '../../../utils/storage';
 import { Plus, Trash2, GripVertical, X, Calendar, Clock, DollarSign, MapPin, Star, Package } from 'lucide-react';
 import type { Event, UpdateEventData } from '../../../types/event.types';
 
@@ -53,34 +53,56 @@ const EditEvent = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [locRes, addOnRes] = await Promise.all([
-        locationService.getLocations(),
-        addOnService.getAddOns({ user_id: currentUser?.id }),
-      ]);
+      // Load locations and add-ons independently so one failing doesn't block the other
+      try {
+        const locRes = await locationService.getLocations();
+        const raw = locRes as unknown as Record<string, unknown>;
+        let locList: Array<{ id: number; name: string }> = [];
+        if (Array.isArray(raw.data)) locList = raw.data;
+        else if (Array.isArray(raw.locations)) locList = raw.locations;
+        else if (Array.isArray(raw)) locList = raw as unknown as Array<{ id: number; name: string }>;
+        setLocations(locList.map((l) => ({ id: l.id, name: l.name })));
+      } catch {
+        console.error('EditEvent: Failed to load locations');
+      }
 
-      const locList = Array.isArray(locRes.data) ? locRes.data : [];
-      setLocations(locList.map((l: { id: number; name: string }) => ({ id: l.id, name: l.name })));
-
-      const addOnList = addOnRes.data?.add_ons || [];
-      setAllAddOns(addOnList.map((a: { id: number; name: string; price: number | null }) => ({ id: a.id, name: a.name, price: a.price || 0 })));
+      try {
+        const addOnRes = await addOnService.getAddOns({ user_id: currentUser?.id });
+        const raw = addOnRes as unknown as Record<string, unknown>;
+        let addOnList: Array<{ id: number; name: string; price: number | null }> = [];
+        if (raw.data && typeof raw.data === 'object' && Array.isArray((raw.data as Record<string, unknown>).add_ons)) {
+          addOnList = (raw.data as Record<string, unknown>).add_ons as typeof addOnList;
+        } else if (Array.isArray(raw.add_ons)) {
+          addOnList = raw.add_ons as typeof addOnList;
+        } else if (Array.isArray(raw.data)) {
+          addOnList = raw.data as typeof addOnList;
+        }
+        setAllAddOns(addOnList.map((a) => ({ id: a.id, name: a.name, price: a.price || 0 })));
+      } catch {
+        console.error('EditEvent: Failed to load add-ons');
+      }
 
       // Load event data
       if (id) {
         const eventRes = await eventService.getEvent(parseInt(id));
-        // Handle various API response shapes
+        // Handle various API response shapes (backend may return {data:{...}}, {event:{...}}, or direct object)
         let event: Event;
-        const d = eventRes.data as unknown;
-        if (d && typeof d === 'object' && 'name' in (d as Record<string, unknown>)) {
-          event = d as Event;
-        } else if (d && typeof d === 'object') {
-          const obj = d as Record<string, unknown>;
+        const raw = eventRes as unknown as Record<string, unknown>;
+        if (raw.data && typeof raw.data === 'object' && 'name' in (raw.data as Record<string, unknown>)) {
+          event = raw.data as Event;
+        } else if (raw.event && typeof raw.event === 'object' && 'name' in (raw.event as Record<string, unknown>)) {
+          event = raw.event as Event;
+        } else if (raw.data && typeof raw.data === 'object') {
+          const obj = raw.data as Record<string, unknown>;
           event = (obj.event || obj.data || obj) as Event;
+        } else if ('name' in raw) {
+          event = raw as unknown as Event;
         } else {
           event = eventRes as unknown as Event;
         }
         setName(event.name || '');
         setDescription(event.description || '');
-        setImagePreview(event.image || '');
+        setImagePreview(event.image ? getImageUrl(event.image) : '');
         setDateType(event.date_type || 'one_time');
         setStartDate(event.start_date ? event.start_date.substring(0, 10) : '');
         setEndDate(event.end_date ? event.end_date.substring(0, 10) : '');

@@ -435,7 +435,7 @@ const FeeSupports: React.FC = () => {
       </div>
 
       {/* Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {[
           { title: 'Total Fee Supports', value: feeSupports.length.toString(), sub: `${totalActive} active`, icon: DollarSign },
           { title: 'Package Fees', value: totalPackageFees.toString(), sub: 'Applied to packages', icon: PackageIcon },
