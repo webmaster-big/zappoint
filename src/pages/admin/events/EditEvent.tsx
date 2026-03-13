@@ -29,6 +29,7 @@ const EditEvent = () => {
   const [description, setDescription] = useState('');
   const [image, setImage] = useState<string>('');
   const [imagePreview, setImagePreview] = useState<string>('');
+  const [imageRemoved, setImageRemoved] = useState(false);
   const [dateType, setDateType] = useState<'one_time' | 'date_range'>('one_time');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -133,6 +134,7 @@ const EditEvent = () => {
     if (!file) return;
     const preview = URL.createObjectURL(file);
     setImagePreview(preview);
+    setImageRemoved(false);
     const reader = new FileReader();
     reader.onloadend = () => setImage(reader.result as string);
     reader.readAsDataURL(file);
@@ -220,6 +222,7 @@ const EditEvent = () => {
         is_active: isActive,
       };
       if (image) payload.image = image;
+      else if (imageRemoved) payload.image = null;
 
       await eventService.updateEvent(parseInt(id), payload as UpdateEventData);
       setToast({ message: 'Event updated successfully!', type: 'success' });
@@ -327,7 +330,7 @@ const EditEvent = () => {
                   <img src={imagePreview} alt="Preview" className="absolute inset-0 w-full h-full object-cover" />
                   <button
                     type="button"
-                    onClick={() => { setImage(''); setImagePreview(''); }}
+                    onClick={() => { setImage(''); setImagePreview(''); setImageRemoved(true); }}
                     className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center opacity-90 hover:opacity-100 transition-opacity text-xs"
                   >
                     ×
