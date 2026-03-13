@@ -1223,7 +1223,7 @@ const CompanyDashboard: React.FC = () => {
             {topLocations.length > 0 ? (
               <div className="space-y-4">
                 {topLocations.map(([locationId, stats], index) => {
-                  const typedStats = stats as { name: string; bookings: number; purchases: number; participants: number; revenue: number; utilization: number };
+                  const typedStats = stats as { name: string; bookings: number; purchases: number; participants: number; revenue: number; utilization: number; eventPurchases?: number };
                   return (
                   <div key={locationId} className={`flex items-center justify-between p-4 rounded-xl shadow-sm border-2 transition-all bg-${themeColor}-50 border-${fullColor}`}>
                     <div className="flex items-center gap-4">

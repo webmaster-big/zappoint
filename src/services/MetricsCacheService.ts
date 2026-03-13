@@ -37,6 +37,7 @@ export interface CachedMetricsData<T> {
   metrics: T;
   recentBookings?: any[];
   recentPurchases?: any[];
+  recentEventPurchases?: any[];
   locationStats?: any;
   timestamp: number;
 }
