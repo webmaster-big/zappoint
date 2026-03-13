@@ -53,11 +53,64 @@ const EditEvent = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
+  const populateEventForm = (event: Event) => {
+    setName(event.name || '');
+    setDescription(event.description || '');
+    setImagePreview(event.image ? getImageUrl(event.image) : '');
+    setDateType(event.date_type || 'one_time');
+    setStartDate(event.start_date ? event.start_date.substring(0, 10) : '');
+    setEndDate(event.end_date ? event.end_date.substring(0, 10) : '');
+    setTimeStart(event.time_start ? event.time_start.substring(0, 5) : '09:00');
+    setTimeEnd(event.time_end ? event.time_end.substring(0, 5) : '17:00');
+    setIntervalMinutes(event.interval_minutes || 60);
+    setMaxBookingsPerSlot(event.max_bookings_per_slot?.toString() || '');
+    setPrice(event.price || '0');
+    setFeatures(event.features || []);
+    setIsActive(event.is_active ?? true);
+    setSelectedLocation(event.location_id?.toString() || '');
+
+    if (event.add_ons_order && event.add_ons_order.length > 0) {
+      setSelectedAddOnIds(event.add_ons_order);
+    } else if (event.add_ons) {
+      setSelectedAddOnIds(event.add_ons.map(a => a.id));
+    }
+  };
+
+  const parseEventFromResponse = (eventRes: unknown): Event | null => {
+    const raw = eventRes as Record<string, unknown>;
+    if (raw.data && typeof raw.data === 'object' && 'name' in (raw.data as Record<string, unknown>)) {
+      return raw.data as Event;
+    } else if (raw.event && typeof raw.event === 'object' && 'name' in (raw.event as Record<string, unknown>)) {
+      return raw.event as Event;
+    } else if (raw.data && typeof raw.data === 'object') {
+      const obj = raw.data as Record<string, unknown>;
+      return (obj.event || obj.data || obj) as Event;
+    } else if ('name' in raw) {
+      return raw as unknown as Event;
+    }
+    return eventRes as unknown as Event;
+  };
+
   const loadData = async () => {
     setLoading(true);
     try {
-      // Load locations, add-ons, and event in parallel using caches
-      const [, , eventData] = await Promise.all([
+      // Phase 1: Try cache for instant display
+      let cacheHit = false;
+      if (id) {
+        try {
+          const cachedEvent = await eventCacheService.getEventFromCache(parseInt(id));
+          if (cachedEvent) {
+            populateEventForm(cachedEvent);
+            cacheHit = true;
+            setLoading(false);
+          }
+        } catch {
+          // Cache miss, continue to API
+        }
+      }
+
+      // Load locations, add-ons, and event (from API) in parallel
+      await Promise.all([
         // Locations
         (async () => {
           try {
@@ -96,63 +149,26 @@ const EditEvent = () => {
             console.error('EditEvent: Failed to load add-ons');
           }
         })(),
-        // Event from cache
+        // Phase 2: Always fetch fresh event from API for complete data (includes add_ons relationships)
         (async () => {
-          if (!id) return null;
+          if (!id) return;
           try {
-            // Try cache first
-            const cached = await eventCacheService.getEventFromCache(parseInt(id));
-            if (cached) {
-              eventCacheService.syncInBackground({ user_id: currentUser?.id });
-              return cached;
-            }
-            // Fallback to API
             const eventRes = await eventService.getEvent(parseInt(id));
-            const raw = eventRes as unknown as Record<string, unknown>;
-            if (raw.data && typeof raw.data === 'object' && 'name' in (raw.data as Record<string, unknown>)) {
-              return raw.data as Event;
-            } else if (raw.event && typeof raw.event === 'object' && 'name' in (raw.event as Record<string, unknown>)) {
-              return raw.event as Event;
-            } else if (raw.data && typeof raw.data === 'object') {
-              const obj = raw.data as Record<string, unknown>;
-              return (obj.event || obj.data || obj) as Event;
-            } else if ('name' in raw) {
-              return raw as unknown as Event;
-            } else {
-              return eventRes as unknown as Event;
+            const event = parseEventFromResponse(eventRes);
+            if (event) {
+              populateEventForm(event);
+              // Update cache with fresh full event data
+              eventCacheService.updateEventInCache(event);
+            } else if (!cacheHit) {
+              setToast({ message: 'Failed to load event data', type: 'error' });
             }
           } catch {
-            return null;
+            if (!cacheHit) {
+              setToast({ message: 'Failed to load event data', type: 'error' });
+            }
           }
         })()
       ]);
-
-      // Populate form with event data
-      if (eventData) {
-        const event = eventData;
-        setName(event.name || '');
-        setDescription(event.description || '');
-        setImagePreview(event.image ? getImageUrl(event.image) : '');
-        setDateType(event.date_type || 'one_time');
-        setStartDate(event.start_date ? event.start_date.substring(0, 10) : '');
-        setEndDate(event.end_date ? event.end_date.substring(0, 10) : '');
-        setTimeStart(event.time_start ? event.time_start.substring(0, 5) : '09:00');
-        setTimeEnd(event.time_end ? event.time_end.substring(0, 5) : '17:00');
-        setIntervalMinutes(event.interval_minutes || 60);
-        setMaxBookingsPerSlot(event.max_bookings_per_slot?.toString() || '');
-        setPrice(event.price || '0');
-        setFeatures(event.features || []);
-        setIsActive(event.is_active ?? true);
-        setSelectedLocation(event.location_id?.toString() || '');
-
-        if (event.add_ons_order && event.add_ons_order.length > 0) {
-          setSelectedAddOnIds(event.add_ons_order);
-        } else if (event.add_ons) {
-          setSelectedAddOnIds(event.add_ons.map(a => a.id));
-        }
-      } else if (id) {
-        setToast({ message: 'Failed to load event data', type: 'error' });
-      }
     } catch {
       setToast({ message: 'Failed to load event data', type: 'error' });
     } finally {
