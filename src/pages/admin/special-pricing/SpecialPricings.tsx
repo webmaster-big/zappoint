@@ -184,9 +184,20 @@ const SpecialPricings: React.FC = () => {
       }
       if (entityType === 'event' || entityType === 'all') {
         const response = await eventService.getEvents();
-        if (response.success && response.data) {
+        let eventList: Array<{ id: number; name: string; is_active?: boolean; end_date?: string | null; start_date?: string }> = [];
+        if (Array.isArray(response.data)) {
+          eventList = response.data;
+        } else if (response.data && typeof response.data === 'object') {
+          const obj = response.data as Record<string, unknown>;
+          if (Array.isArray(obj.events)) eventList = obj.events as typeof eventList;
+          else if (Array.isArray(obj.data)) eventList = obj.data as typeof eventList;
+        }
+        if (eventList.length === 0 && Array.isArray(response)) {
+          eventList = response as unknown as typeof eventList;
+        }
+        if (response.success) {
           const today = new Date().toISOString().split('T')[0];
-          const activeEvents = response.data.filter((e) => {
+          const activeEvents = eventList.filter((e) => {
             if (e.is_active === false) return false;
             if (e.end_date && e.end_date < today) return false;
             return true;

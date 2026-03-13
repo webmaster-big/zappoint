@@ -143,14 +143,26 @@ const FeeSupports: React.FC = () => {
           setAttractions(freshAttractions.map((a: Attraction) => ({ id: a.id, name: a.name })));
         }
       } else if (entityType === 'event') {
-        const response = await eventService.getEvents({ user_id: currentUser?.id, is_active: true });
-        if (response.success && response.data) {
-          const activeEvents = (Array.isArray(response.data) ? response.data : []).filter(ev => {
-            const endDate = ev.end_date || ev.start_date;
-            return new Date(endDate) >= new Date(new Date().toISOString().split('T')[0]);
-          });
-          setEvents(activeEvents.map(ev => ({ id: ev.id, name: ev.name })));
+        const response = await eventService.getEvents({ user_id: currentUser?.id });
+        let eventList: Array<{ id: number; name: string; is_active?: boolean; end_date?: string | null; start_date?: string }> = [];
+        if (Array.isArray(response.data)) {
+          eventList = response.data;
+        } else if (response.data && typeof response.data === 'object') {
+          const obj = response.data as Record<string, unknown>;
+          if (Array.isArray(obj.events)) eventList = obj.events as typeof eventList;
+          else if (Array.isArray(obj.data)) eventList = obj.data as typeof eventList;
         }
+        if (eventList.length === 0 && Array.isArray(response)) {
+          eventList = response as unknown as typeof eventList;
+        }
+        const today = new Date().toISOString().split('T')[0];
+        const activeEvents = eventList.filter(ev => {
+          if (ev.is_active === false) return false;
+          const endDate = ev.end_date || ev.start_date;
+          if (endDate && endDate < today) return false;
+          return true;
+        });
+        setEvents(activeEvents.map(ev => ({ id: ev.id, name: ev.name })));
       }
     } catch {
       console.error('Failed to load entities');
