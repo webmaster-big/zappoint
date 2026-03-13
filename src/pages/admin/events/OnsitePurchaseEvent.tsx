@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { eventService } from '../../../services/EventService';
+import { eventCacheService } from '../../../services/EventCacheService';
 import { eventPurchaseService } from '../../../services/EventPurchaseService';
 import { customerService, type Customer } from '../../../services/CustomerService';
 import Toast from '../../../components/ui/Toast';
@@ -124,6 +125,15 @@ const OnsitePurchaseEvent = () => {
     const fetchEvents = async () => {
       setLoadingEvents(true);
       try {
+        // Try cache first for faster load
+        const cached = await eventCacheService.getCachedEvents();
+        if (cached && cached.length > 0) {
+          setAllEvents(cached.filter(e => e.is_active));
+          setLoadingEvents(false);
+          eventCacheService.syncInBackground({ user_id: currentUser?.id });
+          return;
+        }
+
         const res = await eventService.getEvents({ user_id: currentUser?.id });
         let list: Event[] = [];
         if (Array.isArray(res.data)) {
@@ -136,6 +146,7 @@ const OnsitePurchaseEvent = () => {
         if (list.length === 0 && Array.isArray(res)) {
           list = res as unknown as Event[];
         }
+        await eventCacheService.cacheEvents(list);
         list = list.filter(e => e.is_active);
         setAllEvents(list);
       } catch {

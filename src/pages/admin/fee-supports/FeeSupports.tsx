@@ -22,7 +22,7 @@ import { feeSupportService } from '../../../services/FeeSupportService';
 import { packageCacheService } from '../../../services/PackageCacheService';
 import { attractionCacheService } from '../../../services/AttractionCacheService';
 import { locationService } from '../../../services/LocationService';
-import { eventService } from '../../../services/EventService';
+import { eventCacheService } from '../../../services/EventCacheService';
 import { getStoredUser } from '../../../utils/storage';
 import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
@@ -143,18 +143,8 @@ const FeeSupports: React.FC = () => {
           setAttractions(freshAttractions.map((a: Attraction) => ({ id: a.id, name: a.name })));
         }
       } else if (entityType === 'event') {
-        const response = await eventService.getEvents({ user_id: currentUser?.id });
-        let eventList: Array<{ id: number; name: string; is_active?: boolean; end_date?: string | null; start_date?: string }> = [];
-        if (Array.isArray(response.data)) {
-          eventList = response.data;
-        } else if (response.data && typeof response.data === 'object') {
-          const obj = response.data as Record<string, unknown>;
-          if (Array.isArray(obj.events)) eventList = obj.events as typeof eventList;
-          else if (Array.isArray(obj.data)) eventList = obj.data as typeof eventList;
-        }
-        if (eventList.length === 0 && Array.isArray(response)) {
-          eventList = response as unknown as typeof eventList;
-        }
+        const cached = await eventCacheService.getCachedEvents();
+        let eventList = cached || await eventCacheService.getEvents({ user_id: currentUser?.id });
         const today = new Date().toISOString().split('T')[0];
         const activeEvents = eventList.filter(ev => {
           if (ev.is_active === false) return false;
@@ -163,6 +153,7 @@ const FeeSupports: React.FC = () => {
           return true;
         });
         setEvents(activeEvents.map(ev => ({ id: ev.id, name: ev.name })));
+        if (cached) eventCacheService.syncInBackground({ user_id: currentUser?.id });
       }
     } catch {
       console.error('Failed to load entities');

@@ -215,7 +215,7 @@ const LocationManagerAnalytics: React.FC = () => {
       </div>
 
       {/* Key Metrics - 6 columns */}
-      <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2 sm:gap-4">
+      <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-4 gap-2 sm:gap-4">
         {keyMetrics.map((metric, index) => {
           const Icon = metric.icon;
           return (

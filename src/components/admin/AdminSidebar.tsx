@@ -52,6 +52,7 @@ import { packageCacheService } from '../../services/PackageCacheService';
 import { addOnCacheService } from '../../services/AddOnCacheService';
 import { attractionCacheService } from '../../services/AttractionCacheService';
 import { attractionPurchaseCacheService } from '../../services/AttractionPurchaseCacheService';
+import { eventCacheService } from '../../services/EventCacheService';
 
 // Helper function to add descriptions to navigation items
 const addDescriptions = (navItems: NavItem[]): NavItem[] => {
@@ -565,7 +566,8 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
       packageCacheService.clearCache(),
       addOnCacheService.clearCache(),
       attractionCacheService.clearCache(),
-      attractionPurchaseCacheService.clearCache()
+      attractionPurchaseCacheService.clearCache(),
+      eventCacheService.clearCache()
     ]);
     
     // Clear all possible user data

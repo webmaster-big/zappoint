@@ -18,6 +18,7 @@ import CounterAnimation from '../../../components/ui/CounterAnimation';
 import Toast from '../../../components/ui/Toast';
 import LocationSelector from '../../../components/admin/LocationSelector';
 import { eventService } from '../../../services/EventService';
+import { eventCacheService } from '../../../services/EventCacheService';
 import { locationService } from '../../../services/LocationService';
 import { getStoredUser } from '../../../utils/storage';
 import type { Event } from '../../../types/event.types';
@@ -70,9 +71,22 @@ const Events = () => {
     }
   };
 
-  const fetchEvents = async () => {
+  const fetchEvents = async (forceRefresh = false) => {
     setLoading(true);
     try {
+      // Use cache for faster initial load
+      const cached = !forceRefresh ? await eventCacheService.getCachedEvents() : null;
+      if (cached && cached.length > 0) {
+        let list = cached;
+        if (selectedLocation) list = list.filter(e => e.location_id === selectedLocation);
+        setEvents(list);
+        setLoading(false);
+        // Sync in background
+        eventCacheService.syncInBackground({ user_id: currentUser?.id });
+        return;
+      }
+
+      // No cache — fetch from API
       const filters: Record<string, unknown> = {};
       if (selectedLocation) filters.location_id = selectedLocation;
       const res = await eventService.getEvents(filters);
@@ -88,6 +102,8 @@ const Events = () => {
         list = res as unknown as Event[];
       }
       setEvents(list);
+      // Cache the full list
+      await eventCacheService.cacheEvents(list);
     } catch (err: unknown) {
       setToast({ message: (err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Failed to load events', type: 'error' });
       setEvents([]);
@@ -111,13 +127,14 @@ const Events = () => {
 
   const handleToggleStatus = async (id: number, newStatus: string) => {
     try {
-      if (newStatus === 'active') {
-        await eventService.toggleStatus(id);
-        setEvents(prev => prev.map(e => e.id === id ? { ...e, is_active: true } : e));
-      } else {
-        await eventService.toggleStatus(id);
-        setEvents(prev => prev.map(e => e.id === id ? { ...e, is_active: false } : e));
-      }
+      await eventService.toggleStatus(id);
+      const isActive = newStatus === 'active';
+      setEvents(prev => {
+        const updated = prev.map(e => e.id === id ? { ...e, is_active: isActive } : e);
+        const found = updated.find(e => e.id === id);
+        if (found) eventCacheService.updateEventInCache(found);
+        return updated;
+      });
       setToast({ message: 'Event status updated', type: 'success' });
     } catch (err: unknown) {
       setToast({ message: (err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Failed to update status', type: 'error' });
@@ -130,6 +147,7 @@ const Events = () => {
     try {
       await eventService.deleteEvent(id);
       setEvents(prev => prev.filter(e => e.id !== id));
+      await eventCacheService.removeEventFromCache(id);
       setToast({ message: 'Event deleted', type: 'success' });
     } catch (err: unknown) {
       setToast({ message: (err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Failed to delete event', type: 'error' });
@@ -156,6 +174,9 @@ const Events = () => {
       try { await eventService.deleteEvent(id); } catch { /* skip */ }
     }
     setEvents(prev => prev.filter(e => !selectedEvents.includes(e.id)));
+    for (const eid of selectedEvents) {
+      await eventCacheService.removeEventFromCache(eid);
+    }
     setSelectedEvents([]);
     setToast({ message: `${selectedEvents.length} event(s) deleted`, type: 'success' });
   };
@@ -314,7 +335,7 @@ const Events = () => {
               Filters
             </StandardButton>
             <StandardButton
-              onClick={fetchEvents}
+              onClick={() => fetchEvents(true)}
               variant="secondary"
               size="sm"
               icon={RefreshCcw}

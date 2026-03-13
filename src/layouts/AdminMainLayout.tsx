@@ -7,6 +7,7 @@ import { roomCacheService } from '../services/RoomCacheService';
 import { packageCacheService } from '../services/PackageCacheService';
 import { addOnCacheService } from '../services/AddOnCacheService';
 import { attractionCacheService } from '../services/AttractionCacheService';
+import { eventCacheService } from '../services/EventCacheService';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 
 interface UserData {
@@ -68,7 +69,8 @@ const MainLayout: React.FC = () => {
         roomCacheService.warmupCache(),
         packageCacheService.warmupCache(),
         addOnCacheService.warmupCache(),
-        attractionCacheService.warmupCache()
+        attractionCacheService.warmupCache(),
+        eventCacheService.warmupCache()
       ]);
       console.log('[AdminMainLayout] Caches warmed up');
     };
@@ -117,6 +119,7 @@ const MainLayout: React.FC = () => {
       await packageCacheService.clearCache();
       await addOnCacheService.clearCache();
       await attractionCacheService.clearCache();
+      await eventCacheService.clearCache();
       
       // Clear local storage and redirect
       localStorage.removeItem('zapzone_user');

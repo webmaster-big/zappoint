@@ -25,7 +25,7 @@ import { useThemeColor } from '../../../hooks/useThemeColor';
 import { specialPricingService } from '../../../services/SpecialPricingService';
 import { packageCacheService } from '../../../services/PackageCacheService';
 import { attractionCacheService } from '../../../services/AttractionCacheService';
-import { eventService } from '../../../services/EventService';
+import { eventCacheService } from '../../../services/EventCacheService';
 import { locationService } from '../../../services/LocationService';
 import { getStoredUser } from '../../../utils/storage';
 import Toast from '../../../components/ui/Toast';
@@ -183,18 +183,8 @@ const SpecialPricings: React.FC = () => {
         }
       }
       if (entityType === 'event' || entityType === 'all') {
-        const response = await eventService.getEvents();
-        let eventList: Array<{ id: number; name: string; is_active?: boolean; end_date?: string | null; start_date?: string }> = [];
-        if (Array.isArray(response.data)) {
-          eventList = response.data;
-        } else if (response.data && typeof response.data === 'object') {
-          const obj = response.data as Record<string, unknown>;
-          if (Array.isArray(obj.events)) eventList = obj.events as typeof eventList;
-          else if (Array.isArray(obj.data)) eventList = obj.data as typeof eventList;
-        }
-        if (eventList.length === 0 && Array.isArray(response)) {
-          eventList = response as unknown as typeof eventList;
-        }
+        const cached = await eventCacheService.getCachedEvents();
+        const eventList = cached || await eventCacheService.getEvents({ user_id: currentUser?.id });
         const today = new Date().toISOString().split('T')[0];
         const activeEvents = eventList.filter((e) => {
           if (e.is_active === false) return false;
@@ -202,6 +192,7 @@ const SpecialPricings: React.FC = () => {
           return true;
         });
         setEvents(activeEvents.map((e: { id: number; name: string }) => ({ id: e.id, name: e.name })));
+        if (cached) eventCacheService.syncInBackground({ user_id: currentUser?.id });
       }
     } catch {
       console.error('Failed to load entities');
