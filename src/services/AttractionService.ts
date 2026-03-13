@@ -49,6 +49,7 @@ export interface Attraction {
   add_ons?: Array<{ id: number; name: string; price: number; [key: string]: unknown }>;
   add_ons_order?: string[];
   display_capacity_to_customers?: boolean;
+  display_order?: number;
 }
 
 export interface AttractionFilters {

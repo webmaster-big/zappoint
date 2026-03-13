@@ -707,6 +707,7 @@ const CreatePackage: React.FC = () => {
                 bookingWindowDays: "",
                 minBookingNoticeHours: "",
                 availability_schedules: [],
+                displayOrder: "0",
             });
             setImagePreview("");
             
@@ -2089,6 +2090,7 @@ const CreatePackage: React.FC = () => {
                                         bookingWindowDays: "",
                                         minBookingNoticeHours: "",
                                         availability_schedules: [],
+                                        displayOrder: "0",
                                     })}
                                 >
                                     Reset
