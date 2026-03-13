@@ -1153,7 +1153,7 @@ const EntertainmentLandingPage = () => {
                         {evt.name}
                       </h3>
                       {evt.description && (
-                        <p className="text-sm text-gray-500 mb-3 line-clamp-2 leading-relaxed">{evt.description}</p>
+                        <p className="text-sm text-gray-500 mb-3 line-clamp-2 leading-relaxed whitespace-pre-line">{evt.description}</p>
                       )}
 
                       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -1757,7 +1757,7 @@ const EntertainmentLandingPage = () => {
               {selectedEvent.description && (
                 <div className="mb-5">
                   <h3 className="text-sm font-bold text-gray-900 mb-2">About</h3>
-                  <p className="text-xs md:text-sm text-gray-500 leading-relaxed">{selectedEvent.description}</p>
+                  <p className="text-xs md:text-sm text-gray-500 leading-relaxed whitespace-pre-line">{selectedEvent.description}</p>
                 </div>
               )}
 

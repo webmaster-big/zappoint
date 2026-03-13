@@ -712,7 +712,7 @@ const EditEvent = () => {
               </div>
             )}
 
-            <div className="mb-4 text-neutral-800 text-base min-h-[48px]">
+            <div className="mb-4 text-neutral-800 text-base min-h-[48px] whitespace-pre-line">
               {description || <span className="text-gray-300">Description</span>}
             </div>
 

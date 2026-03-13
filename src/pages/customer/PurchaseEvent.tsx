@@ -1372,7 +1372,7 @@ const PurchaseEvent = () => {
                       {event.date_type === 'one_time' ? formatDate(event.start_date) : `${formatDate(event.start_date)} – ${formatDate(event.end_date!)}`}
                     </span>
                   </div>
-                  {event.description && <p className="text-sm text-gray-500 leading-relaxed line-clamp-3">{event.description}</p>}
+                  {event.description && <p className="text-sm text-gray-500 leading-relaxed whitespace-pre-line">{event.description}</p>}
                 </div>
 
                 {/* Event details */}
