@@ -166,32 +166,11 @@ const AccountingAnalytics: React.FC = () => {
   };
 
   // Export
-  const handleExport = async (format: 'csv' | 'json') => {
+  const handleExport = async () => {
     if (!selectedLocation || !startDate) return;
     try {
-      if (format === 'csv') {
-        accountingAnalyticsService.downloadCSV(parseInt(selectedLocation), startDate, endDate || undefined, viewMode);
-        setToast({ message: 'Downloading CSV...', type: 'success' });
-      } else {
-        const data = await accountingAnalyticsService.exportReport({
-          location_id: parseInt(selectedLocation),
-          start_date: startDate,
-          end_date: endDate || undefined,
-          view_mode: viewMode,
-          format: 'json',
-        });
-        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        const filename = endDate && endDate !== startDate ? `accounting-report-${startDate}-to-${endDate}.json` : `accounting-report-${startDate}.json`;
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
-        setToast({ message: 'JSON exported', type: 'success' });
-      }
+      accountingAnalyticsService.downloadCSV(parseInt(selectedLocation), startDate, endDate || undefined, viewMode);
+      setToast({ message: 'Downloading CSV...', type: 'success' });
     } catch {
       setToast({ message: 'Export failed', type: 'error' });
     }
@@ -269,11 +248,8 @@ const AccountingAnalytics: React.FC = () => {
         <StandardButton onClick={() => fetchReport(true)} variant="secondary" size="sm" icon={RefreshCcw} loading={refreshing}>
           {''}
         </StandardButton>
-        <StandardButton onClick={() => handleExport('csv')} variant="secondary" size="sm" icon={Download}>
+        <StandardButton onClick={() => handleExport()} variant="secondary" size="sm" icon={Download}>
           CSV
-        </StandardButton>
-        <StandardButton onClick={() => handleExport('json')} variant="secondary" size="sm" icon={Download}>
-          JSON
         </StandardButton>
       </div>
 
