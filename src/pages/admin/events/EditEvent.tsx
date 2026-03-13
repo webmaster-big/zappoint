@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { eventService } from '../../../services/EventService';
+import { eventCacheService } from '../../../services/EventCacheService';
 import { locationService } from '../../../services/LocationService';
 import { addOnService } from '../../../services/AddOnService';
+import { addOnCacheService } from '../../../services/AddOnCacheService';
 import Toast from '../../../components/ui/Toast';
 import StandardButton from '../../../components/ui/StandardButton';
 import LocationSelector from '../../../components/admin/LocationSelector';
@@ -54,53 +56,80 @@ const EditEvent = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      // Load locations and add-ons independently so one failing doesn't block the other
-      try {
-        const locRes = await locationService.getLocations();
-        const raw = locRes as unknown as Record<string, unknown>;
-        let locList: Array<{ id: number; name: string }> = [];
-        if (Array.isArray(raw.data)) locList = raw.data;
-        else if (Array.isArray(raw.locations)) locList = raw.locations;
-        else if (Array.isArray(raw)) locList = raw as unknown as Array<{ id: number; name: string }>;
-        setLocations(locList.map((l) => ({ id: l.id, name: l.name })));
-      } catch {
-        console.error('EditEvent: Failed to load locations');
-      }
+      // Load locations, add-ons, and event in parallel using caches
+      const [, , eventData] = await Promise.all([
+        // Locations
+        (async () => {
+          try {
+            const locRes = await locationService.getLocations();
+            const raw = locRes as unknown as Record<string, unknown>;
+            let locList: Array<{ id: number; name: string }> = [];
+            if (Array.isArray(raw.data)) locList = raw.data;
+            else if (Array.isArray(raw.locations)) locList = raw.locations;
+            else if (Array.isArray(raw)) locList = raw as unknown as Array<{ id: number; name: string }>;
+            setLocations(locList.map((l) => ({ id: l.id, name: l.name })));
+          } catch {
+            console.error('EditEvent: Failed to load locations');
+          }
+        })(),
+        // Add-ons from cache
+        (async () => {
+          try {
+            const cached = await addOnCacheService.getCachedAddOns();
+            if (cached && cached.length > 0) {
+              setAllAddOns(cached.map((a) => ({ id: a.id, name: a.name, price: a.price || 0 })));
+              addOnCacheService.syncInBackground({ user_id: currentUser?.id });
+            } else {
+              const addOnRes = await addOnService.getAddOns({ user_id: currentUser?.id });
+              const raw = addOnRes as unknown as Record<string, unknown>;
+              let addOnList: Array<{ id: number; name: string; price: number | null }> = [];
+              if (raw.data && typeof raw.data === 'object' && Array.isArray((raw.data as Record<string, unknown>).add_ons)) {
+                addOnList = (raw.data as Record<string, unknown>).add_ons as typeof addOnList;
+              } else if (Array.isArray(raw.add_ons)) {
+                addOnList = raw.add_ons as typeof addOnList;
+              } else if (Array.isArray(raw.data)) {
+                addOnList = raw.data as typeof addOnList;
+              }
+              setAllAddOns(addOnList.map((a) => ({ id: a.id, name: a.name, price: a.price || 0 })));
+            }
+          } catch {
+            console.error('EditEvent: Failed to load add-ons');
+          }
+        })(),
+        // Event from cache
+        (async () => {
+          if (!id) return null;
+          try {
+            // Try cache first
+            const cached = await eventCacheService.getEventFromCache(parseInt(id));
+            if (cached) {
+              eventCacheService.syncInBackground({ user_id: currentUser?.id });
+              return cached;
+            }
+            // Fallback to API
+            const eventRes = await eventService.getEvent(parseInt(id));
+            const raw = eventRes as unknown as Record<string, unknown>;
+            if (raw.data && typeof raw.data === 'object' && 'name' in (raw.data as Record<string, unknown>)) {
+              return raw.data as Event;
+            } else if (raw.event && typeof raw.event === 'object' && 'name' in (raw.event as Record<string, unknown>)) {
+              return raw.event as Event;
+            } else if (raw.data && typeof raw.data === 'object') {
+              const obj = raw.data as Record<string, unknown>;
+              return (obj.event || obj.data || obj) as Event;
+            } else if ('name' in raw) {
+              return raw as unknown as Event;
+            } else {
+              return eventRes as unknown as Event;
+            }
+          } catch {
+            return null;
+          }
+        })()
+      ]);
 
-      try {
-        const addOnRes = await addOnService.getAddOns({ user_id: currentUser?.id });
-        const raw = addOnRes as unknown as Record<string, unknown>;
-        let addOnList: Array<{ id: number; name: string; price: number | null }> = [];
-        if (raw.data && typeof raw.data === 'object' && Array.isArray((raw.data as Record<string, unknown>).add_ons)) {
-          addOnList = (raw.data as Record<string, unknown>).add_ons as typeof addOnList;
-        } else if (Array.isArray(raw.add_ons)) {
-          addOnList = raw.add_ons as typeof addOnList;
-        } else if (Array.isArray(raw.data)) {
-          addOnList = raw.data as typeof addOnList;
-        }
-        setAllAddOns(addOnList.map((a) => ({ id: a.id, name: a.name, price: a.price || 0 })));
-      } catch {
-        console.error('EditEvent: Failed to load add-ons');
-      }
-
-      // Load event data
-      if (id) {
-        const eventRes = await eventService.getEvent(parseInt(id));
-        // Handle various API response shapes (backend may return {data:{...}}, {event:{...}}, or direct object)
-        let event: Event;
-        const raw = eventRes as unknown as Record<string, unknown>;
-        if (raw.data && typeof raw.data === 'object' && 'name' in (raw.data as Record<string, unknown>)) {
-          event = raw.data as Event;
-        } else if (raw.event && typeof raw.event === 'object' && 'name' in (raw.event as Record<string, unknown>)) {
-          event = raw.event as Event;
-        } else if (raw.data && typeof raw.data === 'object') {
-          const obj = raw.data as Record<string, unknown>;
-          event = (obj.event || obj.data || obj) as Event;
-        } else if ('name' in raw) {
-          event = raw as unknown as Event;
-        } else {
-          event = eventRes as unknown as Event;
-        }
+      // Populate form with event data
+      if (eventData) {
+        const event = eventData;
         setName(event.name || '');
         setDescription(event.description || '');
         setImagePreview(event.image ? getImageUrl(event.image) : '');
@@ -121,6 +150,8 @@ const EditEvent = () => {
         } else if (event.add_ons) {
           setSelectedAddOnIds(event.add_ons.map(a => a.id));
         }
+      } else if (id) {
+        setToast({ message: 'Failed to load event data', type: 'error' });
       }
     } catch {
       setToast({ message: 'Failed to load event data', type: 'error' });
@@ -225,6 +256,8 @@ const EditEvent = () => {
       else if (imageRemoved) payload.image = null;
 
       await eventService.updateEvent(parseInt(id), payload as UpdateEventData);
+      // Refresh event cache so list page shows updated data
+      eventCacheService.forceRefresh({ user_id: currentUser?.id });
       setToast({ message: 'Event updated successfully!', type: 'success' });
       setTimeout(() => navigate('/events'), 1000);
     } catch (err: unknown) {
