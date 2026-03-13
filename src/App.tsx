@@ -50,6 +50,7 @@ import CustomerLogin from "./pages/customer/CustomerLogin";
 import CustomerRegister from "./pages/customer/CustomerRegister";
 import LocationAnalytics from "./pages/admin/Analytics/LocationManagerAnalytics";
 import CompanyAnalytics from "./pages/admin/Analytics/CompanyAnalytics";
+import AccountingAnalytics from "./pages/admin/Analytics/AccountingAnalytics";
 import AttendantActivityLogs from "./pages/admin/Attendants/AttendantActivityLogs";
 import ManageAttendants from "./pages/admin/Attendants/ManageAttendants";
 import ManageAddOns from "./pages/admin/packages/AddOns";
@@ -234,11 +235,13 @@ function App() {
           <Route path="/manager/attendants/activity" element={<ProtectedRoute allowedRoles={['location_manager']}><AttendantActivityLogs /></ProtectedRoute>} />
           <Route path="/manager/day-offs" element={<ProtectedRoute allowedRoles={['location_manager']}><DayOffs /></ProtectedRoute>} />
           <Route path="/manager/analytics" element={<ProtectedRoute allowedRoles={['location_manager']}><LocationAnalytics /></ProtectedRoute>} />
+          <Route path="/manager/accounting" element={<ProtectedRoute allowedRoles={['location_manager']}><AccountingAnalytics /></ProtectedRoute>} />
           <Route path="/manager/payments" element={<ProtectedRoute allowedRoles={['location_manager']}><Payments /></ProtectedRoute>} />
           <Route path="/manager/payments/:id" element={<ProtectedRoute allowedRoles={['location_manager']}><ViewPayment /></ProtectedRoute>} />
           
           {/* Company Admin-only Routes */}
           <Route path="/admin/analytics" element={<ProtectedRoute allowedRoles={['company_admin']}><CompanyAnalytics /></ProtectedRoute>} />
+          <Route path="/admin/accounting" element={<ProtectedRoute allowedRoles={['company_admin']}><AccountingAnalytics /></ProtectedRoute>} />
           <Route path="/admin/activity" element={<ProtectedRoute allowedRoles={['company_admin']}><LocationActivityLogs /></ProtectedRoute>} />
           <Route path="/admin/day-offs" element={<ProtectedRoute allowedRoles={['company_admin']}><DayOffs /></ProtectedRoute>} />
           <Route path="/admin/users" element={<ProtectedRoute allowedRoles={['company_admin']}><ManageAccounts /></ProtectedRoute>} />

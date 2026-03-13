@@ -38,7 +38,8 @@ import {
   Send,
   Percent,
   Coins,
-  CalendarCheck
+  CalendarCheck,
+  Calculator
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -88,6 +89,8 @@ const addDescriptions = (navItems: NavItem[]): NavItem[] => {
     'Create Account': 'Create new user accounts',
     'Account Activity Log': 'View user activity history',
     'Analytics & Reports': 'Business intelligence and reporting',
+    'Performance Analytics': 'Business intelligence and performance metrics',
+    'Accounting & Analytics': 'Financial reporting and sales breakdown',
     'Activity Logs': 'System-wide activity tracking',
     'Day Offs': 'Manage blocked dates and holidays',
     'Notifications': 'Manage your notification preferences',
@@ -236,7 +239,10 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
           { label: 'Activity Log', href: '/manager/attendants/activity', icon: FileText },
           { label: 'Day Offs', href: '/manager/day-offs', icon: CalendarOff },
         ]},
-        { label: 'Analytics & Reports', icon: BarChart3, href: '/manager/analytics', section: 'Reports' },
+        { label: 'Analytics & Reports', icon: BarChart3, section: 'Reports', items: [
+          { label: 'Performance Analytics', href: '/manager/analytics', icon: BarChart3 },
+          { label: 'Accounting & Analytics', href: '/manager/accounting', icon: Calculator }
+        ]},
         { label: 'Profile', icon: User, href: '/manager/profile', section: 'Account' },
         { label: 'Settings', icon: Settings, href: '/manager/settings', section: 'Account' }
       ];
@@ -295,7 +301,10 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
           { label: 'Activity Log', href: '/admin/activity', icon: FileText },
           { label: 'Day Offs', href: '/admin/day-offs', icon: CalendarOff },
         ]},
-        { label: 'Analytics & Reports', icon: BarChart3, href: '/admin/analytics', section: 'Reports' },
+        { label: 'Analytics & Reports', icon: BarChart3, section: 'Reports', items: [
+          { label: 'Performance Analytics', href: '/admin/analytics', icon: BarChart3 },
+          { label: 'Accounting & Analytics', href: '/admin/accounting', icon: Calculator }
+        ]},
         { label: 'Profile', icon: User, href: '/admin/profile', section: 'Account' },
         { label: 'Settings', icon: Settings, href: '/admin/settings', section: 'Account' }
       ];
