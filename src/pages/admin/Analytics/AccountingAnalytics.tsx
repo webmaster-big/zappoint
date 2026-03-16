@@ -26,6 +26,7 @@ import { getStoredUser } from '../../../utils/storage';
 import type {
   AccountingReportResponse,
   CategoryData,
+  CategoryItem,
 } from '../../../types/AccountingAnalytics.types';
 
 // Format currency helper
@@ -38,14 +39,23 @@ const formatCurrency = (value: number): string => {
 };
 
 // Calculate percentage change
-const calculateChange = (primary: number, compare: number): { value: number; display: string } => {
-  if (compare === 0) {
-    if (primary > 0) return { value: 100, display: '+100%' };
-    return { value: 0, display: '0%' };
-  }
+const calculateChange = (primary: number, compare: number): { value: number; display: string; direction: 'up' | 'down' | 'neutral' } => {
+  if (compare === 0 && primary === 0) return { value: 0, display: '0%', direction: 'neutral' };
+  if (compare === 0) return { value: 100, display: '+100%', direction: 'up' };
   const change = ((primary - compare) / compare) * 100;
   const sign = change >= 0 ? '+' : '';
-  return { value: change, display: `${sign}${change.toFixed(1)}%` };
+  const direction = change > 0 ? 'up' : change < 0 ? 'down' : 'neutral';
+  return { value: change, display: `${sign}${change.toFixed(1)}%`, direction };
+};
+
+// Format date range for display
+const formatDateRange = (start: string, end: string): string => {
+  const s = new Date(start + 'T00:00:00');
+  const e = new Date(end + 'T00:00:00');
+  const opts: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric', year: 'numeric' };
+  const optsNoYear: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' };
+  if (start === end) return s.toLocaleDateString('en-US', opts);
+  return `${s.toLocaleDateString('en-US', optsNoYear)} - ${e.toLocaleDateString('en-US', opts)}`;
 };
 
 const AccountingAnalytics: React.FC = () => {
@@ -282,19 +292,32 @@ const AccountingAnalytics: React.FC = () => {
         </div>
       )}
 
+      {/* Comparison Banner */}
+      {reportData?.comparison && reportData.compare_start_date && (
+        <div className={`mb-6 bg-${themeColor}-50 border border-${themeColor}-200 rounded-lg p-4 flex items-center gap-3`}>
+          <span className="text-lg">📊</span>
+          <div>
+            <p className={`font-medium text-${themeColor}-900`}>
+              Comparing: {formatDateRange(reportData.start_date, reportData.end_date)} vs {formatDateRange(reportData.compare_start_date, reportData.compare_end_date!)}
+            </p>
+            <p className={`text-sm text-${themeColor}-600`}>View Mode: {reportData.view_mode_label}</p>
+          </div>
+        </div>
+      )}
+
       {/* Key Metrics */}
       {reportData?.primary?.summary && (() => {
         const summary = reportData.primary.summary;
         const comparison = reportData.comparison?.summary;
         const metrics = [
-          { label: 'Qty Sold', value: summary.quantity_sold, icon: Hash, isCurrency: false, tooltip: 'Total number of items sold', change: comparison ? calculateChange(summary.quantity_sold, comparison.quantity_sold) : null },
-          { label: 'Gross Sales', value: summary.gross_sales, icon: DollarSign, isCurrency: true, tooltip: 'Total revenue before discounts', change: comparison ? calculateChange(summary.gross_sales, comparison.gross_sales) : null },
-          { label: 'Discounts', value: summary.discount_amount, icon: Tag, isCurrency: true, isNegative: true, tooltip: 'Total discounts applied', change: comparison ? calculateChange(summary.discount_amount, comparison.discount_amount) : null },
-          { label: 'Net Sales', value: summary.net_sales, icon: Receipt, isCurrency: true, tooltip: 'Gross sales minus discounts', change: comparison ? calculateChange(summary.net_sales, comparison.net_sales) : null },
-          { label: 'Fees', value: summary.fee_amount, icon: BadgePercent, isCurrency: true, tooltip: 'Service and processing fees', change: comparison ? calculateChange(summary.fee_amount, comparison.fee_amount) : null },
-          { label: 'Tax', value: summary.tax_amount, icon: Landmark, isCurrency: true, tooltip: 'Tax amount collected', change: comparison ? calculateChange(summary.tax_amount, comparison.tax_amount) : null },
-          { label: 'Total Billed', value: summary.total_billed, icon: CircleDollarSign, isCurrency: true, tooltip: 'Total amount invoiced (after discounts, with fees)', change: comparison ? calculateChange(summary.total_billed, comparison.total_billed) : null },
-          { label: 'Collected', value: summary.grand_total, icon: DollarSign, isCurrency: true, tooltip: 'Amount actually collected so far', change: comparison ? calculateChange(summary.grand_total, comparison.grand_total) : null },
+          { label: 'Qty Sold', value: summary.quantity_sold, compareValue: comparison?.quantity_sold, icon: Hash, isCurrency: false, tooltip: 'Total number of items sold', change: comparison ? calculateChange(summary.quantity_sold, comparison.quantity_sold) : null },
+          { label: 'Gross Sales', value: summary.gross_sales, compareValue: comparison?.gross_sales, icon: DollarSign, isCurrency: true, tooltip: 'Total revenue before discounts', change: comparison ? calculateChange(summary.gross_sales, comparison.gross_sales) : null },
+          { label: 'Discounts', value: summary.discount_amount, compareValue: comparison?.discount_amount, icon: Tag, isCurrency: true, isNegative: true, tooltip: 'Total discounts applied', change: comparison ? calculateChange(summary.discount_amount, comparison.discount_amount) : null },
+          { label: 'Net Sales', value: summary.net_sales, compareValue: comparison?.net_sales, icon: Receipt, isCurrency: true, tooltip: 'Gross sales minus discounts', change: comparison ? calculateChange(summary.net_sales, comparison.net_sales) : null },
+          { label: 'Fees', value: summary.fee_amount, compareValue: comparison?.fee_amount, icon: BadgePercent, isCurrency: true, tooltip: 'Service and processing fees', change: comparison ? calculateChange(summary.fee_amount, comparison.fee_amount) : null },
+          { label: 'Tax', value: summary.tax_amount, compareValue: comparison?.tax_amount, icon: Landmark, isCurrency: true, tooltip: 'Tax amount collected', change: comparison ? calculateChange(summary.tax_amount, comparison.tax_amount) : null },
+          { label: 'Total Billed', value: summary.total_billed, compareValue: comparison?.total_billed, icon: CircleDollarSign, isCurrency: true, tooltip: 'Total amount invoiced (after discounts, with fees)', change: comparison ? calculateChange(summary.total_billed, comparison.total_billed) : null },
+          { label: 'Collected', value: summary.grand_total, compareValue: comparison?.grand_total, icon: DollarSign, isCurrency: true, tooltip: 'Amount actually collected so far', change: comparison ? calculateChange(summary.grand_total, comparison.grand_total) : null },
         ];
         return (
           <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-2 sm:gap-3 mb-6">
@@ -315,12 +338,17 @@ const AccountingAnalytics: React.FC = () => {
                         )}
                       </div>
                       {metric.change ? (
-                        <p className={`text-[10px] mt-0.5 flex items-center gap-0.5 ${
-                          metric.change.value > 0 ? 'text-green-600' : metric.change.value < 0 ? 'text-red-600' : 'text-gray-400'
-                        }`}>
-                          {metric.change.value > 0 ? <TrendingUp className="w-2.5 h-2.5" /> : metric.change.value < 0 ? <TrendingDown className="w-2.5 h-2.5" /> : <Minus className="w-2.5 h-2.5" />}
-                          {metric.change.display}
-                        </p>
+                        <div className="mt-0.5">
+                          <p className="text-[10px] text-gray-400">
+                            vs {metric.isCurrency ? `${metric.isNegative ? '-' : ''}${formatCurrency(metric.compareValue!)}` : metric.compareValue}
+                          </p>
+                          <p className={`text-[10px] flex items-center gap-0.5 ${
+                            metric.change.direction === 'up' ? 'text-green-600' : metric.change.direction === 'down' ? 'text-red-600' : 'text-gray-400'
+                          }`}>
+                            {metric.change.direction === 'up' ? <TrendingUp className="w-2.5 h-2.5" /> : metric.change.direction === 'down' ? <TrendingDown className="w-2.5 h-2.5" /> : <Minus className="w-2.5 h-2.5" />}
+                            {metric.change.display}
+                          </p>
+                        </div>
                       ) : (
                         <p className="text-[10px] mt-0.5 text-gray-400">&nbsp;</p>
                       )}
@@ -370,6 +398,7 @@ const AccountingAnalytics: React.FC = () => {
               <CategorySection
                 key={category.name}
                 category={category}
+                comparisonCategory={reportData.comparison?.categories.find(c => c.name === category.name) ?? null}
                 isExpanded={expandedCategories.has(category.name)}
                 onToggle={() => toggleCategory(category.name)}
                 themeColor={themeColor}
@@ -392,6 +421,7 @@ const AccountingAnalytics: React.FC = () => {
 // Category Section
 interface CategorySectionProps {
   category: CategoryData;
+  comparisonCategory: CategoryData | null;
   isExpanded: boolean;
   onToggle: () => void;
   themeColor: string;
@@ -399,10 +429,16 @@ interface CategorySectionProps {
 
 const CategorySection: React.FC<CategorySectionProps> = ({
   category,
+  comparisonCategory,
   isExpanded,
   onToggle,
   themeColor,
 }) => {
+  // Build a lookup of comparison items by name
+  const comparisonItemMap = new Map<string, CategoryItem>();
+  if (comparisonCategory) {
+    comparisonCategory.items.forEach(item => comparisonItemMap.set(item.name, item));
+  }
   return (
     <div>
       <button
@@ -449,21 +485,37 @@ const CategorySection: React.FC<CategorySectionProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {category.items.map((item, index) => (
-                    <tr key={index} className="hover:bg-gray-50">
-                      <td className="py-3 px-2 font-medium text-gray-900">{item.name}</td>
-                      <td className="py-3 px-2 text-gray-600">{item.sub_category}</td>
-                      <td className="py-3 px-2 text-right text-gray-900">{item.quantity_sold}</td>
-                      <td className="py-3 px-2 text-right text-gray-900">{formatCurrency(item.gross_sales)}</td>
-                      <td className="py-3 px-2 text-right text-red-600">-{formatCurrency(item.discount_amount)}</td>
-                      <td className="py-3 px-2 text-right text-gray-900">{formatCurrency(item.net_sales)}</td>
-                      <td className="py-3 px-2 text-right text-gray-900">{formatCurrency(item.fee_amount)}</td>
-                      <td className="py-3 px-2 text-right text-gray-900">{formatCurrency(item.tax_amount)}</td>
-                      <td className="py-3 px-2 text-right text-gray-900">{formatCurrency(item.total_billed)}</td>
-                      <td className="py-3 px-2 text-right font-semibold text-gray-900">{formatCurrency(item.grand_total)}</td>
-                      <td className={`py-3 px-2 text-right font-semibold ${item.balance_due > 0 ? 'text-orange-600' : 'text-gray-400'}`}>{formatCurrency(item.balance_due)}</td>
-                    </tr>
-                  ))}
+                  {category.items.map((item, index) => {
+                    const compareItem = comparisonItemMap.get(item.name);
+                    const change = compareItem ? calculateChange(item.grand_total, compareItem.grand_total) : null;
+                    return (
+                      <tr key={index} className="hover:bg-gray-50">
+                        <td className="py-3 px-2 font-medium text-gray-900">{item.name}</td>
+                        <td className="py-3 px-2 text-gray-600">{item.sub_category}</td>
+                        <td className="py-3 px-2 text-right text-gray-900">{item.quantity_sold}</td>
+                        <td className="py-3 px-2 text-right text-gray-900">{formatCurrency(item.gross_sales)}</td>
+                        <td className="py-3 px-2 text-right text-red-600">-{formatCurrency(item.discount_amount)}</td>
+                        <td className="py-3 px-2 text-right text-gray-900">{formatCurrency(item.net_sales)}</td>
+                        <td className="py-3 px-2 text-right text-gray-900">{formatCurrency(item.fee_amount)}</td>
+                        <td className="py-3 px-2 text-right text-gray-900">{formatCurrency(item.tax_amount)}</td>
+                        <td className="py-3 px-2 text-right text-gray-900">{formatCurrency(item.total_billed)}</td>
+                        <td className="py-3 px-2 text-right font-semibold text-gray-900">
+                          <div>{formatCurrency(item.grand_total)}</div>
+                          {compareItem && change && (
+                            <div className="flex items-center justify-end gap-1 mt-0.5">
+                              <span className="text-[10px] text-gray-400">vs {formatCurrency(compareItem.grand_total)}</span>
+                              <span className={`text-[10px] font-medium px-1 py-px rounded ${
+                                change.direction === 'up' ? 'bg-green-100 text-green-700' : change.direction === 'down' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'
+                              }`}>
+                                {change.direction === 'up' ? '▲' : change.direction === 'down' ? '▼' : ''}{change.display}
+                              </span>
+                            </div>
+                          )}
+                        </td>
+                        <td className={`py-3 px-2 text-right font-semibold ${item.balance_due > 0 ? 'text-orange-600' : 'text-gray-400'}`}>{formatCurrency(item.balance_due)}</td>
+                      </tr>
+                    );
+                  })}
                   <tr className={`bg-${themeColor}-50 font-semibold`}>
                     <td className="py-3 px-2 text-gray-900" colSpan={2}>SUBTOTAL</td>
                     <td className="py-3 px-2 text-right text-gray-900">{category.summary.quantity_sold}</td>
@@ -473,7 +525,22 @@ const CategorySection: React.FC<CategorySectionProps> = ({
                     <td className="py-3 px-2 text-right text-gray-900">{formatCurrency(category.summary.fee_amount)}</td>
                     <td className="py-3 px-2 text-right text-gray-900">{formatCurrency(category.summary.tax_amount)}</td>
                     <td className="py-3 px-2 text-right text-gray-900">{formatCurrency(category.summary.total_billed)}</td>
-                    <td className={`py-3 px-2 text-right text-${themeColor}-700`}>{formatCurrency(category.summary.grand_total)}</td>
+                    <td className={`py-3 px-2 text-right text-${themeColor}-700`}>
+                      <div>{formatCurrency(category.summary.grand_total)}</div>
+                      {comparisonCategory && (() => {
+                        const subtotalChange = calculateChange(category.summary.grand_total, comparisonCategory.summary.grand_total);
+                        return (
+                          <div className="flex items-center justify-end gap-1 mt-0.5">
+                            <span className="text-[10px] text-gray-400">vs {formatCurrency(comparisonCategory.summary.grand_total)}</span>
+                            <span className={`text-[10px] font-medium px-1 py-px rounded ${
+                              subtotalChange.direction === 'up' ? 'bg-green-100 text-green-700' : subtotalChange.direction === 'down' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'
+                            }`}>
+                              {subtotalChange.direction === 'up' ? '▲' : subtotalChange.direction === 'down' ? '▼' : ''}{subtotalChange.display}
+                            </span>
+                          </div>
+                        );
+                      })()}
+                    </td>
                     <td className={`py-3 px-2 text-right font-semibold ${category.summary.balance_due > 0 ? 'text-orange-600' : 'text-gray-400'}`}>{formatCurrency(category.summary.balance_due)}</td>
                   </tr>
                 </tbody>

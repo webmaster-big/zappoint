@@ -56,8 +56,10 @@ export interface AccountingReportResponse {
   success: boolean;
   data: {
     location: LocationInfo;
-    primary_date: string;
-    compare_date: string | null;
+    start_date: string;
+    end_date: string;
+    compare_start_date: string | null;
+    compare_end_date: string | null;
     filters_applied: FiltersApplied;
     view_mode: 'booked_on' | 'booked_for';
     view_mode_label: string;
