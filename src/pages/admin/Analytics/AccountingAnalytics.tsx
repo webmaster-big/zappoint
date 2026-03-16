@@ -295,7 +295,6 @@ const AccountingAnalytics: React.FC = () => {
       {/* Comparison Banner */}
       {reportData?.comparison && reportData.compare_start_date && (
         <div className={`mb-6 bg-${themeColor}-50 border border-${themeColor}-200 rounded-lg p-4 flex items-center gap-3`}>
-          <span className="text-lg">📊</span>
           <div>
             <p className={`font-medium text-${themeColor}-900`}>
               Comparing: {formatDateRange(reportData.start_date, reportData.end_date)} vs {formatDateRange(reportData.compare_start_date, reportData.compare_end_date!)}
