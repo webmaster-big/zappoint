@@ -80,7 +80,7 @@ const AccountingAnalytics: React.FC = () => {
   const [compareEndDate, setCompareEndDate] = useState<string>('');
   
   // View mode
-  const [viewMode, setViewMode] = useState<'booked_for' | 'booked_on'>('booked_for');
+  const [viewMode, setViewMode] = useState<'booked_for' | 'booked_on'>('booked_on');
   
   // Location
   const [locations, setLocations] = useState<Array<{ id: string | number; name: string }>>([]);
