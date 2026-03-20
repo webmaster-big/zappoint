@@ -267,13 +267,10 @@ const AttendantDashboard: React.FC = () => {
            setLoading(false);
          }
 
-         // Also try purchase cache for instant ticket purchases display
-         if (!cachedData?.recentPurchases?.length) {
-           const cachedPurchases = await attractionPurchaseCacheService.getCachedPurchases();
-           if (cachedPurchases && cachedPurchases.length > 0) {
-             setTicketPurchases(cachedPurchases as any);
-           }
-         }
+         // Note: We no longer fall back to the unfiltered purchase cache here.
+         // The unfiltered cache contains ALL purchases (up to 500) which would incorrectly
+         // display as "recent" purchases. Instead, we wait for the API response below
+         // which returns properly filtered recent purchases.
          
          // Step 2: Fetch fresh data from API in background with timeframe
          console.log('🔄 [AttendantDashboard] Fetching fresh metrics from API...');

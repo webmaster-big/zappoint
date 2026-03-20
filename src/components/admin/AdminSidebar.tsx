@@ -466,6 +466,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
   const [unreadNotifications, setUnreadNotifications] = useState<number>(0);
   const isStreamConnectedRef = useRef<boolean>(false);
   const notificationCountRef = useRef<number>(0);
+  const countInitializedRef = useRef<boolean>(false);
   
   // Toast notification state
   const [showToast, setShowToast] = useState(false);
@@ -598,6 +599,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
     const initializeCount = async () => {
       const count = await getUnreadCount();
       notificationCountRef.current = count;
+      countInitializedRef.current = true;
     };
     
     initializeCount();
@@ -677,11 +679,13 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
       // Get new count from backend
       const newCount = await getUnreadCount();
       
-      // CRITICAL: Only show toast if count increased (meaning this is a genuinely NEW notification)
-      const countIncreased = newCount > notificationCountRef.current;
+      // CRITICAL: Only show toast if the initial count has been loaded AND count increased
+      // This prevents false toasts from SSE events that fire before baseline count is established
+      const countIncreased = countInitializedRef.current && newCount > notificationCountRef.current;
       
       // Update the count
       notificationCountRef.current = newCount;
+      countInitializedRef.current = true;
       
       // Update unread count display
       setUnreadNotifications(newCount);

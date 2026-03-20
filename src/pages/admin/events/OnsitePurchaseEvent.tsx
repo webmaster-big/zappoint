@@ -25,9 +25,16 @@ import StandardButton from '../../../components/ui/StandardButton';
 import LocationSelector from '../../../components/admin/LocationSelector';
 import { locationService } from '../../../services/LocationService';
 import type { Event, EventAddOn } from '../../../types/event.types';
-import { ASSET_URL, getStoredUser } from '../../../utils/storage';
+import { ASSET_URL, getStoredUser, getImageUrl } from '../../../utils/storage';
 import { loadAcceptJS, processCardPayment, validateCardNumber, formatCardNumber, getCardType, createPayment, PAYMENT_TYPE } from '../../../services/PaymentService';
 import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
+import { feeSupportService } from '../../../services/FeeSupportService';
+import type { FeeBreakdown } from '../../../types/FeeSupport.types';
+import PriceBreakdownDisplay from '../../../components/ui/PriceBreakdownDisplay';
+import { specialPricingService } from '../../../services/SpecialPricingService';
+import type { SpecialPricingBreakdown } from '../../../types/SpecialPricing.types';
+import { buildAppliedFees } from '../../../utils/fees';
+import { buildAppliedDiscounts } from '../../../utils/discounts';
 
 const OnsitePurchaseEvent = () => {
   const navigate = useNavigate();
@@ -89,6 +96,10 @@ const OnsitePurchaseEvent = () => {
 
   // Add-ons
   const [selectedAddOns, setSelectedAddOns] = useState<Record<number, number>>({});
+
+  // Fee & special pricing support
+  const [feeBreakdown, setFeeBreakdown] = useState<FeeBreakdown | null>(null);
+  const [specialPricingBreakdown, setSpecialPricingBreakdown] = useState<SpecialPricingBreakdown | null>(null);
 
   // Synchronous ref guard to prevent multi-click duplicate submissions
   const isSubmittingRef = useRef(false);
@@ -174,6 +185,8 @@ const OnsitePurchaseEvent = () => {
     setDiscount(0);
     setSelectedAddOns({});
     setNotes('');
+    setFeeBreakdown(null);
+    setSpecialPricingBreakdown(null);
     try {
       const dateRes = await eventService.getAvailableDates(ev.id);
       setAvailableDates(dateRes.dates || []);
@@ -196,6 +209,8 @@ const OnsitePurchaseEvent = () => {
     setQuantity(1);
     setDiscount(0);
     setSelectedAddOns({});
+    setFeeBreakdown(null);
+    setSpecialPricingBreakdown(null);
   };
 
   const loadTimeSlots = async (date: string) => {
@@ -298,7 +313,73 @@ const OnsitePurchaseEvent = () => {
         return sum + (addon ? parseFloat(addon.price) * qty : 0);
       }, 0)
     : 0;
-  const calculateTotal = () => Math.max(0, calculateSubtotal() + addOnTotal - discount);
+  const calculateBaseTotal = () => Math.max(0, calculateSubtotal() + addOnTotal - discount);
+
+  // Compute total with fees and special pricing
+  const specialPricingDiscount = specialPricingBreakdown?.has_special_pricing ? specialPricingBreakdown.total_discount : 0;
+  const totalAfterSpecialPricing = Math.max(0, calculateBaseTotal() - specialPricingDiscount);
+  const calculateTotal = () => feeBreakdown ? Math.max(0, feeBreakdown.total - specialPricingDiscount) : totalAfterSpecialPricing;
+
+  // Fetch fee breakdown when event, quantity, or add-ons change (debounced)
+  useEffect(() => {
+    if (!event) {
+      setFeeBreakdown(null);
+      return;
+    }
+    const timeoutId = setTimeout(async () => {
+      try {
+        const basePrice = calculateBaseTotal();
+        const response = await feeSupportService.getForEntity({
+          entity_type: 'event',
+          entity_id: event.id,
+          base_price: basePrice,
+          location_id: event.location_id || undefined,
+        });
+        if (response.success && response.data) {
+          setFeeBreakdown(response.data);
+        } else {
+          setFeeBreakdown(null);
+        }
+      } catch (error) {
+        console.error('Error fetching fee breakdown:', error);
+        setFeeBreakdown(null);
+      }
+    }, 500);
+    return () => clearTimeout(timeoutId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [event, quantity, selectedAddOns, discount]);
+
+  // Fetch special pricing breakdown for event (debounced)
+  useEffect(() => {
+    if (!event) {
+      setSpecialPricingBreakdown(null);
+      return;
+    }
+    const timeoutId = setTimeout(async () => {
+      try {
+        const pricingDate = selectedDate || new Date().toISOString().split('T')[0];
+        const basePrice = calculateBaseTotal();
+        const breakdown = await specialPricingService.getPriceBreakdown({
+          entity_type: 'event',
+          entity_id: event.id,
+          base_price: basePrice,
+          date: pricingDate,
+          time: selectedTime || undefined,
+          location_id: event.location_id || undefined,
+        });
+        if (breakdown.has_special_pricing) {
+          setSpecialPricingBreakdown(breakdown);
+        } else {
+          setSpecialPricingBreakdown(null);
+        }
+      } catch (error) {
+        console.error('Error fetching special pricing:', error);
+        setSpecialPricingBreakdown(null);
+      }
+    }, 500);
+    return () => clearTimeout(timeoutId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [event, quantity, selectedAddOns, discount, selectedDate, selectedTime]);
 
   const formatTime = (time: string) => {
     const [h, m] = time.split(':');
@@ -387,6 +468,9 @@ const OnsitePurchaseEvent = () => {
         send_email: sendEmail,
         notes: notes || undefined,
         add_ons: addOnsPayload.length > 0 ? addOnsPayload : undefined,
+        applied_fees: buildAppliedFees(feeBreakdown).length > 0 ? buildAppliedFees(feeBreakdown) : undefined,
+        discount_amount: specialPricingDiscount > 0 ? specialPricingDiscount : undefined,
+        applied_discounts: buildAppliedDiscounts(specialPricingBreakdown).length > 0 ? buildAppliedDiscounts(specialPricingBreakdown) : undefined,
       });
 
       const createdPurchase = purchaseRes.data || purchaseRes;
@@ -544,7 +628,7 @@ const OnsitePurchaseEvent = () => {
                   <div className="flex gap-4 flex-1">
                     <div className="w-20 h-20 flex-shrink-0 flex items-center justify-center bg-gray-100 rounded-md border border-gray-200 overflow-hidden">
                       {event.image ? (
-                        <img src={event.image} alt={event.name} className="object-cover w-full h-full" />
+                        <img src={getImageUrl(event.image)} alt={event.name} className="object-cover w-full h-full" />
                       ) : (
                         <span className="text-gray-400 text-xs">No Image</span>
                       )}
@@ -602,7 +686,7 @@ const OnsitePurchaseEvent = () => {
                       >
                         <div className="w-20 h-20 flex-shrink-0 flex items-center justify-center bg-gray-100 rounded-md border border-gray-200 overflow-hidden">
                           {ev.image ? (
-                            <img src={ev.image} alt={ev.name} className="object-cover w-full h-full" />
+                            <img src={getImageUrl(ev.image)} alt={ev.name} className="object-cover w-full h-full" />
                           ) : (
                             <span className="text-gray-400 text-xs">No Image</span>
                           )}
@@ -1104,7 +1188,7 @@ const OnsitePurchaseEvent = () => {
                 <div className="flex items-start gap-3 mb-4 p-3 bg-gray-50 rounded-lg">
                   <div className="w-14 h-14 flex-shrink-0 rounded-md overflow-hidden bg-gray-100 border border-gray-200">
                     {event.image ? (
-                      <img src={event.image} alt={event.name} className="object-cover w-full h-full" />
+                      <img src={getImageUrl(event.image)} alt={event.name} className="object-cover w-full h-full" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">N/A</div>
                     )}
@@ -1146,7 +1230,20 @@ const OnsitePurchaseEvent = () => {
                       <span>-${discount.toFixed(2)}</span>
                     </div>
                   )}
+                  {specialPricingDiscount > 0 && (
+                    <div className="flex justify-between text-green-600">
+                      <span>Special Pricing</span>
+                      <span>-${specialPricingDiscount.toFixed(2)}</span>
+                    </div>
+                  )}
                 </div>
+
+                {/* Fee Breakdown */}
+                {feeBreakdown && feeBreakdown.fees.length > 0 && (
+                  <div className="mb-3">
+                    <PriceBreakdownDisplay breakdown={feeBreakdown} compact />
+                  </div>
+                )}
 
                 {/* Total */}
                 <div className="border-t border-gray-200 pt-3 mb-4">

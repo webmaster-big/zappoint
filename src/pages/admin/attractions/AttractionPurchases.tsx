@@ -148,9 +148,13 @@ const ManagePurchases = () => {
     try {
       setLoading(true);
 
-      // 1. Try cache first for instant rendering
+      // 1. Try cache first for instant rendering (filtered by current location)
       if (!skipCache) {
-        const cached = await attractionPurchaseCacheService.getCachedPurchases();
+        const cacheFilters: any = {};
+        if (selectedLocation) cacheFilters.location_id = Number(selectedLocation);
+        const cached = Object.keys(cacheFilters).length > 0
+          ? await attractionPurchaseCacheService.getFilteredPurchasesFromCache(cacheFilters)
+          : await attractionPurchaseCacheService.getCachedPurchases();
         if (cached && cached.length > 0) {
           setPurchases(convertPurchases(cached));
           setLoading(false);
@@ -262,13 +266,18 @@ const ManagePurchases = () => {
   // Listen for cache updates from other parts of the app (e.g. AdminSidebar notification refresh)
   useEffect(() => {
     const unsubscribe = attractionPurchaseCacheService.onCacheUpdate(async () => {
-      const cached = await attractionPurchaseCacheService.getCachedPurchases();
+      // Use filtered cache to respect current location selection
+      const cacheFilters: any = {};
+      if (selectedLocation) cacheFilters.location_id = Number(selectedLocation);
+      const cached = Object.keys(cacheFilters).length > 0
+        ? await attractionPurchaseCacheService.getFilteredPurchasesFromCache(cacheFilters)
+        : await attractionPurchaseCacheService.getCachedPurchases();
       if (cached) {
         setPurchases(convertPurchases(cached));
       }
     });
     return unsubscribe;
-  }, []);
+  }, [selectedLocation]);
 
   // Apply filters when purchases or filters change
   useEffect(() => {
