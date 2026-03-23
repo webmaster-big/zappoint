@@ -79,6 +79,7 @@ const EventPurchases = () => {
   const statusConfig: Record<string, { color: string; icon: typeof CheckCircle }> = {
     confirmed: { color: 'bg-blue-100 text-blue-800', icon: CheckCircle },
     'checked-in': { color: 'bg-green-100 text-green-800', icon: CheckCircle },
+    paylater: { color: 'bg-amber-100 text-amber-800', icon: Clock },
     pending: { color: 'bg-yellow-100 text-yellow-800', icon: Clock },
     completed: { color: 'bg-emerald-100 text-emerald-800', icon: CheckCircle },
     cancelled: { color: 'bg-gray-100 text-gray-800', icon: XCircle },
@@ -439,6 +440,7 @@ const EventPurchases = () => {
                 >
                   <option value="all">All Statuses</option>
                   <option value="confirmed">Confirmed</option>
+                  <option value="paylater">Awaiting Payment</option>
                   <option value="pending">Pending</option>
                   <option value="checked-in">Checked In</option>
                   <option value="completed">Completed</option>
@@ -596,6 +598,7 @@ const EventPurchases = () => {
                         className={`text-xs font-medium px-3 py-1 rounded-full ${statusConfig[purchase.status]?.color || 'bg-gray-100 text-gray-800'} border-none focus:ring-2 focus:ring-${themeColor}-600`}
                       >
                         <option value="confirmed">Confirmed</option>
+                        <option value="paylater">Awaiting Payment</option>
                         <option value="pending">Pending</option>
                         <option value="checked-in">Checked In</option>
                         <option value="completed">Completed</option>

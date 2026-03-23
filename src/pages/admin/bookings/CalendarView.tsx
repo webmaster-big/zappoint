@@ -544,11 +544,12 @@ const CalendarView: React.FC = () => {
                     <span className={`px-2 py-1 text-xs font-medium rounded-full ${
                       booking.status === 'confirmed' ? 'bg-green-100 text-green-800' :
                       booking.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                      booking.status === 'paylater' ? 'bg-amber-100 text-amber-800' :
                       booking.status === 'cancelled' ? 'bg-red-100 text-red-800' :
                       booking.status === 'checked-in' ? `bg-${themeColor}-100 text-${fullColor}` :
                       'bg-gray-100 text-gray-800'
                     }`}>
-                      {booking.status}
+                      {booking.status === 'paylater' ? 'Awaiting Payment' : booking.status}
                     </span>
                     <span className={`px-2 py-1 text-xs font-medium rounded-full ${getPackageColor(booking)}`}>
                       {booking.package?.name || 'Package'}
@@ -741,11 +742,12 @@ const CalendarView: React.FC = () => {
                     <span className={`px-2 py-1 text-xs font-medium rounded-full ${
                       booking.status === 'confirmed' ? 'bg-green-100 text-green-800' :
                       booking.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                      booking.status === 'paylater' ? 'bg-amber-100 text-amber-800' :
                       booking.status === 'cancelled' ? 'bg-red-100 text-red-800' :
                       booking.status === 'checked-in' ? 'bg-blue-100 text-blue-800' :
                       'bg-gray-100 text-gray-800'
                     }`}>
-                      {booking.status}
+                      {booking.status === 'paylater' ? 'Awaiting Payment' : booking.status}
                     </span>
                     <span className={`px-2 py-1 text-xs font-medium rounded-full ${getPackageColor(booking)}`}>
                       {booking.package?.name || 'Package'}
@@ -1296,11 +1298,12 @@ const CalendarView: React.FC = () => {
                             <span className={`px-3 py-1 text-xs font-medium rounded-full ${
                               booking.status === 'confirmed' ? 'bg-green-100 text-green-800' :
                               booking.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                              booking.status === 'paylater' ? 'bg-amber-100 text-amber-800' :
                               booking.status === 'cancelled' ? 'bg-red-100 text-red-800' :
                               booking.status === 'checked-in' ? `bg-${themeColor}-100 text-${fullColor}` :
                               'bg-gray-100 text-gray-800'
                             }`}>
-                              {booking.status}
+                              {booking.status === 'paylater' ? 'Awaiting Payment' : booking.status}
                             </span>
                             <span className="text-xs text-gray-500 font-mono">
                               #{booking.reference_number}
@@ -1432,11 +1435,12 @@ const CalendarView: React.FC = () => {
                       <span className={`px-3 py-1 text-xs font-medium rounded-full ${
                         selectedBooking.status === 'confirmed' ? 'bg-green-100 text-green-800' :
                         selectedBooking.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                        selectedBooking.status === 'paylater' ? 'bg-amber-100 text-amber-800' :
                         selectedBooking.status === 'cancelled' ? 'bg-red-100 text-red-800' :
                         selectedBooking.status === 'checked-in' ? `bg-${themeColor}-100 text-${fullColor}` :
                         'bg-gray-100 text-gray-800'
                       }`}>
-                        {selectedBooking.status}
+                        {selectedBooking.status === 'paylater' ? 'Awaiting Payment' : selectedBooking.status}
                       </span>
                     </div>
                     <div className="flex justify-between items-center">

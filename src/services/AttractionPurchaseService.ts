@@ -36,7 +36,7 @@ export interface AttractionPurchase {
   quantity: number;
   total_amount: number;
   payment_method: 'card' | 'in-store' | 'paylater' | 'authorize.net';
-  status: 'pending' | 'confirmed' | 'checked-in' | 'cancelled' | 'refunded';
+  status: 'pending' | 'paylater' | 'confirmed' | 'checked-in' | 'cancelled' | 'refunded';
   purchase_date: string;
   scheduled_date?: string; // Customer's chosen date to use the ticket
   scheduled_time?: string; // Customer's chosen time slot
@@ -117,7 +117,7 @@ export interface CreatePurchaseData {
   discount_amount?: number;
   currency?: string;
   method?: string;
-  status?: 'pending' | 'confirmed' | 'checked-in' | 'cancelled' | 'refunded';
+  status?: 'pending' | 'paylater' | 'confirmed' | 'checked-in' | 'cancelled' | 'refunded';
   payment_id?: string;
   location_id?: number;
   // Add-ons selected for this purchase
@@ -143,7 +143,7 @@ export interface CreatePurchaseData {
 }
 
 export interface UpdatePurchaseData extends Partial<CreatePurchaseData> {
-  status?: 'pending' | 'confirmed' | 'checked-in' | 'cancelled' | 'refunded';
+  status?: 'pending' | 'paylater' | 'confirmed' | 'checked-in' | 'cancelled' | 'refunded';
 }
 
 export interface PurchaseFilters {

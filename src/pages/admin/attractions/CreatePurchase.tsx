@@ -631,6 +631,7 @@ const CreatePurchase = () => {
         currency: 'USD',
         method: paymentMethod === 'in-store' ? 'cash' : paymentMethod as 'card' | 'paylater' | 'authorize.net',
         payment_method: paymentMethod as 'card' | 'in-store' | 'paylater' | 'authorize.net',
+        status: (paymentMethod === 'authorize.net' || paymentMethod === 'card') ? 'paylater' as const : undefined,
         location_id: selectedAttraction.locationId || 1,
         purchase_date: new Date().toISOString().split('T')[0],
         scheduled_date: scheduledDate || undefined,

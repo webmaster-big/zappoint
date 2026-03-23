@@ -78,7 +78,7 @@ export interface CreateBookingData {
   payment_status?: 'paid' | 'partial' | 'pending';
   
   // Status and notes
-  status?: 'pending' | 'confirmed' | 'checked-in' | 'completed' | 'cancelled';
+  status?: 'pending' | 'paylater' | 'confirmed' | 'checked-in' | 'completed' | 'cancelled';
   notes?: string;
   special_requests?: string;
   
@@ -134,7 +134,7 @@ export interface UpdateBookingData {
   discount_amount?: number;
   payment_method?: 'card' | 'cash';
   payment_status?: 'paid' | 'partial' | 'pending';
-  status?: 'pending' | 'confirmed' | 'checked-in' | 'completed' | 'cancelled';
+  status?: 'pending' | 'paylater' | 'confirmed' | 'checked-in' | 'completed' | 'cancelled';
   notes?: string;
   internal_notes?: string; // Staff-only notes, never shown to customer
   special_requests?: string;
@@ -172,7 +172,7 @@ export interface UpdateBookingData {
 }
 
 export interface BookingFilters {
-  status?: 'pending' | 'confirmed' | 'checked-in' | 'completed' | 'cancelled';
+  status?: 'pending' | 'paylater' | 'confirmed' | 'checked-in' | 'completed' | 'cancelled';
   location_id?: number;
   customer_id?: number;
   guest_email?: string;
@@ -227,7 +227,7 @@ export interface Booking {
   discount_amount?: string | number;
   payment_method?: 'card' | 'cash';
   payment_status: 'paid' | 'partial' | 'pending';
-  status: 'pending' | 'confirmed' | 'checked-in' | 'completed' | 'cancelled';
+  status: 'pending' | 'paylater' | 'confirmed' | 'checked-in' | 'completed' | 'cancelled';
   notes?: string;
   internal_notes?: string; // Staff-only notes, never shown to customer
   special_requests?: string;

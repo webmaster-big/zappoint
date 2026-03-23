@@ -105,6 +105,7 @@ const MyAttractions = () => {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'confirmed': return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+      case 'paylater': return 'bg-amber-50 text-amber-700 border-amber-200';
       case 'pending': return 'bg-amber-50 text-amber-700 border-amber-200';
       case 'cancelled': case 'refunded': return 'bg-red-50 text-red-700 border-red-200';
       case 'checked-in': return 'bg-blue-50 text-blue-700 border-blue-200';
@@ -115,6 +116,7 @@ const MyAttractions = () => {
   const getStatusDot = (status: string) => {
     switch (status) {
       case 'confirmed': return 'bg-emerald-500';
+      case 'paylater': return 'bg-amber-500';
       case 'pending': return 'bg-amber-500';
       case 'cancelled': case 'refunded': return 'bg-red-500';
       case 'checked-in': return 'bg-blue-500';
@@ -123,7 +125,7 @@ const MyAttractions = () => {
   };
 
   const formatStatusLabel = (status: string) =>
-    status.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    status === 'paylater' ? 'Awaiting Payment' : status.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 
   const handleDownloadQRCode = async (purchase: AttractionPurchase) => {
     try {

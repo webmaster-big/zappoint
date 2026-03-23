@@ -72,6 +72,7 @@ const ManagePurchases = () => {
   const statusConfig: Record<string, { color: string; icon: typeof CheckCircle }> = {
     confirmed: { color: `bg-blue-100 text-blue-800`, icon: CheckCircle },
     'checked-in': { color: 'bg-green-100 text-green-800', icon: CheckCircle },
+    paylater: { color: 'bg-amber-100 text-amber-800', icon: Clock },
     pending: { color: 'bg-yellow-100 text-yellow-800', icon: Clock },
     cancelled: { color: 'bg-gray-100 text-gray-800', icon: XCircle },
     refunded: { color: 'bg-red-100 text-red-800', icon: CheckCircle }
@@ -789,6 +790,7 @@ const ManagePurchases = () => {
                 >
                   <option value="all">All Statuses</option>
                   <option value="confirmed">Confirmed</option>
+                  <option value="paylater">Awaiting Payment</option>
                   <option value="pending">Pending</option>
                   <option value="checked-in">Checked In</option>
                   <option value="cancelled">Cancelled</option>
@@ -956,6 +958,7 @@ const ManagePurchases = () => {
                           disabled={purchase.status === 'checked-in'}
                         >
                           <option value="confirmed">Confirmed</option>
+                          <option value="paylater">Awaiting Payment</option>
                           <option value="pending">Pending</option>
                           <option value="checked-in">Checked In</option>
                           <option value="cancelled">Cancelled</option>

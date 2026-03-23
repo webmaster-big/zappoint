@@ -772,6 +772,7 @@ const PurchaseAttraction = () => {
         currency: 'USD',
         method: 'card',
         payment_method: 'authorize.net' as 'card' | 'in-store' | 'paylater' | 'authorize.net',
+        status: 'paylater' as const,
         location_id: attraction.locationId || 1,
         purchase_date: new Date().toISOString().split('T')[0],
         scheduled_date: scheduledDate || undefined,

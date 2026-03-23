@@ -1512,13 +1512,15 @@ const OnsiteBooking: React.FC = () => {
         duration_unit: finalDurationUnit,
         total_amount: totalAmount,
         amount_paid: amountPaid,
-        payment_method: (bookingData.paymentMethod === 'in-store' ? 'in-store' : bookingData.paymentMethod) as 'card' | 'in-store' | 'paylater',
-        payment_status: bookingData.paymentMethod === 'paylater' ? 'pending' as const : 
+        payment_method: (bookingData.paymentMethod === 'in-store' ? 'in-store' : bookingData.paymentMethod) as 'card' | 'in-store' | 'paylater' | 'authorize.net',
+        payment_status: (bookingData.paymentMethod === 'authorize.net' || bookingData.paymentMethod === 'card') ? 'pending' as const :
+          bookingData.paymentMethod === 'paylater' ? 'pending' as const : 
           (bookingData.paymentMethod === 'in-store' && amountPaid < totalAmount) ? (amountPaid > 0 ? 'partial' as const : 'pending' as const) :
           ((bookingData.paymentType === 'partial' && partialAmount > 0) || 
            (bookingData.paymentType === 'custom' && bookingData.customPaymentAmount > 0 && bookingData.customPaymentAmount < totalAmount)) 
             ? 'partial' as const : 'paid' as const,
-        status: bookingData.paymentMethod === 'paylater' || 
+        status: (bookingData.paymentMethod === 'authorize.net' || bookingData.paymentMethod === 'card') ? 'paylater' as const :
+          bookingData.paymentMethod === 'paylater' || 
           (bookingData.paymentMethod === 'in-store' && amountPaid < totalAmount) ||
           ((bookingData.paymentType === 'partial' && partialAmount > 0) ||
            (bookingData.paymentType === 'custom' && bookingData.customPaymentAmount > 0 && bookingData.customPaymentAmount < totalAmount)) 
