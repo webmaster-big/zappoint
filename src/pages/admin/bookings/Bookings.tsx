@@ -153,7 +153,7 @@ const Bookings: React.FC = () => {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedBookingForPayment, setSelectedBookingForPayment] = useState<BookingsPageBooking | null>(null);
   const [paymentAmount, setPaymentAmount] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<'card' | 'in-store' | 'cash'>('in-store');
+  const [paymentMethod, setPaymentMethod] = useState<'card' | 'in-store'>('in-store');
   const [paymentNotes, setPaymentNotes] = useState('');
   const [processingPayment, setProcessingPayment] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
@@ -422,10 +422,7 @@ const Bookings: React.FC = () => {
   const paymentColors = {
     card: `bg-${themeColor}-100 text-${fullColor}`,
     'authorize.net': `bg-${themeColor}-100 text-${fullColor}`,
-    stripe: 'bg-purple-100 text-purple-800',
-    paypal: 'bg-blue-100 text-blue-800',
     'in-store': 'bg-green-100 text-green-800',
-    cash: 'bg-green-100 text-green-800',
     paylater: 'bg-orange-100 text-orange-800'
   };
 
@@ -3060,10 +3057,7 @@ const Bookings: React.FC = () => {
                     <option value="all">All Methods</option>
                     <option value="card">Card</option>
                     <option value="authorize.net">Authorize.net</option>
-                    <option value="stripe">Stripe</option>
-                    <option value="paypal">PayPal</option>
                     <option value="in-store">In-Store</option>
-                    <option value="cash">Cash</option>
                     <option value="paylater">Pay Later</option>
                   </select>
                 </div>

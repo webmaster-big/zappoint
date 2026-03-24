@@ -127,9 +127,7 @@ const ManagePurchases = () => {
       totalAmount: Number(purchase.total_amount),
       amountPaid: Number(purchase.amount_paid || 0),
       createdAt: purchase.created_at,
-      paymentMethod: purchase.payment_method === 'e-wallet' ? 'paypal' : 
-                    purchase.payment_method === 'credit' ? 'credit_card' : 
-                    purchase.payment_method as string,
+      paymentMethod: purchase.payment_method as string,
       duration: purchase.attraction?.duration ? formatDurationDisplay(purchase.attraction.duration, purchase.attraction.duration_unit) : '',
       activity: purchase.attraction?.category || '',
       locationId: purchase.location_id,
@@ -803,11 +801,10 @@ const ManagePurchases = () => {
                   className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                 >
                   <option value="all">All Methods</option>
-                  <option value="credit_card">Credit Card</option>
-                  <option value="paypal">PayPal</option>
                   <option value="card">Card</option>
+                  <option value="authorize.net">Authorize.net</option>
                   <option value="in-store">In-Store</option>
-                  <option value="cash">Cash</option>
+                  <option value="paylater">Pay Later</option>
                 </select>
               </div>
               <div>

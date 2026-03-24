@@ -84,7 +84,7 @@ const AttendantDashboard: React.FC = () => {
    // Payment modal states
    const [showPaymentModal, setShowPaymentModal] = useState(false);
    const [paymentAmount, setPaymentAmount] = useState('');
-   const [paymentMethod, setPaymentMethod] = useState<'card' | 'in-store' | 'cash'>('in-store');
+   const [paymentMethod, setPaymentMethod] = useState<'card' | 'in-store'>('in-store');
    const [paymentNotes, setPaymentNotes] = useState('');
    const [processingPayment, setProcessingPayment] = useState(false);
    const [metrics, setMetrics] = useState({
@@ -564,17 +564,10 @@ const AttendantDashboard: React.FC = () => {
        partial: 'bg-amber-100 text-amber-800',
        Refunded: 'bg-rose-100 text-rose-800',
        refunded: 'bg-rose-100 text-rose-800',
-       'Credit Card': 'bg-blue-100 text-blue-800',
-       credit_card: 'bg-blue-100 text-blue-800',
        card: 'bg-blue-100 text-blue-800',
        'authorize.net': 'bg-blue-100 text-blue-800',
-       stripe: 'bg-purple-100 text-purple-800',
-       PayPal: 'bg-blue-100 text-blue-800',
-       paypal: 'bg-blue-100 text-blue-800',
-       'In-Store': 'bg-green-100 text-green-800',
        'in-store': 'bg-green-100 text-green-800',
-       Cash: 'bg-gray-100 text-gray-800',
-       cash: 'bg-gray-100 text-gray-800',
+       cash: 'bg-green-100 text-green-800',
        paylater: 'bg-orange-100 text-orange-800',
      };
      return colors[payment] || 'bg-gray-100 text-gray-800';
@@ -1915,11 +1908,10 @@ const AttendantDashboard: React.FC = () => {
                  </div>
                  <div>
                    <label className="block text-sm font-medium text-gray-700 mb-2">Payment Method *</label>
-                   <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as 'card' | 'in-store' | 'cash')}
+                   <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as 'card' | 'in-store')}
                      className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}>
                      <option value="in-store">In-Store</option>
                      <option value="card">Card</option>
-                     <option value="cash">Cash</option>
                    </select>
                  </div>
                  <div>

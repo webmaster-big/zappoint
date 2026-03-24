@@ -1042,9 +1042,6 @@ const Payments: React.FC = () => {
                   <option value="authorize.net">Authorize.net</option>
                   <option value="cash">Cash</option>
                   <option value="in-store">In-Store</option>
-                  <option value="stripe">Stripe</option>
-                  <option value="paypal">PayPal</option>
-                  <option value="paylater">Pay Later</option>
                 </select>
               </div>
               <div>
@@ -1588,9 +1585,6 @@ const Payments: React.FC = () => {
                       <option value="authorize.net">Authorize.net</option>
                       <option value="cash">Cash</option>
                       <option value="in-store">In-Store</option>
-                      <option value="stripe">Stripe</option>
-                      <option value="paypal">PayPal</option>
-                      <option value="paylater">Pay Later</option>
                     </select>
                   </div>
                 </div>
