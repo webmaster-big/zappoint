@@ -627,14 +627,24 @@ const PurchaseEvent = () => {
           customerBillingData
         );
       } catch (paymentErr) {
-        console.error('Payment processing error, deleting purchase:', createdPurchase.id);
-        try { await eventPurchaseService.deletePurchase(createdPurchase.id); } catch { /* ignore */ }
+        console.error('❌ Payment processing error, deleting purchase:', createdPurchase.id);
+        try {
+          await eventPurchaseService.deletePurchase(createdPurchase.id);
+          console.log('🗑️ Purchase deleted due to payment processing error');
+        } catch (deleteErr) {
+          console.error('⚠️ Failed to delete purchase after payment error:', deleteErr);
+        }
         throw paymentErr;
       }
 
       if (!paymentResponse.success) {
-        console.error('Payment failed, deleting purchase:', createdPurchase.id);
-        try { await eventPurchaseService.deletePurchase(createdPurchase.id); } catch { /* ignore */ }
+        console.error('❌ Payment failed, deleting purchase:', createdPurchase.id);
+        try {
+          await eventPurchaseService.deletePurchase(createdPurchase.id);
+          console.log('🗑️ Purchase deleted due to payment failure');
+        } catch (deleteErr) {
+          console.error('⚠️ Failed to delete purchase after payment failure:', deleteErr);
+        }
         throw new Error(paymentResponse.message || 'Your payment could not be processed. No charges were made. Please check your card details and try again.');
       }
 

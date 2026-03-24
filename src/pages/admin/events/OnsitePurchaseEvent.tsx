@@ -517,12 +517,24 @@ const OnsitePurchaseEvent = () => {
             customerData
           );
         } catch (paymentErr) {
-          try { await eventPurchaseService.deletePurchase(createdPurchase.id); } catch { /* cleanup */ }
+          console.error('❌ Payment processing error, deleting purchase:', createdPurchase.id);
+          try {
+            await eventPurchaseService.deletePurchase(createdPurchase.id);
+            console.log('🗑️ Purchase deleted due to payment processing error');
+          } catch (deleteErr) {
+            console.error('⚠️ Failed to delete purchase after payment error:', deleteErr);
+          }
           throw paymentErr;
         }
 
         if (!paymentResponse.success) {
-          try { await eventPurchaseService.deletePurchase(createdPurchase.id); } catch { /* cleanup */ }
+          console.error('❌ Payment failed, deleting purchase:', createdPurchase.id);
+          try {
+            await eventPurchaseService.deletePurchase(createdPurchase.id);
+            console.log('🗑️ Purchase deleted due to payment failure');
+          } catch (deleteErr) {
+            console.error('⚠️ Failed to delete purchase after payment failure:', deleteErr);
+          }
           const rawMsg = (paymentResponse.message || '').toLowerCase();
           let friendlyMsg = 'Payment could not be processed. The purchase has been cancelled. Please check your card details and try again.';
           if (rawMsg.includes('declined') || rawMsg.includes('decline')) {
