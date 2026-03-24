@@ -19,7 +19,6 @@ import { customerService, type Customer } from '../../services/CustomerService';
 import { getImageUrl, ASSET_URL } from '../../utils/storage';
 import { loadAcceptJS, processCardPayment, validateCardNumber, formatCardNumber, getCardType, PAYMENT_TYPE } from '../../services/PaymentService';
 import { getAuthorizeNetPublicKey } from '../../services/SettingsService';
-import { generatePurchaseQRCode } from '../../utils/qrcode';
 import { extractIdFromSlug } from '../../utils/slug';
 import Toast from '../../components/ui/Toast';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
@@ -174,10 +173,6 @@ const PurchaseEvent = () => {
   // Multi-step form
   const [currentStep, setCurrentStep] = useState(1);
   const [purchaseComplete, setPurchaseComplete] = useState(false);
-
-  // QR code confirmation
-  const [qrCodeImage, setQrCodeImage] = useState<string | null>(null);
-  const [showQRModal, setShowQRModal] = useState(false);
 
   // Account modal + mobile summary
   const [showAccountModal, setShowAccountModal] = useState(false);
@@ -591,17 +586,9 @@ const PurchaseEvent = () => {
         throw new Error('We couldn\'t process your order right now. No charges were made. Please try again.');
       }
 
-      const createdPurchase = response.data;
+      const createdPurchase = response.data || response;
 
-      // Step 2: Generate QR code
-      let qrData = '';
-      try {
-        qrData = await generatePurchaseQRCode(createdPurchase.id);
-      } catch (qrErr) {
-        console.error('QR code generation failed:', qrErr);
-      }
-
-      // Step 3: Charge payment WITH payable_id
+      // Step 2: Charge payment WITH payable_id
       const paymentData = {
         location_id: event!.location_id,
         amount: totalAmount,
@@ -613,7 +600,6 @@ const PurchaseEvent = () => {
         payable_id: createdPurchase.id,
         payable_type: PAYMENT_TYPE.EVENT_PURCHASE,
         send_email: true,
-        qr_code: qrData || undefined,
         applied_fees: buildAppliedFees(feeBreakdown).length > 0 ? buildAppliedFees(feeBreakdown) : null,
       };
 
@@ -648,7 +634,6 @@ const PurchaseEvent = () => {
         throw new Error(paymentResponse.message || 'Your payment could not be processed. No charges were made. Please check your card details and try again.');
       }
 
-      setQrCodeImage(qrData);
       setToast({ message: 'Purchase confirmed! Receipt sent to your email.', type: 'success' });
 
       // Store dedup fingerprint to prevent duplicate submissions
@@ -657,7 +642,6 @@ const PurchaseEvent = () => {
 
       setPurchaseComplete(true);
       setCurrentStep(4);
-      setShowQRModal(true);
     } catch (err: unknown) {
       const errorMsg = getPaymentErrorMessage(err);
       setPaymentError(errorMsg);
@@ -1554,57 +1538,6 @@ const PurchaseEvent = () => {
                   <div className="text-center"><Star className="h-4 w-4 mx-auto mb-1" /><span>Best Price</span></div>
                 </div>
               </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* QR Code Confirmation Modal */}
-      {showQRModal && qrCodeImage && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-fade-in">
-          <div className="bg-white rounded-2xl max-w-2xl w-full p-4 sm:p-6 max-h-[calc(100vh-2rem)] overflow-y-auto shadow-2xl">
-            <div className="text-center mb-4">
-              <div className="mx-auto w-14 h-14 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-2xl flex items-center justify-center mb-3 shadow-lg">
-                <CheckCircle className="h-8 w-8 text-white" />
-              </div>
-              <h3 className="text-xl sm:text-2xl font-extrabold text-gray-900 mb-2">Purchase Confirmed!</h3>
-              <p className="text-sm text-gray-500">Your tickets have been confirmed</p>
-            </div>
-            <div className="bg-gray-50 rounded-xl p-4 sm:p-6 mb-4">
-              <div className="flex flex-col items-center">
-                <img src={qrCodeImage} alt="Purchase QR Code" className="w-48 h-48 sm:w-64 sm:h-64 rounded-xl shadow-sm mb-3" />
-                <p className="text-xs sm:text-sm text-gray-600">Scan this QR code at the entrance</p>
-              </div>
-            </div>
-            <div className="bg-blue-50 rounded-xl p-4 sm:p-6 mb-4">
-              <h3 className="font-semibold text-base sm:text-lg mb-3 text-gray-800">Purchase Details</h3>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between"><span className="text-gray-600">Event:</span><span className="font-medium text-gray-900 text-right ml-2">{event.name}</span></div>
-                {event.location && <div className="flex justify-between"><span className="text-gray-600">Location:</span><span className="font-medium text-gray-900">{event.location.name}</span></div>}
-                <div className="flex justify-between"><span className="text-gray-600">Guest Name:</span><span className="font-medium text-gray-900">{guestName}</span></div>
-                <div className="flex justify-between"><span className="text-gray-600">Email:</span><span className="font-medium text-gray-900 text-right ml-2 break-all">{guestEmail}</span></div>
-                <div className="flex justify-between"><span className="text-gray-600">Date:</span><span className="font-medium text-gray-900">{formatDate(selectedDate)}</span></div>
-                <div className="flex justify-between"><span className="text-gray-600">Time:</span><span className="font-medium text-gray-900">{formatTime(selectedTime)}</span></div>
-                <div className="flex justify-between"><span className="text-gray-600">Quantity:</span><span className="font-medium text-gray-900">{quantity} {quantity === 1 ? 'ticket' : 'tickets'}</span></div>
-                <div className="flex justify-between pt-3 mt-3"><span className="text-gray-600 font-semibold">Total Paid:</span><span className="font-bold text-emerald-600 text-lg sm:text-xl">${totalAmount.toFixed(2)}</span></div>
-                <div className="flex justify-between"><span className="text-gray-600">Payment Method:</span><span className="font-medium text-gray-900">Credit/Debit Card</span></div>
-              </div>
-            </div>
-            <div className="bg-yellow-50 rounded-lg p-3 mb-4">
-              <div className="flex">
-                <svg className="w-5 h-5 text-yellow-600 mr-2 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
-                <div className="text-xs sm:text-sm text-yellow-800">
-                  <p className="font-semibold mb-1">Important Information</p>
-                  <ul className="list-disc list-inside space-y-1">
-                    <li>Receipt sent to {guestEmail}</li>
-                    <li>Please present this QR code at the entrance</li>
-                    <li>Save or screenshot this confirmation for your records</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-            <div className="flex justify-center">
-              <StandardButton variant="primary" size="md" onClick={() => { setShowQRModal(false); navigate('/'); }}>Done</StandardButton>
             </div>
           </div>
         </div>
