@@ -700,8 +700,8 @@ const CreatePurchase = () => {
           // processCardPayment threw (tokenization or network error)
           // Clean up the purchase since payment was not completed
           try {
-            await attractionPurchaseService.deletePurchase(createdPurchase.id);
-            console.log('🗑️ Purchase deleted due to payment processing error');
+            await attractionPurchaseService.forceDeletePurchase(createdPurchase.id);
+            console.log('🗑️ Purchase force deleted due to payment processing error');
           } catch (deleteErr) {
             console.error('⚠️ Failed to delete purchase after payment error:', deleteErr);
           }
@@ -709,10 +709,10 @@ const CreatePurchase = () => {
         }
         
         if (!paymentResponse.success) {
-          // Payment failed - delete the purchase we just created
+          // Payment failed - force delete the purchase we just created
           try {
-            await attractionPurchaseService.deletePurchase(createdPurchase.id);
-            console.log('🗑️ Purchase deleted due to payment failure');
+            await attractionPurchaseService.forceDeletePurchase(createdPurchase.id);
+            console.log('🗑️ Purchase force deleted due to payment failure');
           } catch (deleteErr) {
             console.error('⚠️ Failed to delete purchase after payment failure:', deleteErr);
           }

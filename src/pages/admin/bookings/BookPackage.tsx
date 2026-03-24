@@ -1217,10 +1217,10 @@ const BookPackage: React.FC = () => {
         });
       } catch {
         // QR generation failed — clean up the booking before it becomes orphaned
-        console.error('❌ QR generation failed, deleting booking:', bookingId);
+        console.error('❌ QR generation failed, force deleting booking:', bookingId);
         try {
-          await bookingService.deleteBooking(bookingId);
-          console.log('🗑️ Booking deleted due to QR generation failure');
+          await bookingService.forceDeleteBooking(bookingId);
+          console.log('🗑️ Booking force deleted due to QR generation failure');
         } catch (deleteErr) {
           console.error('⚠️ Failed to delete booking after QR failure:', deleteErr);
         }
@@ -1254,10 +1254,10 @@ const BookPackage: React.FC = () => {
       } catch (paymentErr) {
         // processCardPayment threw (tokenization or network error)
         // Clean up the booking since payment was not completed
-        console.error('❌ Payment processing error, deleting booking:', bookingId);
+        console.error('❌ Payment processing error, force deleting booking:', bookingId);
         try {
-          await bookingService.deleteBooking(bookingId);
-          console.log('🗑️ Booking deleted due to payment processing error');
+          await bookingService.forceDeleteBooking(bookingId);
+          console.log('🗑️ Booking force deleted due to payment processing error');
         } catch (deleteErr) {
           console.error('⚠️ Failed to delete booking after payment error:', deleteErr);
         }
@@ -1266,10 +1266,10 @@ const BookPackage: React.FC = () => {
       
       if (!paymentResponse.success) {
         // Payment failed — clean up the booking we created
-        console.error('❌ Payment failed, deleting booking:', bookingId);
+        console.error('❌ Payment failed, force deleting booking:', bookingId);
         try {
-          await bookingService.deleteBooking(bookingId);
-          console.log('🗑️ Booking deleted due to payment failure');
+          await bookingService.forceDeleteBooking(bookingId);
+          console.log('🗑️ Booking force deleted due to payment failure');
         } catch (deleteErr) {
           console.error('⚠️ Failed to delete booking after payment failure:', deleteErr);
         }

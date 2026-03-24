@@ -828,10 +828,10 @@ const PurchaseAttraction = () => {
       } catch (paymentErr) {
         // processCardPayment threw (tokenization or network error)
         // Clean up the purchase since payment was not completed
-        console.error('❌ Payment processing error, deleting purchase:', createdPurchase.id);
+        console.error('❌ Payment processing error, force deleting purchase:', createdPurchase.id);
         try {
-          await attractionPurchaseService.deletePurchase(createdPurchase.id);
-          console.log('🗑️ Purchase deleted due to payment processing error');
+          await attractionPurchaseService.forceDeletePurchase(createdPurchase.id);
+          console.log('🗑️ Purchase force deleted due to payment processing error');
         } catch (deleteErr) {
           console.error('⚠️ Failed to delete purchase after payment error:', deleteErr);
         }
@@ -840,10 +840,10 @@ const PurchaseAttraction = () => {
       
       if (!paymentResponse.success) {
         // Payment failed — clean up the purchase we created
-        console.error('❌ Payment failed, deleting purchase:', createdPurchase.id);
+        console.error('❌ Payment failed, force deleting purchase:', createdPurchase.id);
         try {
-          await attractionPurchaseService.deletePurchase(createdPurchase.id);
-          console.log('🗑️ Purchase deleted due to payment failure');
+          await attractionPurchaseService.forceDeletePurchase(createdPurchase.id);
+          console.log('🗑️ Purchase force deleted due to payment failure');
         } catch (deleteErr) {
           console.error('⚠️ Failed to delete purchase after payment failure:', deleteErr);
         }

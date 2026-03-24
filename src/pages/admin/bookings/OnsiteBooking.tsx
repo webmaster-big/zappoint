@@ -1639,11 +1639,11 @@ const OnsiteBooking: React.FC = () => {
           
           if (!paymentResult.success) {
             // Payment failed — clean up the booking we created
-            console.error('❌ Payment failed, deleting booking:', bookingId);
+            console.error('❌ Payment failed, force deleting booking:', bookingId);
             try {
-              await bookingService.deleteBooking(bookingId);
+              await bookingService.forceDeleteBooking(bookingId);
               await bookingCacheService.removeBookingFromCache(bookingId);
-              console.log('🗑️ Booking deleted due to payment failure');
+              console.log('🗑️ Booking force deleted due to payment failure');
             } catch (deleteErr) {
               console.error('⚠️ Failed to delete booking after payment failure:', deleteErr);
             }
@@ -1671,9 +1671,9 @@ const OnsiteBooking: React.FC = () => {
           // Clean up booking if it was created before the error
           if (createdBookingIdForCleanup) {
             try {
-              await bookingService.deleteBooking(createdBookingIdForCleanup);
+              await bookingService.forceDeleteBooking(createdBookingIdForCleanup);
               await bookingCacheService.removeBookingFromCache(createdBookingIdForCleanup);
-              console.log('🗑️ Booking deleted due to payment processing error');
+              console.log('🗑️ Booking force deleted due to payment processing error');
             } catch (deleteErr) {
               console.error('⚠️ Failed to delete booking after payment error:', deleteErr);
             }

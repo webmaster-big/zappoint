@@ -517,10 +517,10 @@ const OnsitePurchaseEvent = () => {
             customerData
           );
         } catch (paymentErr) {
-          console.error('❌ Payment processing error, deleting purchase:', createdPurchase.id);
+          console.error('❌ Payment processing error, force deleting purchase:', createdPurchase.id);
           try {
-            await eventPurchaseService.deletePurchase(createdPurchase.id);
-            console.log('🗑️ Purchase deleted due to payment processing error');
+            await eventPurchaseService.forceDeletePurchase(createdPurchase.id);
+            console.log('🗑️ Purchase force deleted due to payment processing error');
           } catch (deleteErr) {
             console.error('⚠️ Failed to delete purchase after payment error:', deleteErr);
           }
@@ -528,10 +528,10 @@ const OnsitePurchaseEvent = () => {
         }
 
         if (!paymentResponse.success) {
-          console.error('❌ Payment failed, deleting purchase:', createdPurchase.id);
+          console.error('❌ Payment failed, force deleting purchase:', createdPurchase.id);
           try {
-            await eventPurchaseService.deletePurchase(createdPurchase.id);
-            console.log('🗑️ Purchase deleted due to payment failure');
+            await eventPurchaseService.forceDeletePurchase(createdPurchase.id);
+            console.log('🗑️ Purchase force deleted due to payment failure');
           } catch (deleteErr) {
             console.error('⚠️ Failed to delete purchase after payment failure:', deleteErr);
           }

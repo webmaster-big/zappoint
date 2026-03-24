@@ -84,6 +84,12 @@ class EventPurchaseService {
     return response.data;
   }
 
+  /** Force delete a pending purchase (permanent removal) */
+  async forceDeletePurchase(id: number): Promise<ApiResponse<null>> {
+    const response = await api.delete(`/event-purchases/${id}/force-delete`);
+    return response.data;
+  }
+
   /** Cancel a purchase */
   async cancelPurchase(id: number): Promise<ApiResponse<EventPurchase>> {
     const response = await api.patch(`/event-purchases/${id}/cancel`);
