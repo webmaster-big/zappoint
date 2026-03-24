@@ -725,8 +725,6 @@ const LocationManagerDashboard: React.FC = () => {
     const colors: Record<string, string> = {
       Confirmed: 'bg-emerald-100 text-emerald-800',
       confirmed: 'bg-emerald-100 text-emerald-800',
-      Paylater: 'bg-amber-100 text-amber-800',
-      paylater: 'bg-amber-100 text-amber-800',
       Pending: 'bg-amber-100 text-amber-800',
       pending: 'bg-amber-100 text-amber-800',
       Cancelled: 'bg-rose-100 text-rose-800',
@@ -1084,7 +1082,6 @@ const LocationManagerDashboard: React.FC = () => {
                           const getBgColor = () => {
                             const status = booking.status?.toLowerCase();
                             if (status === 'confirmed') return 'bg-green-100';
-                            if (status === 'paylater') return 'bg-amber-100';
                             if (status === 'pending') return 'bg-yellow-100';
                             if (status === 'checked-in') return 'bg-blue-100';
                             if (status === 'cancelled') return 'bg-red-100';
@@ -1598,12 +1595,11 @@ const LocationManagerDashboard: React.FC = () => {
                       <span className={`px-2 py-1 text-xs font-medium rounded-full capitalize ${
                         ep.status === 'completed' ? 'bg-green-100 text-green-700' :
                         ep.status === 'confirmed' ? 'bg-blue-100 text-blue-700' :
-                        ep.status === 'paylater' ? 'bg-amber-100 text-amber-700' :
                         ep.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
                         ep.status === 'cancelled' ? 'bg-red-100 text-red-700' :
                         'bg-gray-100 text-gray-700'
                       }`}>
-                        {ep.status === 'paylater' ? 'Awaiting Payment' : ep.status}
+                        {ep.status}
                       </span>
                     </td>
                   </tr>
@@ -1626,7 +1622,6 @@ const LocationManagerDashboard: React.FC = () => {
             >
               <option value="all">All Statuses</option>
               <option value="confirmed">Confirmed</option>
-              <option value="paylater">Awaiting Payment</option>
               <option value="pending">Pending</option>
               <option value="cancelled">Cancelled</option>
             </select>

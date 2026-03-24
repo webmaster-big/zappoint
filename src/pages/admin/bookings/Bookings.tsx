@@ -413,7 +413,6 @@ const Bookings: React.FC = () => {
   // Status and payment colors
   const statusColors = {
     pending: 'bg-yellow-100 text-yellow-800',
-    paylater: 'bg-amber-100 text-amber-800',
     confirmed: `bg-${themeColor}-100 text-${fullColor}`,
     cancelled: 'bg-red-100 text-red-800',
     'checked-in': 'bg-green-100 text-green-800'
@@ -2013,7 +2012,6 @@ const Bookings: React.FC = () => {
                 className={`text-xs font-medium px-2 py-1 rounded-full ${statusColors[booking.status as keyof typeof statusColors] || 'bg-gray-100 text-gray-800'} border-none focus:ring-2 focus:ring-${themeColor}-600 ${isStatusSaving ? 'opacity-50 cursor-wait' : ''}`}
               >
                 <option value="pending">Pending</option>
-                <option value="paylater">Awaiting Payment</option>
                 <option value="confirmed">Confirmed</option>
                 <option value="checked-in">Checked In</option>
                 <option value="cancelled">Cancelled</option>
@@ -3041,7 +3039,6 @@ const Bookings: React.FC = () => {
                   >
                     <option value="all">All Statuses</option>
                     <option value="pending">Pending</option>
-                    <option value="paylater">Awaiting Payment</option>
                     <option value="confirmed">Confirmed</option>
                     <option value="checked-in">Checked In</option>
                     <option value="cancelled">Cancelled</option>

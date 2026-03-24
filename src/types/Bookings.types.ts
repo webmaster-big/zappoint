@@ -14,7 +14,7 @@ export interface BookingsPageBooking {
   date: string;
   time: string;
   participants: number;
-  status: 'pending' | 'paylater' | 'confirmed' | 'cancelled' | 'completed' | 'checked-in';
+  status: 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'checked-in';
   totalAmount: number;
   amountPaid: number;
   paymentStatus: 'paid' | 'partial' | 'pending';

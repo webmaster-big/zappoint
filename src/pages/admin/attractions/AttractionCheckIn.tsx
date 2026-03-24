@@ -625,16 +625,6 @@ const AttractionCheckIn = () => {
                   </div>
                 )}
 
-                {verifiedPurchase.status === 'paylater' && (
-                  <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-3">
-                    <Clock className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-semibold text-amber-800">Awaiting Payment</p>
-                      <p className="text-sm text-amber-600">Payment has not been processed yet. Cannot check in until payment is completed.</p>
-                    </div>
-                  </div>
-                )}
-
                 {verifiedPurchase.status === 'confirmed' && (
                   <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-start gap-3">
                     <CheckCircle className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
@@ -771,7 +761,7 @@ const AttractionCheckIn = () => {
                             ? 'text-purple-600'
                             : 'text-yellow-600'
                         }`}>
-                          {verifiedPurchase.status === 'checked-in' ? 'Checked In' : verifiedPurchase.status === 'paylater' ? 'Awaiting Payment' : verifiedPurchase.status.charAt(0).toUpperCase() + verifiedPurchase.status.slice(1)}
+                          {verifiedPurchase.status === 'checked-in' ? 'Checked In' : verifiedPurchase.status.charAt(0).toUpperCase() + verifiedPurchase.status.slice(1)}
                         </p>
                       </div>
                     </div>

@@ -885,7 +885,6 @@ const CompanyDashboard: React.FC = () => {
   // Status colors (supporting both capitalized display and lowercase API values)
   const statusColors = {
     Confirmed: 'bg-emerald-100 text-emerald-800',
-    Paylater: 'bg-amber-100 text-amber-800',
     Pending: 'bg-amber-100 text-amber-800',
     Cancelled: 'bg-rose-100 text-rose-800',
     Completed: 'bg-blue-100 text-blue-800',
@@ -1782,12 +1781,11 @@ const CompanyDashboard: React.FC = () => {
                                   <div className="mt-1">
                                     <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${
                                       booking.status === 'confirmed' ? 'bg-green-200' :
-                                      booking.status === 'paylater' ? 'bg-amber-200' :
                                       booking.status === 'pending' ? 'bg-yellow-200' :
                                       booking.status === 'checked_in' ? 'bg-blue-200' :
                                       'bg-gray-200'
                                     }`}>
-                                      {booking.status === 'paylater' ? 'Awaiting Payment' : booking.status}
+                                      {booking.status}
                                     </span>
                                   </div>
                                 </Link>
@@ -1993,7 +1991,6 @@ const CompanyDashboard: React.FC = () => {
             >
               <option value="all">All Statuses</option>
               <option value="confirmed">Confirmed</option>
-              <option value="paylater">Awaiting Payment</option>
               <option value="pending">Pending</option>
               <option value="cancelled">Cancelled</option>
               <option value="completed">Completed</option>
@@ -2066,7 +2063,7 @@ const CompanyDashboard: React.FC = () => {
                 }
                 
                 const displayPaymentStatus = paymentStatus.charAt(0).toUpperCase() + paymentStatus.slice(1);
-                const bookingStatus = booking.status === 'paylater' ? 'Awaiting Payment' : booking.status.charAt(0).toUpperCase() + booking.status.slice(1);
+                const bookingStatus = booking.status.charAt(0).toUpperCase() + booking.status.slice(1);
                 
                 return (
                   <tr key={booking.id} className="hover:bg-gray-50">
@@ -2200,7 +2197,7 @@ const CompanyDashboard: React.FC = () => {
                             ? 'bg-blue-100 text-blue-800'
                             : 'bg-rose-100 text-rose-800'
                         }`}>
-                          {booking.status === 'paylater' ? 'Awaiting Payment' : booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
+                          {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
                         </span>
                         <span className="text-sm font-semibold text-gray-900">
                           ${parseFloat(String(booking.total_amount || 0)).toFixed(2)}
@@ -2389,7 +2386,7 @@ const CompanyDashboard: React.FC = () => {
                         ? 'bg-blue-100 text-blue-800'
                         : 'bg-rose-100 text-rose-800'
                     }`}>
-                      {selectedBooking.status === 'paylater' ? 'Awaiting Payment' : selectedBooking.status.charAt(0).toUpperCase() + selectedBooking.status.slice(1)}
+                      {selectedBooking.status.charAt(0).toUpperCase() + selectedBooking.status.slice(1)}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
@@ -2826,11 +2823,10 @@ const CompanyDashboard: React.FC = () => {
                     <td className="px-4 py-3">
                       <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
                         purchase.status === 'confirmed' || purchase.status === 'completed' ? 'bg-emerald-100 text-emerald-800' :
-                        purchase.status === 'paylater' ? 'bg-amber-100 text-amber-800' :
                         purchase.status === 'pending' ? 'bg-amber-100 text-amber-800' :
                         purchase.status === 'cancelled' ? 'bg-rose-100 text-rose-800' : 'bg-gray-100 text-gray-800'
                       }`}>
-                        {purchase.status === 'paylater' ? 'Awaiting Payment' : purchase.status}
+                        {purchase.status}
                       </span>
                     </td>
                   </tr>

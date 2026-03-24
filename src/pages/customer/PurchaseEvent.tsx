@@ -580,7 +580,6 @@ const PurchaseEvent = () => {
           discount_amount: specialPricingDiscount > 0 ? specialPricingDiscount : undefined,
           payment_method: 'authorize.net',
           payment_status: 'pending',
-          status: 'paylater',
           special_requests: specialRequests || undefined,
           send_email: false,
           applied_fees: buildAppliedFees(feeBreakdown).length > 0 ? buildAppliedFees(feeBreakdown) : undefined,

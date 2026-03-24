@@ -17,7 +17,7 @@ export interface CustomerReservationReservation {
   location: string;
   bookingDate: string;
   bookingTime: string;
-  status: 'confirmed' | 'pending' | 'paylater' | 'cancelled' | 'refunded';
+  status: 'confirmed' | 'pending' | 'cancelled' | 'refunded';
   paymentId: string;
   totalAmount: number;
   participantsCount: number;

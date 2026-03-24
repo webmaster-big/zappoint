@@ -464,9 +464,15 @@ const OnsitePurchaseEvent = () => {
         total_amount: total,
         amount_paid: paymentMethod === 'paylater' ? 0 : total,
         payment_method: paymentMethod as 'card' | 'in-store' | 'paylater' | 'authorize.net',
-        payment_status: (paymentMethod === 'paylater' || paymentMethod === 'authorize.net' || paymentMethod === 'card') ? 'pending' : 'paid',
-        status: (paymentMethod === 'authorize.net' || paymentMethod === 'card') ? 'paylater' : undefined,
-        send_email: sendEmail,
+        ...(paymentMethod === 'in-store' ? {
+          status: 'confirmed' as const,
+          payment_status: 'paid' as const,
+        } : paymentMethod === 'paylater' ? {
+          payment_status: 'pending' as const,
+        } : {
+          // Online (authorize.net/card): let backend default to pending
+        }),
+        send_email: paymentMethod === 'in-store' ? sendEmail : false,
         notes: notes || undefined,
         add_ons: addOnsPayload.length > 0 ? addOnsPayload : undefined,
         applied_fees: buildAppliedFees(feeBreakdown).length > 0 ? buildAppliedFees(feeBreakdown) : undefined,

@@ -53,7 +53,7 @@ export interface EventPurchase {
   discount_amount: string | null;
   payment_method: 'card' | 'in-store' | 'paylater' | 'authorize.net' | null;
   payment_status: 'paid' | 'partial' | 'pending';
-  status: 'pending' | 'paylater' | 'confirmed' | 'checked-in' | 'completed' | 'cancelled';
+  status: 'pending' | 'confirmed' | 'checked-in' | 'completed' | 'cancelled';
   transaction_id: string | null;
   notes: string | null;
   special_requests: string | null;
@@ -121,7 +121,7 @@ export interface CreateEventPurchaseData {
   discount_amount?: number;
   payment_method?: string;
   payment_status?: string;
-  status?: 'pending' | 'paylater' | 'confirmed' | 'checked-in' | 'completed' | 'cancelled';
+  status?: 'pending' | 'confirmed' | 'checked-in' | 'completed' | 'cancelled';
   transaction_id?: string;
   notes?: string;
   special_requests?: string;

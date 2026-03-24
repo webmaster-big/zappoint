@@ -545,8 +545,6 @@ const AttendantDashboard: React.FC = () => {
      const colors: Record<string, string> = {
        Confirmed: 'bg-emerald-100 text-emerald-800',
        confirmed: 'bg-emerald-100 text-emerald-800',
-       Paylater: 'bg-amber-100 text-amber-800',
-       paylater: 'bg-amber-100 text-amber-800',
        Pending: 'bg-amber-100 text-amber-800',
        pending: 'bg-amber-100 text-amber-800',
        Cancelled: 'bg-rose-100 text-rose-800',
@@ -1025,7 +1023,6 @@ const AttendantDashboard: React.FC = () => {
                              const getBgColor = () => {
                                const status = booking.status?.toLowerCase();
                                if (status === 'confirmed') return 'bg-green-100';
-                               if (status === 'paylater') return 'bg-amber-100';
                                if (status === 'pending') return 'bg-yellow-100';
                                if (status === 'checked-in') return 'bg-blue-100';
                                if (status === 'cancelled') return 'bg-red-100';
@@ -1593,13 +1590,12 @@ const AttendantDashboard: React.FC = () => {
                        <span className="text-sm text-gray-600">Status</span>
                        <span className={`px-3 py-1 text-xs font-medium rounded-full ${
                          selectedBooking.status === 'confirmed' ? 'bg-emerald-100 text-emerald-800'
-                           : selectedBooking.status === 'paylater' ? 'bg-amber-100 text-amber-800'
                            : selectedBooking.status === 'pending' ? 'bg-amber-100 text-amber-800'
                            : selectedBooking.status === 'checked-in' ? 'bg-blue-100 text-blue-800'
                            : selectedBooking.status === 'completed' ? 'bg-emerald-100 text-emerald-800'
                            : 'bg-rose-100 text-rose-800'
                        }`}>
-                         {selectedBooking.status === 'paylater' ? 'Awaiting Payment' : (selectedBooking.status?.charAt(0).toUpperCase() + selectedBooking.status?.slice(1))}
+                         {selectedBooking.status?.charAt(0).toUpperCase() + selectedBooking.status?.slice(1)}
                        </span>
                      </div>
                    </div>
@@ -2082,11 +2078,10 @@ const AttendantDashboard: React.FC = () => {
                            ep.status === 'completed' ? 'bg-green-100 text-green-700' :
                            ep.status === 'confirmed' ? 'bg-blue-100 text-blue-700' :
                            ep.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
-                           ep.status === 'paylater' ? 'bg-amber-100 text-amber-700' :
                            ep.status === 'cancelled' ? 'bg-red-100 text-red-700' :
                            'bg-gray-100 text-gray-700'
                          }`}>
-                           {ep.status === 'paylater' ? 'Awaiting Payment' : ep.status}
+                           {ep.status}
                          </span>
                        </td>
                      </tr>

@@ -76,7 +76,7 @@ const EditBooking: React.FC = () => {
     date: '',
     time: '',
     participants: 0,
-    status: 'pending' as 'pending' | 'paylater' | 'confirmed' | 'checked-in' | 'completed' | 'cancelled',
+    status: 'pending' as 'pending' | 'confirmed' | 'checked-in' | 'completed' | 'cancelled',
     packageId: null as number | null,
     roomId: null as number | null,
     notes: '',
@@ -643,7 +643,6 @@ const EditBooking: React.FC = () => {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'confirmed': return 'bg-green-100 text-green-800';
-      case 'paylater': return 'bg-amber-100 text-amber-800';
       case 'pending': return 'bg-yellow-100 text-yellow-800';
       case 'checked-in': return `bg-${themeColor}-100 text-${fullColor}`;
       case 'completed': return 'bg-blue-100 text-blue-800';
@@ -694,7 +693,7 @@ const EditBooking: React.FC = () => {
               </p>
             </div>
             <span className={`ml-auto px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(formData.status)}`}>
-              {formData.status === 'paylater' ? 'Awaiting Payment' : formData.status.charAt(0).toUpperCase() + formData.status.slice(1).replace('-', ' ')}
+              {formData.status.charAt(0).toUpperCase() + formData.status.slice(1).replace('-', ' ')}
             </span>
           </div>
 
@@ -916,7 +915,6 @@ const EditBooking: React.FC = () => {
                       className={`w-full rounded-md border border-gray-200 px-4 py-2 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 bg-white text-neutral-900 text-base transition-all`}
                     >
                       <option value="pending">Pending</option>
-                      <option value="paylater">Awaiting Payment</option>
                       <option value="confirmed">Confirmed</option>
                       <option value="checked-in">Checked In</option>
                       <option value="completed">Completed</option>
@@ -1139,7 +1137,7 @@ const EditBooking: React.FC = () => {
             <div className="pb-4 border-b border-gray-100">
               <p className="text-sm text-gray-500 mb-1">Status</p>
               <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(formData.status)}`}>
-                {formData.status === 'paylater' ? 'Awaiting Payment' : formData.status.charAt(0).toUpperCase() + formData.status.slice(1).replace('-', ' ')}
+                {formData.status.charAt(0).toUpperCase() + formData.status.slice(1).replace('-', ' ')}
               </span>
             </div>
 

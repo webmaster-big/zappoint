@@ -918,14 +918,13 @@ const SpaceSchedule = () => {
                             <div className="flex items-center justify-between mb-2">
                               <span className={`px-2 py-0.5 text-[10px] font-bold uppercase rounded-full ${
                                 booking.status === 'confirmed' ? 'bg-green-500 text-white' :
-                                booking.status === 'paylater' ? 'bg-amber-500 text-white' :
                                 booking.status === 'pending' ? 'bg-yellow-500 text-white' :
                                 booking.status === 'checked-in' ? 'bg-blue-500 text-white' :
                                 booking.status === 'completed' ? 'bg-gray-500 text-white' :
                                 booking.status === 'cancelled' ? 'bg-red-500 text-white' :
                                 'bg-gray-400 text-white'
                               }`}>
-                                {booking.status === 'paylater' ? 'Awaiting Payment' : booking.status}
+                                {booking.status}
                               </span>
                               <span className={`text-[10px] font-medium ${packageColor.text} opacity-70`}>
                                 #{booking.reference_number?.slice(-6)}
@@ -1036,13 +1035,12 @@ const SpaceSchedule = () => {
                     <span className="text-sm text-gray-600">Status</span>
                     <span className={`px-3 py-1 text-xs font-medium rounded-full ${
                       selectedBooking.status === 'confirmed' ? 'bg-green-100 text-green-800' :
-                      selectedBooking.status === 'paylater' ? 'bg-amber-100 text-amber-800' :
                       selectedBooking.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
                       selectedBooking.status === 'cancelled' ? 'bg-red-100 text-red-800' :
                       selectedBooking.status === 'checked-in' ? `bg-${themeColor}-100 text-${fullColor}` :
                       'bg-gray-100 text-gray-800'
                     }`}>
-                      {selectedBooking.status === 'paylater' ? 'Awaiting Payment' : selectedBooking.status}
+                      {selectedBooking.status}
                     </span>
                   </div>
                 </div>

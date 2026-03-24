@@ -116,7 +116,7 @@ const ManualBooking: React.FC = () => {
     participants: number;
     paymentMethod: 'in-store' | 'card' | 'paylater';
     paymentStatus: 'paid' | 'partial' | 'pending';
-    status: 'pending' | 'paylater' | 'confirmed' | 'checked-in' | 'completed' | 'cancelled';
+    status: 'pending' | 'confirmed' | 'checked-in' | 'completed' | 'cancelled';
     notes: string;
     totalAmount: string;
     amountPaid: string;
@@ -926,7 +926,7 @@ const ManualBooking: React.FC = () => {
         amount_paid: finalAmountPaid,
         payment_method: (form.paymentMethod === 'in-store' ? 'in-store' : form.paymentMethod) as 'card' | 'in-store' | 'paylater',
         payment_status: derivedPaymentStatus,
-        status: form.status as 'pending' | 'paylater' | 'confirmed' | 'checked-in' | 'completed' | 'cancelled',
+        status: form.status as 'pending' | 'confirmed' | 'checked-in' | 'completed' | 'cancelled',
         notes: form.notes || undefined,
         location_id: locationId,
         created_by: user?.id,
@@ -1473,7 +1473,6 @@ const ManualBooking: React.FC = () => {
                               className={`w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
                             >
                               <option value="confirmed">Confirmed</option>
-                              <option value="paylater">Awaiting Payment</option>
                               <option value="pending">Pending</option>
                               <option value="checked-in">Checked In</option>
                               <option value="completed">Completed</option>
@@ -1554,7 +1553,6 @@ const ManualBooking: React.FC = () => {
                               className={`w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
                             >
                               <option value="confirmed">Confirmed</option>
-                              <option value="paylater">Awaiting Payment</option>
                               <option value="completed">Completed</option>
                               <option value="checked-in">Checked In</option>
                               <option value="cancelled">Cancelled</option>

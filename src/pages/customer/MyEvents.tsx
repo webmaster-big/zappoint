@@ -103,7 +103,6 @@ const MyEvents = () => {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'confirmed': return 'bg-emerald-50 text-emerald-700 border-emerald-200';
-      case 'paylater': return 'bg-amber-50 text-amber-700 border-amber-200';
       case 'pending': return 'bg-amber-50 text-amber-700 border-amber-200';
       case 'cancelled': return 'bg-red-50 text-red-700 border-red-200';
       case 'completed': return 'bg-blue-50 text-blue-700 border-blue-200';
@@ -115,7 +114,6 @@ const MyEvents = () => {
   const getStatusDot = (status: string) => {
     switch (status) {
       case 'confirmed': return 'bg-emerald-500';
-      case 'paylater': return 'bg-amber-500';
       case 'pending': return 'bg-amber-500';
       case 'cancelled': return 'bg-red-500';
       case 'completed': return 'bg-blue-500';
@@ -312,7 +310,7 @@ const MyEvents = () => {
                             </h3>
                             <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 text-xs font-medium rounded-full ${getStatusColor(purchase.status)}`}>
                               <span className={`w-1.5 h-1.5 rounded-full ${getStatusDot(purchase.status)}`} />
-                              {purchase.status === 'paylater' ? 'Awaiting Payment' : purchase.status.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                              {purchase.status.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase())}
                             </span>
                           </div>
 
@@ -495,7 +493,7 @@ const MyEvents = () => {
                     )}
                     <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 text-xs font-medium rounded-full mt-2 ${getStatusColor(selectedPurchase.status)}`}>
                       <span className={`w-1.5 h-1.5 rounded-full ${getStatusDot(selectedPurchase.status)}`} />
-                      {selectedPurchase.status === 'paylater' ? 'Awaiting Payment' : selectedPurchase.status.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                      {selectedPurchase.status.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase())}
                     </span>
                   </div>
                 </div>

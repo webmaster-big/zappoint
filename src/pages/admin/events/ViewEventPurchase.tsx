@@ -64,7 +64,6 @@ const ViewEventPurchase = () => {
   const statusConfig: Record<string, { color: string; icon: typeof CheckCircle; label: string }> = {
     confirmed: { color: 'bg-blue-100 text-blue-800', icon: CheckCircle, label: 'Confirmed' },
     'checked-in': { color: 'bg-green-100 text-green-800', icon: CheckCircle, label: 'Checked In' },
-    paylater: { color: 'bg-amber-100 text-amber-800', icon: Clock, label: 'Awaiting Payment' },
     pending: { color: 'bg-yellow-100 text-yellow-800', icon: Clock, label: 'Pending' },
     completed: { color: 'bg-emerald-100 text-emerald-800', icon: CheckCircle, label: 'Completed' },
     cancelled: { color: 'bg-red-100 text-red-800', icon: XCircle, label: 'Cancelled' },
