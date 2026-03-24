@@ -24,7 +24,7 @@ import LocationSelector from '../../../components/admin/LocationSelector';
 import Toast from '../../../components/ui/Toast';
 import EmptyStateModal from '../../../components/ui/EmptyStateModal';
 import { ASSET_URL, getStoredUser } from '../../../utils/storage';
-import { loadAcceptJS, processCardPayment, validateCardNumber, formatCardNumber, getCardType, createPayment, PAYMENT_TYPE } from '../../../services/PaymentService';
+import { loadAcceptJS, processCardPayment, validateCardNumber, isTestCardNumber, formatCardNumber, getCardType, createPayment, PAYMENT_TYPE } from '../../../services/PaymentService';
 import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
 import { generatePurchaseQRCode } from '../../../utils/qrcode';
 import StandardButton from '../../../components/ui/StandardButton';
@@ -579,6 +579,11 @@ const CreatePurchase = () => {
       }
       if (!validateCardNumber(cardNumber)) {
         setPaymentError('Invalid card number');
+        isSubmittingRef.current = false;
+        return;
+      }
+      if (isTestCardNumber(cardNumber)) {
+        setPaymentError('Test card numbers are not allowed. Please use a real card.');
         isSubmittingRef.current = false;
         return;
       }

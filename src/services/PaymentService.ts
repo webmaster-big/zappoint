@@ -995,6 +995,40 @@ export const exportPackageInvoices = async (
  * @param cardNumber - Card number to validate
  * @returns true if valid, false otherwise
  */
+// Known test card numbers that should be blocked in production
+const TEST_CARD_NUMBERS = new Set([
+  '4242424242424242', // Visa
+  '4000056655665556', // Visa (debit)
+  '5555555555554444', // Mastercard
+  '2223003122003222', // Mastercard (2-series)
+  '5200828282828210', // Mastercard (debit)
+  '5105105105105100', // Mastercard (prepaid)
+  '378282246310005',  // American Express
+  '371449635398431',  // American Express
+  '6011111111111117', // Discover
+  '6011000990139424', // Discover
+  '6011981111111113', // Discover (debit)
+  '3056930009020004', // Diners Club
+  '36227206271667',   // Diners Club (14-digit)
+  '6555900060004105', // BCcard / DinaCard
+  '3566002020360505', // JCB
+  '6200000000000005', // UnionPay
+  '6200000000000047', // UnionPay (debit)
+  '6205500000000000004', // UnionPay (19-digit)
+  '4111111111111111', // Authorize.Net test Visa
+  '4007000000027',    // Authorize.Net test Visa (13-digit)
+  '370000000000002',  // Authorize.Net test Amex
+  '6011000000000012', // Authorize.Net test Discover
+  '3088000000000017', // Authorize.Net test JCB
+  '38000000000006',   // Authorize.Net test Diners Club
+  '5424000000000015', // Authorize.Net test Mastercard
+]);
+
+export const isTestCardNumber = (cardNumber: string): boolean => {
+  const cleaned = cardNumber.replace(/\s+/g, '');
+  return TEST_CARD_NUMBERS.has(cleaned);
+};
+
 export const validateCardNumber = (cardNumber: string): boolean => {
   const cleaned = cardNumber.replace(/\s+/g, '');
   

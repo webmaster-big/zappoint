@@ -17,7 +17,7 @@ import { eventService } from '../../services/EventService';
 import { eventPurchaseService } from '../../services/EventPurchaseService';
 import { customerService, type Customer } from '../../services/CustomerService';
 import { getImageUrl, ASSET_URL } from '../../utils/storage';
-import { loadAcceptJS, processCardPayment, validateCardNumber, formatCardNumber, getCardType, PAYMENT_TYPE } from '../../services/PaymentService';
+import { loadAcceptJS, processCardPayment, validateCardNumber, isTestCardNumber, formatCardNumber, getCardType, PAYMENT_TYPE } from '../../services/PaymentService';
 import { getAuthorizeNetPublicKey } from '../../services/SettingsService';
 import { extractIdFromSlug } from '../../utils/slug';
 import Toast from '../../components/ui/Toast';
@@ -507,6 +507,11 @@ const PurchaseEvent = () => {
     }
     if (!validateCardNumber(cardNumber)) {
       setPaymentError('Invalid card number');
+      isSubmittingRef.current = false;
+      return;
+    }
+    if (isTestCardNumber(cardNumber)) {
+      setPaymentError('Test card numbers are not allowed. Please use a real card.');
       isSubmittingRef.current = false;
       return;
     }

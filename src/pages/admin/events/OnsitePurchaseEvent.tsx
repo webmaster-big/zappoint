@@ -26,7 +26,7 @@ import LocationSelector from '../../../components/admin/LocationSelector';
 import { locationService } from '../../../services/LocationService';
 import type { Event, EventAddOn } from '../../../types/event.types';
 import { ASSET_URL, getStoredUser, getImageUrl } from '../../../utils/storage';
-import { loadAcceptJS, processCardPayment, validateCardNumber, formatCardNumber, getCardType, createPayment, PAYMENT_TYPE } from '../../../services/PaymentService';
+import { loadAcceptJS, processCardPayment, validateCardNumber, isTestCardNumber, formatCardNumber, getCardType, createPayment, PAYMENT_TYPE } from '../../../services/PaymentService';
 import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
 import { feeSupportService } from '../../../services/FeeSupportService';
 import type { FeeBreakdown } from '../../../types/FeeSupport.types';
@@ -425,6 +425,11 @@ const OnsitePurchaseEvent = () => {
       }
       if (!validateCardNumber(cardNumber)) {
         setPaymentError('Invalid card number');
+        isSubmittingRef.current = false;
+        return;
+      }
+      if (isTestCardNumber(cardNumber)) {
+        setPaymentError('Test card numbers are not allowed. Please use a real card.');
         isSubmittingRef.current = false;
         return;
       }

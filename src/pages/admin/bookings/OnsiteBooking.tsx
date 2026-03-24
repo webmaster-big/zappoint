@@ -31,7 +31,7 @@ interface DayOffWithTime {
   room_ids?: number[] | null;     // If set, only blocks these rooms
 }
 import { formatDurationDisplay } from '../../../utils/timeFormat';
-import { loadAcceptJS, processCardPayment, validateCardNumber, formatCardNumber, getCardType, createPayment } from '../../../services/PaymentService';
+import { loadAcceptJS, processCardPayment, validateCardNumber, isTestCardNumber, formatCardNumber, getCardType, createPayment } from '../../../services/PaymentService';
 import { PAYMENT_TYPE } from '../../../types/Payment.types';
 import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
 import { globalNoteService, type GlobalNote } from '../../../services/GlobalNoteService';
@@ -1352,6 +1352,11 @@ const OnsiteBooking: React.FC = () => {
     if (bookingData.paymentMethod === 'authorize.net' || (bookingData.paymentMethod === 'card' && useAuthorizeNet)) {
       if (!validateCardNumber(cardNumber)) {
         setPaymentError('Please enter a valid card number');
+        isSubmittingRef.current = false;
+        return;
+      }
+      if (isTestCardNumber(cardNumber)) {
+        setPaymentError('Test card numbers are not allowed. Please use a real card.');
         isSubmittingRef.current = false;
         return;
       }

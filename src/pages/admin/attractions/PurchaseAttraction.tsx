@@ -22,7 +22,7 @@ import { customerService, type Customer } from '../../../services/CustomerServic
 import { generatePurchaseQRCode } from '../../../utils/qrcode';
 import Toast from '../../../components/ui/Toast';
 import { ASSET_URL } from '../../../utils/storage';
-import { loadAcceptJS, processCardPayment, validateCardNumber, formatCardNumber, getCardType, PAYMENT_TYPE } from '../../../services/PaymentService';
+import { loadAcceptJS, processCardPayment, validateCardNumber, isTestCardNumber, formatCardNumber, getCardType, PAYMENT_TYPE } from '../../../services/PaymentService';
 import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
 import { extractIdFromSlug } from '../../../utils/slug';
 import StandardButton from '../../../components/ui/StandardButton';
@@ -703,6 +703,11 @@ const PurchaseAttraction = () => {
     }
     if (!validateCardNumber(cardNumber)) {
       setPaymentError('Invalid card number');
+      isSubmittingRef.current = false;
+      return;
+    }
+    if (isTestCardNumber(cardNumber)) {
+      setPaymentError('Test card numbers are not allowed. Please use a real card.');
       isSubmittingRef.current = false;
       return;
     }

@@ -16,7 +16,7 @@ interface DayOffWithTime {
   package_ids?: number[] | null;  // If set, only applies to these packages
   room_ids?: number[] | null;     // If set, only blocks these rooms
 }
-import { loadAcceptJS, processCardPayment, validateCardNumber, formatCardNumber, getCardType, PAYMENT_TYPE } from '../../../services/PaymentService';
+import { loadAcceptJS, processCardPayment, validateCardNumber, isTestCardNumber, formatCardNumber, getCardType, PAYMENT_TYPE } from '../../../services/PaymentService';
 import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
 import customerService from '../../../services/CustomerService';
 import DatePicker from '../../../components/ui/DatePicker';
@@ -1084,6 +1084,11 @@ const BookPackage: React.FC = () => {
     
     if (!validateCardNumber(cardNumber)) {
       setPaymentError('Invalid card number');
+      isSubmittingRef.current = false;
+      return;
+    }
+    if (isTestCardNumber(cardNumber)) {
+      setPaymentError('Test card numbers are not allowed. Please use a real card.');
       isSubmittingRef.current = false;
       return;
     }
