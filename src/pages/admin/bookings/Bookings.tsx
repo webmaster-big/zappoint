@@ -153,7 +153,7 @@ const Bookings: React.FC = () => {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedBookingForPayment, setSelectedBookingForPayment] = useState<BookingsPageBooking | null>(null);
   const [paymentAmount, setPaymentAmount] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<'card' | 'in-store'>('in-store');
+  const [paymentMethod, setPaymentMethod] = useState<'card' | 'in-store' | 'cash'>('in-store');
   const [paymentNotes, setPaymentNotes] = useState('');
   const [processingPayment, setProcessingPayment] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
@@ -415,14 +415,18 @@ const Bookings: React.FC = () => {
     pending: 'bg-yellow-100 text-yellow-800',
     confirmed: `bg-${themeColor}-100 text-${fullColor}`,
     cancelled: 'bg-red-100 text-red-800',
-    'checked-in': 'bg-green-100 text-green-800'
+    'checked-in': 'bg-green-100 text-green-800',
+    completed: 'bg-blue-100 text-blue-800'
   };
 
   const paymentColors = {
-    credit_card: `bg-${themeColor}-100 text-${fullColor}`,
-    paypal: `bg-${themeColor}-100 text-${fullColor}`,
+    card: `bg-${themeColor}-100 text-${fullColor}`,
+    'authorize.net': `bg-${themeColor}-100 text-${fullColor}`,
+    stripe: 'bg-purple-100 text-purple-800',
+    paypal: 'bg-blue-100 text-blue-800',
+    'in-store': 'bg-green-100 text-green-800',
     cash: 'bg-green-100 text-green-800',
-    'e-wallet': 'bg-orange-100 text-orange-800'
+    paylater: 'bg-orange-100 text-orange-800'
   };
 
   const paymentStatusColors = {
@@ -2014,6 +2018,7 @@ const Bookings: React.FC = () => {
                 <option value="pending">Pending</option>
                 <option value="confirmed">Confirmed</option>
                 <option value="checked-in">Checked In</option>
+                <option value="completed">Completed</option>
                 <option value="cancelled">Cancelled</option>
               </select>
               {isStatusSaving && (
@@ -3041,6 +3046,7 @@ const Bookings: React.FC = () => {
                     <option value="pending">Pending</option>
                     <option value="confirmed">Confirmed</option>
                     <option value="checked-in">Checked In</option>
+                    <option value="completed">Completed</option>
                     <option value="cancelled">Cancelled</option>
                   </select>
                 </div>
@@ -3052,8 +3058,13 @@ const Bookings: React.FC = () => {
                     className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                   >
                     <option value="all">All Methods</option>
-                    <option value="credit_card">Card</option>
+                    <option value="card">Card</option>
+                    <option value="authorize.net">Authorize.net</option>
+                    <option value="stripe">Stripe</option>
+                    <option value="paypal">PayPal</option>
+                    <option value="in-store">In-Store</option>
                     <option value="cash">Cash</option>
+                    <option value="paylater">Pay Later</option>
                   </select>
                 </div>
                 <div>
@@ -3141,6 +3152,7 @@ const Bookings: React.FC = () => {
                 <option value="">Change Status</option>
                 <option value="confirmed">Confirm</option>
                 <option value="checked-in">Check In</option>
+                <option value="completed">Complete</option>
                 <option value="cancelled">Cancel</option>
               </select>
               <StandardButton
@@ -3672,7 +3684,7 @@ const Bookings: React.FC = () => {
                 <div>
                   <h3 className="text-sm font-semibold text-gray-900 mb-3">Status</h3>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    {['pending', 'confirmed', 'checked-in', 'cancelled'].map(status => (
+                    {['pending', 'confirmed', 'checked-in', 'completed', 'cancelled'].map(status => (
                       <label key={status} className="flex items-center">
                         <input
                           type="checkbox"

@@ -129,7 +129,7 @@ const ManagePurchases = () => {
       createdAt: purchase.created_at,
       paymentMethod: purchase.payment_method === 'e-wallet' ? 'paypal' : 
                     purchase.payment_method === 'credit' ? 'credit_card' : 
-                    purchase.payment_method as 'credit_card' | 'paypal',
+                    purchase.payment_method as string,
       duration: purchase.attraction?.duration ? formatDurationDisplay(purchase.attraction.duration, purchase.attraction.duration_unit) : '',
       activity: purchase.attraction?.category || '',
       locationId: purchase.location_id,
@@ -530,7 +530,7 @@ const ManagePurchases = () => {
       amountPaid: Number(purchase.amount_paid || 0),
       createdAt: purchase.created_at,
       deletedAt: purchase.deleted_at,
-      paymentMethod: purchase.payment_method as 'credit_card' | 'paypal',
+      paymentMethod: purchase.payment_method as string,
       duration: purchase.attraction?.duration ? formatDurationDisplay(purchase.attraction.duration, purchase.attraction.duration_unit) : '',
       activity: purchase.attraction?.category || '',
       locationId: purchase.location_id,
@@ -805,6 +805,9 @@ const ManagePurchases = () => {
                   <option value="all">All Methods</option>
                   <option value="credit_card">Credit Card</option>
                   <option value="paypal">PayPal</option>
+                  <option value="card">Card</option>
+                  <option value="in-store">In-Store</option>
+                  <option value="cash">Cash</option>
                 </select>
               </div>
               <div>

@@ -566,10 +566,16 @@ const AttendantDashboard: React.FC = () => {
        refunded: 'bg-rose-100 text-rose-800',
        'Credit Card': 'bg-blue-100 text-blue-800',
        credit_card: 'bg-blue-100 text-blue-800',
+       card: 'bg-blue-100 text-blue-800',
+       'authorize.net': 'bg-blue-100 text-blue-800',
+       stripe: 'bg-purple-100 text-purple-800',
        PayPal: 'bg-blue-100 text-blue-800',
        paypal: 'bg-blue-100 text-blue-800',
+       'In-Store': 'bg-green-100 text-green-800',
+       'in-store': 'bg-green-100 text-green-800',
        Cash: 'bg-gray-100 text-gray-800',
        cash: 'bg-gray-100 text-gray-800',
+       paylater: 'bg-orange-100 text-orange-800',
      };
      return colors[payment] || 'bg-gray-100 text-gray-800';
    };

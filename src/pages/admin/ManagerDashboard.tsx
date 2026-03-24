@@ -731,6 +731,8 @@ const LocationManagerDashboard: React.FC = () => {
       cancelled: 'bg-rose-100 text-rose-800',
       Completed: 'bg-emerald-100 text-emerald-800',
       completed: 'bg-emerald-100 text-emerald-800',
+      'Checked-in': 'bg-green-100 text-green-800',
+      'checked-in': 'bg-green-100 text-green-800',
     };
     return colors[status] || 'bg-gray-100 text-gray-800';
   };
@@ -1623,6 +1625,8 @@ const LocationManagerDashboard: React.FC = () => {
               <option value="all">All Statuses</option>
               <option value="confirmed">Confirmed</option>
               <option value="pending">Pending</option>
+              <option value="checked-in">Checked In</option>
+              <option value="completed">Completed</option>
               <option value="cancelled">Cancelled</option>
             </select>
           </div>

@@ -58,7 +58,7 @@ const CheckIn: React.FC = () => {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedBookingForPayment, setSelectedBookingForPayment] = useState<Booking | null>(null);
   const [paymentAmount, setPaymentAmount] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<'card' | 'in-store'>('in-store');
+  const [paymentMethod, setPaymentMethod] = useState<'card' | 'in-store' | 'cash'>('in-store');
   const [paymentNotes, setPaymentNotes] = useState('');
   const [processingPayment, setProcessingPayment] = useState(false);
   const scannerRef = useRef<Html5Qrcode | null>(null);
@@ -1933,11 +1933,12 @@ const CheckIn: React.FC = () => {
                   </label>
                   <select
                     value={paymentMethod}
-                    onChange={(e) => setPaymentMethod(e.target.value as 'card' | 'in-store')}
+                    onChange={(e) => setPaymentMethod(e.target.value as 'card' | 'in-store' | 'cash')}
                     className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}
                   >
                     <option value="in-store">In-Store</option>
                     <option value="card">Card</option>
+                    <option value="cash">Cash</option>
                   </select>
                 </div>
 

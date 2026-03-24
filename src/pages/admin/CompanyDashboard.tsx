@@ -888,6 +888,7 @@ const CompanyDashboard: React.FC = () => {
     Pending: 'bg-amber-100 text-amber-800',
     Cancelled: 'bg-rose-100 text-rose-800',
     Completed: 'bg-blue-100 text-blue-800',
+    'Checked-in': 'bg-green-100 text-green-800',
   };
 
   // Payment status colors
@@ -1992,8 +1993,9 @@ const CompanyDashboard: React.FC = () => {
               <option value="all">All Statuses</option>
               <option value="confirmed">Confirmed</option>
               <option value="pending">Pending</option>
-              <option value="cancelled">Cancelled</option>
+              <option value="checked-in">Checked In</option>
               <option value="completed">Completed</option>
+              <option value="cancelled">Cancelled</option>
             </select>
             <div className="min-w-[200px]">
               <LocationSelector

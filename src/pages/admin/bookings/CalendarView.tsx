@@ -92,7 +92,7 @@ const CalendarView: React.FC = () => {
   // Payment modal states
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<'card' | 'in-store'>('in-store');
+  const [paymentMethod, setPaymentMethod] = useState<'card' | 'in-store' | 'cash'>('in-store');
   const [paymentNotes, setPaymentNotes] = useState('');
   const [processingPayment, setProcessingPayment] = useState(false);
 
@@ -1883,10 +1883,11 @@ const CalendarView: React.FC = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Payment Method *</label>
-                  <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as 'card' | 'in-store')}
+                  <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as 'card' | 'in-store' | 'cash')}
                     className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}>
                     <option value="in-store">In-Store</option>
                     <option value="card">Card</option>
+                    <option value="cash">Cash</option>
                   </select>
                 </div>
                 <div>
