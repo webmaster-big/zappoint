@@ -114,7 +114,7 @@ const ManualBooking: React.FC = () => {
     bookingDate: string;
     bookingTime: string;
     participants: number;
-    paymentMethod: 'in-store' | 'card' | 'paylater';
+    paymentMethod: 'in-store' | 'paylater';
     paymentStatus: 'paid' | 'partial' | 'pending';
     status: 'pending' | 'confirmed' | 'checked-in' | 'completed' | 'cancelled';
     notes: string;
@@ -924,7 +924,7 @@ const ManualBooking: React.FC = () => {
         duration_unit: finalDurationUnit,
         total_amount: finalTotalAmount,
         amount_paid: finalAmountPaid,
-        payment_method: (form.paymentMethod === 'in-store' ? 'in-store' : form.paymentMethod) as 'card' | 'in-store' | 'paylater',
+        payment_method: form.paymentMethod as 'in-store' | 'paylater',
         payment_status: derivedPaymentStatus,
         status: form.status as 'pending' | 'confirmed' | 'checked-in' | 'completed' | 'cancelled',
         notes: form.notes || undefined,
@@ -1974,7 +1974,6 @@ const ManualBooking: React.FC = () => {
                           className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
                         >
                           <option value="in-store">In-Store</option>
-                          <option value="card">Card</option>
                           <option value="paylater">Pay Later</option>
                         </select>
                       </div>

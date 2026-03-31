@@ -161,12 +161,20 @@ const EventPurchases = () => {
       setLoading(true);
       const apiFilters: Record<string, unknown> = {
         per_page: 100,
+        user_id: currentUser?.id,
         ...(selectedLocation && { location_id: Number(selectedLocation) }),
       };
-      const response = await eventPurchaseService.getPurchases(apiFilters as never);
+      const result = await eventPurchaseService.getPurchases(apiFilters as never);
+      // Backend returns plain array via response()->json($purchases)
+      // Service returns axios response.data which IS the array directly
+      // Handle both plain array and wrapped { data: [...] } responses
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const raw = (response.data as any);
-      const rawPurchases: EventPurchase[] = Array.isArray(raw) ? raw : (raw?.purchases || raw?.data || []);
+      const raw = result as any;
+      const rawPurchases: EventPurchase[] = Array.isArray(raw)
+        ? raw
+        : Array.isArray(raw?.data)
+          ? raw.data
+          : (raw?.data?.purchases || raw?.data?.event_purchases || []);
       setPurchases(convertPurchases(rawPurchases));
     } catch (error) {
       console.error('Error loading event purchases:', error);
@@ -349,7 +357,7 @@ const EventPurchases = () => {
   const loadTrashedPurchases = async (page: number = 1) => {
     try {
       setTrashedLoading(true);
-      const response = await eventPurchaseService.getTrashedPurchases({
+      const result = await eventPurchaseService.getTrashedPurchases({
         page,
         per_page: itemsPerPage,
         search: filters.search,
@@ -357,10 +365,11 @@ const EventPurchases = () => {
       });
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const raw = response.data as any;
-      const rawPurchases = Array.isArray(raw) ? raw : (raw?.purchases || raw?.data || []);
+      const raw = result as any;
+      const innerData = Array.isArray(raw) ? raw : (raw?.data ?? raw);
+      const rawPurchases = Array.isArray(innerData) ? innerData : (innerData?.purchases || innerData?.data || []);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const pagination = (raw as any)?.pagination || response.meta;
+      const pagination = (innerData as any)?.pagination || (raw as any)?.meta || (result as any)?.meta;
 
       setTrashedPurchases(convertTrashedPurchases(rawPurchases));
       if (pagination) {
@@ -608,7 +617,6 @@ const EventPurchases = () => {
                   className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
                 >
                   <option value="all">All Methods</option>
-                  <option value="card">Card</option>
                   <option value="in-store">In-Store</option>
                   <option value="paylater">Pay Later</option>
                   <option value="authorize.net">Authorize.net</option>
@@ -682,6 +690,8 @@ const EventPurchases = () => {
                 <th scope="col" className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Qty</th>
                 <th scope="col" className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Total</th>
                 <th scope="col" className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Paid</th>
+                <th scope="col" className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Method</th>
+                <th scope="col" className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Payment</th>
                 <th scope="col" className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Scheduled</th>
                 <th scope="col" className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Created</th>
                 <th scope="col" className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
@@ -691,7 +701,7 @@ const EventPurchases = () => {
             <tbody className="divide-y divide-gray-100">
               {currentPurchases.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="px-4 py-8 text-center text-sm text-gray-600">
+                    <td colSpan={13} className="px-4 py-8 text-center text-sm text-gray-600">
                     No event purchases found
                   </td>
                 </tr>
@@ -727,6 +737,22 @@ const EventPurchases = () => {
                     <td className="px-4 py-4 whitespace-nowrap text-sm">
                       <span className={purchase.amountPaid >= purchase.totalAmount ? 'text-green-600 font-semibold' : 'text-orange-600'}>
                         ${purchase.amountPaid.toFixed(2)}
+                      </span>
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700 capitalize">
+                      {purchase.paymentMethod?.replace('_', ' ').replace('.', ' ') || 'N/A'}
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap">
+                      <span className={`text-xs font-medium px-2 py-1 rounded-full ${
+                        purchase.paymentStatus === 'paid' ? 'bg-green-100 text-green-800' :
+                        purchase.paymentStatus === 'partial' ? 'bg-orange-100 text-orange-800' :
+                        purchase.paymentStatus === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                        'bg-gray-100 text-gray-800'
+                      }`}>
+                        {purchase.paymentStatus === 'paid' ? 'Paid' :
+                         purchase.paymentStatus === 'partial' ? 'Partial' :
+                         purchase.paymentStatus === 'pending' ? 'Pending' :
+                         purchase.paymentStatus || 'N/A'}
                       </span>
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">

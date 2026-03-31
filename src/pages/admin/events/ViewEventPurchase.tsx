@@ -83,8 +83,10 @@ const ViewEventPurchase = () => {
   const loadPurchaseDetails = async () => {
     try {
       setLoading(true);
-      const response = await eventPurchaseService.getPurchase(Number(id));
-      setPurchase(response.data);
+      const result = await eventPurchaseService.getPurchase(Number(id));
+      const raw = result as any;
+      const purchaseData: EventPurchase | null = raw?.data ? raw.data : (raw?.id ? raw : null);
+      setPurchase(purchaseData);
     } catch (error) {
       console.error('Error loading purchase details:', error);
       setToast({ message: 'Failed to load purchase details', type: 'error' });

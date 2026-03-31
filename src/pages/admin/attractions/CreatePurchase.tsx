@@ -870,61 +870,95 @@ const CreatePurchase = () => {
             {/* 1. Select Attraction */}
             <div className="bg-white rounded-lg shadow-sm p-6">
               <h2 className="text-lg font-semibold text-gray-800 mb-4">Select Attraction</h2>
-              
-              {/* Search */}
-              <div className="relative mb-4">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Search className="h-5 w-5 text-gray-400" />
-                </div>
-                <input
-                  type="text"
-                  placeholder="Search attractions..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className={`pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
-                />
-              </div>
 
-              {/* Attractions Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto">
-                {filteredAttractions.filter(a => a.status === 'active').map(attraction => (
-                  <div
-                    key={attraction.id}
-                    className={`border rounded-lg p-4 cursor-pointer transition-colors flex gap-4 ${
-                      selectedAttraction?.id === attraction.id
-                        ? `border-${themeColor}-500 bg-${themeColor}-50`
-                        : `border-gray-200 hover:border-${themeColor}-300`
-                    }`}
-                    onClick={() => handleAddToCart(attraction)}
-                  >
-                    {/* Attraction Image */}
-                    <div className="w-20 h-20 flex-shrink-0 flex items-center justify-center bg-gray-100 rounded-md border border-gray-200 overflow-hidden">
-                      {attraction.images && attraction.images.length > 0 ? (
-                        <img src={ASSET_URL + attraction.images[0]} alt={attraction.name} className="object-cover w-full h-full" />
-                      ) : (
-                        <span className="text-gray-400 text-xs">No Image</span>
-                      )}
-                    </div>
-                    <div className="flex-1 flex flex-col justify-between">
-                      <h3 className="font-semibold text-gray-800">{attraction.name}</h3>
-                      <p className="text-sm text-gray-600 mb-2">{attraction.category}</p>
-                      <div className="flex justify-between items-center">
-                        <span className={`text-lg font-bold text-${themeColor}-600`}>
-                          ${attraction.price}
-                          <span className="text-xs font-normal text-gray-500 ml-1">
-                            {attraction.pricingType === 'per_person' ? '/person' : 
-                             attraction.pricingType === 'per_group' ? '/group' : 
-                             attraction.pricingType === 'per_hour' ? '/hour' : ''}
+              {selectedAttraction ? (
+                <div className={`border rounded-lg p-4 border-${themeColor}-500 bg-${themeColor}-50`}>
+                  <div className="flex items-start justify-between">
+                    <div className="flex gap-4 flex-1">
+                      <div className="w-20 h-20 flex-shrink-0 flex items-center justify-center bg-gray-100 rounded-md border border-gray-200 overflow-hidden">
+                        {selectedAttraction.images && selectedAttraction.images.length > 0 ? (
+                          <img src={ASSET_URL + selectedAttraction.images[0]} alt={selectedAttraction.name} className="object-cover w-full h-full" />
+                        ) : (
+                          <span className="text-gray-400 text-xs">No Image</span>
+                        )}
+                      </div>
+                      <div className="flex-1 flex flex-col justify-between">
+                        <h3 className="font-semibold text-gray-800">{selectedAttraction.name}</h3>
+                        <p className="text-sm text-gray-600 mb-2">{selectedAttraction.category}</p>
+                        <div className="flex justify-between items-center">
+                          <span className={`text-lg font-bold text-${themeColor}-600`}>
+                            ${selectedAttraction.price}
+                            <span className="text-xs font-normal text-gray-500 ml-1">
+                              {selectedAttraction.pricingType === 'per_person' ? '/person' : 
+                               selectedAttraction.pricingType === 'per_group' ? '/group' : 
+                               selectedAttraction.pricingType === 'per_hour' ? '/hour' : ''}
+                            </span>
                           </span>
-                        </span>
-                        <span className="text-xs text-gray-500">
-                          {attraction.duration === '0' || !attraction.duration ? 'Unlimited' : formatDurationDisplay(parseFloat(attraction.duration), attraction.durationUnit)}
-                        </span>
+                          <span className="text-xs text-gray-500">
+                            {selectedAttraction.duration === '0' || !selectedAttraction.duration ? 'Unlimited' : formatDurationDisplay(parseFloat(selectedAttraction.duration), selectedAttraction.durationUnit)}
+                          </span>
+                        </div>
                       </div>
                     </div>
+                    <button onClick={() => setSelectedAttraction(null)} className="text-gray-400 hover:text-gray-600 p-0.5">
+                      <X className="h-4 w-4" />
+                    </button>
                   </div>
-                ))}
-              </div>
+                </div>
+              ) : (
+                <>
+                  {/* Search */}
+                  <div className="relative mb-4">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Search className="h-5 w-5 text-gray-400" />
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Search attractions..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className={`pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
+                    />
+                  </div>
+
+                  {/* Attractions Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto">
+                    {filteredAttractions.filter(a => a.status === 'active').map(attraction => (
+                      <div
+                        key={attraction.id}
+                        className={`border rounded-lg p-4 cursor-pointer transition-colors flex gap-4 border-gray-200 hover:border-${themeColor}-300`}
+                        onClick={() => handleAddToCart(attraction)}
+                      >
+                        {/* Attraction Image */}
+                        <div className="w-20 h-20 flex-shrink-0 flex items-center justify-center bg-gray-100 rounded-md border border-gray-200 overflow-hidden">
+                          {attraction.images && attraction.images.length > 0 ? (
+                            <img src={ASSET_URL + attraction.images[0]} alt={attraction.name} className="object-cover w-full h-full" />
+                          ) : (
+                            <span className="text-gray-400 text-xs">No Image</span>
+                          )}
+                        </div>
+                        <div className="flex-1 flex flex-col justify-between">
+                          <h3 className="font-semibold text-gray-800">{attraction.name}</h3>
+                          <p className="text-sm text-gray-600 mb-2">{attraction.category}</p>
+                          <div className="flex justify-between items-center">
+                            <span className={`text-lg font-bold text-${themeColor}-600`}>
+                              ${attraction.price}
+                              <span className="text-xs font-normal text-gray-500 ml-1">
+                                {attraction.pricingType === 'per_person' ? '/person' : 
+                                 attraction.pricingType === 'per_group' ? '/group' : 
+                                 attraction.pricingType === 'per_hour' ? '/hour' : ''}
+                              </span>
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              {attraction.duration === '0' || !attraction.duration ? 'Unlimited' : formatDurationDisplay(parseFloat(attraction.duration), attraction.durationUnit)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
 
             {/* 2. Customer Information */}

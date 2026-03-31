@@ -1321,32 +1321,41 @@ const Payments: React.FC = () => {
                               {openActionsMenu === payment.id && (
                                 <>
                                   <div className="fixed inset-0 z-40" onClick={() => setOpenActionsMenu(null)} />
-                                  <div className={`absolute right-0 w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-50 py-1 ${paymentIndex >= currentPayments.length - 3 ? 'bottom-full mb-1' : 'top-full mt-1'}`}>
+                                  <div className={`absolute right-0 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-50 py-1 ${paymentIndex >= currentPayments.length - 3 ? 'bottom-full mb-1' : 'top-full mt-1'}`}>
                                     {canRefund(payment) && (
                                       <button
                                         onClick={() => handleRefundClick(payment)}
-                                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-orange-600 hover:bg-orange-50 transition-colors"
+                                        className="w-full flex items-start gap-2 px-3 py-2 text-sm hover:bg-orange-50 transition-colors"
                                       >
-                                        <RotateCcw className="w-4 h-4" />
-                                        Refund (Authorize.Net)
+                                        <RotateCcw className="w-4 h-4 mt-0.5 text-orange-600 shrink-0" />
+                                        <span className="text-left">
+                                          <span className="block font-medium text-orange-600">Refund (Authorize.Net)</span>
+                                          <span className="block text-xs text-gray-500 mt-0.5">Returns money to the original card via the payment gateway. Use for settled transactions.</span>
+                                        </span>
                                       </button>
                                     )}
                                     {canVoid(payment) && (
                                       <button
                                         onClick={() => handleVoidClick(payment)}
-                                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                                        className="w-full flex items-start gap-2 px-3 py-2 text-sm hover:bg-red-50 transition-colors"
                                       >
-                                        <Ban className="w-4 h-4" />
-                                        Void Transaction
+                                        <Ban className="w-4 h-4 mt-0.5 text-red-600 shrink-0" />
+                                        <span className="text-left">
+                                          <span className="block font-medium text-red-600">Void Transaction</span>
+                                          <span className="block text-xs text-gray-500 mt-0.5">Cancels the transaction before it settles. No money moves — the charge is simply removed.</span>
+                                        </span>
                                       </button>
                                     )}
                                     {canManualRefund(payment) && (
                                       <button
                                         onClick={() => handleManualRefundClick(payment)}
-                                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-orange-600 hover:bg-orange-50 transition-colors"
+                                        className="w-full flex items-start gap-2 px-3 py-2 text-sm hover:bg-orange-50 transition-colors"
                                       >
-                                        <RotateCcw className="w-4 h-4" />
-                                        Manual Refund ({payment.method === 'in-store' ? 'In-Store' : payment.method === 'cash' ? 'Cash' : 'Card'})
+                                        <RotateCcw className="w-4 h-4 mt-0.5 text-orange-600 shrink-0" />
+                                        <span className="text-left">
+                                          <span className="block font-medium text-orange-600">Manual Refund ({payment.method === 'in-store' ? 'In-Store' : payment.method === 'cash' ? 'Cash' : 'Card'})</span>
+                                          <span className="block text-xs text-gray-500 mt-0.5">Records a cash/in-store refund. No gateway involved — marks the refund in the system only.</span>
+                                        </span>
                                       </button>
                                     )}
                                     {payment.payable_id && (

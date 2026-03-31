@@ -135,7 +135,6 @@ const OnsiteBooking: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   
   // Card payment details
-  const [useAuthorizeNet, setUseAuthorizeNet] = useState(true);
   const [cardNumber, setCardNumber] = useState('');
   const [cardMonth, setCardMonth] = useState('');
   const [cardYear, setCardYear] = useState('');
@@ -1308,7 +1307,6 @@ const OnsiteBooking: React.FC = () => {
     setCardMonth('');
     setCardYear('');
     setCardCVV('');
-    setUseAuthorizeNet(true);
     setPaymentError('');
     setSelectedRoomId(null);
     setStep(1);
@@ -1349,7 +1347,7 @@ const OnsiteBooking: React.FC = () => {
     }
     
     // Validate card details if using Authorize.Net
-    if (bookingData.paymentMethod === 'authorize.net' || (bookingData.paymentMethod === 'card' && useAuthorizeNet)) {
+    if (bookingData.paymentMethod === 'authorize.net') {
       if (!validateCardNumber(cardNumber)) {
         setPaymentError('Please enter a valid card number');
         isSubmittingRef.current = false;
@@ -1563,7 +1561,7 @@ const OnsiteBooking: React.FC = () => {
       console.log('================================\n');
       
       // Determine if using card payment via Authorize.Net
-      const isCardPayment = bookingData.paymentMethod === 'authorize.net' || (bookingData.paymentMethod === 'card' && useAuthorizeNet);
+      const isCardPayment = bookingData.paymentMethod === 'authorize.net';
       
       let bookingId: number;
       let referenceNumber: string;
@@ -1720,7 +1718,7 @@ const OnsiteBooking: React.FC = () => {
               customer_id: customerId || null,
               amount: amountPaid,
               currency: 'USD',
-              method: (bookingData.paymentMethod === 'in-store' ? 'cash' : bookingData.paymentMethod) as 'card' | 'cash',
+              method: bookingData.paymentMethod as 'card' | 'in-store',
               status: 'completed' as const,
               location_id: bookingData_request.location_id,
               notes: bookingData.paymentMethod === 'in-store' 
@@ -3061,7 +3059,7 @@ const OnsiteBooking: React.FC = () => {
           {/* Payment Method */}
           <div className="mb-4">
             <h3 className="text-sm font-medium text-gray-700 mb-3">Payment Method</h3>
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               <StandardButton
                 type="button"
                 variant={bookingData.paymentMethod === 'authorize.net' ? 'primary' : 'secondary'}
@@ -3078,15 +3076,6 @@ const OnsiteBooking: React.FC = () => {
               >
                 <DollarSign className="h-5 w-5 mx-auto mb-1" />
                 <span className="text-sm font-medium">In-Store</span>
-              </StandardButton>
-              
-              <StandardButton
-                type="button"
-                variant={bookingData.paymentMethod === 'card' ? 'primary' : 'secondary'}
-                onClick={() => setBookingData(prev => ({ ...prev, paymentMethod: 'card' }))}
-              >
-                <CreditCard className="h-5 w-5 mx-auto mb-1" />
-                <span className="text-sm font-medium">Card</span>
               </StandardButton>
               
               <StandardButton
@@ -3155,8 +3144,8 @@ const OnsiteBooking: React.FC = () => {
         </div>
       )}
       
-      {/* Card Payment Options - Show when card or authorize.net is selected */}
-      {(bookingData.paymentMethod === 'card' || bookingData.paymentMethod === 'authorize.net') && (
+      {/* Card Payment Options - Show when authorize.net is selected */}
+      {bookingData.paymentMethod === 'authorize.net' && (
         <div className="mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
           <h3 className="text-sm font-medium text-gray-700 mb-3">Card Details</h3>
               
