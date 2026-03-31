@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Download,
   RefreshCcw,
@@ -14,10 +14,12 @@ import {
   BadgePercent,
   Landmark,
   CircleDollarSign,
+  CreditCard,
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import StandardButton from '../../../components/ui/StandardButton';
 import LocationSelector from '../../../components/admin/LocationSelector';
+import DateRangeCalendar from '../../../components/ui/DateRangeCalendar';
 import Toast from '../../../components/ui/Toast';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
 import { accountingAnalyticsService } from '../../../services/AccountingAnalyticsService';
@@ -69,6 +71,7 @@ const AccountingAnalytics: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [reportData, setReportData] = useState<AccountingReportResponse['data'] | null>(null);
   const [showCompare, setShowCompare] = useState(false);
+  const [showExtraMetrics, setShowExtraMetrics] = useState(false);
   
   // Date range selection
   const [startDate, setStartDate] = useState<string>(() => {
@@ -121,8 +124,8 @@ const AccountingAnalytics: React.FC = () => {
     fetchLocations();
   }, [isLocationManager, user?.location_id]);
 
-  // Fetch report
-  const fetchReport = useCallback(async (showRefreshing = false) => {
+  // Fetch report — plain function so it always reads latest state values
+  const fetchReport = async (showRefreshing = false) => {
     if (!selectedLocation || !startDate) return;
 
     if (showRefreshing) {
@@ -157,13 +160,38 @@ const AccountingAnalytics: React.FC = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [selectedLocation, startDate, endDate, compareStartDate, compareEndDate, viewMode]);
+  };
 
+  // Only auto-fetch on initial load / location change
   useEffect(() => {
     if (selectedLocation) {
       fetchReport();
     }
-  }, [fetchReport, selectedLocation]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedLocation]);
+
+  // Auto-fetch when filters change (debounced to avoid rapid calls)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const initialLoadDone = useRef(false);
+
+  useEffect(() => {
+    // Skip the very first render (handled by selectedLocation effect above)
+    if (!initialLoadDone.current) {
+      initialLoadDone.current = true;
+      return;
+    }
+    if (!selectedLocation || !startDate) return;
+
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      fetchReport(true);
+    }, 400);
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startDate, endDate, viewMode, compareStartDate, compareEndDate]);
 
   // Toggle category
   const toggleCategory = (name: string) => {
@@ -226,20 +254,17 @@ const AccountingAnalytics: React.FC = () => {
 
       {/* Action Buttons Row */}
       <div className="mb-6 flex flex-wrap items-center gap-2">
-        <input
-          type="date"
-          value={startDate}
-          onChange={(e) => setStartDate(e.target.value)}
-          className={`px-2 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
-        />
-        <span className="text-gray-400 text-sm">to</span>
-        <input
-          type="date"
-          value={endDate}
-          onChange={(e) => setEndDate(e.target.value)}
-          min={startDate}
-          className={`px-2 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
-        />
+        <div className="w-56">
+          <DateRangeCalendar
+            startDate={startDate}
+            endDate={endDate}
+            onChange={(start, end) => {
+              setStartDate(start);
+              setEndDate(end);
+            }}
+            themeColor={themeColor}
+          />
+        </div>
         <select
           value={viewMode}
           onChange={(e) => setViewMode(e.target.value as 'booked_for' | 'booked_on')}
@@ -267,28 +292,17 @@ const AccountingAnalytics: React.FC = () => {
       {showCompare && (
         <div className="mb-6 flex flex-wrap items-center gap-2 bg-gray-50 rounded-lg px-4 py-3 border border-gray-200">
           <span className="text-sm font-medium text-gray-700">Compare with:</span>
-          <input
-            type="date"
-            value={compareStartDate}
-            onChange={(e) => setCompareStartDate(e.target.value)}
-            className={`px-2 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
-          />
-          <span className="text-gray-400 text-sm">to</span>
-          <input
-            type="date"
-            value={compareEndDate}
-            onChange={(e) => setCompareEndDate(e.target.value)}
-            min={compareStartDate}
-            className={`px-2 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
-          />
-          {(compareStartDate || compareEndDate) && (
-            <button
-              onClick={() => { setCompareStartDate(''); setCompareEndDate(''); }}
-              className="text-sm text-red-500 hover:text-red-700"
-            >
-              Clear
-            </button>
-          )}
+          <div className="w-56">
+            <DateRangeCalendar
+              startDate={compareStartDate}
+              endDate={compareEndDate}
+              onChange={(start, end) => {
+                setCompareStartDate(start);
+                setCompareEndDate(end);
+              }}
+              themeColor={themeColor}
+            />
+          </div>
         </div>
       )}
 
@@ -318,8 +332,12 @@ const AccountingAnalytics: React.FC = () => {
           { label: 'Total Billed', value: summary.total_billed, compareValue: comparison?.total_billed, icon: CircleDollarSign, isCurrency: true, tooltip: 'Total amount invoiced (after discounts, with fees)', change: comparison ? calculateChange(summary.total_billed, comparison.total_billed) : null },
           { label: 'Collected', value: summary.grand_total, compareValue: comparison?.grand_total, icon: DollarSign, isCurrency: true, tooltip: 'Amount actually collected so far', change: comparison ? calculateChange(summary.grand_total, comparison.grand_total) : null },
         ];
+        const extraMetrics = [
+          { label: 'Card Payments', value: summary.collected_via_gateway, compareValue: comparison?.collected_via_gateway, icon: CreditCard, isCurrency: true, tooltip: 'Total collected via credit/debit card (Authorize.Net)', change: comparison ? calculateChange(summary.collected_via_gateway, comparison.collected_via_gateway) : null },
+        ];
         return (
-          <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-2 sm:gap-3 mb-6">
+          <div className="mb-6">
+            <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-2 sm:gap-3">
             {metrics.map((metric, index) => {
               const Icon = metric.icon;
               return (
@@ -364,6 +382,57 @@ const AccountingAnalytics: React.FC = () => {
                 </div>
               );
             })}
+            </div>
+            {showExtraMetrics && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-2 sm:gap-3 mt-2">
+                {extraMetrics.map((metric, index) => {
+                  const Icon = metric.icon;
+                  return (
+                    <div key={`extra-${index}`} className="bg-white rounded-xl p-3 shadow-sm border border-gray-100 group relative">
+                      <div className="flex items-center justify-between gap-1">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[11px] font-medium text-gray-500">{metric.label}</p>
+                          <div className="mt-1">
+                            <span className="text-sm font-bold text-gray-900">
+                              {formatCurrency(metric.value)}
+                            </span>
+                          </div>
+                          {metric.change ? (
+                            <div className="mt-0.5">
+                              <p className="text-[10px] text-gray-400">
+                                vs {formatCurrency(metric.compareValue!)}
+                              </p>
+                              <p className={`text-[10px] flex items-center gap-0.5 ${
+                                metric.change.direction === 'up' ? 'text-green-600' : metric.change.direction === 'down' ? 'text-red-600' : 'text-gray-400'
+                              }`}>
+                                {metric.change.direction === 'up' ? <TrendingUp className="w-2.5 h-2.5" /> : metric.change.direction === 'down' ? <TrendingDown className="w-2.5 h-2.5" /> : <Minus className="w-2.5 h-2.5" />}
+                                {metric.change.display}
+                              </p>
+                            </div>
+                          ) : (
+                            <p className="text-[10px] mt-0.5 text-gray-400">&nbsp;</p>
+                          )}
+                        </div>
+                        <div className={`p-1 bg-${themeColor}-50 rounded-md flex-shrink-0`}>
+                          <Icon className={`w-3.5 h-3.5 text-${themeColor}-600`} />
+                        </div>
+                      </div>
+                      <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 hidden group-hover:block w-48 px-2.5 py-1.5 bg-gray-900 text-white text-xs rounded-lg shadow-lg z-50 text-center pointer-events-none">
+                        {metric.tooltip}
+                        <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-gray-900"></div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            <button
+              onClick={() => setShowExtraMetrics(!showExtraMetrics)}
+              className="mt-2 text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1 transition-colors"
+            >
+              {showExtraMetrics ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+              {showExtraMetrics ? 'Show less' : 'More metrics'}
+            </button>
           </div>
         );
       })()}
@@ -481,6 +550,7 @@ const CategorySection: React.FC<CategorySectionProps> = ({
                     <th className="text-right py-3 px-2 font-medium text-gray-600">Total Billed</th>
                     <th className="text-right py-3 px-2 font-medium text-gray-600">Collected</th>
                     <th className="text-right py-3 px-2 font-medium text-gray-600">Balance Due</th>
+                    <th className="text-right py-3 px-2 font-medium text-gray-600">Card Payments</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -512,6 +582,7 @@ const CategorySection: React.FC<CategorySectionProps> = ({
                           )}
                         </td>
                         <td className={`py-3 px-2 text-right font-semibold ${item.balance_due > 0 ? 'text-orange-600' : 'text-gray-400'}`}>{formatCurrency(item.balance_due)}</td>
+                        <td className="py-3 px-2 text-right text-gray-900">{formatCurrency(item.collected_via_gateway)}</td>
                       </tr>
                     );
                   })}
@@ -541,6 +612,7 @@ const CategorySection: React.FC<CategorySectionProps> = ({
                       })()}
                     </td>
                     <td className={`py-3 px-2 text-right font-semibold ${category.summary.balance_due > 0 ? 'text-orange-600' : 'text-gray-400'}`}>{formatCurrency(category.summary.balance_due)}</td>
+                    <td className="py-3 px-2 text-right text-gray-900">{formatCurrency(category.summary.collected_via_gateway)}</td>
                   </tr>
                 </tbody>
               </table>

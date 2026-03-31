@@ -10,6 +10,8 @@ export interface AccountingSummary {
   total_billed: number;  // what was invoiced
   grand_total: number;   // what was collected
   balance_due: number;   // what's still owed
+  collected_via_gateway: number;     // payments collected through Authorize.Net
+  collected_via_gateway_net: number; // gateway collected minus fees and taxes
 }
 
 export interface CategoryItem {
@@ -24,6 +26,8 @@ export interface CategoryItem {
   total_billed: number;  // what was invoiced
   grand_total: number;   // what was collected
   balance_due: number;   // what's still owed
+  collected_via_gateway: number;     // payments collected through Authorize.Net
+  collected_via_gateway_net: number; // gateway collected minus fees and taxes
 }
 
 export interface CategoryData {

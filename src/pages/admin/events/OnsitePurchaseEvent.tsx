@@ -467,15 +467,13 @@ const OnsitePurchaseEvent = () => {
         purchase_time: selectedTime,
         quantity,
         total_amount: total,
-        amount_paid: paymentMethod === 'paylater' ? 0 : total,
+        amount_paid: paymentMethod === 'in-store' ? total : 0,
         payment_method: paymentMethod as 'card' | 'in-store' | 'paylater' | 'authorize.net',
         ...(paymentMethod === 'in-store' ? {
           status: 'confirmed' as const,
           payment_status: 'paid' as const,
-        } : paymentMethod === 'paylater' ? {
-          payment_status: 'pending' as const,
         } : {
-          // Online (authorize.net/card): let backend default to pending
+          payment_status: 'pending' as const,
         }),
         send_email: paymentMethod === 'in-store' ? sendEmail : false,
         notes: notes || undefined,

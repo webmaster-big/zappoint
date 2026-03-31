@@ -576,7 +576,7 @@ const PurchaseEvent = () => {
           purchase_time: selectedTime,
           quantity,
           total_amount: totalAmount,
-          amount_paid: totalAmount,
+          amount_paid: 0,
           discount_amount: specialPricingDiscount > 0 ? specialPricingDiscount : undefined,
           payment_method: 'authorize.net',
           payment_status: 'pending',

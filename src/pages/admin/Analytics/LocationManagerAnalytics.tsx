@@ -16,6 +16,7 @@ import {
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
 import StandardButton from '../../../components/ui/StandardButton';
+import DateRangeCalendar from '../../../components/ui/DateRangeCalendar';
 import AnalyticsService from '../../../services/AnalyticsService';
 import type { LocationAnalyticsResponse } from '../../../services/AnalyticsService';
 import {
@@ -184,22 +185,15 @@ const LocationManagerAnalytics: React.FC = () => {
             <option value="custom">Custom Range</option>
           </select>
           {dateRange === 'custom' && (
-            <div className="flex items-center gap-2">
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-${themeColor}-500"
-                placeholder="Start Date"
-              />
-              <span className="text-gray-500">to</span>
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                min={startDate}
-                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-${themeColor}-500"
-                placeholder="End Date"
+            <div className="w-56">
+              <DateRangeCalendar
+                startDate={startDate}
+                endDate={endDate}
+                onChange={(start, end) => {
+                  setStartDate(start);
+                  setEndDate(end);
+                }}
+                themeColor={themeColor}
               />
             </div>
           )}
@@ -641,26 +635,16 @@ const LocationManagerAnalytics: React.FC = () => {
                   <option value="custom">Custom Range</option>
                 </select>
                 {dateRange === 'custom' && (
-                  <div className="mt-3 space-y-2">
-                    <div>
-                      <label className="text-xs text-gray-600 mb-1 block">Start Date</label>
-                      <input
-                        type="date"
-                        value={startDate}
-                        onChange={(e) => setStartDate(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-${themeColor}-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-gray-600 mb-1 block">End Date</label>
-                      <input
-                        type="date"
-                        value={endDate}
-                        onChange={(e) => setEndDate(e.target.value)}
-                        min={startDate}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-${themeColor}-500"
-                      />
-                    </div>
+                  <div className="mt-3">
+                    <DateRangeCalendar
+                      startDate={startDate}
+                      endDate={endDate}
+                      onChange={(start, end) => {
+                        setStartDate(start);
+                        setEndDate(end);
+                      }}
+                      themeColor={themeColor}
+                    />
                   </div>
                 )}
               </div>

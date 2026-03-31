@@ -52,7 +52,7 @@ export interface EventPurchase {
   amount_paid: string;
   discount_amount: string | null;
   payment_method: 'card' | 'in-store' | 'paylater' | 'authorize.net' | null;
-  payment_status: 'paid' | 'partial' | 'pending';
+  payment_status: 'paid' | 'partial' | 'pending' | 'refunded' | 'voided';
   status: 'pending' | 'confirmed' | 'checked-in' | 'completed' | 'cancelled';
   transaction_id: string | null;
   notes: string | null;

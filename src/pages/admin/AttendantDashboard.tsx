@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import CounterAnimation from '../../components/ui/CounterAnimation';
 import StandardButton from '../../components/ui/StandardButton';
+import DateRangeCalendar from '../../components/ui/DateRangeCalendar';
 import { getStoredUser } from '../../utils/storage';
 import bookingService from '../../services/bookingService';
 import { bookingCacheService } from '../../services/BookingCacheService';
@@ -819,21 +820,14 @@ const AttendantDashboard: React.FC = () => {
              
              {/* Custom Date Range Inputs */}
              {metricsTimeframe === 'custom' && (
-               <div className="flex items-center gap-2">
-                 <input
-                   type="date"
-                   value={customDateFrom}
-                   onChange={(e) => setCustomDateFrom(e.target.value)}
-                   className="bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                   placeholder="From"
-                 />
-                 <span className="text-gray-500 text-sm">to</span>
-                 <input
-                   type="date"
-                   value={customDateTo}
-                   onChange={(e) => setCustomDateTo(e.target.value)}
-                   className="bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                   placeholder="To"
+               <div className="w-56">
+                 <DateRangeCalendar
+                   startDate={customDateFrom}
+                   endDate={customDateTo}
+                   onChange={(start, end) => {
+                     setCustomDateFrom(start);
+                     setCustomDateTo(end);
+                   }}
                  />
                </div>
              )}

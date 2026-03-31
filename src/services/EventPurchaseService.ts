@@ -113,6 +113,26 @@ class EventPurchaseService {
     const response = await api.get('/event-purchases/customer', { params: { guest_email: email, ...filters } });
     return response.data;
   }
+
+  // ========== SOFT DELETE METHODS ==========
+
+  /** Get all soft-deleted (trashed) purchases */
+  async getTrashedPurchases(filters?: Record<string, unknown>): Promise<{ success: boolean; data: EventPurchase[]; meta?: { current_page: number; last_page: number; per_page: number; total: number } }> {
+    const response = await api.get('/event-purchases/trashed', { params: filters });
+    return response.data;
+  }
+
+  /** Restore a soft-deleted purchase */
+  async restorePurchase(id: number): Promise<{ success: boolean; data: EventPurchase; message?: string }> {
+    const response = await api.post(`/event-purchases/${id}/restore`);
+    return response.data;
+  }
+
+  /** Bulk restore soft-deleted purchases */
+  async bulkRestore(ids: number[]): Promise<{ success: boolean; data: { restored_count: number }; message?: string }> {
+    const response = await api.post('/event-purchases/bulk-restore', { ids });
+    return response.data;
+  }
 }
 
 export const eventPurchaseService = new EventPurchaseService();

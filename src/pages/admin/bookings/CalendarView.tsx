@@ -122,15 +122,8 @@ const CalendarView: React.FC = () => {
   }, [userData]);
 
   // Load bookings from API with cache support
-  const loadBookings = useCallback(async () => {
+  const loadBookings = useCallback(async (silent = false) => {
     try {
-      // Only show full loading on initial load
-      if (initialLoading) {
-        // Keep initialLoading true
-      } else {
-        setDataLoading(true);
-      }
-      
       // Calculate date range based on current view
       const startDate = new Date(currentDate);
       let endDate = new Date(currentDate);
@@ -163,12 +156,12 @@ const CalendarView: React.FC = () => {
             date_to: filters.dateRange.end,
           });
           setBookings((cachedBookings || []) as Booking[]);
-          // Trigger background sync for freshness
           bookingCacheService.syncInBackground({ user_id: getStoredUser()?.id });
           return;
         }
         
-        // No cache, fetch from API
+        // No cache, fetch from API - show loading
+        if (!silent && !initialLoading) setDataLoading(true);
         const response = await bookingService.getBookings({
           date_from: filters.dateRange.start,
           date_to: filters.dateRange.end,
@@ -191,13 +184,14 @@ const CalendarView: React.FC = () => {
       const hasCache = await bookingCacheService.hasCachedData();
       
       if (hasCache) {
+        // Cache reads are fast - no loading indicator needed
         const cachedBookings = await bookingCacheService.getFilteredBookingsFromCache(dateParams);
         console.log('Using cached bookings:', (cachedBookings || []).length);
         setBookings((cachedBookings || []) as Booking[]);
-        // Trigger background sync for freshness
         bookingCacheService.syncInBackground({ user_id: getStoredUser()?.id });
       } else {
-        // No cache, fetch from API
+        // No cache, fetch from API - show loading
+        if (!silent && !initialLoading) setDataLoading(true);
         const response = await bookingService.getBookings({
           ...dateParams,
           per_page: 1000,
@@ -209,7 +203,6 @@ const CalendarView: React.FC = () => {
           console.log('Date range:', startDate.toISOString().split('T')[0], 'to', endDate.toISOString().split('T')[0]);
           console.log('Total bookings loaded:', response.data.bookings.length);
           setBookings(response.data.bookings);
-          // Cache the fetched bookings
           await bookingCacheService.cacheBookings(response.data.bookings);
         } else {
           console.log('No bookings data in response');
@@ -218,7 +211,7 @@ const CalendarView: React.FC = () => {
       }
     } catch (error) {
       console.error('Error loading bookings:', error);
-      setToast({ message: 'Failed to load bookings', type: 'error' });
+      if (!silent) setToast({ message: 'Failed to load bookings', type: 'error' });
       setBookings([]);
     } finally {
       setInitialLoading(false);
@@ -230,11 +223,11 @@ const CalendarView: React.FC = () => {
     loadBookings();
   }, [loadBookings]);
 
-  // Listen for cache updates from background sync
+  // Listen for cache updates from background sync - refresh silently
   useEffect(() => {
     const unsubscribe = bookingCacheService.onCacheUpdate(async (event: CustomEvent) => {
       if (event.detail?.source === 'api') {
-        loadBookings();
+        loadBookings(true);
       }
     });
     return () => unsubscribe();

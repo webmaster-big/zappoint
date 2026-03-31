@@ -13,6 +13,8 @@ import {
   Clock,
   Eye,
   DollarSign,
+  RotateCcw,
+  Archive,
 } from 'lucide-react';
 import { convertTo12Hour } from '../../../utils/timeFormat';
 import { useThemeColor } from '../../../hooks/useThemeColor';
@@ -51,6 +53,7 @@ interface DisplayPurchase {
   purchaseTime: string;
   createdAt: string;
   locationId: number;
+  deletedAt?: string;
 }
 
 const EventPurchases = () => {
@@ -75,6 +78,15 @@ const EventPurchases = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
+  // Soft delete (trash) states
+  const [showTrashed, setShowTrashed] = useState(false);
+  const [trashedPurchases, setTrashedPurchases] = useState<DisplayPurchase[]>([]);
+  const [trashedLoading, setTrashedLoading] = useState(false);
+  const [trashedCurrentPage, setTrashedCurrentPage] = useState(1);
+  const [trashedTotalPages, setTrashedTotalPages] = useState(1);
+  const [trashedTotal, setTrashedTotal] = useState(0);
+  const [selectedTrashed, setSelectedTrashed] = useState<string[]>([]);
+
   // Status colors and icons
   const statusConfig: Record<string, { color: string; icon: typeof CheckCircle }> = {
     confirmed: { color: 'bg-blue-100 text-blue-800', icon: CheckCircle },
@@ -82,6 +94,8 @@ const EventPurchases = () => {
     pending: { color: 'bg-yellow-100 text-yellow-800', icon: Clock },
     completed: { color: 'bg-emerald-100 text-emerald-800', icon: CheckCircle },
     cancelled: { color: 'bg-gray-100 text-gray-800', icon: XCircle },
+    refunded: { color: 'bg-purple-100 text-purple-800', icon: XCircle },
+    voided: { color: 'bg-red-100 text-red-800', icon: XCircle },
   };
 
   // Calculate metrics data
@@ -304,6 +318,135 @@ const EventPurchases = () => {
     }
   };
 
+  // ========== TRASH FUNCTIONS ==========
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const convertTrashedPurchases = (rawPurchases: any[]): DisplayPurchase[] => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return rawPurchases.map((purchase: any) => ({
+      id: purchase.id.toString(),
+      referenceNumber: purchase.reference_number,
+      eventName: purchase.event?.name || 'Unknown Event',
+      customerName: purchase.customer
+        ? `${purchase.customer.first_name} ${purchase.customer.last_name}`
+        : purchase.guest_name || 'Walk-in Customer',
+      email: purchase.customer?.email || purchase.guest_email || '',
+      phone: purchase.customer?.phone || purchase.guest_phone || '',
+      quantity: purchase.quantity,
+      status: purchase.status,
+      totalAmount: Number(purchase.total_amount),
+      amountPaid: Number(purchase.amount_paid || 0),
+      paymentMethod: purchase.payment_method || 'N/A',
+      paymentStatus: purchase.payment_status,
+      purchaseDate: purchase.purchase_date,
+      purchaseTime: purchase.purchase_time,
+      createdAt: purchase.created_at,
+      locationId: purchase.location_id,
+      deletedAt: purchase.deleted_at,
+    }));
+  };
+
+  const loadTrashedPurchases = async (page: number = 1) => {
+    try {
+      setTrashedLoading(true);
+      const response = await eventPurchaseService.getTrashedPurchases({
+        page,
+        per_page: itemsPerPage,
+        search: filters.search,
+        ...(selectedLocation && { location_id: Number(selectedLocation) }),
+      });
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const raw = response.data as any;
+      const rawPurchases = Array.isArray(raw) ? raw : (raw?.purchases || raw?.data || []);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const pagination = (raw as any)?.pagination || response.meta;
+
+      setTrashedPurchases(convertTrashedPurchases(rawPurchases));
+      if (pagination) {
+        setTrashedTotalPages(pagination.last_page);
+        setTrashedTotal(pagination.total);
+        setTrashedCurrentPage(pagination.current_page);
+      } else {
+        setTrashedTotalPages(1);
+        setTrashedTotal(rawPurchases.length);
+        setTrashedCurrentPage(1);
+      }
+    } catch (error) {
+      console.error('Error loading trashed purchases:', error);
+      setToast({ message: 'Failed to load deleted purchases', type: 'error' });
+    } finally {
+      setTrashedLoading(false);
+    }
+  };
+
+  const handleRestorePurchase = async (id: string) => {
+    try {
+      const response = await eventPurchaseService.restorePurchase(Number(id));
+      if (response.success) {
+        setToast({ message: 'Purchase restored successfully', type: 'success' });
+        loadTrashedPurchases(trashedCurrentPage);
+      }
+    } catch (error) {
+      console.error('Error restoring purchase:', error);
+      setToast({ message: 'Failed to restore purchase', type: 'error' });
+    }
+  };
+
+  const handleBulkRestore = async () => {
+    if (selectedTrashed.length === 0) return;
+    try {
+      const ids = selectedTrashed.map(id => Number(id));
+      const response = await eventPurchaseService.bulkRestore(ids);
+      if (response.success) {
+        setToast({ message: `${response.data.restored_count} purchase(s) restored successfully`, type: 'success' });
+        setSelectedTrashed([]);
+        loadTrashedPurchases(trashedCurrentPage);
+      }
+    } catch (error) {
+      console.error('Error bulk restoring purchases:', error);
+      setToast({ message: 'Failed to restore some purchases', type: 'error' });
+    }
+  };
+
+  const handleForceDelete = async (id: string) => {
+    if (!window.confirm('Are you sure you want to PERMANENTLY delete this purchase? This action cannot be undone.')) {
+      return;
+    }
+    try {
+      await eventPurchaseService.forceDeletePurchase(Number(id));
+      setToast({ message: 'Purchase permanently deleted', type: 'success' });
+      loadTrashedPurchases(trashedCurrentPage);
+    } catch (error) {
+      console.error('Error force deleting purchase:', error);
+      setToast({ message: 'Failed to permanently delete purchase', type: 'error' });
+    }
+  };
+
+  const toggleTrashedView = () => {
+    setShowTrashed(!showTrashed);
+    if (!showTrashed) {
+      loadTrashedPurchases(1);
+    }
+    setSelectedTrashed([]);
+  };
+
+  const handleSelectTrashed = (id: string) => {
+    setSelectedTrashed(prev =>
+      prev.includes(id)
+        ? prev.filter(purchaseId => purchaseId !== id)
+        : [...prev, id]
+    );
+  };
+
+  const handleSelectAllTrashed = () => {
+    if (selectedTrashed.length === trashedPurchases.length) {
+      setSelectedTrashed([]);
+    } else {
+      setSelectedTrashed(trashedPurchases.map(p => p.id));
+    }
+  };
+
   const exportToCSV = () => {
     const headers = ['Reference', 'Customer Name', 'Email', 'Phone', 'Event', 'Quantity', 'Total Amount', 'Status', 'Payment Method', 'Date'];
     const csvData = filteredPurchases.map((p) => [
@@ -372,13 +515,25 @@ const EventPurchases = () => {
               showAllOption={true}
             />
           )}
-          <StandardButton variant="primary" size="md" onClick={exportToCSV} icon={Download}>
-            Export CSV
+          <StandardButton
+            variant={showTrashed ? 'primary' : 'secondary'}
+            size="md"
+            onClick={toggleTrashedView}
+            icon={showTrashed ? RefreshCcw : Archive}
+          >
+            {showTrashed ? 'View Active' : 'View Deleted'}
           </StandardButton>
+          {!showTrashed && (
+            <StandardButton variant="primary" size="md" onClick={exportToCSV} icon={Download}>
+              Export CSV
+            </StandardButton>
+          )}
         </div>
       </div>
 
       {/* Metrics Grid */}
+      {!showTrashed && (
+      <>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {metrics.map((metric, index) => {
           const Icon = metric.icon;
@@ -639,6 +794,132 @@ const EventPurchases = () => {
           />
         </div>
       </div>
+      </>
+      )}
+
+      {/* Trashed Purchases View */}
+      {showTrashed && (
+        <>
+          {/* Bulk Restore Bar */}
+          {selectedTrashed.length > 0 && (
+            <div className={`bg-${themeColor}-50 p-4 rounded-lg mb-6 flex flex-wrap items-center gap-4`}>
+              <span className={`text-${fullColor} font-medium`}>
+                {selectedTrashed.length} deleted purchase(s) selected
+              </span>
+              <StandardButton variant="primary" size="md" onClick={handleBulkRestore} icon={RotateCcw}>
+                Restore Selected
+              </StandardButton>
+            </div>
+          )}
+
+          {/* Trashed Table */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            {trashedLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className={`animate-spin rounded-full h-8 w-8 border-b-2 border-${fullColor}`}></div>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-red-50 border-b border-red-100">
+                    <tr>
+                      <th className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-12">
+                        <input
+                          type="checkbox"
+                          checked={selectedTrashed.length === trashedPurchases.length && trashedPurchases.length > 0}
+                          onChange={handleSelectAllTrashed}
+                          className={`rounded border-gray-300 text-${fullColor} focus:ring-${themeColor}-600`}
+                        />
+                      </th>
+                      <th className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Customer</th>
+                      <th className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Event</th>
+                      <th className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Total</th>
+                      <th className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
+                      <th className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Deleted At</th>
+                      <th className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {trashedPurchases.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="px-4 py-12 text-center">
+                          <Archive className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                          <p className="text-sm text-gray-500">No deleted purchases found</p>
+                        </td>
+                      </tr>
+                    ) : (
+                      trashedPurchases.map((purchase) => (
+                        <tr key={purchase.id} className="hover:bg-red-50/50">
+                          <td className="px-4 py-4 whitespace-nowrap">
+                            <input
+                              type="checkbox"
+                              checked={selectedTrashed.includes(purchase.id)}
+                              onChange={() => handleSelectTrashed(purchase.id)}
+                              className={`rounded border-gray-300 text-${fullColor} focus:ring-${themeColor}-600`}
+                            />
+                          </td>
+                          <td className="px-4 py-4">
+                            <div>
+                              <div className="text-sm font-medium text-gray-900">{purchase.customerName}</div>
+                              <div className="text-xs text-gray-500">{purchase.email}</div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {purchase.eventName}
+                          </td>
+                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                            ${purchase.totalAmount.toFixed(2)}
+                          </td>
+                          <td className="px-4 py-4 whitespace-nowrap">
+                            <span className={`text-xs font-medium px-3 py-1 rounded-full ${statusConfig[purchase.status]?.color || 'bg-gray-100 text-gray-800'}`}>
+                              {purchase.status}
+                            </span>
+                          </td>
+                          <td className="px-4 py-4 whitespace-nowrap text-sm text-red-600">
+                            {purchase.deletedAt ? formatDate(purchase.deletedAt) : '—'}
+                          </td>
+                          <td className="px-4 py-4 whitespace-nowrap">
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => handleRestorePurchase(purchase.id)}
+                                className={`p-2 text-${fullColor} hover:bg-${themeColor}-50 rounded-lg transition-colors`}
+                                title="Restore"
+                              >
+                                <RotateCcw className="h-4 w-4" />
+                              </button>
+                              <button
+                                onClick={() => handleForceDelete(purchase.id)}
+                                className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                                title="Permanently Delete"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Trashed Pagination */}
+            {!trashedLoading && trashedTotal > 0 && (
+              <div className="bg-white px-4 py-4 border-t border-gray-100">
+                <Pagination
+                  currentPage={trashedCurrentPage}
+                  totalPages={trashedTotalPages}
+                  onPageChange={(page) => loadTrashedPurchases(page)}
+                  totalItems={trashedTotal}
+                  showingFrom={(trashedCurrentPage - 1) * itemsPerPage + 1}
+                  showingTo={Math.min(trashedCurrentPage * itemsPerPage, trashedTotal)}
+                />
+              </div>
+            )}
+          </div>
+        </>
+      )}
 
       {/* Toast Notification */}
       {toast && (
