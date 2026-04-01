@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Download,
   RefreshCcw,
@@ -71,7 +71,7 @@ const AccountingAnalytics: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [reportData, setReportData] = useState<AccountingReportResponse['data'] | null>(null);
   const [showCompare, setShowCompare] = useState(false);
-  const [showExtraMetrics, setShowExtraMetrics] = useState(false);
+
   
   // Date range selection
   const [startDate, setStartDate] = useState<string>(() => {
@@ -170,28 +170,7 @@ const AccountingAnalytics: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedLocation]);
 
-  // Auto-fetch when filters change (debounced to avoid rapid calls)
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const initialLoadDone = useRef(false);
 
-  useEffect(() => {
-    // Skip the very first render (handled by selectedLocation effect above)
-    if (!initialLoadDone.current) {
-      initialLoadDone.current = true;
-      return;
-    }
-    if (!selectedLocation || !startDate) return;
-
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      fetchReport(true);
-    }, 400);
-
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [startDate, endDate, viewMode, compareStartDate, compareEndDate]);
 
   // Toggle category
   const toggleCategory = (name: string) => {
@@ -330,10 +309,9 @@ const AccountingAnalytics: React.FC = () => {
           { label: 'Fees', value: summary.fee_amount, compareValue: comparison?.fee_amount, icon: BadgePercent, isCurrency: true, tooltip: 'Service and processing fees', change: comparison ? calculateChange(summary.fee_amount, comparison.fee_amount) : null },
           { label: 'Tax', value: summary.tax_amount, compareValue: comparison?.tax_amount, icon: Landmark, isCurrency: true, tooltip: 'Tax amount collected', change: comparison ? calculateChange(summary.tax_amount, comparison.tax_amount) : null },
           { label: 'Total Billed', value: summary.total_billed, compareValue: comparison?.total_billed, icon: CircleDollarSign, isCurrency: true, tooltip: 'Total amount invoiced (after discounts, with fees)', change: comparison ? calculateChange(summary.total_billed, comparison.total_billed) : null },
-          { label: 'Collected', value: summary.grand_total, compareValue: comparison?.grand_total, icon: DollarSign, isCurrency: true, tooltip: 'Amount actually collected so far', change: comparison ? calculateChange(summary.grand_total, comparison.grand_total) : null },
-        ];
-        const extraMetrics = [
-          { label: 'Card Payments', value: summary.collected_via_gateway, compareValue: comparison?.collected_via_gateway, icon: CreditCard, isCurrency: true, tooltip: 'Total collected via credit/debit card (Authorize.Net)', change: comparison ? calculateChange(summary.collected_via_gateway, comparison.collected_via_gateway) : null },
+          { label: 'Collected', value: summary.grand_total, compareValue: comparison?.grand_total, icon: DollarSign, isCurrency: true, tooltip: 'Total collected from Authorize.Net and in-store payments', change: comparison ? calculateChange(summary.grand_total, comparison.grand_total) : null },
+          { label: 'Authorize Payment', value: summary.collected_via_gateway, compareValue: comparison?.collected_via_gateway, icon: CreditCard, isCurrency: true, tooltip: 'Total collected via Authorize.Net. In-store payments are not included.', change: comparison ? calculateChange(summary.collected_via_gateway, comparison.collected_via_gateway) : null },
+          { label: 'Gateway Net', value: summary.collected_via_gateway_net, compareValue: comparison?.collected_via_gateway_net, icon: CreditCard, isCurrency: true, tooltip: 'Gateway collected minus fees and taxes. In-store payments are not included.', change: comparison ? calculateChange(summary.collected_via_gateway_net, comparison.collected_via_gateway_net) : null },
         ];
         return (
           <div className="mb-6">
@@ -383,56 +361,6 @@ const AccountingAnalytics: React.FC = () => {
               );
             })}
             </div>
-            {showExtraMetrics && (
-              <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-2 sm:gap-3 mt-2">
-                {extraMetrics.map((metric, index) => {
-                  const Icon = metric.icon;
-                  return (
-                    <div key={`extra-${index}`} className="bg-white rounded-xl p-3 shadow-sm border border-gray-100 group relative">
-                      <div className="flex items-center justify-between gap-1">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[11px] font-medium text-gray-500">{metric.label}</p>
-                          <div className="mt-1">
-                            <span className="text-sm font-bold text-gray-900">
-                              {formatCurrency(metric.value)}
-                            </span>
-                          </div>
-                          {metric.change ? (
-                            <div className="mt-0.5">
-                              <p className="text-[10px] text-gray-400">
-                                vs {formatCurrency(metric.compareValue!)}
-                              </p>
-                              <p className={`text-[10px] flex items-center gap-0.5 ${
-                                metric.change.direction === 'up' ? 'text-green-600' : metric.change.direction === 'down' ? 'text-red-600' : 'text-gray-400'
-                              }`}>
-                                {metric.change.direction === 'up' ? <TrendingUp className="w-2.5 h-2.5" /> : metric.change.direction === 'down' ? <TrendingDown className="w-2.5 h-2.5" /> : <Minus className="w-2.5 h-2.5" />}
-                                {metric.change.display}
-                              </p>
-                            </div>
-                          ) : (
-                            <p className="text-[10px] mt-0.5 text-gray-400">&nbsp;</p>
-                          )}
-                        </div>
-                        <div className={`p-1 bg-${themeColor}-50 rounded-md flex-shrink-0`}>
-                          <Icon className={`w-3.5 h-3.5 text-${themeColor}-600`} />
-                        </div>
-                      </div>
-                      <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 hidden group-hover:block w-48 px-2.5 py-1.5 bg-gray-900 text-white text-xs rounded-lg shadow-lg z-50 text-center pointer-events-none">
-                        {metric.tooltip}
-                        <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-gray-900"></div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-            <button
-              onClick={() => setShowExtraMetrics(!showExtraMetrics)}
-              className="mt-2 text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1 transition-colors"
-            >
-              {showExtraMetrics ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-              {showExtraMetrics ? 'Show less' : 'More metrics'}
-            </button>
           </div>
         );
       })()}
@@ -550,7 +478,8 @@ const CategorySection: React.FC<CategorySectionProps> = ({
                     <th className="text-right py-3 px-2 font-medium text-gray-600">Total Billed</th>
                     <th className="text-right py-3 px-2 font-medium text-gray-600">Collected</th>
                     <th className="text-right py-3 px-2 font-medium text-gray-600">Balance Due</th>
-                    <th className="text-right py-3 px-2 font-medium text-gray-600">Card Payments</th>
+                    <th className="text-right py-3 px-2 font-medium text-gray-600">Authorize Payment</th>
+                    <th className="text-right py-3 px-2 font-medium text-gray-600">Gateway Net</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -583,6 +512,7 @@ const CategorySection: React.FC<CategorySectionProps> = ({
                         </td>
                         <td className={`py-3 px-2 text-right font-semibold ${item.balance_due > 0 ? 'text-orange-600' : 'text-gray-400'}`}>{formatCurrency(item.balance_due)}</td>
                         <td className="py-3 px-2 text-right text-gray-900">{formatCurrency(item.collected_via_gateway)}</td>
+                        <td className="py-3 px-2 text-right text-gray-900">{formatCurrency(item.collected_via_gateway_net)}</td>
                       </tr>
                     );
                   })}
@@ -613,6 +543,7 @@ const CategorySection: React.FC<CategorySectionProps> = ({
                     </td>
                     <td className={`py-3 px-2 text-right font-semibold ${category.summary.balance_due > 0 ? 'text-orange-600' : 'text-gray-400'}`}>{formatCurrency(category.summary.balance_due)}</td>
                     <td className="py-3 px-2 text-right text-gray-900">{formatCurrency(category.summary.collected_via_gateway)}</td>
+                    <td className="py-3 px-2 text-right text-gray-900">{formatCurrency(category.summary.collected_via_gateway_net)}</td>
                   </tr>
                 </tbody>
               </table>
