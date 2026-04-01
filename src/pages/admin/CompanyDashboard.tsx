@@ -742,7 +742,7 @@ const CompanyDashboard: React.FC = () => {
     {
       title: 'Total Revenue',
       value: `$${metrics.totalRevenue.toFixed(2)}`,
-      change: `Bookings: $${metrics.bookingRevenue.toFixed(2)} | Tickets: $${metrics.purchaseRevenue.toFixed(2)}${metrics.eventPurchaseRevenue > 0 ? ` | Events: $${metrics.eventPurchaseRevenue.toFixed(2)}` : ''}`,
+      change: `Bkgs: $${Math.round(metrics.bookingRevenue)} | Tix: $${Math.round(metrics.purchaseRevenue)}${metrics.eventPurchaseRevenue > 0 ? ` | Events: $${Math.round(metrics.eventPurchaseRevenue)}` : ''}`,
       trend: 'up',
       icon: DollarSign,
       accent: `bg-${themeColor}-100 text-${fullColor}`,
