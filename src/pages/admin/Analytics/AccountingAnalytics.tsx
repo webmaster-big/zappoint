@@ -240,13 +240,17 @@ const AccountingAnalytics: React.FC = () => {
             onChange={(start, end) => {
               setStartDate(start);
               setEndDate(end);
+              setToast({ message: 'Click the refresh button to update the report', type: 'success' });
             }}
             themeColor={themeColor}
           />
         </div>
         <select
           value={viewMode}
-          onChange={(e) => setViewMode(e.target.value as 'booked_for' | 'booked_on')}
+          onChange={(e) => {
+            setViewMode(e.target.value as 'booked_for' | 'booked_on');
+            setToast({ message: 'Click the refresh button to update the report', type: 'success' });
+          }}
           className={`px-2 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
         >
           <option value="booked_for">Booked For</option>
@@ -278,6 +282,7 @@ const AccountingAnalytics: React.FC = () => {
               onChange={(start, end) => {
                 setCompareStartDate(start);
                 setCompareEndDate(end);
+                setToast({ message: 'Click the refresh button to update the report', type: 'success' });
               }}
               themeColor={themeColor}
             />
