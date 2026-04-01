@@ -872,7 +872,7 @@ const CalendarView: React.FC = () => {
             <StandardButton
               variant="secondary"
               icon={RefreshCw}
-              onClick={loadBookings}
+              onClick={() => loadBookings()}
               disabled={dataLoading}
               loading={dataLoading}
             >
