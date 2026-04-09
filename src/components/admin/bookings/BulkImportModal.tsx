@@ -21,6 +21,8 @@ interface BulkImportModalProps {
   onClose: () => void;
   locations: Location[];
   onImportComplete?: () => void;
+  isCompanyAdmin?: boolean;
+  userLocationId?: number | null;
 }
 
 type ModalState = 'upload' | 'importing' | 'results';
@@ -33,6 +35,8 @@ const BulkImportModal: React.FC<BulkImportModalProps> = ({
   onClose,
   locations,
   onImportComplete,
+  isCompanyAdmin = false,
+  userLocationId = null,
 }) => {
   const { themeColor, fullColor } = useThemeColor();
   const [state, setState] = useState<ModalState>('upload');
@@ -49,13 +53,14 @@ const BulkImportModal: React.FC<BulkImportModalProps> = ({
     if (isOpen) {
       setState('upload');
       setFile(null);
-      setLocationId('');
+      // Auto-set location for non-company-admin users
+      setLocationId(!isCompanyAdmin && userLocationId ? userLocationId : '');
       setSkipDuplicates(true);
       setResult(null);
       setError(null);
       setIsDragOver(false);
     }
-  }, [isOpen]);
+  }, [isOpen, isCompanyAdmin, userLocationId]);
 
   const validateFile = useCallback((f: File): string | null => {
     const ext = '.' + f.name.split('.').pop()?.toLowerCase();
@@ -182,20 +187,29 @@ const BulkImportModal: React.FC<BulkImportModalProps> = ({
               Import bookings from a Bookly CSV or Excel file.
             </p>
 
-            {/* Location select */}
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Location</label>
-              <select
-                value={locationId}
-                onChange={(e) => setLocationId(Number(e.target.value) || '')}
-                className={`w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
-              >
-                <option value="">Select location</option>
-                {locations.map((loc) => (
-                  <option key={loc.id} value={loc.id}>{loc.name}</option>
-                ))}
-              </select>
-            </div>
+            {/* Location select — only shown for company admins */}
+            {isCompanyAdmin ? (
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Location</label>
+                <select
+                  value={locationId}
+                  onChange={(e) => setLocationId(Number(e.target.value) || '')}
+                  className={`w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
+                >
+                  <option value="">Select location</option>
+                  {locations.map((loc) => (
+                    <option key={loc.id} value={loc.id}>{loc.name}</option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Location</label>
+                <p className="text-sm text-gray-900 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                  {locations.find((loc) => loc.id === userLocationId)?.name || 'Your assigned location'}
+                </p>
+              </div>
+            )}
 
             {/* Dropzone */}
             {!file ? (

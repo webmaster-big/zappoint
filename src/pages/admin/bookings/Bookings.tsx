@@ -546,6 +546,13 @@ const Bookings: React.FC = () => {
             name: loc.name
           })));
         }
+      } else if (currentUser?.location_id) {
+        // For location managers / attendants, fetch their assigned location
+        const response = await locationService.getLocation(currentUser.location_id);
+        if (response.success && response.data) {
+          const loc = response.data;
+          setAvailableLocations([{ id: loc.id, name: loc.name }]);
+        }
       }
     } catch (error) {
       console.error('Error loading locations:', error);
@@ -3537,6 +3544,8 @@ const Bookings: React.FC = () => {
           onClose={() => setShowBulkImportModal(false)}
           locations={availableLocations}
           onImportComplete={loadBookings}
+          isCompanyAdmin={isCompanyAdmin}
+          userLocationId={currentUser?.location_id ?? null}
         />
 
         {/* Export Modal */}
