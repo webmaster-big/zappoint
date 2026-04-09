@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { API_BASE_URL, getStoredUser } from '../utils/storage';
+import type { GenerateBulkPayload, GenerateBulkResponseData, PromoBatch, BatchDetailResponse, BatchDetailFilters } from '../types/Promo.types';
 
 // Create axios instance with base configuration
 const api = axios.create({
@@ -28,6 +29,8 @@ api.interceptors.request.use(
 export interface Promo {
   id: number;
   code: string;
+  code_mode: 'single' | 'unique';
+  batch_id: string | null;
   name: string;
   type: 'fixed' | 'percentage';
   value: number;
@@ -42,6 +45,8 @@ export interface Promo {
   deleted: boolean;
   created_at: string;
   updated_at: string;
+  creator?: { id: number; first_name: string; last_name: string };
+  packages?: { id: number; name: string }[];
 }
 
 export interface PromoFilters {
@@ -120,7 +125,7 @@ class PromoService {
    * Update an existing promo
    */
   async updatePromo(id: number, data: UpdatePromoData): Promise<ApiResponse<Promo>> {
-    const response = await api.put(`/promos/${id}`, data);
+    const response = await api.patch(`/promos/${id}`, data);
     return response.data;
   }
 
@@ -129,6 +134,66 @@ class PromoService {
    */
   async deletePromo(id: number): Promise<ApiResponse<null>> {
     const response = await api.delete(`/promos/${id}`);
+    return response.data;
+  }
+
+  /**
+   * Toggle promo status (active ↔ inactive)
+   */
+  async togglePromoStatus(id: number): Promise<ApiResponse<Promo>> {
+    const response = await api.patch(`/promos/${id}/toggle-status`);
+    return response.data;
+  }
+
+  // ── Bulk / Batch Endpoints ──
+
+  /**
+   * Generate bulk unique promo codes
+   */
+  async generateBulkCodes(data: GenerateBulkPayload): Promise<ApiResponse<GenerateBulkResponseData>> {
+    const response = await api.post('/promos/generate-bulk', data);
+    return response.data;
+  }
+
+  /**
+   * List all batches with aggregate stats
+   */
+  async getBatches(): Promise<{ success: boolean; data: PromoBatch[] }> {
+    const response = await api.get('/promos/batches');
+    return response.data;
+  }
+
+  /**
+   * Get batch details with individual codes
+   */
+  async getBatchDetail(batchId: string, filters?: BatchDetailFilters): Promise<{ success: boolean; data: BatchDetailResponse }> {
+    const response = await api.get(`/promos/batches/${batchId}`, { params: filters });
+    return response.data;
+  }
+
+  /**
+   * Export batch codes to CSV (returns blob)
+   */
+  async exportBatchCsv(batchId: string): Promise<Blob> {
+    const response = await api.get(`/promos/batches/${batchId}/export-csv`, {
+      responseType: 'blob',
+    });
+    return response.data;
+  }
+
+  /**
+   * Deactivate all active codes in a batch
+   */
+  async deactivateBatch(batchId: string): Promise<ApiResponse<{ deactivated_count: number }>> {
+    const response = await api.patch(`/promos/batches/${batchId}/deactivate`);
+    return response.data;
+  }
+
+  /**
+   * Soft-delete all codes in a batch
+   */
+  async deleteBatch(batchId: string): Promise<ApiResponse<{ deleted_count: number }>> {
+    const response = await api.delete(`/promos/batches/${batchId}`);
     return response.data;
   }
 }

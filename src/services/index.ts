@@ -43,6 +43,7 @@ export type { GiftCard, GiftCardFilters, CreateGiftCardData, UpdateGiftCardData 
 
 export { promoService } from './PromoService';
 export type { Promo, PromoFilters, CreatePromoData, UpdatePromoData } from './PromoService';
+export type { PromoBatch, BatchSummary, GenerateBulkPayload, GenerateBulkResponseData, BatchDetailResponse, BatchDetailFilters } from '../types/Promo.types';
 
 export { notificationStreamService } from './NotificationStreamService';
 export type { StreamNotificationData, NotificationObject } from './NotificationStreamService';

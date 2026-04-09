@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Plus, X, Edit2, Trash2, Eye, EyeOff, Copy, Search, Filter, RefreshCcw } from "lucide-react";
 import StandardButton from '../../../components/ui/StandardButton';
 import type { PromoStatus, PromoType, PromoItem } from '../../../types/Promo.types';
@@ -6,22 +6,31 @@ import { useThemeColor } from '../../../hooks/useThemeColor';
 import { promoService } from '../../../services';
 import Toast from '../../../components/ui/Toast';
 import { getStoredUser } from "../../../utils/storage";
+import BatchListTab from "../../../components/admin/promos/BatchListTab";
+import BatchDetailView from "../../../components/admin/promos/BatchDetailView";
+
+type Tab = "single" | "bulk";
 
 const Promo: React.FC = () => {
   const { themeColor, fullColor } = useThemeColor();
+  const [activeTab, setActiveTab] = useState<Tab>("single");
+  const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
+
+  // Single codes state
   const [promos, setPromos] = useState<PromoItem[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [showFilters, setShowFilters] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [editIndex, setEditIndex] = useState<number | null>(null);
+  const [editPromoId, setEditPromoId] = useState<number | null>(null);
   const [editForm, setEditForm] = useState<null | Partial<PromoItem>>(null);
-  
+
   const [form, setForm] = useState({
     type: "fixed" as PromoType,
     value: "",
     code: "",
+    name: "",
     start_date: "",
     end_date: "",
     usage_limit_total: "",
@@ -36,34 +45,34 @@ const Promo: React.FC = () => {
     setTimeout(() => setToast(null), 3000);
   };
 
-  useEffect(() => {
-    loadPromos();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const loadPromos = async () => {
+  const loadPromos = useCallback(async () => {
     try {
       setLoading(true);
       const response = await promoService.getPromos();
-      
+
       if (response.data && response.data.promos) {
-        const formattedPromos: PromoItem[] = response.data.promos.map(promo => ({
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          ...(promo as any), // Keep all backend fields including id
-          code: promo.code,
-          type: promo.type as PromoType,
-          value: Number(promo.value), // Ensure it's a number
-          start_date: promo.start_date,
-          end_date: promo.end_date,
-          usage_limit_total: Number(promo.usage_limit_total || 0),
-          usage_limit_per_user: Number(promo.usage_limit_per_user),
-          status: promo.status as PromoStatus,
-          description: promo.description || '',
-          created_by: promo.created_by?.toString() || 'admin',
-          created_at: promo.created_at,
-          updated_at: promo.updated_at,
-          deleted: promo.deleted || false
-        }));
+        const formattedPromos: PromoItem[] = response.data.promos
+          .filter(promo => !promo.batch_id) // Only show single-mode promos
+          .map(promo => ({
+            id: promo.id,
+            code: promo.code,
+            code_mode: promo.code_mode || 'single',
+            batch_id: promo.batch_id ?? null,
+            name: promo.name || promo.code,
+            type: promo.type as PromoType,
+            value: Number(promo.value),
+            start_date: promo.start_date,
+            end_date: promo.end_date,
+            usage_limit_total: promo.usage_limit_total ? Number(promo.usage_limit_total) : null,
+            usage_limit_per_user: Number(promo.usage_limit_per_user),
+            current_usage: Number(promo.current_usage),
+            status: promo.status as PromoStatus,
+            description: promo.description || '',
+            created_by: promo.created_by,
+            created_at: promo.created_at,
+            updated_at: promo.updated_at,
+            deleted: promo.deleted || false
+          }));
         setPromos(formattedPromos);
       }
     } catch (error) {
@@ -72,10 +81,13 @@ const Promo: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  // Note: Status updates for expired promos should be handled by the backend
-  // This useEffect is removed to avoid localStorage dependency and infinite loops
+  useEffect(() => {
+    if (activeTab === "single") {
+      loadPromos();
+    }
+  }, [activeTab, loadPromos]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -96,14 +108,6 @@ const Promo: React.FC = () => {
       showToast('Please enter a valid value', 'error');
       return;
     }
-    if (!form.usage_limit_total.trim() || isNaN(Number(form.usage_limit_total))) {
-      showToast('Please enter a valid usage limit', 'error');
-      return;
-    }
-    if (!form.usage_limit_per_user.trim() || isNaN(Number(form.usage_limit_per_user))) {
-      showToast('Please enter a valid usage limit per user', 'error');
-      return;
-    }
     
     try {
       setLoading(true);
@@ -111,13 +115,14 @@ const Promo: React.FC = () => {
       const now = new Date().toISOString();
       
       await promoService.createPromo({
-        name: code, // Using code as name
+        name: form.name || code,
         code,
         type: form.type,
         value: Number(form.value),
         start_date: form.start_date || now.split('T')[0],
         end_date: form.end_date || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        usage_limit_per_user: Number(form.usage_limit_per_user),
+        usage_limit_total: form.usage_limit_total ? Number(form.usage_limit_total) : undefined,
+        usage_limit_per_user: form.usage_limit_per_user ? Number(form.usage_limit_per_user) : undefined,
         description: form.description,
         status: 'active',
         created_by: getStoredUser()?.id
@@ -129,6 +134,7 @@ const Promo: React.FC = () => {
         type: "fixed",
         value: "",
         code: "",
+        name: "",
         start_date: "",
         end_date: "",
         usage_limit_total: "",
@@ -144,9 +150,10 @@ const Promo: React.FC = () => {
     }
   };
 
-  const openEditModal = (index: number) => {
-    setEditIndex(index);
-    const promo = promos[index];
+  const openEditModal = (id: number) => {
+    setEditPromoId(id);
+    const promo = promos.find(p => p.id === id);
+    if (!promo) return;
     setEditForm({
       type: promo.type,
       value: promo.value,
@@ -160,7 +167,7 @@ const Promo: React.FC = () => {
   };
 
   const closeEditModal = () => {
-    setEditIndex(null);
+    setEditPromoId(null);
     setEditForm(null);
   };
 
@@ -175,62 +182,72 @@ const Promo: React.FC = () => {
     }));
   };
 
-  const handleEditSave = () => {
-    if (editIndex === null || !editForm) return;
-    const updatedPromos = [...promos];
-    const promo = { ...updatedPromos[editIndex] };
-    if (editForm.type) promo.type = editForm.type as PromoType;
-    if (editForm.value !== undefined) promo.value = Number(editForm.value);
-    if (editForm.start_date !== undefined) promo.start_date = editForm.start_date ? new Date(editForm.start_date).toISOString() : '';
-    if (editForm.end_date !== undefined) promo.end_date = editForm.end_date ? new Date(editForm.end_date).toISOString() : '';
-    if (editForm.usage_limit_total !== undefined) promo.usage_limit_total = Number(editForm.usage_limit_total);
-    if (editForm.usage_limit_per_user !== undefined) promo.usage_limit_per_user = Number(editForm.usage_limit_per_user);
-    if (editForm.status) promo.status = editForm.status as PromoStatus;
-    if (editForm.description !== undefined) promo.description = editForm.description;
-    promo.updated_at = new Date().toISOString();
-    updatedPromos[editIndex] = promo;
-    setPromos(updatedPromos);
-    localStorage.setItem("zapzone_promos", JSON.stringify(updatedPromos));
-    closeEditModal();
+  const handleEditSave = async () => {
+    if (editPromoId === null || !editForm) return;
+    const promo = promos.find(p => p.id === editPromoId);
+    if (!promo) return;
+    try {
+      setLoading(true);
+      const updateData: Record<string, unknown> = {};
+      if (editForm.type) updateData.type = editForm.type;
+      if (editForm.value !== undefined) updateData.value = Number(editForm.value);
+      if (editForm.start_date !== undefined) updateData.start_date = editForm.start_date;
+      if (editForm.end_date !== undefined) updateData.end_date = editForm.end_date;
+      if (editForm.usage_limit_total !== undefined) updateData.usage_limit_total = Number(editForm.usage_limit_total);
+      if (editForm.usage_limit_per_user !== undefined) updateData.usage_limit_per_user = Number(editForm.usage_limit_per_user);
+      if (editForm.status) updateData.status = editForm.status;
+      if (editForm.description !== undefined) updateData.description = editForm.description;
+
+      await promoService.updatePromo(promo.id, updateData);
+      showToast('Promo updated successfully!', 'success');
+      await loadPromos();
+      closeEditModal();
+    } catch (error) {
+      console.error('Error updating promo:', error);
+      showToast('Error updating promo', 'error');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleDeactivate = (index: number) => {
-    const updatedPromos = [...promos];
-    updatedPromos[index] = {
-      ...updatedPromos[index],
-      status: "inactive" as PromoStatus,
-      updated_at: new Date().toISOString(),
-    };
-    setPromos(updatedPromos);
-    localStorage.setItem("zapzone_promos", JSON.stringify(updatedPromos));
+  const handleDeactivate = async (id: number) => {
+    const promo = promos.find(p => p.id === id);
+    if (!promo) return;
+    try {
+      await promoService.togglePromoStatus(promo.id);
+      showToast('Promo deactivated', 'success');
+      await loadPromos();
+    } catch (error) {
+      console.error('Error toggling promo:', error);
+      showToast('Error updating promo status', 'error');
+    }
   };
 
-  const handleActivate = (index: number) => {
-    const updatedPromos = [...promos];
-    updatedPromos[index] = {
-      ...updatedPromos[index],
-      status: "active" as PromoStatus,
-      updated_at: new Date().toISOString(),
-    };
-    setPromos(updatedPromos);
-    localStorage.setItem("zapzone_promos", JSON.stringify(updatedPromos));
+  const handleActivate = async (id: number) => {
+    const promo = promos.find(p => p.id === id);
+    if (!promo) return;
+    try {
+      await promoService.togglePromoStatus(promo.id);
+      showToast('Promo activated', 'success');
+      await loadPromos();
+    } catch (error) {
+      console.error('Error toggling promo:', error);
+      showToast('Error updating promo status', 'error');
+    }
   };
 
-  const handleDelete = async (index: number) => {
-    const promo = promos[index];
+  const handleDelete = async (id: number) => {
+    const promo = promos.find(p => p.id === id);
+    if (!promo) return;
     if (!window.confirm(`Are you sure you want to delete promo "${promo.code}"?`)) {
       return;
     }
 
     try {
       setLoading(true);
-      // Assuming promo has an id field from backend
-      const promoId = (promo as unknown as { id?: number }).id;
-      if (promoId) {
-        await promoService.deletePromo(promoId);
-        showToast('Promo deleted successfully!', 'success');
-        await loadPromos();
-      }
+      await promoService.deletePromo(promo.id);
+      showToast('Promo deleted successfully!', 'success');
+      await loadPromos();
     } catch (error) {
       console.error('Error deleting promo:', error);
       showToast('Error deleting promo', 'error');
@@ -281,24 +298,65 @@ const Promo: React.FC = () => {
 
   return (
     <div className="px-6 py-8">
-      {/* Page Header with Action Buttons */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Promo Codes</h1>
-          <p className="text-gray-600 mt-2">Create and manage promotional codes</p>
+      {/* Batch Detail View (full-page overlay when viewing a batch) */}
+      {selectedBatchId ? (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <BatchDetailView
+            batchId={selectedBatchId}
+            onBack={() => setSelectedBatchId(null)}
+          />
         </div>
-        <StandardButton
-          onClick={() => setShowModal(true)}
-          variant="primary"
-          size="md"
-          icon={Plus}
-        >
-          Create Promo Code
-        </StandardButton>
-      </div>
+      ) : (
+        <>
+          {/* Page Header */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">Promo Codes</h1>
+              <p className="text-gray-600 mt-2">Create and manage promotional codes</p>
+            </div>
+            {activeTab === "single" && (
+              <StandardButton
+                onClick={() => setShowModal(true)}
+                variant="primary"
+                size="md"
+                icon={Plus}
+              >
+                Create Promo Code
+              </StandardButton>
+            )}
+          </div>
 
-      {/* Main Content */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          {/* Tabs */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100">
+            <div className="border-b border-gray-200">
+              <nav className="flex -mb-px">
+                <button
+                  onClick={() => setActiveTab("single")}
+                  className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
+                    activeTab === "single"
+                      ? `border-${themeColor}-600 text-${fullColor}`
+                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                  }`}
+                >
+                  Single Codes
+                </button>
+                <button
+                  onClick={() => setActiveTab("bulk")}
+                  className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
+                    activeTab === "bulk"
+                      ? `border-${themeColor}-600 text-${fullColor}`
+                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                  }`}
+                >
+                  Bulk Codes (Batches)
+                </button>
+              </nav>
+            </div>
+
+            <div className="p-6">
+              {activeTab === "single" ? (
+                /* ── Single Codes Tab ── */
+                <div>
 
         {/* Search and Filter Section */}
         <div className="mb-6">
@@ -380,12 +438,12 @@ const Promo: React.FC = () => {
           </div>
         ) : filteredPromos.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {filteredPromos.map((promo, i) => {
+              {filteredPromos.map((promo) => {
                 const isExpired = promo.end_date && new Date(promo.end_date) < new Date();
                 const status = isExpired ? 'expired' : promo.status;
                 
                 return (
-                  <div key={i} className="border-2 border-gray-200 rounded-lg p-4 hover:shadow-lg hover:scale-105 hover:border-gray-300 transition-all bg-white">
+                  <div key={promo.id} className="border-2 border-gray-200 rounded-lg p-4 hover:shadow-lg hover:scale-105 hover:border-gray-300 transition-all bg-white">
                     <div className="flex justify-between items-start mb-4">
                       <div className="flex items-center gap-2">
                         <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${getStatusColor(status)}`}>
@@ -395,7 +453,7 @@ const Promo: React.FC = () => {
                       </div>
                       <div className="flex gap-1">
                         <StandardButton 
-                          onClick={() => openEditModal(i)}
+                          onClick={() => openEditModal(promo.id)}
                           variant="ghost"
                           size="sm"
                           className="p-1.5"
@@ -403,7 +461,7 @@ const Promo: React.FC = () => {
                         />
                         {status === 'active' ? (
                           <StandardButton 
-                            onClick={() => handleDeactivate(i)}
+                            onClick={() => handleDeactivate(promo.id)}
                             variant="ghost"
                             size="sm"
                             className="p-1.5 text-yellow-600 hover:bg-yellow-50"
@@ -412,7 +470,7 @@ const Promo: React.FC = () => {
                           />
                         ) : (
                           <StandardButton 
-                            onClick={() => handleActivate(i)}
+                            onClick={() => handleActivate(promo.id)}
                             variant="ghost"
                             size="sm"
                             className="p-1.5 text-green-600 hover:bg-green-50"
@@ -421,7 +479,7 @@ const Promo: React.FC = () => {
                           />
                         )}
                         <StandardButton 
-                          onClick={() => handleDelete(i)}
+                          onClick={() => handleDelete(promo.id)}
                           variant="danger"
                           size="sm"
                           className="p-1.5"
@@ -509,7 +567,15 @@ const Promo: React.FC = () => {
               </StandardButton>
           </div>
         )}
-      </div>
+                </div>
+              ) : (
+                /* ── Bulk Codes Tab ── */
+                <BatchListTab onViewBatch={(batchId) => setSelectedBatchId(batchId)} />
+              )}
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Create Modal */}
       {showModal && (
@@ -525,6 +591,18 @@ const Promo: React.FC = () => {
             <h3 className="text-xl font-semibold mb-4 text-gray-900">Create Promo Code</h3>
             <form onSubmit={handleAdd}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-800 mb-1">Name *</label>
+                    <input
+                      type="text"
+                      name="name"
+                      value={form.name}
+                      onChange={handleChange}
+                      className={`w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
+                      required
+                      placeholder="e.g. Summer Sale 20%"
+                    />
+                  </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-800 mb-1">Type</label>
                     <select 
@@ -645,7 +723,7 @@ const Promo: React.FC = () => {
       )}
 
       {/* Edit Modal */}
-      {editIndex !== null && editForm && (
+      {editPromoId !== null && editForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-md relative border border-gray-200 m-4">
             <StandardButton 
@@ -707,7 +785,7 @@ const Promo: React.FC = () => {
                     <input
                       type="number"
                       name="usage_limit_total"
-                      value={editForm.usage_limit_total === undefined ? '' : editForm.usage_limit_total}
+                      value={editForm.usage_limit_total ?? ''}
                       onChange={handleEditChange}
                       className={`w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500`}
                       min="1"
