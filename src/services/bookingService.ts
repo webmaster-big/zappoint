@@ -621,6 +621,34 @@ const bookingService = {
     const response = await api.post('/bookings/bulk-restore', { ids });
     return response.data;
   },
+
+  /**
+   * Bulk import bookings from a Bookly CSV/Excel file
+   */
+  async bulkImportCsv(
+    file: File,
+    locationId: number,
+    skipDuplicates: boolean = true
+  ): Promise<{
+    success: true;
+    message: string;
+    data: {
+      imported: number;
+      skipped: number;
+      errors: { row: number; error: string }[];
+      total_rows: number;
+    };
+  }> {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('location_id', locationId.toString());
+    formData.append('skip_duplicates', skipDuplicates ? '1' : '0');
+
+    const response = await api.post('/bookings/bulk-import-csv', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
 };
 
 export default bookingService;

@@ -29,7 +29,8 @@ import {
   ChevronDown,
   AlertTriangle,
   RotateCcw,
-  Archive
+  Archive,
+  Upload
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import StandardButton from '../../../components/ui/StandardButton';
@@ -50,6 +51,7 @@ import { packageService, type Package as PackageType } from '../../../services/P
 import { roomService, type Room } from '../../../services/RoomService';
 import { packageCacheService } from '../../../services/PackageCacheService';
 import { roomCacheService } from '../../../services/RoomCacheService';
+import BulkImportModal from '../../../components/admin/bookings/BulkImportModal';
 
 // Convert 24-hour time to 12-hour format with AM/PM
 const formatTime12Hour = (time24: string): string => {
@@ -157,6 +159,7 @@ const Bookings: React.FC = () => {
   const [paymentNotes, setPaymentNotes] = useState('');
   const [processingPayment, setProcessingPayment] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
+  const [showBulkImportModal, setShowBulkImportModal] = useState(false);
   const [exportFilters, setExportFilters] = useState({
     locations: [] as number[],
     customers: [] as number[],
@@ -2773,6 +2776,14 @@ const Bookings: React.FC = () => {
             <StandardButton
               variant="primary"
               size="md"
+              icon={Upload}
+              onClick={() => setShowBulkImportModal(true)}
+            >
+              Bulk Import
+            </StandardButton>
+            <StandardButton
+              variant="primary"
+              size="md"
               icon={Download}
               onClick={() => setShowExportModal(true)}
             >
@@ -3519,6 +3530,14 @@ const Bookings: React.FC = () => {
             </div>
           </>
         )}
+
+        {/* Bulk Import Modal */}
+        <BulkImportModal
+          isOpen={showBulkImportModal}
+          onClose={() => setShowBulkImportModal(false)}
+          locations={availableLocations}
+          onImportComplete={loadBookings}
+        />
 
         {/* Export Modal */}
         {showExportModal && (
