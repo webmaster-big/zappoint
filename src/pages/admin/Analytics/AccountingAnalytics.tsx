@@ -246,7 +246,10 @@ const AccountingAnalytics: React.FC = () => {
   if (loading && !reportData) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className={`animate-spin rounded-full h-12 w-12 border-b-2 border-${fullColor}`}></div>
+        <div className="text-center">
+          <div className={`animate-spin rounded-full h-12 w-12 border-b-2 border-${fullColor} mx-auto mb-4`}></div>
+          <p className="text-gray-600">Loading analytics...</p>
+        </div>
       </div>
     );
   }
@@ -255,6 +258,14 @@ const AccountingAnalytics: React.FC = () => {
     <div className="px-6 py-8">
       {toast && (
         <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />
+      )}
+
+      {/* Background refresh indicator */}
+      {refreshing && (
+        <div className={`mb-4 flex items-center gap-2 rounded-lg border border-${themeColor}-200 bg-${themeColor}-50 px-4 py-2.5 text-sm text-${themeColor}-700`}>
+          <RefreshCcw className="h-4 w-4 animate-spin" />
+          <span>Updating data in the background... You may see outdated figures until the refresh completes.</span>
+        </div>
       )}
 
       {/* Header */}

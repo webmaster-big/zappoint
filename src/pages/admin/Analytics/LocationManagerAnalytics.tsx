@@ -10,7 +10,6 @@ import {
   X,
   Info,
   Activity,
-  Loader2,
   CalendarDays,
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
@@ -35,7 +34,7 @@ import {
 } from 'recharts';
 
 const LocationManagerAnalytics: React.FC = () => {
-  const { themeColor } = useThemeColor();
+  const { themeColor, fullColor } = useThemeColor();
   const [dateRange, setDateRange] = useState<'7d' | '30d' | '90d' | '1y' | 'custom'>('30d');
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
@@ -129,7 +128,7 @@ const LocationManagerAnalytics: React.FC = () => {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="w-12 h-12 text-gray-400 animate-spin mx-auto mb-4" />
+          <div className={`animate-spin rounded-full h-12 w-12 border-b-2 border-${fullColor} mx-auto mb-4`}></div>
           <p className="text-gray-600">Loading analytics...</p>
         </div>
       </div>
