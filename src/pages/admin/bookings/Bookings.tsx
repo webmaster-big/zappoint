@@ -538,20 +538,46 @@ const Bookings: React.FC = () => {
   const loadLocations = async () => {
     try {
       if (isCompanyAdmin) {
+        // Check localStorage cache first for instant load
+        const cached = localStorage.getItem('zapzone_locations');
+        if (cached) {
+          try {
+            const parsed = JSON.parse(cached);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              setAvailableLocations(parsed);
+            }
+          } catch { /* ignore bad cache */ }
+        }
         const response = await locationService.getLocations();
         if (response.success && response.data) {
           const locationsArray = Array.isArray(response.data) ? response.data : [];
-          setAvailableLocations(locationsArray.map((loc: any) => ({
+          const mapped = locationsArray.map((loc: any) => ({
             id: loc.id,
             name: loc.name
-          })));
+          }));
+          setAvailableLocations(mapped);
+          localStorage.setItem('zapzone_locations', JSON.stringify(mapped));
         }
       } else if (currentUser?.location_id) {
-        // For location managers / attendants, fetch their assigned location
+        // Check localStorage cache first
+        const cached = localStorage.getItem('zapzone_locations');
+        if (cached) {
+          try {
+            const parsed = JSON.parse(cached);
+            const found = parsed.find((l: any) => l.id === currentUser.location_id);
+            if (found) {
+              setAvailableLocations([found]);
+              return; // Cache hit, no API call needed
+            }
+          } catch { /* ignore */ }
+        }
+        // Fallback to API
         const response = await locationService.getLocation(currentUser.location_id);
         if (response.success && response.data) {
           const loc = response.data;
-          setAvailableLocations([{ id: loc.id, name: loc.name }]);
+          const mapped = [{ id: loc.id, name: loc.name }];
+          setAvailableLocations(mapped);
+          localStorage.setItem('zapzone_locations', JSON.stringify(mapped));
         }
       }
     } catch (error) {

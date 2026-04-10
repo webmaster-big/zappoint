@@ -97,10 +97,33 @@ const AccountingAnalytics: React.FC = () => {
   // Toast
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
-  // Fetch locations
+  // Fetch locations — use localStorage cache for instant load
   useEffect(() => {
     const fetchLocations = async () => {
       try {
+        // Try localStorage cache first for instant UI
+        const cached = localStorage.getItem('zapzone_locations');
+        if (cached) {
+          try {
+            const parsed = JSON.parse(cached);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              if (isLocationManager && user?.location_id) {
+                const userLoc = parsed.find((l: { id: number }) => l.id === user.location_id);
+                if (userLoc) {
+                  setLocations([userLoc]);
+                  setSelectedLocation(userLoc.id.toString());
+                }
+              } else {
+                setLocations(parsed);
+                if (!selectedLocation && parsed.length > 0) {
+                  setSelectedLocation(parsed[0].id.toString());
+                }
+              }
+            }
+          } catch { /* ignore */ }
+        }
+
+        // Always refresh from API in background
         const response = await locationService.getLocations();
         const locs = response.data || response;
         
@@ -111,9 +134,11 @@ const AccountingAnalytics: React.FC = () => {
             setSelectedLocation(userLocation.id.toString());
           }
         } else {
-          setLocations(locs.map((l: { id: number; name: string }) => ({ id: l.id, name: l.name })));
-          if (locs.length > 0) {
-            setSelectedLocation(locs[0].id.toString());
+          const mapped = locs.map((l: { id: number; name: string }) => ({ id: l.id, name: l.name }));
+          setLocations(mapped);
+          localStorage.setItem('zapzone_locations', JSON.stringify(mapped));
+          if (!selectedLocation && mapped.length > 0) {
+            setSelectedLocation(mapped[0].id.toString());
           }
         }
       } catch (error) {
@@ -122,13 +147,33 @@ const AccountingAnalytics: React.FC = () => {
       }
     };
     fetchLocations();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLocationManager, user?.location_id]);
 
   // Fetch report — plain function so it always reads latest state values
   const fetchReport = async (showRefreshing = false) => {
     if (!selectedLocation || !startDate) return;
 
-    if (showRefreshing) {
+    // Build cache key from params
+    const cacheKey = `zapzone_acct_report_${selectedLocation}_${startDate}_${endDate || ''}_${viewMode}`;
+
+    // Show cached data instantly if available (don't block on loading)
+    if (!showRefreshing && !reportData) {
+      try {
+        const cached = sessionStorage.getItem(cacheKey);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          setReportData(parsed);
+          setLoading(false);
+          // Continue to refresh in background
+          setRefreshing(true);
+        } else {
+          setLoading(true);
+        }
+      } catch {
+        setLoading(true);
+      }
+    } else if (showRefreshing) {
       setRefreshing(true);
     } else {
       setLoading(true);
@@ -146,6 +191,10 @@ const AccountingAnalytics: React.FC = () => {
 
       if (response.success) {
         setReportData(response.data);
+        // Cache the result for instant load next time
+        try {
+          sessionStorage.setItem(cacheKey, JSON.stringify(response.data));
+        } catch { /* sessionStorage full — ignore */ }
       }
     } catch (error) {
       console.error('Failed to fetch report:', error);
@@ -155,7 +204,7 @@ const AccountingAnalytics: React.FC = () => {
       } else {
         setToast({ message: 'Failed to load report', type: 'error' });
       }
-      setReportData(null);
+      if (!reportData) setReportData(null);
     } finally {
       setLoading(false);
       setRefreshing(false);

@@ -160,7 +160,7 @@ const EventPurchases = () => {
     try {
       setLoading(true);
       const apiFilters: Record<string, unknown> = {
-        per_page: 100,
+        per_page: 10000,
         user_id: currentUser?.id,
         ...(selectedLocation && { location_id: Number(selectedLocation) }),
       };
@@ -233,6 +233,22 @@ const EventPurchases = () => {
       }
       result = result.filter((p) => new Date(p.createdAt) >= startDate);
     }
+
+    // Sort: confirmed at top, cancelled/refunded/checked-in at bottom, newest first within groups
+    const statusPriority: Record<string, number> = {
+      confirmed: 0,
+      pending: 1,
+      completed: 2,
+      'checked-in': 3,
+      cancelled: 4,
+      refunded: 5,
+      voided: 6,
+    };
+    result.sort((a, b) => {
+      const priorityDiff = (statusPriority[a.status] ?? 3) - (statusPriority[b.status] ?? 3);
+      if (priorityDiff !== 0) return priorityDiff;
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
 
     setFilteredPurchases(result);
   }, [purchases, filters]);
