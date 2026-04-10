@@ -204,13 +204,24 @@ class BookingCacheService {
 
     this.syncPromise = (async () => {
       try {
-        // Fetch all bookings with high per_page to get most data
-        const response: PaginatedBookingResponse = await bookingService.getBookings({
-          ...filters,
-          per_page: 500, // Get a large batch (500 max to avoid backend limits)
-        });
+        // Fetch ALL pages of bookings
+        let allBookings: Booking[] = [];
+        let currentPage = 1;
+        let lastPage = 1;
 
-        const bookings = response.data.bookings || [];
+        do {
+          const response: PaginatedBookingResponse = await bookingService.getBookings({
+            ...filters,
+            per_page: 500,
+            page: currentPage,
+          });
+          const pageBatch = response.data.bookings || [];
+          allBookings = allBookings.concat(pageBatch);
+          lastPage = response.data.pagination?.last_page ?? 1;
+          currentPage++;
+        } while (currentPage <= lastPage);
+
+        const bookings = allBookings;
 
         // Cache the bookings
         await this.cacheBookings(bookings, {

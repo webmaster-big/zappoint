@@ -599,23 +599,36 @@ const Bookings: React.FC = () => {
         }
       }
       
-      // No cache or cache is empty - fetch from API
+      // No cache or cache is empty - fetch ALL pages from API
       console.log('[Bookings] Fetching from API...');
-      const params: any = {
-        page: 1,
-        per_page: 1000,
+      const baseParams: any = {
+        per_page: 500,
         user_id: getStoredUser()?.id,
         sort_by: 'booking_date',
         sort_order: 'asc',
       };
       if (selectedLocation !== null) {
-        params.location_id = selectedLocation;
+        baseParams.location_id = selectedLocation;
       }
-      const response = await bookingService.getBookings(params);
-      
-      if (response.success && response.data) {
-        const transformedBookings: BookingsPageBooking[] = response.data.bookings.map(transformRawBooking);
-        console.log('[Bookings] Fetched from API:', transformedBookings.length, 'bookings');
+
+      let allRawBookings: any[] = [];
+      let currentPage = 1;
+      let lastPage = 1;
+
+      do {
+        const response = await bookingService.getBookings({ ...baseParams, page: currentPage });
+        if (response.success && response.data) {
+          allRawBookings = allRawBookings.concat(response.data.bookings);
+          lastPage = response.data.pagination?.last_page ?? 1;
+        } else {
+          break;
+        }
+        currentPage++;
+      } while (currentPage <= lastPage);
+
+      if (allRawBookings.length > 0) {
+        const transformedBookings: BookingsPageBooking[] = allRawBookings.map(transformRawBooking);
+        console.log('[Bookings] Fetched from API:', transformedBookings.length, 'bookings across', lastPage, 'page(s)');
         
         // Extract unique packages, rooms, customers for filter dropdowns
         extractFilterOptions(transformedBookings);
@@ -623,7 +636,7 @@ const Bookings: React.FC = () => {
         setBookings(transformedBookings);
         
         // Cache the raw API data in background - don't block UI
-        bookingCacheService.cacheBookings(response.data.bookings).catch(err => 
+        bookingCacheService.cacheBookings(allRawBookings).catch(err => 
           console.warn('[Bookings] Background cache write failed:', err)
         );
       }
