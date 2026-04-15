@@ -30,7 +30,8 @@ import {
   AlertTriangle,
   RotateCcw,
   Archive,
-  Upload
+  Upload,
+  Loader2
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import StandardButton from '../../../components/ui/StandardButton';
@@ -2387,14 +2388,10 @@ const Bookings: React.FC = () => {
 
   const handleOpenInternalNotesModal = async (booking: BookingsPageBooking) => {
     setSelectedBookingForNotes(booking);
-    
-    // Show cached/local data instantly, then refresh from API in background
-    const cachedBooking = await bookingCacheService.getBookingFromCache(Number(booking.id)).catch(() => null);
-    setInternalNotesText(cachedBooking?.internal_notes || booking.internal_notes || '');
+    setInternalNotesText(booking.internal_notes || '');
     setShowInternalNotesModal(true);
-    
-    // Fetch fresh internal_notes from detail API in background (only updates the textarea, nothing else)
     setLoadingInternalNotes(true);
+    // Always fetch fresh from API since list endpoint may not include internal_notes
     try {
       const response = await bookingService.getBookingById(Number(booking.id));
       if (response.success && response.data) {
@@ -2402,6 +2399,7 @@ const Bookings: React.FC = () => {
       }
     } catch (error) {
       console.error('Error fetching booking details:', error);
+      // Keep whatever we already have from the local booking data
     } finally {
       setLoadingInternalNotes(false);
     }
@@ -2411,7 +2409,6 @@ const Bookings: React.FC = () => {
     setShowInternalNotesModal(false);
     setSelectedBookingForNotes(null);
     setInternalNotesText('');
-    setLoadingInternalNotes(false);
   };
 
   const handleSaveInternalNotes = async () => {
@@ -3981,26 +3978,25 @@ const Bookings: React.FC = () => {
               </div>
 
               <div className="p-6">
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
-                    Notes
-                    {loadingInternalNotes && (
-                      <span className="inline-flex items-center gap-1 text-xs text-amber-600 font-normal">
-                        <span className="h-3 w-3 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
-                        Syncing...
-                      </span>
-                    )}
-                  </label>
-                  <textarea
-                    value={internalNotesText}
-                    onChange={(e) => setInternalNotesText(e.target.value)}
-                    rows={8}
-                    disabled={loadingInternalNotes}
-                    className={`w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent font-mono text-sm transition-opacity ${loadingInternalNotes ? 'opacity-60' : ''}`}
-                    placeholder="Add internal notes about this booking...&#10;&#10;Examples:&#10;- Customer requested quiet area&#10;- VIP - provide extra attention&#10;- Follow up required after service"
-                  />
-                </div>
+                {loadingInternalNotes ? (
+                  <div className="flex items-center justify-center py-10">
+                    <Loader2 className="h-6 w-6 animate-spin text-amber-500" />
+                    <span className="ml-2 text-sm text-gray-500">Loading notes...</span>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Notes
+                    </label>
+                    <textarea
+                      value={internalNotesText}
+                      onChange={(e) => setInternalNotesText(e.target.value)}
+                      rows={8}
+                      className={`w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent font-mono text-sm`}
+                      placeholder="Add internal notes about this booking...&#10;&#10;Examples:&#10;- Customer requested quiet area&#10;- VIP - provide extra attention&#10;- Follow up required after service"
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="p-6 border-t border-gray-100 flex gap-3 justify-end">
@@ -4008,7 +4004,7 @@ const Bookings: React.FC = () => {
                   variant="secondary"
                   size="md"
                   onClick={handleCloseInternalNotesModal}
-                  disabled={savingInternalNotes}
+                  disabled={savingInternalNotes || loadingInternalNotes}
                 >
                   Cancel
                 </StandardButton>
