@@ -888,8 +888,11 @@ const Payments: React.FC = () => {
           const booking = payment.booking;
           const attractionPurchase = payment.attractionPurchase || payment.attraction_purchase;
           const eventPurchase = payment.eventPurchase || payment.event_purchase;
+          
+          // Determine customer name — same logic as loadPayments
           let customerName = 'Guest';
           let customerEmail = 'N/A';
+          
           if (payment.customer) {
             customerName = `${payment.customer.first_name} ${payment.customer.last_name}`;
             customerEmail = payment.customer.email || 'N/A';
@@ -899,19 +902,35 @@ const Payments: React.FC = () => {
           } else if (payableType === PAYMENT_TYPE.ATTRACTION_PURCHASE && attractionPurchase) {
             customerName = attractionPurchase.guest_name || 'Guest';
             customerEmail = attractionPurchase.guest_email || 'N/A';
+          } else if (payableType === PAYMENT_TYPE.EVENT_PURCHASE && eventPurchase) {
+            customerName = eventPurchase.guest_name || 'Guest';
+            customerEmail = eventPurchase.guest_email || 'N/A';
           }
+          
+          // Build reference string with details — same logic as loadPayments
           let payableReference = 'N/A';
           let payableDescription = 'Unknown';
+          
           if (payableType === PAYMENT_TYPE.BOOKING && booking) {
             payableReference = booking.reference_number || `Booking #${payment.payable_id}`;
+            payableDescription = `Package Booking • ${booking.participants || 0} guests`;
+          } else if (payableType === PAYMENT_TYPE.BOOKING) {
+            payableReference = `Booking #${payment.payable_id}`;
             payableDescription = 'Package Booking';
           } else if (payableType === PAYMENT_TYPE.ATTRACTION_PURCHASE && attractionPurchase) {
             payableReference = attractionPurchase.transaction_id || `Purchase #${payment.payable_id}`;
+            payableDescription = `Attraction • Qty: ${attractionPurchase.quantity || 1}`;
+          } else if (payableType === PAYMENT_TYPE.ATTRACTION_PURCHASE) {
+            payableReference = `Purchase #${payment.payable_id}`;
             payableDescription = 'Attraction Purchase';
           } else if (payableType === PAYMENT_TYPE.EVENT_PURCHASE && eventPurchase) {
             payableReference = eventPurchase.reference_number || `Event #${payment.payable_id}`;
+            payableDescription = `Event Purchase • Qty: ${eventPurchase.quantity || 1}`;
+          } else if (payableType === PAYMENT_TYPE.EVENT_PURCHASE) {
+            payableReference = `Event #${payment.payable_id}`;
             payableDescription = 'Event Purchase';
           }
+          
           return {
             id: payment.id,
             payable_id: payment.payable_id,
@@ -930,11 +949,23 @@ const Payments: React.FC = () => {
             created_at: payment.created_at,
             updated_at: payment.updated_at,
             deleted_at: payment.deleted_at,
+            // Relationships
+            booking: booking,
+            attractionPurchase: attractionPurchase,
+            // Display-friendly fields
             customerName,
             customerEmail,
             locationName: payment.location?.name || 'N/A',
             payableReference,
             payableDescription,
+            // Additional details
+            bookingDate: booking?.booking_date,
+            bookingTime: booking?.booking_time,
+            participants: booking?.participants,
+            guestName: booking?.guest_name || attractionPurchase?.guest_name,
+            // Signature & Terms
+            signature_image: payment.signature_image || null,
+            terms_accepted: payment.terms_accepted ?? null,
           };
         });
         setTrashedPayments(transformed);
@@ -1143,6 +1174,7 @@ const Payments: React.FC = () => {
                     <tr className="border-b border-gray-100 bg-gray-50">
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Customer</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Method</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
@@ -1164,8 +1196,16 @@ const Payments: React.FC = () => {
                               <span className="text-sm font-mono text-gray-600">#{payment.id}</span>
                             </td>
                             <td className="px-4 py-3">
-                              <span className="text-sm text-gray-900">{payment.customerName}</span>
-                              <span className="block text-xs text-gray-500">{payment.payableReference}</span>
+                              <div className="flex flex-col">
+                                <span className="text-sm font-medium text-gray-900">{payment.customerName}</span>
+                                <span className="text-xs text-gray-500">{payment.customerEmail}</span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex flex-col">
+                                <span className="text-xs text-gray-500">{payment.payableDescription}</span>
+                                <span className="text-xs font-mono text-gray-400">{payment.payableReference}</span>
+                              </div>
                             </td>
                             <td className="px-4 py-3">
                               <span className="text-sm font-semibold text-gray-900">${payment.amount.toFixed(2)}</span>
@@ -1755,11 +1795,47 @@ const Payments: React.FC = () => {
               </div>
             </div>
             <div className="p-6">
-              <div className="bg-gray-50 rounded-lg p-3 mb-4 text-sm">
-                <div className="flex justify-between"><span className="text-gray-500">Payment ID:</span><span className="font-medium">#{confirmDialog.payment.id}</span></div>
-                <div className="flex justify-between mt-1"><span className="text-gray-500">Amount:</span><span className="font-medium">${confirmDialog.payment.amount.toFixed(2)}</span></div>
-                <div className="flex justify-between mt-1"><span className="text-gray-500">Method:</span><span className="font-medium">{confirmDialog.payment.method}</span></div>
-                <div className="flex justify-between mt-1"><span className="text-gray-500">Customer:</span><span className="font-medium">{confirmDialog.payment.customerName}</span></div>
+              <div className="bg-gray-50 rounded-lg p-4 mb-4 text-sm space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Payment ID</span>
+                  <span className="font-medium text-gray-900">#{confirmDialog.payment.id}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Customer</span>
+                  <span className="font-medium text-gray-900">{confirmDialog.payment.customerName || 'Guest'}</span>
+                </div>
+                {confirmDialog.payment.customerEmail && confirmDialog.payment.customerEmail !== 'N/A' && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Email</span>
+                    <span className="font-medium text-gray-900">{confirmDialog.payment.customerEmail}</span>
+                  </div>
+                )}
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Amount</span>
+                  <span className="font-semibold text-gray-900">${confirmDialog.payment.amount.toFixed(2)} {confirmDialog.payment.currency}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Method</span>
+                  <span className="font-medium text-gray-900">{(methodConfig[confirmDialog.payment.method] || { label: confirmDialog.payment.method }).label}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Status</span>
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full ${(statusConfig[confirmDialog.payment.status as keyof typeof statusConfig] || statusConfig.pending).color}`}>
+                    {(statusConfig[confirmDialog.payment.status as keyof typeof statusConfig] || statusConfig.pending).label}
+                  </span>
+                </div>
+                {confirmDialog.payment.payableReference && confirmDialog.payment.payableReference !== 'N/A' && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Reference</span>
+                    <span className="font-medium text-gray-900">{confirmDialog.payment.payableReference}</span>
+                  </div>
+                )}
+                {confirmDialog.payment.locationName && confirmDialog.payment.locationName !== 'N/A' && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Location</span>
+                    <span className="font-medium text-gray-900">{confirmDialog.payment.locationName}</span>
+                  </div>
+                )}
               </div>
               <p className="text-sm text-gray-600">
                 {confirmDialog.type === 'soft-delete' && 'Are you sure you want to delete this payment? It can be restored later. The linked booking/purchase totals will be recalculated.'}

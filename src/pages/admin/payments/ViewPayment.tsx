@@ -727,16 +727,47 @@ const ViewPayment: React.FC = () => {
               </div>
               <h3 className="text-lg font-semibold text-gray-900">Delete Payment</h3>
             </div>
-            <p className="text-gray-600 mb-2">
+            <p className="text-gray-600 mb-3">
               Are you sure you want to delete this payment?
             </p>
-            <div className="bg-gray-50 rounded-lg p-3 mb-4 text-sm">
-              <p><span className="font-medium">Payment #{payment.id}</span></p>
-              <p>Amount: ${Number(payment.amount).toFixed(2)}</p>
-              <p>Method: {payment.method}</p>
+            <div className="bg-gray-50 rounded-lg p-4 mb-4 text-sm space-y-2">
+              <div className="flex justify-between">
+                <span className="text-gray-500">Payment ID</span>
+                <span className="font-medium text-gray-900">#{payment.id}</span>
+              </div>
+              {payment.customer && (
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Customer</span>
+                  <span className="font-medium text-gray-900">{payment.customer.first_name} {payment.customer.last_name}</span>
+                </div>
+              )}
+              {payment.customer?.email && (
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Email</span>
+                  <span className="font-medium text-gray-900">{payment.customer.email}</span>
+                </div>
+              )}
+              <div className="flex justify-between">
+                <span className="text-gray-500">Amount</span>
+                <span className="font-semibold text-gray-900">${Number(payment.amount).toFixed(2)} {payment.currency}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Method</span>
+                <span className="font-medium text-gray-900">{payment.method}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Status</span>
+                <span className="font-medium text-gray-900 capitalize">{payment.status}</span>
+              </div>
+              {payment.transaction_id && (
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Transaction</span>
+                  <span className="font-medium text-gray-900 font-mono text-xs">{payment.transaction_id}</span>
+                </div>
+              )}
             </div>
             <p className="text-sm text-gray-500 mb-6">
-              This payment will be moved to trash and can be restored later.
+              This payment will be moved to trash and can be restored later. Linked totals will be recalculated.
             </p>
             <div className="flex gap-3 justify-end">
               <button
