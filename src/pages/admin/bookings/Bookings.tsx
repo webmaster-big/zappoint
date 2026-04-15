@@ -179,6 +179,7 @@ const Bookings: React.FC = () => {
   const [selectedBookingForNotes, setSelectedBookingForNotes] = useState<BookingsPageBooking | null>(null);
   const [internalNotesText, setInternalNotesText] = useState('');
   const [savingInternalNotes, setSavingInternalNotes] = useState(false);
+  const [loadingInternalNotes, setLoadingInternalNotes] = useState(false);
   
   const currentUser = getStoredUser();
   const isCompanyAdmin = currentUser?.role === 'company_admin';
@@ -2386,28 +2387,28 @@ const Bookings: React.FC = () => {
 
   const handleOpenInternalNotesModal = async (booking: BookingsPageBooking) => {
     setSelectedBookingForNotes(booking);
-    // Always fetch from detail API to get internal_notes
-    // The listing API may not include internal_notes, so cache may not have it
+    
+    // Show cached/local value immediately for instant modal open
+    const cachedBooking = await bookingCacheService.getBookingFromCache(Number(booking.id)).catch(() => null);
+    const cachedNotes = cachedBooking?.internal_notes || booking.internal_notes || '';
+    setInternalNotesText(cachedNotes);
+    setShowInternalNotesModal(true);
+    
+    // Fetch fresh data from detail API in background
+    setLoadingInternalNotes(true);
     try {
       const response = await bookingService.getBookingById(Number(booking.id));
       if (response.success && response.data) {
         setInternalNotesText(response.data.internal_notes || '');
-      } else {
-        // Fallback to cache or local booking data
-        const cachedBooking = await bookingCacheService.getBookingFromCache(Number(booking.id));
-        setInternalNotesText(cachedBooking?.internal_notes || booking.internal_notes || '');
+        // Update cache with fresh data so next open is accurate
+        await bookingCacheService.updateBookingInCache(response.data).catch(() => {});
       }
     } catch (error) {
       console.error('Error fetching booking details:', error);
-      // Fallback to cache or local booking data
-      try {
-        const cachedBooking = await bookingCacheService.getBookingFromCache(Number(booking.id));
-        setInternalNotesText(cachedBooking?.internal_notes || booking.internal_notes || '');
-      } catch {
-        setInternalNotesText(booking.internal_notes || '');
-      }
+      // Keep the cached/local value already shown
+    } finally {
+      setLoadingInternalNotes(false);
     }
-    setShowInternalNotesModal(true);
   };
 
   const handleCloseInternalNotesModal = () => {
@@ -3985,8 +3986,14 @@ const Bookings: React.FC = () => {
               <div className="p-6">
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                     Notes
+                    {loadingInternalNotes && (
+                      <span className="inline-flex items-center gap-1 text-xs text-amber-600 font-normal">
+                        <span className="animate-spin h-3 w-3 border-2 border-amber-400 border-t-transparent rounded-full" />
+                        Syncing...
+                      </span>
+                    )}
                   </label>
                   <textarea
                     value={internalNotesText}
