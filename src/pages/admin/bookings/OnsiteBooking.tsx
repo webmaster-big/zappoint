@@ -1515,7 +1515,7 @@ const OnsiteBooking: React.FC = () => {
         duration_unit: finalDurationUnit,
         total_amount: totalAmount,
         amount_paid: amountPaid,
-        payment_method: (bookingData.paymentMethod === 'in-store' ? 'in-store' : bookingData.paymentMethod) as 'card' | 'in-store' | 'paylater',
+        payment_method: (bookingData.paymentMethod === 'in-store' ? 'in-store' : bookingData.paymentMethod) as 'authorize.net' | 'in-store' | 'paylater',
         ...(bookingData.paymentMethod === 'in-store' ? {
           // Onsite: confirmed immediately, payment_status reflects actual payment
           status: 'confirmed' as const,
@@ -1718,7 +1718,7 @@ const OnsiteBooking: React.FC = () => {
               customer_id: customerId || null,
               amount: amountPaid,
               currency: 'USD',
-              method: bookingData.paymentMethod as 'card' | 'in-store',
+              method: bookingData.paymentMethod as 'in-store' | 'authorize.net',
               status: 'completed' as const,
               location_id: bookingData_request.location_id,
               notes: bookingData.paymentMethod === 'in-store' 

@@ -622,9 +622,9 @@ const ViewBooking: React.FC = () => {
                           }
                         }
                         
-                        // Fallback to pivot price or addon price
+                        // Fallback to pivot price_at_booking or addon price
                         if (unitPrice === 0) {
-                          unitPrice = addon.pivot?.price !== undefined ? Number(addon.pivot.price) : (addon.price !== null ? Number(addon.price) : 0);
+                          unitPrice = Number(addon.pivot?.price_at_booking ?? addon.pivot?.price ?? addon.price ?? 0) || 0;
                         }
                         
                         const quantity = addon.pivot?.quantity || 1;

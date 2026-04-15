@@ -563,6 +563,41 @@ const EditBooking: React.FC = () => {
     setSubmitting(true);
 
     try {
+      // Calculate updated total if participants, package, or fees changed
+      let updatedTotal: number | undefined = undefined;
+      const isPackageChanged = formData.packageId !== originalBooking.package_id;
+      const isParticipantsChanged = formData.participants !== originalBooking.participants;
+      
+      // Check if fees have changed
+      const originalFees = originalBooking.applied_fees || [];
+      const feesChanged = JSON.stringify(appliedFees) !== JSON.stringify(originalFees);
+      
+      if (isPackageChanged || isParticipantsChanged || feesChanged) {
+        const basePackagePrice = packageDetails ? Number(packageDetails.price) : 0;
+        const minParticipants = packageDetails?.min_participants || 1;
+        const pricePerAdditional = Number(packageDetails?.price_per_additional || 0);
+        const additionalCount = Math.max(0, formData.participants - minParticipants);
+        const packagePrice = basePackagePrice + (additionalCount * pricePerAdditional);
+        
+        const attractionsTotal = (originalBooking.attractions || []).reduce((sum, attr) => {
+          const price = Number(attr.pivot?.price_at_booking || 0);
+          const qty = Number(attr.pivot?.quantity || 1);
+          return sum + (price * qty);
+        }, 0);
+        
+        const addonsTotal = (originalBooking.add_ons || []).reduce((sum, addon) => {
+          const price = Number(addon.pivot?.price_at_booking || 0);
+          const qty = Number(addon.pivot?.quantity || 1);
+          return sum + (price * qty);
+        }, 0);
+        
+        const additiveFeeTotal = appliedFees
+          .filter(f => f.fee_application_type === 'additive')
+          .reduce((sum, f) => sum + f.fee_amount, 0);
+        
+        updatedTotal = packagePrice + attractionsTotal + addonsTotal + additiveFeeTotal;
+      }
+
       const response = await bookingService.updateBooking(Number(originalBooking.id), {
         guest_name: formData.customerName,
         guest_email: formData.email,
@@ -578,6 +613,7 @@ const EditBooking: React.FC = () => {
         applied_fees: appliedFees.length > 0 ? appliedFees : null,
         applied_discounts: appliedDiscounts.length > 0 ? appliedDiscounts : null,
         discount_amount: originalBooking.discount_amount ? Number(originalBooking.discount_amount) : undefined,
+        ...(updatedTotal !== undefined && { total_amount: updatedTotal }),
         guest_of_honor_name: packageDetails?.has_guest_of_honor && formData.guestOfHonorName ? formData.guestOfHonorName : undefined,
         guest_of_honor_age: packageDetails?.has_guest_of_honor && formData.guestOfHonorAge ? parseInt(formData.guestOfHonorAge) : undefined,
         guest_of_honor_gender: packageDetails?.has_guest_of_honor && formData.guestOfHonorGender ? formData.guestOfHonorGender as 'male' | 'female' | 'other' : undefined,
@@ -1237,7 +1273,12 @@ const EditBooking: React.FC = () => {
               <div className="space-y-2">
                 {/* Package Price */}
                 <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Package</span>
+                  <span className="text-sm text-gray-600">
+                    Package
+                    {packageDetails?.min_participants && packageDetails.min_participants > 1 && (
+                      <span className="text-xs text-gray-400 ml-1">(up to {packageDetails.min_participants} people)</span>
+                    )}
+                  </span>
                   <span className="font-medium text-gray-900">
                     ${packageDetails ? Number(packageDetails.price).toFixed(2) : '0.00'}
                   </span>
@@ -1283,7 +1324,12 @@ const EditBooking: React.FC = () => {
                 
                 {/* Calculated Totals */}
                 {(() => {
-                  const packagePrice = packageDetails ? Number(packageDetails.price) : 0;
+                  const basePackagePrice = packageDetails ? Number(packageDetails.price) : 0;
+                  const minParticipants = packageDetails?.min_participants || 1;
+                  const pricePerAdditional = Number(packageDetails?.price_per_additional || 0);
+                  const additionalCount = Math.max(0, formData.participants - minParticipants);
+                  const additionalParticipantCost = additionalCount * pricePerAdditional;
+                  const packagePrice = basePackagePrice + additionalParticipantCost;
                   
                   const attractionsTotal = (originalBooking?.attractions || []).reduce((sum, attr) => {
                     const price = Number(attr.pivot?.price_at_booking || 0);
@@ -1298,26 +1344,42 @@ const EditBooking: React.FC = () => {
                   }, 0);
                   
                   const originalTotal = Number(originalBooking?.total_amount || 0);
-                  const calculatedTotal = packagePrice + attractionsTotal + addonsTotal;
                   
-                  // Sum additive fees (these add on top of the base total)
+                  // Sum additive fees
                   const additiveFeeTotal = appliedFees
                     .filter(f => f.fee_application_type === 'additive')
                     .reduce((sum, f) => sum + f.fee_amount, 0);
                   
-                  // Use calculated total if package changed, otherwise use original
+                  // Recalculate if package, participants, or fees changed
                   const isPackageChanged = formData.packageId !== originalBooking?.package_id;
-                  const baseTotal = isPackageChanged ? calculatedTotal : originalTotal;
-                  const displayTotal = baseTotal + additiveFeeTotal;
+                  const isParticipantsChanged = formData.participants !== originalBooking?.participants;
+                  const originalFees = originalBooking?.applied_fees || [];
+                  const feesChanged = JSON.stringify(appliedFees) !== JSON.stringify(originalFees);
+                  const needsRecalc = isPackageChanged || isParticipantsChanged || feesChanged;
+                  
+                  // When recalculating: build total from components + fees
+                  // When NOT recalculating: originalTotal already includes fees, don't add again
+                  const calculatedTotal = packagePrice + attractionsTotal + addonsTotal + additiveFeeTotal;
+                  const displayTotal = needsRecalc ? calculatedTotal : originalTotal;
                   const balance = displayTotal - originalAmountPaid;
                   
                   return (
                     <>
+                      {/* Additional Participants Line Item */}
+                      {additionalCount > 0 && pricePerAdditional > 0 && (
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600">
+                            +{additionalCount} extra participant{additionalCount > 1 ? 's' : ''} × ${pricePerAdditional.toFixed(2)}
+                          </span>
+                          <span className="text-gray-900">${additionalParticipantCost.toFixed(2)}</span>
+                        </div>
+                      )}
+
                       {/* Additive Fees Line Item */}
                       {additiveFeeTotal > 0 && (
                         <div className="flex justify-between pt-2 border-t border-gray-100">
-                          <span className="text-sm text-red-600">+ Additive Fees</span>
-                          <span className="font-medium text-red-600">${additiveFeeTotal.toFixed(2)}</span>
+                          <span className="text-sm text-gray-600">Additive Fees</span>
+                          <span className="font-medium text-gray-900">${additiveFeeTotal.toFixed(2)}</span>
                         </div>
                       )}
 
@@ -1326,7 +1388,7 @@ const EditBooking: React.FC = () => {
                         <span className="text-sm font-semibold text-gray-900">Total Amount</span>
                         <span className="font-bold text-gray-900">
                           ${displayTotal.toFixed(2)}
-                          {(isPackageChanged || additiveFeeTotal > 0) && (
+                          {needsRecalc && (
                             <span className="text-xs text-orange-600 ml-1">(Updated)</span>
                           )}
                         </span>

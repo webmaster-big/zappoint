@@ -13,10 +13,11 @@ import {
   FileText,
   Package,
   Ticket,
-  RefreshCw
+  RefreshCw,
+  Trash2
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
-import { getPayment, canRefund, canVoid, canManualRefund } from '../../../services/PaymentService';
+import { getPayment, canRefund, canVoid, canManualRefund, deletePayment } from '../../../services/PaymentService';
 import type { Payment } from '../../../types/Payment.types';
 import type { PaymentsPagePayment } from '../../../types/Payments.types';
 import StandardButton from '../../../components/ui/StandardButton';
@@ -58,6 +59,28 @@ const ViewPayment: React.FC = () => {
   const [showRefundModal, setShowRefundModal] = useState(false);
   const [showVoidDialog, setShowVoidDialog] = useState(false);
   const [showManualRefundModal, setShowManualRefundModal] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleSoftDelete = async () => {
+    if (!payment) return;
+    try {
+      setDeleting(true);
+      const response = await deletePayment(payment.id);
+      if (response.success) {
+        setToast({ message: 'Payment deleted successfully. It can be restored from the Deleted Payments tab.', type: 'success' });
+        setTimeout(() => navigate('/payments'), 1500);
+      } else {
+        setToast({ message: 'Failed to delete payment', type: 'error' });
+      }
+    } catch (error) {
+      console.error('Error deleting payment:', error);
+      setToast({ message: 'Failed to delete payment', type: 'error' });
+    } finally {
+      setDeleting(false);
+      setShowDeleteConfirm(false);
+    }
+  };
 
   // Convert Payment to PaymentsPagePayment for modal compatibility
   const toPaymentsPagePayment = (p: Payment): PaymentsPagePayment => ({
@@ -620,7 +643,7 @@ const ViewPayment: React.FC = () => {
           {/* Actions */}
           <div className="p-6 bg-gray-50">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Actions</h2>
-            <div className="flex gap-3">
+            <div className="flex flex-wrap gap-3">
               {canRefund(payment) && (
                 <StandardButton variant="secondary" icon={RefreshCw} onClick={() => setShowRefundModal(true)}>
                   Refund Payment
@@ -636,7 +659,16 @@ const ViewPayment: React.FC = () => {
                   Manual Refund
                 </StandardButton>
               )}
-              {!canRefund(payment) && !canVoid(payment) && !canManualRefund(payment) && (
+              {payment.status === 'completed' && (
+                <button
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-600 bg-white hover:bg-red-50 border border-red-200 rounded-lg transition-colors"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Delete Payment
+                </button>
+              )}
+              {!canRefund(payment) && !canVoid(payment) && !canManualRefund(payment) && payment.status !== 'completed' && (
                 <p className="text-gray-500 text-sm">No actions available for this payment.</p>
               )}
             </div>
@@ -684,6 +716,47 @@ const ViewPayment: React.FC = () => {
         onRefundComplete={handleManualRefundComplete}
         onToast={(message, type) => setToast({ message, type })}
       />
+
+      {/* Delete Confirmation Dialog */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl p-6 max-w-md w-full mx-4">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-red-100 rounded-full">
+                <Trash2 className="w-5 h-5 text-red-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900">Delete Payment</h3>
+            </div>
+            <p className="text-gray-600 mb-2">
+              Are you sure you want to delete this payment?
+            </p>
+            <div className="bg-gray-50 rounded-lg p-3 mb-4 text-sm">
+              <p><span className="font-medium">Payment #{payment.id}</span></p>
+              <p>Amount: ${Number(payment.amount).toFixed(2)}</p>
+              <p>Method: {payment.method}</p>
+            </div>
+            <p className="text-sm text-gray-500 mb-6">
+              This payment will be moved to trash and can be restored later.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                disabled={deleting}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSoftDelete}
+                disabled={deleting}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50"
+              >
+                {deleting ? 'Deleting...' : 'Delete Payment'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Toast Notification */}
       {toast && (

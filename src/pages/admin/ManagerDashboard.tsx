@@ -81,7 +81,7 @@ const LocationManagerDashboard: React.FC = () => {
   // Payment modal states
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<'card' | 'in-store'>('in-store');
+  const [paymentMethod, setPaymentMethod] = useState<'in-store'>('in-store');
   const [paymentNotes, setPaymentNotes] = useState('');
   const [processingPayment, setProcessingPayment] = useState(false);
 
@@ -2415,11 +2415,9 @@ const LocationManagerDashboard: React.FC = () => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Payment Method *</label>
-                <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as 'card' | 'in-store')}
-                  className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent`}>
-                  <option value="in-store">In-Store</option>
-                  <option value="card">Card</option>
-                </select>
+                <div className={`w-full px-4 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-700 text-sm`}>
+                  In-Store
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Notes (Optional)</label>

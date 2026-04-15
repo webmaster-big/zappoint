@@ -634,8 +634,8 @@ const CreatePurchase = () => {
         total_amount: totalAmount, // Include fees in total_amount
         amount_paid: paymentMethod === 'paylater' ? 0 : (isCardPayment ? totalAmount : cashAmountPaid),
         currency: 'USD',
-        method: paymentMethod === 'in-store' ? 'cash' : paymentMethod as 'card' | 'paylater' | 'authorize.net',
-        payment_method: paymentMethod as 'card' | 'in-store' | 'paylater' | 'authorize.net',
+        method: paymentMethod === 'in-store' ? 'cash' : paymentMethod as 'paylater' | 'authorize.net',
+        payment_method: paymentMethod as 'in-store' | 'paylater' | 'authorize.net',
         ...(paymentMethod === 'in-store' ? {
           status: 'confirmed' as const,
         } : {}),
@@ -753,7 +753,7 @@ const CreatePurchase = () => {
             customer_id: selectedCustomerId || null,
             amount: cashAmountPaid,
             currency: 'USD',
-            method: 'cash' as 'card' | 'cash',
+            method: 'cash',
             status: 'completed' as const,
             location_id: selectedAttraction.locationId || 1,
             notes: `Payment for attraction purchase: ${selectedAttraction.name}`,

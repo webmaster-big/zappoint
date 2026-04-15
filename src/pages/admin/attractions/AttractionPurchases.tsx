@@ -55,7 +55,7 @@ const ManagePurchases = () => {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedPurchaseForPayment, setSelectedPurchaseForPayment] = useState<AttractionPurchasesPurchase | null>(null);
   const [paymentAmount, setPaymentAmount] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<'card' | 'in-store'>('in-store');
+  const [paymentMethod, setPaymentMethod] = useState<'in-store'>('in-store');
   const [paymentNotes, setPaymentNotes] = useState('');
   const [processingPayment, setProcessingPayment] = useState(false);
   

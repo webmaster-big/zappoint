@@ -165,13 +165,59 @@ export const updatePayment = async (
 };
 
 /**
- * Delete payment
+ * Soft delete a payment
+ * The payment is marked with deleted_at and excluded from queries/analytics.
+ * Linked entity's amount_paid is recalculated automatically.
  * 
  * @param id - Payment ID
  * @returns Success response
  */
 export const deletePayment = async (id: number): Promise<PaymentApiResponse> => {
   const response = await api.delete<PaymentApiResponse>(`/payments/${id}`);
+  return response.data;
+};
+
+/**
+ * Restore a soft-deleted payment
+ * The linked entity's amount_paid is recalculated automatically.
+ * 
+ * @param id - Payment ID
+ * @returns Restored payment data
+ */
+export const restorePayment = async (id: number): Promise<PaymentApiResponse<Payment>> => {
+  const response = await api.patch<PaymentApiResponse<Payment>>(`/payments/${id}/restore`);
+  return response.data;
+};
+
+/**
+ * Permanently delete a soft-deleted payment
+ * Only works on already soft-deleted (trashed) payments.
+ * 
+ * @param id - Payment ID
+ * @returns Success response
+ */
+export const forceDeletePayment = async (id: number): Promise<PaymentApiResponse> => {
+  const response = await api.delete<PaymentApiResponse>(`/payments/${id}/force-delete`);
+  return response.data;
+};
+
+/**
+ * Get soft-deleted (trashed) payments
+ * 
+ * @param filters - Optional filters (payable_type, location_id, per_page)
+ * @returns Paginated list of trashed payments
+ */
+export const getTrashedPayments = async (filters?: PaymentFilters): Promise<PaginatedPaymentsResponse> => {
+  const params = new URLSearchParams();
+  if (filters) {
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        params.append(key, String(value));
+      }
+    });
+  }
+  const queryString = params.toString() ? `?${params.toString()}` : '';
+  const response = await api.get<PaginatedPaymentsResponse>(`/payments/trashed${queryString}`);
   return response.data;
 };
 
@@ -1099,6 +1145,9 @@ export default {
   getPaymentsForAttractionPurchase,
   updatePayment,
   deletePayment,
+  restorePayment,
+  forceDeletePayment,
+  getTrashedPayments,
   refundPayment,
   voidPayment,
   manualRefundPayment,

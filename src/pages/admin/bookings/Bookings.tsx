@@ -31,7 +31,8 @@ import {
   RotateCcw,
   Archive,
   Upload,
-  Loader2
+  Loader2,
+  CreditCard
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import StandardButton from '../../../components/ui/StandardButton';
@@ -156,7 +157,7 @@ const Bookings: React.FC = () => {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedBookingForPayment, setSelectedBookingForPayment] = useState<BookingsPageBooking | null>(null);
   const [paymentAmount, setPaymentAmount] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<'card' | 'in-store'>('in-store');
+  const [paymentMethod, setPaymentMethod] = useState<'in-store' | 'authorize.net'>('in-store');
   const [paymentNotes, setPaymentNotes] = useState('');
   const [processingPayment, setProcessingPayment] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
@@ -2720,11 +2721,11 @@ const Bookings: React.FC = () => {
         location_id: locationId,
         amount: amount,
         currency: 'USD',
-        method: paymentMethod === 'in-store' ? 'cash' : paymentMethod,
+        method: paymentMethod,
         status: 'completed',
         notes: paymentNotes || (paymentMethod === 'in-store' 
           ? `In-store payment for booking ${selectedBookingForPayment.referenceNumber}`
-          : `Partial payment for booking ${selectedBookingForPayment.referenceNumber}`),
+          : `Authorize.net payment for booking ${selectedBookingForPayment.referenceNumber}`),
       });
 
       if (!paymentResponse.success) {
@@ -3915,8 +3916,31 @@ const Bookings: React.FC = () => {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Payment Method
                   </label>
-                  <div className={`w-full px-4 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-700 text-sm`}>
-                    In-Store
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setPaymentMethod('in-store')}
+                      className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border text-sm font-medium transition-colors ${
+                        paymentMethod === 'in-store'
+                          ? `border-${themeColor}-500 bg-${themeColor}-50 text-${themeColor}-700 ring-2 ring-${themeColor}-200`
+                          : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+                      }`}
+                    >
+                      <DollarSign className="h-4 w-4" />
+                      In-Store
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPaymentMethod('authorize.net')}
+                      className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border text-sm font-medium transition-colors ${
+                        paymentMethod === 'authorize.net'
+                          ? `border-${themeColor}-500 bg-${themeColor}-50 text-${themeColor}-700 ring-2 ring-${themeColor}-200`
+                          : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+                      }`}
+                    >
+                      <CreditCard className="h-4 w-4" />
+                      Authorize.net
+                    </button>
                   </div>
                 </div>
 

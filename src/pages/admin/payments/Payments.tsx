@@ -24,7 +24,11 @@ import {
   RotateCcw,
   Ban,
   MoreVertical,
-  PenLine
+  PenLine,
+  Trash2,
+  Undo2,
+  AlertTriangle,
+  Archive
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { 
@@ -42,6 +46,10 @@ import {
   isRefundRecord,
   isVoidRecord,
   extractOriginalPaymentId,
+  deletePayment,
+  restorePayment,
+  forceDeletePayment,
+  getTrashedPayments,
   type InvoiceExportFilters,
   type PackageInvoiceFilters
 } from '../../../services/PaymentService';
@@ -104,6 +112,16 @@ const Payments: React.FC = () => {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [totalPages, setTotalPages] = useState(1);
   
+  // View mode: active payments or trashed (soft-deleted) payments
+  const [viewMode, setViewMode] = useState<'active' | 'trashed'>('active');
+  const [trashedPayments, setTrashedPayments] = useState<PaymentsPagePayment[]>([]);
+  const [loadingTrashed, setLoadingTrashed] = useState(false);
+  const [trashedCurrentPage, setTrashedCurrentPage] = useState(1);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    type: 'soft-delete' | 'restore' | 'force-delete';
+    payment: PaymentsPagePayment;
+  } | null>(null);
+
   // Selection state for bulk actions
   const [selectedPayments, setSelectedPayments] = useState<Set<number>>(new Set());
   const [isExporting, setIsExporting] = useState(false);
@@ -853,6 +871,141 @@ const Payments: React.FC = () => {
     });
   };
 
+  // --- Soft Delete / Restore / Force Delete handlers ---
+  const loadTrashedPayments = useCallback(async () => {
+    try {
+      setLoadingTrashed(true);
+      const params: PaymentFilters = { per_page: 1000 };
+      if (selectedLocation) {
+        params.location_id = parseInt(selectedLocation);
+      } else if (isLocationManager && currentUser?.location_id) {
+        params.location_id = currentUser.location_id;
+      }
+      const response = await getTrashedPayments(params);
+      if (response.success && response.data) {
+        const transformed: PaymentsPagePayment[] = response.data.payments.map((payment: Payment) => {
+          const payableType = normalizePayableType(payment.payable_type as string);
+          const booking = payment.booking;
+          const attractionPurchase = payment.attractionPurchase || payment.attraction_purchase;
+          const eventPurchase = payment.eventPurchase || payment.event_purchase;
+          let customerName = 'Guest';
+          let customerEmail = 'N/A';
+          if (payment.customer) {
+            customerName = `${payment.customer.first_name} ${payment.customer.last_name}`;
+            customerEmail = payment.customer.email || 'N/A';
+          } else if (payableType === PAYMENT_TYPE.BOOKING && booking) {
+            customerName = booking.guest_name || 'Guest';
+            customerEmail = booking.guest_email || 'N/A';
+          } else if (payableType === PAYMENT_TYPE.ATTRACTION_PURCHASE && attractionPurchase) {
+            customerName = attractionPurchase.guest_name || 'Guest';
+            customerEmail = attractionPurchase.guest_email || 'N/A';
+          }
+          let payableReference = 'N/A';
+          let payableDescription = 'Unknown';
+          if (payableType === PAYMENT_TYPE.BOOKING && booking) {
+            payableReference = booking.reference_number || `Booking #${payment.payable_id}`;
+            payableDescription = 'Package Booking';
+          } else if (payableType === PAYMENT_TYPE.ATTRACTION_PURCHASE && attractionPurchase) {
+            payableReference = attractionPurchase.transaction_id || `Purchase #${payment.payable_id}`;
+            payableDescription = 'Attraction Purchase';
+          } else if (payableType === PAYMENT_TYPE.EVENT_PURCHASE && eventPurchase) {
+            payableReference = eventPurchase.reference_number || `Event #${payment.payable_id}`;
+            payableDescription = 'Event Purchase';
+          }
+          return {
+            id: payment.id,
+            payable_id: payment.payable_id,
+            payable_type: payableType,
+            customer_id: payment.customer_id,
+            location_id: payment.location_id,
+            amount: Number(payment.amount),
+            currency: payment.currency,
+            method: payment.method,
+            status: payment.status,
+            transaction_id: payment.transaction_id,
+            payment_id: payment.payment_id,
+            notes: payment.notes,
+            paid_at: payment.paid_at,
+            refunded_at: payment.refunded_at,
+            created_at: payment.created_at,
+            updated_at: payment.updated_at,
+            deleted_at: payment.deleted_at,
+            customerName,
+            customerEmail,
+            locationName: payment.location?.name || 'N/A',
+            payableReference,
+            payableDescription,
+          };
+        });
+        setTrashedPayments(transformed);
+      }
+    } catch (error) {
+      console.error('Error loading trashed payments:', error);
+      setToast({ message: 'Failed to load deleted payments', type: 'error' });
+    } finally {
+      setLoadingTrashed(false);
+    }
+  }, [selectedLocation, isLocationManager, currentUser?.location_id]);
+
+  const handleSoftDelete = async (payment: PaymentsPagePayment) => {
+    try {
+      const response = await deletePayment(payment.id);
+      if (response.success) {
+        setPayments(prev => prev.filter(p => p.id !== payment.id));
+        setToast({ message: 'Payment deleted successfully. It can be restored later.', type: 'success' });
+        if (viewMode === 'trashed') loadTrashedPayments();
+      } else {
+        setToast({ message: 'Failed to delete payment', type: 'error' });
+      }
+    } catch (error) {
+      console.error('Error deleting payment:', error);
+      setToast({ message: 'Failed to delete payment', type: 'error' });
+    }
+    setConfirmDialog(null);
+    setOpenActionsMenu(null);
+  };
+
+  const handleRestore = async (payment: PaymentsPagePayment) => {
+    try {
+      const response = await restorePayment(payment.id);
+      if (response.success) {
+        setTrashedPayments(prev => prev.filter(p => p.id !== payment.id));
+        setToast({ message: 'Payment restored successfully. Linked totals recalculated.', type: 'success' });
+        // Reload active payments to include restored one
+        loadPayments();
+      } else {
+        setToast({ message: 'Failed to restore payment', type: 'error' });
+      }
+    } catch (error) {
+      console.error('Error restoring payment:', error);
+      setToast({ message: 'Failed to restore payment', type: 'error' });
+    }
+    setConfirmDialog(null);
+  };
+
+  const handleForceDelete = async (payment: PaymentsPagePayment) => {
+    try {
+      const response = await forceDeletePayment(payment.id);
+      if (response.success) {
+        setTrashedPayments(prev => prev.filter(p => p.id !== payment.id));
+        setToast({ message: 'Payment permanently deleted.', type: 'success' });
+      } else {
+        setToast({ message: 'Failed to permanently delete payment', type: 'error' });
+      }
+    } catch (error) {
+      console.error('Error permanently deleting payment:', error);
+      setToast({ message: 'Failed to permanently delete payment', type: 'error' });
+    }
+    setConfirmDialog(null);
+  };
+
+  // Load trashed payments when switching to trashed view
+  useEffect(() => {
+    if (viewMode === 'trashed') {
+      loadTrashedPayments();
+    }
+  }, [viewMode, loadTrashedPayments]);
+
   // Pagination
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
@@ -914,6 +1067,18 @@ const Payments: React.FC = () => {
           >
             Export Invoices
           </StandardButton>
+          <StandardButton
+            variant={viewMode === 'trashed' ? 'primary' : 'secondary'}
+            size="md"
+            onClick={() => {
+              const next = viewMode === 'trashed' ? 'active' : 'trashed';
+              setViewMode(next);
+              if (next === 'trashed') loadTrashedPayments();
+            }}
+            icon={viewMode === 'trashed' ? RefreshCcw : Archive}
+          >
+            {viewMode === 'trashed' ? 'View Active' : 'View Deleted'}
+          </StandardButton>
         </div>
       </div>
 
@@ -939,6 +1104,131 @@ const Payments: React.FC = () => {
         })}
       </div>
 
+
+
+      {/* Trashed Payments View */}
+      {viewMode === 'trashed' ? (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100">
+          <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Trash2 className="w-5 h-5 text-red-500" />
+              <h2 className="text-lg font-semibold text-gray-900">Deleted Payments</h2>
+              <span className="text-sm text-gray-500">({trashedPayments.length} total)</span>
+            </div>
+            <StandardButton
+              variant="secondary"
+              size="sm"
+              icon={RefreshCcw}
+              onClick={loadTrashedPayments}
+            >
+              Refresh
+            </StandardButton>
+          </div>
+
+          {loadingTrashed ? (
+            <div className="flex items-center justify-center py-16">
+              <div className={`animate-spin rounded-full h-8 w-8 border-b-2 border-${fullColor}`}></div>
+            </div>
+          ) : trashedPayments.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+              <Trash2 className="w-12 h-12 mb-3 text-gray-300" />
+              <p className="text-lg font-medium text-gray-500">No deleted payments</p>
+              <p className="text-sm text-gray-400 mt-1">Soft-deleted payments will appear here</p>
+            </div>
+          ) : (
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-gray-100 bg-gray-50">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Customer</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Method</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Deleted At</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {trashedPayments
+                      .slice((trashedCurrentPage - 1) * itemsPerPage, trashedCurrentPage * itemsPerPage)
+                      .map((payment) => {
+                        const methodInfo = methodConfig[payment.method] || { icon: CreditCard, label: payment.method };
+                        const MethodIcon = methodInfo.icon;
+                        const statusInfo = statusConfig[payment.status as keyof typeof statusConfig] || statusConfig.pending;
+                        const StatusIcon = statusInfo.icon;
+                        return (
+                          <tr key={payment.id} className="border-b border-gray-50 hover:bg-red-50/30 transition-colors">
+                            <td className="px-4 py-3">
+                              <span className="text-sm font-mono text-gray-600">#{payment.id}</span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className="text-sm text-gray-900">{payment.customerName}</span>
+                              <span className="block text-xs text-gray-500">{payment.payableReference}</span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className="text-sm font-semibold text-gray-900">${payment.amount.toFixed(2)}</span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-1.5">
+                                <MethodIcon className="w-3.5 h-3.5 text-gray-500" />
+                                <span className="text-sm text-gray-700">{methodInfo.label}</span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full ${statusInfo.color}`}>
+                                <StatusIcon className="w-3 h-3" />
+                                {statusInfo.label}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className="text-sm text-red-600">{payment.deleted_at ? formatDate(payment.deleted_at) : 'N/A'}</span>
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              <div className="flex items-center justify-end gap-1">
+                                <button
+                                  onClick={() => setConfirmDialog({ type: 'restore', payment })}
+                                  className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-green-700 bg-green-50 hover:bg-green-100 border border-green-200 rounded-lg transition-colors"
+                                  title="Restore this payment"
+                                >
+                                  <Undo2 className="w-3.5 h-3.5" />
+                                  Restore
+                                </button>
+                                <button
+                                  onClick={() => setConfirmDialog({ type: 'force-delete', payment })}
+                                  className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition-colors"
+                                  title="Permanently delete this payment"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                  Delete Forever
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                  </tbody>
+                </table>
+              </div>
+              {trashedPayments.length > itemsPerPage && (
+                <div className="px-6 py-4 border-t border-gray-100">
+                  <Pagination
+                    currentPage={trashedCurrentPage}
+                    totalPages={Math.ceil(trashedPayments.length / itemsPerPage)}
+                    onPageChange={setTrashedCurrentPage}
+                    totalItems={trashedPayments.length}
+                    showingFrom={(trashedCurrentPage - 1) * itemsPerPage + 1}
+                    showingTo={Math.min(trashedCurrentPage * itemsPerPage, trashedPayments.length)}
+                    itemLabel="deleted payments"
+                  />
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      ) : (
+      <>
       {/* Filters and Search */}
       <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-6">
         {/* Bulk Actions Bar - Shows when items are selected */}
@@ -1308,8 +1598,8 @@ const Payments: React.FC = () => {
                           >
                             <Download className="w-4 h-4" />
                           </button>
-                          {/* Actions dropdown for refund/void/manual-refund */}
-                          {(canRefund(payment) || canVoid(payment) || canManualRefund(payment)) && (
+                          {/* Actions dropdown for refund/void/manual-refund/delete */}
+                          {(canRefund(payment) || canVoid(payment) || canManualRefund(payment) || payment.status === 'completed') && (
                             <div className="relative">
                               <button
                                 onClick={() => setOpenActionsMenu(openActionsMenu === payment.id ? null : payment.id)}
@@ -1376,13 +1666,27 @@ const Payments: React.FC = () => {
                                         View Details
                                       </button>
                                     )}
+                                    {/* Soft Delete */}
+                                    <button
+                                      onClick={() => {
+                                        setConfirmDialog({ type: 'soft-delete', payment });
+                                        setOpenActionsMenu(null);
+                                      }}
+                                      className="w-full flex items-start gap-2 px-3 py-2 text-sm hover:bg-red-50 transition-colors border-t border-gray-100"
+                                    >
+                                      <Trash2 className="w-4 h-4 mt-0.5 text-red-500 shrink-0" />
+                                      <span className="text-left">
+                                        <span className="block font-medium text-red-600">Delete Payment</span>
+                                        <span className="block text-xs text-gray-500 mt-0.5">Soft delete — can be restored later. Linked totals will be recalculated.</span>
+                                      </span>
+                                    </button>
                                   </div>
                                 </>
                               )}
                             </div>
                           )}
                           {/* Simple details button for non-actionable payments */}
-                          {!canRefund(payment) && !canVoid(payment) && !canManualRefund(payment) && payment.payable_id && (
+                          {!canRefund(payment) && !canVoid(payment) && !canManualRefund(payment) && payment.status !== 'completed' && payment.payable_id && (
                             <button
                               onClick={() => {
                                 if (payment.payable_type === PAYMENT_TYPE.BOOKING) {
@@ -1424,6 +1728,71 @@ const Payments: React.FC = () => {
           </div>
         )}
       </div>
+      </>
+      )}
+
+      {/* Confirmation Dialog for soft-delete / restore / force-delete */}
+      {confirmDialog && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setConfirmDialog(null)}>
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
+            <div className={`p-6 border-b border-gray-100 ${
+              confirmDialog.type === 'force-delete' ? 'bg-red-50' : 
+              confirmDialog.type === 'restore' ? 'bg-green-50' : 'bg-amber-50'
+            }`}>
+              <div className="flex items-center gap-3">
+                {confirmDialog.type === 'force-delete' ? (
+                  <AlertTriangle className="w-6 h-6 text-red-600" />
+                ) : confirmDialog.type === 'restore' ? (
+                  <Undo2 className="w-6 h-6 text-green-600" />
+                ) : (
+                  <Trash2 className="w-6 h-6 text-amber-600" />
+                )}
+                <h2 className="text-lg font-bold text-gray-900">
+                  {confirmDialog.type === 'soft-delete' && 'Delete Payment'}
+                  {confirmDialog.type === 'restore' && 'Restore Payment'}
+                  {confirmDialog.type === 'force-delete' && 'Permanently Delete Payment'}
+                </h2>
+              </div>
+            </div>
+            <div className="p-6">
+              <div className="bg-gray-50 rounded-lg p-3 mb-4 text-sm">
+                <div className="flex justify-between"><span className="text-gray-500">Payment ID:</span><span className="font-medium">#{confirmDialog.payment.id}</span></div>
+                <div className="flex justify-between mt-1"><span className="text-gray-500">Amount:</span><span className="font-medium">${confirmDialog.payment.amount.toFixed(2)}</span></div>
+                <div className="flex justify-between mt-1"><span className="text-gray-500">Method:</span><span className="font-medium">{confirmDialog.payment.method}</span></div>
+                <div className="flex justify-between mt-1"><span className="text-gray-500">Customer:</span><span className="font-medium">{confirmDialog.payment.customerName}</span></div>
+              </div>
+              <p className="text-sm text-gray-600">
+                {confirmDialog.type === 'soft-delete' && 'Are you sure you want to delete this payment? It can be restored later. The linked booking/purchase totals will be recalculated.'}
+                {confirmDialog.type === 'restore' && 'Are you sure you want to restore this payment? The linked booking/purchase totals will be recalculated.'}
+                {confirmDialog.type === 'force-delete' && 'Are you sure you want to permanently delete this payment? This action cannot be undone.'}
+              </p>
+            </div>
+            <div className="p-6 border-t border-gray-100 flex gap-3 justify-end">
+              <StandardButton variant="secondary" size="md" onClick={() => setConfirmDialog(null)}>
+                Cancel
+              </StandardButton>
+              {confirmDialog.type === 'soft-delete' && (
+                <StandardButton variant="primary" size="md" onClick={() => handleSoftDelete(confirmDialog.payment)}>
+                  Delete
+                </StandardButton>
+              )}
+              {confirmDialog.type === 'restore' && (
+                <StandardButton variant="primary" size="md" onClick={() => handleRestore(confirmDialog.payment)}>
+                  Restore
+                </StandardButton>
+              )}
+              {confirmDialog.type === 'force-delete' && (
+                <button
+                  onClick={() => handleForceDelete(confirmDialog.payment)}
+                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+                >
+                  Delete Permanently
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Toast Notification */}
       {toast && (

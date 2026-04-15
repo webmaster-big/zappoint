@@ -468,7 +468,7 @@ const OnsitePurchaseEvent = () => {
         quantity,
         total_amount: total,
         amount_paid: paymentMethod === 'in-store' ? total : 0,
-        payment_method: paymentMethod as 'card' | 'in-store' | 'paylater' | 'authorize.net',
+        payment_method: paymentMethod as 'in-store' | 'paylater' | 'authorize.net',
         ...(paymentMethod === 'in-store' ? {
           status: 'confirmed' as const,
           payment_status: 'paid' as const,
@@ -558,7 +558,7 @@ const OnsitePurchaseEvent = () => {
             customer_id: selectedCustomerId || null,
             amount: total,
             currency: 'USD',
-            method: 'cash' as 'card' | 'cash',
+            method: 'cash',
             status: 'completed' as const,
             location_id: event!.location_id || 1,
             notes: `Payment for event purchase: ${event!.name}`,

@@ -775,8 +775,8 @@ const PurchaseAttraction = () => {
         total_amount: totalAmount, // Include fees in total_amount
         amount_paid: totalAmount,
         currency: 'USD',
-        method: 'card',
-        payment_method: 'authorize.net' as 'card' | 'in-store' | 'paylater' | 'authorize.net',
+        method: 'authorize.net',
+        payment_method: 'authorize.net' as 'in-store' | 'paylater' | 'authorize.net',
         location_id: attraction.locationId || 1,
         purchase_date: new Date().toISOString().split('T')[0],
         scheduled_date: scheduledDate || undefined,
