@@ -2388,10 +2388,16 @@ const Bookings: React.FC = () => {
   const handleOpenInternalNotesModal = async (booking: BookingsPageBooking) => {
     setSelectedBookingForNotes(booking);
     
-    // Show cached/local value immediately for instant modal open
-    const cachedBooking = await bookingCacheService.getBookingFromCache(Number(booking.id)).catch(() => null);
-    const cachedNotes = cachedBooking?.internal_notes || booking.internal_notes || '';
-    setInternalNotesText(cachedNotes);
+    // Show cached/local data instantly, then refresh from API in background
+    let initialNotes = booking.internal_notes || '';
+    try {
+      const cachedBooking = await bookingCacheService.getBookingFromCache(Number(booking.id));
+      if (cachedBooking?.internal_notes) {
+        initialNotes = cachedBooking.internal_notes;
+      }
+    } catch { /* ignore cache errors */ }
+    
+    setInternalNotesText(initialNotes);
     setShowInternalNotesModal(true);
     
     // Fetch fresh data from detail API in background
@@ -2400,7 +2406,7 @@ const Bookings: React.FC = () => {
       const response = await bookingService.getBookingById(Number(booking.id));
       if (response.success && response.data) {
         setInternalNotesText(response.data.internal_notes || '');
-        // Update cache with fresh data so next open is accurate
+        // Update cache with fresh data
         await bookingCacheService.updateBookingInCache(response.data).catch(() => {});
       }
     } catch (error) {
@@ -2415,6 +2421,7 @@ const Bookings: React.FC = () => {
     setShowInternalNotesModal(false);
     setSelectedBookingForNotes(null);
     setInternalNotesText('');
+    setLoadingInternalNotes(false);
   };
 
   const handleSaveInternalNotes = async () => {
@@ -3990,7 +3997,7 @@ const Bookings: React.FC = () => {
                     Notes
                     {loadingInternalNotes && (
                       <span className="inline-flex items-center gap-1 text-xs text-amber-600 font-normal">
-                        <span className="animate-spin h-3 w-3 border-2 border-amber-400 border-t-transparent rounded-full" />
+                        <span className="h-3 w-3 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
                         Syncing...
                       </span>
                     )}
@@ -3999,7 +4006,8 @@ const Bookings: React.FC = () => {
                     value={internalNotesText}
                     onChange={(e) => setInternalNotesText(e.target.value)}
                     rows={8}
-                    className={`w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent font-mono text-sm`}
+                    disabled={loadingInternalNotes}
+                    className={`w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent font-mono text-sm transition-opacity ${loadingInternalNotes ? 'opacity-60' : ''}`}
                     placeholder="Add internal notes about this booking...&#10;&#10;Examples:&#10;- Customer requested quiet area&#10;- VIP - provide extra attention&#10;- Follow up required after service"
                   />
                 </div>
@@ -4018,7 +4026,7 @@ const Bookings: React.FC = () => {
                   variant="primary"
                   size="md"
                   onClick={handleSaveInternalNotes}
-                  disabled={savingInternalNotes}
+                  disabled={savingInternalNotes || loadingInternalNotes}
                   loading={savingInternalNotes}
                 >
                   {savingInternalNotes ? 'Saving...' : 'Save Notes'}
