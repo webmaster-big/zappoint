@@ -2389,29 +2389,19 @@ const Bookings: React.FC = () => {
     setSelectedBookingForNotes(booking);
     
     // Show cached/local data instantly, then refresh from API in background
-    let initialNotes = booking.internal_notes || '';
-    try {
-      const cachedBooking = await bookingCacheService.getBookingFromCache(Number(booking.id));
-      if (cachedBooking?.internal_notes) {
-        initialNotes = cachedBooking.internal_notes;
-      }
-    } catch { /* ignore cache errors */ }
-    
-    setInternalNotesText(initialNotes);
+    const cachedBooking = await bookingCacheService.getBookingFromCache(Number(booking.id)).catch(() => null);
+    setInternalNotesText(cachedBooking?.internal_notes || booking.internal_notes || '');
     setShowInternalNotesModal(true);
     
-    // Fetch fresh data from detail API in background
+    // Fetch fresh internal_notes from detail API in background (only updates the textarea, nothing else)
     setLoadingInternalNotes(true);
     try {
       const response = await bookingService.getBookingById(Number(booking.id));
       if (response.success && response.data) {
         setInternalNotesText(response.data.internal_notes || '');
-        // Update cache with fresh data
-        await bookingCacheService.updateBookingInCache(response.data).catch(() => {});
       }
     } catch (error) {
       console.error('Error fetching booking details:', error);
-      // Keep the cached/local value already shown
     } finally {
       setLoadingInternalNotes(false);
     }
