@@ -2386,22 +2386,26 @@ const Bookings: React.FC = () => {
 
   const handleOpenInternalNotesModal = async (booking: BookingsPageBooking) => {
     setSelectedBookingForNotes(booking);
-    // Use cache first for instant loading, fallback to API if needed
+    // Always fetch from detail API to get internal_notes
+    // The listing API may not include internal_notes, so cache may not have it
     try {
-      const cachedBooking = await bookingCacheService.getBookingFromCache(Number(booking.id));
-      if (cachedBooking) {
-        console.log('[Bookings] Loaded internal notes from cache');
-        setInternalNotesText(cachedBooking.internal_notes || '');
+      const response = await bookingService.getBookingById(Number(booking.id));
+      if (response.success && response.data) {
+        setInternalNotesText(response.data.internal_notes || '');
       } else {
-        // Fallback to API if not in cache
-        const response = await bookingService.getBookingById(Number(booking.id));
-        if (response.success && response.data) {
-          setInternalNotesText(response.data.internal_notes || '');
-        }
+        // Fallback to cache or local booking data
+        const cachedBooking = await bookingCacheService.getBookingFromCache(Number(booking.id));
+        setInternalNotesText(cachedBooking?.internal_notes || booking.internal_notes || '');
       }
     } catch (error) {
       console.error('Error fetching booking details:', error);
-      setInternalNotesText(booking.internal_notes || '');
+      // Fallback to cache or local booking data
+      try {
+        const cachedBooking = await bookingCacheService.getBookingFromCache(Number(booking.id));
+        setInternalNotesText(cachedBooking?.internal_notes || booking.internal_notes || '');
+      } catch {
+        setInternalNotesText(booking.internal_notes || '');
+      }
     }
     setShowInternalNotesModal(true);
   };
