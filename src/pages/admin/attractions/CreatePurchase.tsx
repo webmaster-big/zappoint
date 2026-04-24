@@ -753,7 +753,7 @@ const CreatePurchase = () => {
             customer_id: selectedCustomerId || null,
             amount: cashAmountPaid,
             currency: 'USD',
-            method: 'cash',
+            method: 'cash' as const,
             status: 'completed' as const,
             location_id: selectedAttraction.locationId || 1,
             notes: `Payment for attraction purchase: ${selectedAttraction.name}`,

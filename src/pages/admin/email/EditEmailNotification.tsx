@@ -37,7 +37,11 @@ import {
   Code,
   Image,
   Undo2,
-  Redo2
+  Redo2,
+  RotateCcw,
+  Shield,
+  Sparkles,
+  Pencil
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { emailNotificationService } from '../../../services/EmailNotificationService';
@@ -45,6 +49,7 @@ import { emailCampaignService } from '../../../services/EmailCampaignService';
 import { locationService } from '../../../services/LocationService';
 import StandardButton from '../../../components/ui/StandardButton';
 import Toast from '../../../components/ui/Toast';
+import HtmlCodeEditor from '../../../components/admin/email/HtmlCodeEditor';
 import { getStoredUser } from '../../../utils/storage';
 import type { 
   UpdateEmailNotificationData, 
@@ -107,6 +112,18 @@ const EditEmailNotification: React.FC = () => {
   const [showLinkModal, setShowLinkModal] = useState(false);
   const [linkUrl, setLinkUrl] = useState('');
   const [linkText, setLinkText] = useState('');
+
+  // Default-template / code-editor state
+  const [isDefault, setIsDefault] = useState(false);
+  const [defaultKey, setDefaultKey] = useState<string | null>(null);
+  const [isBodyCustomized, setIsBodyCustomized] = useState(false);
+  const [isSubjectCustomized, setIsSubjectCustomized] = useState(false);
+  const [editorMode, setEditorMode] = useState<'wysiwyg' | 'code'>('wysiwyg');
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewSubject, setPreviewSubject] = useState<string | null>(null);
+  const [previewBody, setPreviewBody] = useState<string | null>(null);
   
   // Variables panel state
   const [variableGroups, setVariableGroups] = useState<VariableGroup[]>([]);
@@ -196,15 +213,23 @@ const EditEmailNotification: React.FC = () => {
         
         if (notificationRes.success && notificationRes.data) {
           const notification = notificationRes.data;
+          // Prefer effective values so defaults render seeded HTML when un-customized
+          const initialSubject = notification.effective_subject ?? notification.subject ?? '';
+          const initialBody = notification.effective_body ?? notification.body ?? '';
+          setIsDefault(!!notification.is_default);
+          setDefaultKey((notification.default_key as string | null) ?? null);
+          setIsBodyCustomized(!!notification.is_body_customized);
+          setIsSubjectCustomized(!!notification.is_subject_customized);
           setFormData({
             name: notification.name,
+            description: notification.description ?? '',
             trigger_type: notification.trigger_type,
             entity_type: notification.entity_type || 'all',
             entity_ids: notification.entity_ids || [],
             location_id: notification.location_id,
             email_template_id: notification.email_template_id,
-            subject: notification.subject || '',
-            body: notification.body || '',
+            subject: initialSubject,
+            body: initialBody,
             recipient_types: notification.recipient_types || ['customer'],
             custom_emails: notification.custom_emails || [],
             include_qr_code: notification.include_qr_code || false,
@@ -215,8 +240,8 @@ const EditEmailNotification: React.FC = () => {
           setUseTemplate(!!notification.email_template_id);
           
           setTimeout(() => {
-            if (bodyEditorRef.current && notification.body) {
-              bodyEditorRef.current.innerHTML = notification.body;
+            if (bodyEditorRef.current) {
+              bodyEditorRef.current.innerHTML = initialBody;
             }
           }, 100);
         }
@@ -373,6 +398,87 @@ const EditEmailNotification: React.FC = () => {
   const handleBodyChange = () => {
     if (bodyEditorRef.current) {
       setFormData(prev => ({ ...prev, body: bodyEditorRef.current?.innerHTML || '' }));
+    }
+  };
+
+  // Handle CodeMirror code-editor body changes
+  const handleCodeBodyChange = (value: string) => {
+    setFormData(prev => ({ ...prev, body: value }));
+  };
+
+  // Switch editor mode and keep both editors in sync
+  const switchEditorMode = (mode: 'wysiwyg' | 'code') => {
+    if (mode === editorMode) return;
+    if (mode === 'code') {
+      // Push current WYSIWYG html into formData first
+      if (bodyEditorRef.current) {
+        setFormData(prev => ({ ...prev, body: bodyEditorRef.current?.innerHTML || prev.body || '' }));
+      }
+      setEditorMode('code');
+    } else {
+      setEditorMode('wysiwyg');
+      // Sync code value back to WYSIWYG editor on next paint
+      setTimeout(() => {
+        if (bodyEditorRef.current) {
+          bodyEditorRef.current.innerHTML = formData.body || '';
+        }
+      }, 0);
+    }
+  };
+
+  // Reset default notification (subject + body) back to seeded values
+  const handleResetDefault = async () => {
+    if (!id) return;
+    try {
+      setResetting(true);
+      const response = await emailNotificationService.resetDefault(parseInt(id));
+      if (response.success) {
+        const n = response.data;
+        const newSubject = n.effective_subject ?? n.default_subject ?? '';
+        const newBody = n.effective_body ?? n.default_body ?? '';
+        setFormData(prev => ({ ...prev, subject: newSubject, body: newBody }));
+        setIsBodyCustomized(false);
+        setIsSubjectCustomized(false);
+        if (bodyEditorRef.current) {
+          bodyEditorRef.current.innerHTML = newBody;
+        }
+        setToast({ message: 'Reset to default template', type: 'success' });
+      }
+    } catch (error) {
+      console.error('Error resetting notification:', error);
+      setToast({ message: 'Failed to reset notification', type: 'error' });
+    } finally {
+      setResetting(false);
+      setShowResetConfirm(false);
+    }
+  };
+
+  // Open the live preview modal — fetches rendered HTML with sample data
+  const openPreview = async () => {
+    setShowPreview(true);
+    setPreviewLoading(true);
+    setPreviewSubject(null);
+    setPreviewBody(null);
+    if (!id) {
+      setPreviewLoading(false);
+      return;
+    }
+    try {
+      const response = await emailNotificationService.preview(parseInt(id), {
+        subject: formData.subject || undefined,
+        body: formData.body || undefined,
+      });
+      if (response.success) {
+        setPreviewSubject(response.data.subject);
+        setPreviewBody(response.data.body);
+      }
+    } catch (error) {
+      console.error('Error generating preview:', error);
+      // Fall back to raw values without rendered variables
+      setPreviewSubject(formData.subject || '');
+      setPreviewBody(formData.body || '');
+    } finally {
+      setPreviewLoading(false);
     }
   };
 
@@ -556,14 +662,31 @@ const EditEmailNotification: React.FC = () => {
 
     try {
       setLoading(true);
-      const submitData: UpdateEmailNotificationData = {
-        ...formData,
-        email_template_id: useTemplate ? formData.email_template_id : undefined,
-        subject: useTemplate ? undefined : formData.subject,
-        body: useTemplate ? undefined : formData.body,
-      };
+      const submitData: UpdateEmailNotificationData = isDefault
+        ? {
+            // Defaults: only the allowed fields are accepted by the API
+            subject: formData.subject,
+            body: formData.body,
+            description: formData.description,
+            is_active: formData.is_active,
+            include_qr_code: formData.include_qr_code,
+            recipient_types: formData.recipient_types,
+            custom_emails: formData.custom_emails,
+            send_before_hours: formData.send_before_hours,
+            send_after_hours: formData.send_after_hours,
+          }
+        : {
+            ...formData,
+            email_template_id: useTemplate ? formData.email_template_id : undefined,
+            subject: useTemplate ? undefined : formData.subject,
+            body: useTemplate ? undefined : formData.body,
+          };
       const response = await emailNotificationService.update(parseInt(id), submitData);
       if (response.success) {
+        const updated = response.data;
+        // Refresh customization flags from the server response
+        setIsBodyCustomized(!!updated.is_body_customized);
+        setIsSubjectCustomized(!!updated.is_subject_customized);
         setToast({ message: 'Email notification updated successfully', type: 'success' });
         setTimeout(() => navigate('/admin/email/notifications'), 1500);
       }
@@ -602,15 +725,39 @@ const EditEmailNotification: React.FC = () => {
                 <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
                   <Bell className={`w-6 h-6 text-${fullColor}`} />
                   Edit Email Notification
+                  {isDefault ? (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-100 text-blue-700 border border-blue-200">
+                      <Shield className="w-3 h-3" />
+                      Default
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-purple-100 text-purple-700 border border-purple-200">
+                      <Sparkles className="w-3 h-3" />
+                      Custom
+                    </span>
+                  )}
                 </h1>
-                <p className="text-sm text-gray-500">Update automated email notification settings</p>
+                <p className="text-sm text-gray-500">
+                  {isDefault
+                    ? `Default template${defaultKey ? ` · ${defaultKey}` : ''} — name & trigger are locked.`
+                    : 'Update automated email notification settings'}
+                </p>
               </div>
             </div>
             <div className="flex items-center gap-3">
+              {isDefault && (isBodyCustomized || isSubjectCustomized) && (
+                <StandardButton
+                  variant="secondary"
+                  icon={RotateCcw}
+                  onClick={() => setShowResetConfirm(true)}
+                >
+                  Reset to Default
+                </StandardButton>
+              )}
               <StandardButton
                 variant="secondary"
                 icon={Eye}
-                onClick={() => setShowPreview(true)}
+                onClick={openPreview}
               >
                 Preview
               </StandardButton>
@@ -647,8 +794,12 @@ const EditEmailNotification: React.FC = () => {
                     value={formData.name || ''}
                     onChange={handleInputChange}
                     placeholder="e.g., Booking Confirmation Email"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    disabled={isDefault}
+                    className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${isDefault ? 'bg-gray-100 cursor-not-allowed text-gray-600' : ''}`}
                   />
+                  {isDefault && (
+                    <p className="text-xs text-gray-500 mt-1">Default template name is fixed.</p>
+                  )}
                 </div>
 
                 {isCompanyAdmin && locations.length > 0 && (
@@ -675,7 +826,8 @@ const EditEmailNotification: React.FC = () => {
                   <select
                     value={formData.entity_type || 'all'}
                     onChange={(e) => handleEntityTypeChange(e.target.value as EntityType)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    disabled={isDefault}
+                    className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${isDefault ? 'bg-gray-100 cursor-not-allowed text-gray-600' : ''}`}
                   >
                     <option value="all">All (Packages & Attractions)</option>
                     <option value="package">Packages Only</option>
@@ -695,7 +847,8 @@ const EditEmailNotification: React.FC = () => {
                       send_before_hours: undefined,
                       send_after_hours: undefined
                     }))}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    disabled={isDefault}
+                    className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${isDefault ? 'bg-gray-100 cursor-not-allowed text-gray-600' : ''}`}
                   >
                     {availableTriggers.map((group) => (
                       <optgroup key={group.label} label={group.label}>
@@ -879,6 +1032,11 @@ const EditEmailNotification: React.FC = () => {
                   <div className="mb-4">
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Subject Line <span className="text-red-500">*</span>
+                      {isSubjectCustomized && (
+                        <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700 border border-amber-200">
+                          Customized
+                        </span>
+                      )}
                     </label>
                     <input
                       type="text"
@@ -892,10 +1050,52 @@ const EditEmailNotification: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Email Body <span className="text-red-500">*</span>
-                    </label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-sm font-medium text-gray-700">
+                        Email Body <span className="text-red-500">*</span>
+                        {isBodyCustomized && (
+                          <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700 border border-amber-200">
+                            Customized
+                          </span>
+                        )}
+                      </label>
+                      <div className="inline-flex rounded-lg border border-gray-200 overflow-hidden text-xs">
+                        <button
+                          type="button"
+                          onClick={() => switchEditorMode('wysiwyg')}
+                          className={`px-3 py-1.5 inline-flex items-center gap-1 transition-colors ${
+                            editorMode === 'wysiwyg'
+                              ? `bg-${themeColor}-100 text-${fullColor} font-semibold`
+                              : 'bg-white text-gray-600 hover:bg-gray-50'
+                          }`}
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                          Visual
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => switchEditorMode('code')}
+                          className={`px-3 py-1.5 inline-flex items-center gap-1 transition-colors border-l border-gray-200 ${
+                            editorMode === 'code'
+                              ? `bg-${themeColor}-100 text-${fullColor} font-semibold`
+                              : 'bg-white text-gray-600 hover:bg-gray-50'
+                          }`}
+                        >
+                          <Code className="w-3.5 h-3.5" />
+                          HTML
+                        </button>
+                      </div>
+                    </div>
                     
+                    {editorMode === 'code' ? (
+                      <HtmlCodeEditor
+                        value={formData.body || ''}
+                        onChange={handleCodeBodyChange}
+                        height="500px"
+                        placeholder="<table>...your email HTML...</table>"
+                      />
+                    ) : (
+                    <>
                     {/* Toolbar */}
                     <div className="flex flex-wrap items-center gap-1 p-2 border border-gray-300 border-b-0 rounded-t-lg bg-gray-50">
                       <button type="button" onMouseDown={(e) => handleToolbarClick(e, 'undo')} className="p-1.5 hover:bg-gray-200 rounded text-gray-600" title="Undo">
@@ -991,6 +1191,8 @@ const EditEmailNotification: React.FC = () => {
                         style={{ whiteSpace: 'pre-wrap' }}
                       />
                     </div>
+                    </>
+                    )}
                     <p className="text-xs text-gray-500 mt-1">Click on a variable in the panel to insert it at cursor position.</p>
                   </div>
                 </>
@@ -1100,22 +1302,31 @@ const EditEmailNotification: React.FC = () => {
               </button>
             </div>
             <div className="flex-1 overflow-y-auto p-6">
-              <div className="mb-4">
-                <label className="text-sm font-medium text-gray-500">Subject</label>
-                <p className="text-gray-900 mt-1 font-medium">{formData.subject || '(No subject)'}</p>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-gray-500">Body</label>
-                <div 
-                  className="mt-2 prose prose-sm max-w-none border border-gray-200 rounded-lg p-4 bg-gray-50"
-                  dangerouslySetInnerHTML={{ __html: formData.body || '<p class="text-gray-400">(No content)</p>' }}
-                />
-              </div>
-              {formData.include_qr_code && (
-                <div className="mt-4 p-4 bg-gray-100 rounded-lg text-center">
-                  <QrCode className="w-16 h-16 mx-auto text-gray-400" />
-                  <p className="text-xs text-gray-500 mt-2">QR Code will appear here</p>
+              {previewLoading ? (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <Loader2 className="w-8 h-8 animate-spin text-gray-400 mb-3" />
+                  <p className="text-sm text-gray-500">Rendering preview with sample data...</p>
                 </div>
+              ) : (
+                <>
+                  <div className="mb-4">
+                    <label className="text-sm font-medium text-gray-500">Subject</label>
+                    <p className="text-gray-900 mt-1 font-medium">{previewSubject ?? formData.subject ?? '(No subject)'}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">Body</label>
+                    <div
+                      className="mt-2 prose prose-sm max-w-none border border-gray-200 rounded-lg p-4 bg-gray-50"
+                      dangerouslySetInnerHTML={{ __html: previewBody ?? formData.body ?? '<p class="text-gray-400">(No content)</p>' }}
+                    />
+                  </div>
+                  {formData.include_qr_code && (
+                    <div className="mt-4 p-4 bg-gray-100 rounded-lg text-center">
+                      <QrCode className="w-16 h-16 mx-auto text-gray-400" />
+                      <p className="text-xs text-gray-500 mt-2">QR Code will appear here</p>
+                    </div>
+                  )}
+                </>
               )}
             </div>
             <div className="flex items-center justify-end gap-3 p-4 border-t border-gray-200 bg-gray-50">
@@ -1243,6 +1454,35 @@ const EditEmailNotification: React.FC = () => {
               </button>
               <StandardButton variant="primary" onClick={insertLink}>
                 Insert Link
+              </StandardButton>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reset to Default Confirmation Modal */}
+      {showResetConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-3 bg-amber-100 rounded-full">
+                <RotateCcw className="w-6 h-6 text-amber-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Reset to Default</h3>
+                <p className="text-sm text-gray-500">{formData.name}</p>
+              </div>
+            </div>
+            <p className="text-gray-600 mb-6">
+              This will discard your custom subject and body and restore the original seeded template.
+              This action cannot be undone.
+            </p>
+            <div className="flex items-center gap-3 justify-end">
+              <StandardButton variant="secondary" onClick={() => setShowResetConfirm(false)} disabled={resetting}>
+                Cancel
+              </StandardButton>
+              <StandardButton variant="primary" icon={resetting ? Loader2 : RotateCcw} onClick={handleResetDefault} disabled={resetting} loading={resetting}>
+                Reset Template
               </StandardButton>
             </div>
           </div>

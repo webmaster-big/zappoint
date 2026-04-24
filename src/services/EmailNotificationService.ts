@@ -16,6 +16,9 @@ import type {
   RecipientTypesResponse,
   EntitiesResponse,
   EntityType,
+  PreviewEmailNotificationData,
+  PreviewEmailNotificationResponse,
+  ResetDefaultResponse,
 } from '../types/EmailNotification.types';
 
 // Create axios instance with base configuration
@@ -117,6 +120,71 @@ export const deleteEmailNotification = async (
 ): Promise<EmailNotificationApiResponse<null>> => {
   const response = await api.delete<EmailNotificationApiResponse<null>>(
     `${BASE_URL}/${id}`
+  );
+  return response.data;
+};
+
+/**
+ * Live preview the rendered email body/subject (with sample data substitution).
+ * If body/subject are omitted, uses the saved effective values.
+ */
+export const previewEmailNotification = async (
+  id: number,
+  data?: PreviewEmailNotificationData
+): Promise<PreviewEmailNotificationResponse> => {
+  const response = await api.post<PreviewEmailNotificationResponse>(
+    `${BASE_URL}/${id}/preview`,
+    data ?? {}
+  );
+  return response.data;
+};
+
+/**
+ * Reset a default notification's user-edited subject/body back to the seeded defaults.
+ * Only valid when notification.is_default === true.
+ */
+export const resetDefaultNotification = async (
+  id: number
+): Promise<ResetDefaultResponse> => {
+  const response = await api.post<ResetDefaultResponse>(
+    `${BASE_URL}/${id}/reset-default`
+  );
+  return response.data;
+};
+
+/**
+ * Defaults-only listing (auto-seeds on first call).
+ */
+export const getDefaultEmailNotifications = async (
+  filters?: EmailNotificationFilters
+): Promise<PaginatedEmailNotificationsResponse> => {
+  const response = await api.get<PaginatedEmailNotificationsResponse>(
+    `${BASE_URL}/defaults`,
+    { params: filters }
+  );
+  return response.data;
+};
+
+/**
+ * Manually re-seed all default notifications for the company.
+ */
+export const seedDefaultNotifications = async (): Promise<
+  EmailNotificationApiResponse<{ created: number }>
+> => {
+  const response = await api.post<EmailNotificationApiResponse<{ created: number }>>(
+    `${BASE_URL}/seed-defaults`
+  );
+  return response.data;
+};
+
+/**
+ * List all available default-key labels (used for UI hints).
+ */
+export const getDefaultKeys = async (): Promise<
+  EmailNotificationApiResponse<Record<string, string>>
+> => {
+  const response = await api.get<EmailNotificationApiResponse<Record<string, string>>>(
+    `${BASE_URL}/default-keys`
   );
   return response.data;
 };
@@ -275,6 +343,11 @@ export const emailNotificationService = {
   create: createEmailNotification,
   update: updateEmailNotification,
   delete: deleteEmailNotification,
+  preview: previewEmailNotification,
+  resetDefault: resetDefaultNotification,
+  getDefaults: getDefaultEmailNotifications,
+  seedDefaults: seedDefaultNotifications,
+  getDefaultKeys,
   
   // Utility
   getTriggerTypes,

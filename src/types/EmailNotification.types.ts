@@ -41,18 +41,41 @@ export type RecipientType = 'customer' | 'staff' | 'company_admin' | 'location_m
 // Notification Log Status
 export type NotificationLogStatus = 'pending' | 'sent' | 'failed';
 
+// Default notification keys (per-company auto-seeded templates)
+export type DefaultNotificationKey =
+  | 'booking_confirmation_customer'
+  | 'booking_confirmation_staff'
+  | 'booking_cancellation_customer'
+  | 'booking_reminder_customer'
+  | 'booking_updated_customer'
+  | 'purchase_confirmation_customer'
+  | 'purchase_cancellation_customer'
+  | 'payment_received_customer'
+  | 'payment_refunded_customer';
+
 // Main Email Notification Interface
 export interface EmailNotification {
   id: number;
   company_id: number;
   location_id: number | null;
   name: string;
+  description?: string | null;
   trigger_type: TriggerType;
   entity_type: EntityType;
   entity_ids: number[];
   email_template_id: number | null;
   subject: string | null;
   body: string | null;
+  // Default-template support
+  is_default?: boolean;
+  default_key?: DefaultNotificationKey | string | null;
+  default_subject?: string | null;
+  default_body?: string | null;
+  // Effective values resolved by backend (priority chain)
+  effective_subject?: string;
+  effective_body?: string;
+  is_subject_customized?: boolean;
+  is_body_customized?: boolean;
   recipient_types: RecipientType[];
   custom_emails: string[];
   include_qr_code: boolean;
@@ -97,6 +120,7 @@ export interface EmailNotificationLog {
 // Create/Update Data Interfaces
 export interface CreateEmailNotificationData {
   name: string;
+  description?: string | null;
   trigger_type: TriggerType;
   entity_type: EntityType;
   entity_ids?: number[];
@@ -132,7 +156,29 @@ export interface EmailNotificationFilters {
   trigger_type?: TriggerType;
   entity_type?: EntityType;
   is_active?: boolean;
+  is_default?: boolean;
   search?: string;
+}
+
+// Preview request body (subject + body for live preview while editing)
+export interface PreviewEmailNotificationData {
+  subject?: string;
+  body?: string;
+}
+
+export interface PreviewEmailNotificationResponse {
+  success: boolean;
+  data: {
+    subject: string;
+    body: string;
+  };
+}
+
+// Reset-to-default response
+export interface ResetDefaultResponse {
+  success: boolean;
+  data: EmailNotification;
+  message?: string;
 }
 
 // API Response Types

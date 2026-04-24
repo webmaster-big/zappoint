@@ -19,7 +19,10 @@ import {
   CreditCard,
   Mail,
   CheckCircle,
-  XCircle
+  XCircle,
+  RotateCcw,
+  Shield,
+  Sparkles
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { emailNotificationService } from '../../../services/EmailNotificationService';
@@ -50,11 +53,13 @@ const EmailNotifications: React.FC = () => {
     triggerType: TriggerType | 'all';
     entityType: EntityType | 'all';
     isActive: 'all' | 'true' | 'false';
+    isDefault: 'all' | 'true' | 'false';
     search: string;
   }>({
     triggerType: 'all',
     entityType: 'all',
     isActive: 'all',
+    isDefault: 'all',
     search: ''
   });
   const [showFilters, setShowFilters] = useState(false);
@@ -64,6 +69,7 @@ const EmailNotifications: React.FC = () => {
   const [itemsPerPage] = useState(10);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
+  const [resetConfirm, setResetConfirm] = useState<EmailNotification | null>(null);
   const [testEmailModal, setTestEmailModal] = useState<EmailNotification | null>(null);
   const [testEmail, setTestEmail] = useState('');
   const [sendingTest, setSendingTest] = useState(false);
@@ -150,6 +156,9 @@ const EmailNotifications: React.FC = () => {
       if (filters.isActive !== 'all') {
         apiFilters.is_active = filters.isActive === 'true';
       }
+      if (filters.isDefault !== 'all') {
+        apiFilters.is_default = filters.isDefault === 'true';
+      }
       if (filters.search.trim()) {
         apiFilters.search = filters.search.trim();
       }
@@ -184,11 +193,30 @@ const EmailNotifications: React.FC = () => {
         setToast({ message: 'Notification deleted successfully', type: 'success' });
         fetchNotifications();
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error deleting notification:', error);
-      setToast({ message: 'Failed to delete notification', type: 'error' });
+      const message =
+        (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        'Failed to delete notification';
+      setToast({ message, type: 'error' });
     } finally {
       setDeleteConfirm(null);
+    }
+  };
+
+  // Handle reset-to-default (defaults only)
+  const handleResetDefault = async (notification: EmailNotification) => {
+    try {
+      const response = await emailNotificationService.resetDefault(notification.id);
+      if (response.success) {
+        setToast({ message: 'Reset to default template', type: 'success' });
+        fetchNotifications();
+      }
+    } catch (error) {
+      console.error('Error resetting notification:', error);
+      setToast({ message: 'Failed to reset notification', type: 'error' });
+    } finally {
+      setResetConfirm(null);
     }
   };
 
@@ -407,7 +435,7 @@ const EmailNotifications: React.FC = () => {
         {/* Advanced Filters */}
         {showFilters && (
           <div className="mt-3 p-3 bg-gray-50 rounded-lg">
-            <div className={`grid grid-cols-1 ${isCompanyAdmin && locations.length > 0 ? 'md:grid-cols-4' : 'md:grid-cols-3'} gap-3`}>
+            <div className={`grid grid-cols-1 sm:grid-cols-2 ${isCompanyAdmin && locations.length > 0 ? 'lg:grid-cols-5' : 'lg:grid-cols-4'} gap-3`}>
               {/* Location Filter (Company Admin only) */}
               {isCompanyAdmin && locations.length > 0 && (
                 <div>
@@ -495,11 +523,28 @@ const EmailNotifications: React.FC = () => {
                   <option value="false">Inactive</option>
                 </select>
               </div>
+
+              {/* Type Filter (Default vs Custom) */}
+              <div>
+                <label className="block text-xs font-medium text-gray-800 mb-1">Type</label>
+                <select
+                  value={filters.isDefault}
+                  onChange={(e) => {
+                    setFilters(prev => ({ ...prev, isDefault: e.target.value as 'all' | 'true' | 'false' }));
+                    setCurrentPage(1);
+                  }}
+                  className={`w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`}
+                >
+                  <option value="all">All Types</option>
+                  <option value="true">Default Only</option>
+                  <option value="false">Custom Only</option>
+                </select>
+              </div>
             </div>
             <div className="mt-3 flex justify-end">
               <StandardButton
                 onClick={() => {
-                  setFilters({ triggerType: 'all', entityType: 'all', isActive: 'all', search: '' });
+                  setFilters({ triggerType: 'all', entityType: 'all', isActive: 'all', isDefault: 'all', search: '' });
                   setSelectedLocation('');
                   setCurrentPage(1);
                 }}
@@ -562,7 +607,26 @@ const EmailNotifications: React.FC = () => {
                       <tr key={notification.id} className="hover:bg-gray-50 transition-colors">
                         <td className="px-4 py-4">
                           <div>
-                            <p className="font-medium text-gray-900 text-sm">{notification.name}</p>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="font-medium text-gray-900 text-sm">{notification.name}</p>
+                              {notification.is_default ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-100 text-blue-700 border border-blue-200">
+                                  <Shield className="w-3 h-3" />
+                                  Default
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-purple-100 text-purple-700 border border-purple-200">
+                                  <Sparkles className="w-3 h-3" />
+                                  Custom
+                                </span>
+                              )}
+                              {notification.is_default &&
+                                (notification.is_body_customized || notification.is_subject_customized) && (
+                                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700 border border-amber-200">
+                                    Edited
+                                  </span>
+                                )}
+                            </div>
                             {notification.location && (
                               <p className="text-xs text-gray-500 mt-0.5">{notification.location.name}</p>
                             )}
@@ -619,6 +683,16 @@ const EmailNotifications: React.FC = () => {
                             >
                               <Send className="w-4 h-4" />
                             </button>
+                            {notification.is_default &&
+                              (notification.is_body_customized || notification.is_subject_customized) && (
+                                <button
+                                  onClick={() => setResetConfirm(notification)}
+                                  className="p-2 text-amber-600 hover:text-amber-700 hover:bg-amber-50 rounded-lg transition-colors"
+                                  title="Reset to default template"
+                                >
+                                  <RotateCcw className="w-4 h-4" />
+                                </button>
+                              )}
                             <button
                               onClick={() => handleDuplicate(notification.id)}
                               className={`p-2 text-${fullColor} hover:text-${themeColor}-700 hover:bg-${themeColor}-50 rounded-lg transition-colors`}
@@ -640,13 +714,15 @@ const EmailNotifications: React.FC = () => {
                             >
                               <Edit className="w-4 h-4" />
                             </Link>
-                            <button
-                              onClick={() => setDeleteConfirm(notification.id)}
-                              className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
-                              title="Delete"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
+                            {!notification.is_default && (
+                              <button
+                                onClick={() => setDeleteConfirm(notification.id)}
+                                className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                                title="Delete"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -712,11 +788,14 @@ const EmailNotifications: React.FC = () => {
                           <Edit className="w-4 h-4" />
                         </Link>
                         <button
-                          onClick={() => setDeleteConfirm(notification.id)}
-                          className="p-2 text-red-500 hover:text-red-700"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                  onClick={() => setDeleteConfirm(notification.id)}
+                  className="p-2 text-red-500 hover:text-red-700"
+                  disabled={notification.is_default}
+                  style={notification.is_default ? { opacity: 0.3, cursor: 'not-allowed' } : {}}
+                  title={notification.is_default ? 'Default templates cannot be deleted' : 'Delete'}
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
                       </div>
                     </div>
                   </div>
@@ -763,6 +842,35 @@ const EmailNotifications: React.FC = () => {
               </StandardButton>
               <StandardButton variant="danger" onClick={() => handleDelete(deleteConfirm)}>
                 Delete Notification
+              </StandardButton>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reset to Default Confirmation Modal */}
+      {resetConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-3 bg-amber-100 rounded-full">
+                <RotateCcw className="w-6 h-6 text-amber-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Reset to Default</h3>
+                <p className="text-sm text-gray-500">{resetConfirm.name}</p>
+              </div>
+            </div>
+            <p className="text-gray-600 mb-6">
+              This will discard your custom subject and body and restore the original seeded template.
+              This action cannot be undone.
+            </p>
+            <div className="flex items-center gap-3 justify-end">
+              <StandardButton variant="secondary" onClick={() => setResetConfirm(null)}>
+                Cancel
+              </StandardButton>
+              <StandardButton variant="primary" icon={RotateCcw} onClick={() => handleResetDefault(resetConfirm)}>
+                Reset Template
               </StandardButton>
             </div>
           </div>

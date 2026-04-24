@@ -37,7 +37,8 @@ import {
   Code,
   Image,
   Undo2,
-  Redo2
+  Redo2,
+  Pencil
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { emailNotificationService } from '../../../services/EmailNotificationService';
@@ -45,6 +46,7 @@ import { emailCampaignService } from '../../../services/EmailCampaignService';
 import { locationService } from '../../../services/LocationService';
 import StandardButton from '../../../components/ui/StandardButton';
 import Toast from '../../../components/ui/Toast';
+import HtmlCodeEditor from '../../../components/admin/email/HtmlCodeEditor';
 import { getStoredUser } from '../../../utils/storage';
 import type { 
   CreateEmailNotificationData, 
@@ -105,6 +107,7 @@ const CreateEmailNotification: React.FC = () => {
   const [showLinkModal, setShowLinkModal] = useState(false);
   const [linkUrl, setLinkUrl] = useState('');
   const [linkText, setLinkText] = useState('');
+  const [editorMode, setEditorMode] = useState<'wysiwyg' | 'code'>('wysiwyg');
   
   // Variables panel state
   const [variableGroups, setVariableGroups] = useState<VariableGroup[]>([]);
@@ -333,6 +336,29 @@ const CreateEmailNotification: React.FC = () => {
   const handleBodyChange = () => {
     if (bodyEditorRef.current) {
       setFormData(prev => ({ ...prev, body: bodyEditorRef.current?.innerHTML || '' }));
+    }
+  };
+
+  // Handle CodeMirror code-editor body changes
+  const handleCodeBodyChange = (value: string) => {
+    setFormData(prev => ({ ...prev, body: value }));
+  };
+
+  // Switch editor mode and keep both editors in sync
+  const switchEditorMode = (mode: 'wysiwyg' | 'code') => {
+    if (mode === editorMode) return;
+    if (mode === 'code') {
+      if (bodyEditorRef.current) {
+        setFormData(prev => ({ ...prev, body: bodyEditorRef.current?.innerHTML || prev.body || '' }));
+      }
+      setEditorMode('code');
+    } else {
+      setEditorMode('wysiwyg');
+      setTimeout(() => {
+        if (bodyEditorRef.current) {
+          bodyEditorRef.current.innerHTML = formData.body || '';
+        }
+      }, 0);
     }
   };
 
@@ -842,10 +868,47 @@ const CreateEmailNotification: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Email Body <span className="text-red-500">*</span>
-                    </label>
-                    
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-sm font-medium text-gray-700">
+                        Email Body <span className="text-red-500">*</span>
+                      </label>
+                      <div className="inline-flex rounded-lg border border-gray-200 overflow-hidden text-xs">
+                        <button
+                          type="button"
+                          onClick={() => switchEditorMode('wysiwyg')}
+                          className={`px-3 py-1.5 inline-flex items-center gap-1 transition-colors ${
+                            editorMode === 'wysiwyg'
+                              ? `bg-${themeColor}-100 text-${fullColor} font-semibold`
+                              : 'bg-white text-gray-600 hover:bg-gray-50'
+                          }`}
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                          Visual
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => switchEditorMode('code')}
+                          className={`px-3 py-1.5 inline-flex items-center gap-1 transition-colors border-l border-gray-200 ${
+                            editorMode === 'code'
+                              ? `bg-${themeColor}-100 text-${fullColor} font-semibold`
+                              : 'bg-white text-gray-600 hover:bg-gray-50'
+                          }`}
+                        >
+                          <Code className="w-3.5 h-3.5" />
+                          HTML
+                        </button>
+                      </div>
+                    </div>
+
+                    {editorMode === 'code' ? (
+                      <HtmlCodeEditor
+                        value={formData.body || ''}
+                        onChange={handleCodeBodyChange}
+                        height="500px"
+                        placeholder="<table>...your email HTML...</table>"
+                      />
+                    ) : (
+                    <>
                     {/* Toolbar */}
                     <div className="flex flex-wrap items-center gap-1 p-2 border border-gray-300 border-b-0 rounded-t-lg bg-gray-50">
                       <button type="button" onMouseDown={(e) => handleToolbarClick(e, 'undo')} className="p-1.5 hover:bg-gray-200 rounded text-gray-600" title="Undo">
@@ -941,6 +1004,8 @@ const CreateEmailNotification: React.FC = () => {
                         style={{ whiteSpace: 'pre-wrap' }}
                       />
                     </div>
+                    </>
+                    )}
                     <p className="text-xs text-gray-500 mt-1">Click on a variable in the panel to insert it at cursor position.</p>
                   </div>
                 </>
