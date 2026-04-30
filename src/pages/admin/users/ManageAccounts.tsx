@@ -758,7 +758,7 @@ const ManageAccounts = () => {
           <h1 className="text-3xl font-bold text-gray-900">Manage Accounts</h1>
           <p className="text-gray-600 mt-2">Manage all attendant and location manager accounts</p>
         </div>
-        <div className="flex flex-wrap gap-2 mt-4 sm:mt-0">
+        <div className="flex gap-2 mt-4 sm:mt-0">
           {isCompanyAdmin && (
             <StandardButton
               onClick={() => setShowCreateLocationModal(true)}
@@ -770,14 +770,6 @@ const ManageAccounts = () => {
             </StandardButton>
           )}
           <StandardButton
-            onClick={() => setShowCreateStaffModal(true)}
-            variant="primary"
-            size="md"
-            icon={UserPlus}
-          >
-            Create Staff Account
-          </StandardButton>
-          <StandardButton
             onClick={() => handleInviteAccount()}
             variant="secondary"
             size="md"
@@ -785,13 +777,14 @@ const ManageAccounts = () => {
           >
             Send Invitation
           </StandardButton>
-          {/* <Link
-            to="/accounts/create"
-            className={`inline-flex items-center px-4 py-2 bg-${fullColor} text-white rounded-lg hover:bg-${themeColor}-900 transition-colors`}
+          <StandardButton
+            onClick={() => setShowCreateStaffModal(true)}
+            variant="primary"
+            size="md"
+            icon={UserPlus}
           >
-            <Plus className="h-5 w-5 mr-2" />
-            Create Account
-          </Link> */}
+            Create Staff Account
+          </StandardButton>
         </div>
       </div>
 
