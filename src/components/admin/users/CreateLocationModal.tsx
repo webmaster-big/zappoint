@@ -164,7 +164,7 @@ const CreateLocationModal = ({ isOpen, onClose, onCreated, elevated = false }: C
                 value={form.name}
                 onChange={(e) => update('name', e.target.value)}
                 disabled={submitting}
-                placeholder="e.g. Zap Zone Riverside"
+                placeholder="e.g. Brighton"
                 className={`w-full px-3 py-2 border ${fieldErrors.name ? 'border-red-400' : 'border-gray-300'} rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 disabled:bg-gray-100`}
               />
               {fieldErrors.name && <p className="text-xs text-red-600 mt-1">{fieldErrors.name[0]}</p>}
