@@ -22,6 +22,7 @@ import StandardButton from '../../../components/ui/StandardButton';
 import DateRangeCalendar from '../../../components/ui/DateRangeCalendar';
 import AnalyticsService from '../../../services/AnalyticsService';
 import type { CompanyAnalyticsResponse } from '../../../services/AnalyticsService';
+import { getStoredUser } from '../../../utils/storage';
 import {
   LineChart,
   Line,
@@ -50,20 +51,30 @@ const CompanyAnalytics: React.FC = () => {
   const [showExportModal, setShowExportModal] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [analyticsData, setAnalyticsData] = useState<CompanyAnalyticsResponse | null>(null);
   const [exportFormat, setExportFormat] = useState<'json' | 'csv'>('json');
-  
-  // TODO: Get company_id from authenticated user's company
-  const companyId = 1; // Replace with actual company ID from user context
+
+  // Resolve the admin's company_id from the authenticated user record.
+  // The backend will 403 cross-company requests, so the previous hardcoded
+  // `companyId = 1` made the page hang for any admin not in company 1.
+  const currentUser = getStoredUser();
+  const companyId: number | null = currentUser?.company_id ?? null;
 
   const fetchAnalytics = useCallback(async () => {
     // Don't fetch if custom range is selected but dates are not set
     if (dateRange === 'custom' && (!startDate || !endDate)) {
       return;
     }
-    
+    if (companyId == null) {
+      setIsLoading(false);
+      setLoadError('Your account is not associated with a company.');
+      return;
+    }
+
     try {
       setIsLoading(true);
+      setLoadError(null);
       const params = {
         company_id: companyId,
         date_range: dateRange,
@@ -71,12 +82,19 @@ const CompanyAnalytics: React.FC = () => {
         ...(dateRange === 'custom' && startDate && { start_date: startDate }),
         ...(dateRange === 'custom' && endDate && { end_date: endDate }),
       };
-      
+
       const data = await AnalyticsService.getCompanyAnalytics(params);
       console.log('Fetched Company Analytics:', data);
       setAnalyticsData(data);
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Failed to fetch analytics:', error);
+      const status = (error as { response?: { status?: number; data?: { message?: string } } })?.response?.status;
+      const apiMsg = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      if (status === 403) {
+        setLoadError(apiMsg || 'You do not have access to this company’s analytics.');
+      } else {
+        setLoadError(apiMsg || 'Failed to load analytics. Please try again.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -103,6 +121,10 @@ const CompanyAnalytics: React.FC = () => {
     
     setIsExporting(true);
     try {
+      if (companyId === null) {
+        alert('Your account is not linked to a company.');
+        return;
+      }
       const params = {
         company_id: companyId,
         date_range: dateRange,
@@ -128,12 +150,32 @@ const CompanyAnalytics: React.FC = () => {
     }
   };
 
-  if (isLoading || !analyticsData) {
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className={`animate-spin rounded-full h-12 w-12 border-b-2 border-${fullColor} mx-auto mb-4`}></div>
           <p className="text-gray-600">Loading analytics...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (loadError || !analyticsData) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
+        <div className="max-w-md w-full bg-white border border-gray-200 rounded-xl p-6 text-center shadow-sm">
+          <div className="mx-auto mb-3 w-12 h-12 rounded-full bg-amber-50 flex items-center justify-center">
+            <Info className="w-6 h-6 text-amber-600" />
+          </div>
+          <h2 className="text-lg font-semibold text-gray-900 mb-1">Analytics unavailable</h2>
+          <p className="text-sm text-gray-600 mb-4">{loadError || 'No analytics data could be loaded for your company.'}</p>
+          <button
+            onClick={fetchAnalytics}
+            className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium rounded-lg bg-gray-900 text-white hover:bg-gray-800 transition"
+          >
+            Retry
+          </button>
         </div>
       </div>
     );

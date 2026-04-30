@@ -1,3 +1,8 @@
+// IMPORTANT: this side-effect import must come first. It monkey-patches
+// `axios.create` so every service instance picks up tenant-scope stripping
+// and centralised 401/403 handling. See utils/apiInterceptors.ts.
+import './utils/apiInterceptors'
+
 import { createRoot } from 'react-dom/client'
 import App from './App.tsx'
 import { BrowserRouter } from 'react-router-dom'

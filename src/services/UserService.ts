@@ -55,6 +55,53 @@ export interface ApiResponse<T> {
   data?: T;
 }
 
+// ---- Direct staff-account creation (POST /api/users/staff) ----------------
+// See BACKEND_PROMPT_DIRECT_ACCOUNT_PROVISIONING.md (Section 4).
+// `company_id` is forced from the bearer token and must NOT be sent.
+export interface CreateStaffAccountData {
+  first_name: string;
+  last_name: string;
+  email: string;
+  role: 'location_manager' | 'attendant' | 'company_admin';
+  /** Required when role is location_manager or attendant. */
+  location_id?: number | null;
+  phone?: string;
+  employee_id?: string;
+  department?: string;
+  position?: string;
+  shift?: string;
+  assigned_areas?: string[];
+  hire_date?: string; // YYYY-MM-DD
+  status?: 'active' | 'inactive';
+  password_mode?: 'custom' | 'generate';
+  /** Required when password_mode = 'custom'. Min 8 chars. */
+  password?: string;
+  send_email?: boolean;
+  /** When true the response includes the plain password — use only over HTTPS. */
+  return_password?: boolean;
+  login_url?: string;
+}
+
+export interface StaffAccountResult {
+  user: User & {
+    first_name?: string;
+    last_name?: string;
+    company?: { id: number; company_name: string };
+    location?: { id: number; name: string };
+  };
+  email_sent: boolean;
+  email_error: string | null;
+  generated_password?: string;
+}
+
+export interface ResendCredentialsData {
+  password_mode?: 'custom' | 'generate';
+  password?: string;
+  send_email?: boolean;
+  return_password?: boolean;
+  login_url?: string;
+}
+
 class UserService {
   /**
    * Get all users with filters
@@ -109,6 +156,35 @@ class UserService {
    */
   async bulkDelete(ids: number[]): Promise<ApiResponse<null>> {
     const response = await api.post('/users/bulk-delete', { ids });
+    return response.data;
+  }
+
+  /**
+   * Create a staff account directly (company_admin only).
+   * Backend endpoint: POST /api/users/staff
+   *
+   * The backend forces `company_id` from the auth token, validates the
+   * `location_id` belongs to the caller's company, hashes the password,
+   * and (by default) emails the credentials to the new user.
+   *
+   * Pass `return_password: true` to receive the plain password in the
+   * response so the admin UI can show it once. Treat that field as
+   * sensitive — do not log it.
+   */
+  async createStaff(data: CreateStaffAccountData): Promise<ApiResponse<StaffAccountResult>> {
+    const response = await api.post('/users/staff', data);
+    return response.data;
+  }
+
+  /**
+   * Reset and re-email a staff user's credentials (company_admin only).
+   * Backend endpoint: POST /api/users/{user}/resend-credentials
+   */
+  async resendCredentials(
+    userId: number,
+    data: ResendCredentialsData = { password_mode: 'generate', send_email: true },
+  ): Promise<ApiResponse<Omit<StaffAccountResult, 'generated_password'> & { generated_password?: string }>> {
+    const response = await api.post(`/users/${userId}/resend-credentials`, data);
     return response.data;
   }
 }

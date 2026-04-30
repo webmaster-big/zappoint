@@ -79,10 +79,29 @@ export const getStoredUser = () => {
   return userData ? JSON.parse(userData) : null;
 };
 
-// Store user data safely (sanitized)
+// Store user data safely (sanitized).
+// If the user identity is changing (login as a different account), purge all
+// tenant-scoped Cache Storage entries so the new user never sees the previous
+// user's cached records. See utils/cacheGuard.ts.
 export const setStoredUser = (userData: any, preserveToken: boolean = true) => {
   const sanitized = sanitizeUserData(userData, preserveToken);
-  if (sanitized) {
-    localStorage.setItem('zapzone_user', JSON.stringify(sanitized));
+  if (!sanitized) return;
+
+  let identityChanged = false;
+  try {
+    const prevRaw = localStorage.getItem('zapzone_user');
+    const prevId = prevRaw ? JSON.parse(prevRaw)?.id : null;
+    identityChanged = prevId != null && prevId !== sanitized.id;
+  } catch {
+    identityChanged = true;
+  }
+
+  localStorage.setItem('zapzone_user', JSON.stringify(sanitized));
+
+  if (identityChanged && typeof window !== 'undefined' && 'caches' in window) {
+    // Lazy-import to avoid a circular dep at module-eval time.
+    import('./cacheGuard')
+      .then((m) => m.purgeAllZapzoneCaches())
+      .catch(() => { /* ignore */ });
   }
 };

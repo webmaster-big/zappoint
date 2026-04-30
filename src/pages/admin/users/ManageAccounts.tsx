@@ -17,7 +17,10 @@ import {
   Copy,
   Shield,
   UserCheck,
-  CheckCircle
+  CheckCircle,
+  UserPlus,
+  Building2,
+  KeyRound
 } from 'lucide-react';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
@@ -26,6 +29,10 @@ import Pagination from '../../../components/ui/Pagination';
 import { API_BASE_URL } from '../../../utils/storage';
 import { locationService } from '../../../services';
 import { userService } from '../../../services/UserService';
+import { getStoredUser } from '../../../utils/storage';
+import CreateStaffAccountModal from '../../../components/admin/users/CreateStaffAccountModal';
+import CreateLocationModal from '../../../components/admin/users/CreateLocationModal';
+import ResendCredentialsModal from '../../../components/admin/users/ResendCredentialsModal';
 import type { 
   ManageAccountsAccount, 
   ManageAccountsFilterOptions, 
@@ -335,6 +342,11 @@ const ManageAccounts = () => {
   const [itemsPerPage] = useState(10);
   const [showFilters, setShowFilters] = useState(false);
   const [showInvitationModal, setShowInvitationModal] = useState(false);
+  const [showCreateStaffModal, setShowCreateStaffModal] = useState(false);
+  const [showCreateLocationModal, setShowCreateLocationModal] = useState(false);
+  const [resendTarget, setResendTarget] = useState<{ id: number; first_name?: string; last_name?: string; email: string } | null>(null);
+  const currentUser = getStoredUser();
+  const isCompanyAdmin = currentUser?.role === 'company_admin';
 
   // Locations
   const locations = [
@@ -746,10 +758,28 @@ const ManageAccounts = () => {
           <h1 className="text-3xl font-bold text-gray-900">Manage Accounts</h1>
           <p className="text-gray-600 mt-2">Manage all attendant and location manager accounts</p>
         </div>
-        <div className="flex gap-2 mt-4 sm:mt-0">
+        <div className="flex flex-wrap gap-2 mt-4 sm:mt-0">
+          {isCompanyAdmin && (
+            <StandardButton
+              onClick={() => setShowCreateLocationModal(true)}
+              variant="secondary"
+              size="md"
+              icon={Building2}
+            >
+              Add Location
+            </StandardButton>
+          )}
+          <StandardButton
+            onClick={() => setShowCreateStaffModal(true)}
+            variant="primary"
+            size="md"
+            icon={UserPlus}
+          >
+            Create Staff Account
+          </StandardButton>
           <StandardButton
             onClick={() => handleInviteAccount()}
-            variant="primary"
+            variant="secondary"
             size="md"
             icon={Send}
           >
@@ -1030,6 +1060,21 @@ const ManageAccounts = () => {
                         >
                           <Pencil className="h-4 w-4" />
                         </Link>
+                        {isCompanyAdmin && (
+                          <StandardButton
+                            onClick={() => setResendTarget({
+                              id: parseInt(account.id, 10),
+                              first_name: account.firstName,
+                              last_name: account.lastName,
+                              email: account.email,
+                            })}
+                            variant="ghost"
+                            size="sm"
+                            icon={KeyRound}
+                            className="text-amber-600 hover:text-amber-800"
+                            title="Resend credentials"
+                          />
+                        )}
                         <StandardButton
                           onClick={() => handleDeleteAccount(account.id)}
                           variant="ghost"
@@ -1067,6 +1112,26 @@ const ManageAccounts = () => {
         onSendInvitation={handleSendInvitation}
         defaultEmail=''
         defaultUserType='attendant'
+      />
+
+      {/* Create Staff Account (direct provisioning) */}
+      <CreateStaffAccountModal
+        isOpen={showCreateStaffModal}
+        onClose={() => setShowCreateStaffModal(false)}
+        onCreated={() => loadAccounts()}
+      />
+
+      {/* Create Location (company_admin only) */}
+      <CreateLocationModal
+        isOpen={showCreateLocationModal}
+        onClose={() => setShowCreateLocationModal(false)}
+      />
+
+      {/* Resend / rotate credentials */}
+      <ResendCredentialsModal
+        isOpen={resendTarget !== null}
+        onClose={() => setResendTarget(null)}
+        user={resendTarget}
       />
     </div>
   );

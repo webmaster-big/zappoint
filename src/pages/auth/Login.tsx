@@ -106,6 +106,17 @@ export default function Login() {
       const redirect = redirectPaths[role] || '/attendant/dashboard';
 
       await animateProgress(85, 600);
+      // Purge any tenant-scoped Cache Storage entries left behind by a
+      // previous user on this device BEFORE we install the new identity.
+      // This closes a cross-tenant data leak where the new user's first
+      // paint could otherwise be served from the previous user's cache.
+      try {
+        const { purgeAllZapzoneCaches } = await import('../../utils/cacheGuard');
+        await purgeAllZapzoneCaches();
+      } catch {
+        /* ignore \u2014 cache purge is best-effort */
+      }
+
       // Store user data
       localStorage.setItem('zapzone_user', JSON.stringify({
         id: user.id,

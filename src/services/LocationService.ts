@@ -60,6 +60,8 @@ export interface CreateLocationData {
   email?: string;
   capacity?: number;
   operating_hours?: string;
+  /** IANA timezone (e.g. "America/Chicago"). See backend Section 3. */
+  timezone?: string;
   is_active?: boolean;
 }
 
