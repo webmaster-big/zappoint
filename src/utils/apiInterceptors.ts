@@ -80,6 +80,18 @@ const notify = (message: string, type: 'error' | 'warning' = 'error') => {
 
 const isAuthEndpoint = (url?: string) => !!url && /\/auth\/(login|register|me)/.test(url);
 
+/**
+ * Routes that require an authenticated staff session. We only ever bounce
+ * to `/login` when a 401 happens on one of these. Customer-facing routes
+ * (`/`, `/book/*`, `/purchase/*`, `/event/*`, etc.) are public — a 401 on
+ * those is just the API saying "not logged in" and must be swallowed, not
+ * turned into a navigation that 404s on the customer subdomain.
+ */
+const ADMIN_ROUTE_PREFIXES = ['/admin', '/manager', '/attendant', '/accounts', '/dashboard'];
+
+const isAdminRoute = (path: string): boolean =>
+  ADMIN_ROUTE_PREFIXES.some((p) => path === p || path.startsWith(`${p}/`));
+
 /** Centralised response handling for 401 / 403. */
 const handleAuthError = (error: any) => {
   const status = error?.response?.status;
@@ -87,23 +99,36 @@ const handleAuthError = (error: any) => {
   const message: string | undefined = error?.response?.data?.message;
 
   if (status === 401 && !isAuthEndpoint(url)) {
-    // Session expired or token rejected. Clear creds + cached tenant data
-    // and bounce to login.
+    // Only react when there was actually a logged-in staff session AND we
+    // are on an admin route. Otherwise let the caller handle the 401.
+    let hadSession = false;
     try {
-      localStorage.removeItem('zapzone_user');
-      localStorage.removeItem('zapzone_customer');
+      hadSession = !!localStorage.getItem('zapzone_user');
     } catch {
       /* ignore */
     }
-    void purgeAllZapzoneCaches();
-    notify(message || 'Your session has expired. Please log in again.', 'warning');
-    if (typeof window !== 'undefined') {
-      const path = window.location.pathname;
-      // Avoid redirect loops on the login screen itself.
-      if (!path.startsWith('/login') && !path.startsWith('/auth')) {
-        window.location.assign('/login');
+
+    const path = typeof window !== 'undefined' ? window.location.pathname : '';
+    const onAdminRoute = isAdminRoute(path);
+
+    if (hadSession && onAdminRoute) {
+      // Session expired or token rejected. Clear creds + cached tenant data
+      // and bounce to login.
+      try {
+        localStorage.removeItem('zapzone_user');
+        localStorage.removeItem('zapzone_customer');
+      } catch {
+        /* ignore */
+      }
+      void purgeAllZapzoneCaches();
+      notify(message || 'Your session has expired. Please log in again.', 'warning');
+      // Staff login lives at `/admin`, not `/login`. Avoid bouncing if we're
+      // already on the login screen.
+      if (path !== '/admin' && !path.startsWith('/admin/register')) {
+        window.location.assign('/admin');
       }
     }
+    // Public routes / no session: stay silent — the calling component decides.
   } else if (status === 403) {
     notify(message || 'You do not have access to this resource.', 'error');
   }
