@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
 import { 
   Eye, 
   Pencil, 
@@ -33,6 +32,8 @@ import { getStoredUser } from '../../../utils/storage';
 import CreateStaffAccountModal from '../../../components/admin/users/CreateStaffAccountModal';
 import CreateLocationModal from '../../../components/admin/users/CreateLocationModal';
 import ResendCredentialsModal from '../../../components/admin/users/ResendCredentialsModal';
+import AccountViewModal from '../../../components/admin/users/AccountViewModal';
+import AccountEditModal from '../../../components/admin/users/AccountEditModal';
 import type { 
   ManageAccountsAccount, 
   ManageAccountsFilterOptions, 
@@ -345,6 +346,8 @@ const ManageAccounts = () => {
   const [showCreateStaffModal, setShowCreateStaffModal] = useState(false);
   const [showCreateLocationModal, setShowCreateLocationModal] = useState(false);
   const [resendTarget, setResendTarget] = useState<{ id: number; first_name?: string; last_name?: string; email: string } | null>(null);
+  const [viewTarget, setViewTarget] = useState<ManageAccountsAccount | null>(null);
+  const [editTarget, setEditTarget] = useState<ManageAccountsAccount | null>(null);
   const currentUser = getStoredUser();
   const isCompanyAdmin = currentUser?.role === 'company_admin';
 
@@ -1038,21 +1041,20 @@ const ManageAccounts = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-3">
-                        {/* No invite button, all accounts are created */}
-                        <Link
-                          to={`/accounts/${account.id}`}
-                          className={`text-${fullColor} hover:text-${fullColor}`}
+                        <button
+                          onClick={() => setViewTarget(account)}
+                          className={`text-${themeColor}-600 hover:text-${themeColor}-800`}
                           title="View Profile"
                         >
                           <Eye className="h-4 w-4" />
-                        </Link>
-                        <Link
-                          to={`/accounts/edit/${account.id}`}
+                        </button>
+                        <button
+                          onClick={() => setEditTarget(account)}
                           className="text-gray-600 hover:text-gray-800"
                           title="Edit"
                         >
                           <Pencil className="h-4 w-4" />
-                        </Link>
+                        </button>
                         {isCompanyAdmin && (
                           <StandardButton
                             onClick={() => setResendTarget({
@@ -1125,6 +1127,26 @@ const ManageAccounts = () => {
         isOpen={resendTarget !== null}
         onClose={() => setResendTarget(null)}
         user={resendTarget}
+      />
+
+      {/* View Profile Modal */}
+      <AccountViewModal
+        isOpen={viewTarget !== null}
+        onClose={() => setViewTarget(null)}
+        account={viewTarget}
+      />
+
+      {/* Edit Account Modal */}
+      <AccountEditModal
+        isOpen={editTarget !== null}
+        onClose={() => setEditTarget(null)}
+        account={editTarget}
+        onSaved={(updated) => {
+          setAccounts((prev) =>
+            prev.map((a) => (a.id === updated.id ? updated : a))
+          );
+          setEditTarget(null);
+        }}
       />
     </div>
   );

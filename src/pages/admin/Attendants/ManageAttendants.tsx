@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
 import { 
   Eye, 
   Pencil, 
@@ -26,6 +25,8 @@ import CounterAnimation from '../../../components/ui/CounterAnimation';
 import { API_BASE_URL } from '../../../utils/storage';
 import { userService } from '../../../services/UserService';
 import CreateStaffAccountModal from '../../../components/admin/users/CreateStaffAccountModal';
+import AttendantViewModal from '../../../components/admin/users/AttendantViewModal';
+import AttendantEditModal from '../../../components/admin/users/AttendantEditModal';
 import type {
   ManageAttendantsAttendant,
   ManageAttendantsFilterOptions,
@@ -278,6 +279,8 @@ const ManageAttendants = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [showInvitationModal, setShowInvitationModal] = useState(false);
   const [showCreateStaffModal, setShowCreateStaffModal] = useState(false);
+  const [viewTarget, setViewTarget] = useState<ManageAttendantsAttendant | null>(null);
+  const [editTarget, setEditTarget] = useState<ManageAttendantsAttendant | null>(null);
 
   // Status colors
   const statusColors = {
@@ -904,21 +907,20 @@ const ManageAttendants = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-3">
-                        {/* No invite button, all accounts are created */}
-                        <Link
-                          to={`/attendants/${attendant.id}`}
-                          className={`text-${themeColor}-600 hover:text-${fullColor}`}
+                        <button
+                          onClick={() => setViewTarget(attendant)}
+                          className={`text-${themeColor}-600 hover:text-${themeColor}-800`}
                           title="View Profile"
                         >
                           <Eye className="h-4 w-4" />
-                        </Link>
-                        <Link
-                          to={`/attendants/edit/${attendant.id}`}
+                        </button>
+                        <button
+                          onClick={() => setEditTarget(attendant)}
                           className="text-gray-600 hover:text-gray-800"
                           title="Edit"
                         >
                           <Pencil className="h-4 w-4" />
-                        </Link>
+                        </button>
                         <StandardButton
                           variant="danger"
                           size="sm"
@@ -961,6 +963,26 @@ const ManageAttendants = () => {
         isOpen={showCreateStaffModal}
         onClose={() => setShowCreateStaffModal(false)}
         onCreated={() => loadAttendants()}
+      />
+
+      {/* View Profile Modal */}
+      <AttendantViewModal
+        isOpen={viewTarget !== null}
+        onClose={() => setViewTarget(null)}
+        attendant={viewTarget}
+      />
+
+      {/* Edit Staff Modal */}
+      <AttendantEditModal
+        isOpen={editTarget !== null}
+        onClose={() => setEditTarget(null)}
+        attendant={editTarget}
+        onSaved={(updated) => {
+          setAttendants((prev) =>
+            prev.map((a) => (a.id === updated.id ? updated : a))
+          );
+          setEditTarget(null);
+        }}
       />
     </div>
   );
