@@ -16,7 +16,8 @@ import {
   Send,
   X,
   Copy,
-  CheckCircle
+  CheckCircle,
+  UserPlus
 } from 'lucide-react';
 import StandardButton from '../../../components/ui/StandardButton';
 import Pagination from '../../../components/ui/Pagination';
@@ -24,6 +25,7 @@ import { useThemeColor } from '../../../hooks/useThemeColor';
 import CounterAnimation from '../../../components/ui/CounterAnimation';
 import { API_BASE_URL } from '../../../utils/storage';
 import { userService } from '../../../services/UserService';
+import CreateStaffAccountModal from '../../../components/admin/users/CreateStaffAccountModal';
 import type {
   ManageAttendantsAttendant,
   ManageAttendantsFilterOptions,
@@ -275,6 +277,7 @@ const ManageAttendants = () => {
   const [itemsPerPage] = useState(10);
   const [showFilters, setShowFilters] = useState(false);
   const [showInvitationModal, setShowInvitationModal] = useState(false);
+  const [showCreateStaffModal, setShowCreateStaffModal] = useState(false);
 
   // Status colors
   const statusColors = {
@@ -659,12 +662,20 @@ const ManageAttendants = () => {
         </div>
         <div className="flex gap-2 mt-4 sm:mt-0">
           <StandardButton
-            variant="primary"
+            variant="secondary"
             size="md"
             icon={Send}
             onClick={() => handleInviteAttendant()}
           >
             Send Invitation
+          </StandardButton>
+          <StandardButton
+            variant="primary"
+            size="md"
+            icon={UserPlus}
+            onClick={() => setShowCreateStaffModal(true)}
+          >
+            Create Staff Account
           </StandardButton>
           {/* <Link
             to="/manager/attendants/create"
@@ -943,6 +954,13 @@ const ManageAttendants = () => {
         isOpen={showInvitationModal}
         onClose={() => setShowInvitationModal(false)}
         onSendInvitation={handleSendInvitation}
+      />
+
+      {/* Create Staff Account (direct provisioning) */}
+      <CreateStaffAccountModal
+        isOpen={showCreateStaffModal}
+        onClose={() => setShowCreateStaffModal(false)}
+        onCreated={() => loadAttendants()}
       />
     </div>
   );

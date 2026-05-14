@@ -21,6 +21,7 @@ import type {
 } from '../../../services/UserService';
 import { getStoredUser } from '../../../utils/storage';
 import CreateLocationModal from './CreateLocationModal';
+import Toast from '../../ui/Toast';
 
 interface CreateStaffAccountModalProps {
   isOpen: boolean;
@@ -63,14 +64,22 @@ const CreateStaffAccountModal = ({ isOpen, onClose, onCreated }: CreateStaffAcco
   const [loadingLocations, setLoadingLocations] = useState(false);
   const [showCreateLocation, setShowCreateLocation] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
   const [success, setSuccess] = useState<StaffAccountResult | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  const showToast = (message: string, type: 'success' | 'error') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 4000);
+  };
 
   // Only company_admin can create new locations.
   const canCreateLocation = currentUser?.role === 'company_admin';
+  // Location managers are restricted to their own location/store.
+  const isLocationManager = currentUser?.role === 'location_manager';
+  const lockedLocationId = isLocationManager ? (currentUser?.location_id ?? null) : null;
 
   const fetchLocations = useCallback(async () => {
     setLoadingLocations(true);
@@ -89,14 +98,18 @@ const CreateStaffAccountModal = ({ isOpen, onClose, onCreated }: CreateStaffAcco
   // Reset everything when the modal opens, fetch locations.
   useEffect(() => {
     if (!isOpen) return;
-    setForm(initialForm);
-    setError(null);
+    // Pre-select the location manager's own location so they can't pick another store.
+    setForm({
+      ...initialForm,
+      location_id: lockedLocationId ?? initialForm.location_id,
+    });
     setFieldErrors({});
     setSuccess(null);
     setShowPassword(false);
     setCopied(false);
+    setToast(null);
     void fetchLocations();
-  }, [isOpen, fetchLocations]);
+  }, [isOpen, fetchLocations, lockedLocationId]);
 
   const update = <K extends keyof CreateStaffAccountData>(key: K, value: CreateStaffAccountData[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -117,11 +130,10 @@ const CreateStaffAccountModal = ({ isOpen, onClose, onCreated }: CreateStaffAcco
   };
 
   const handleSubmit = async () => {
-    setError(null);
     setFieldErrors({});
     const localErr = validateLocally();
     if (localErr) {
-      setError(localErr);
+      showToast(localErr, 'error');
       return;
     }
 
@@ -144,10 +156,14 @@ const CreateStaffAccountModal = ({ isOpen, onClose, onCreated }: CreateStaffAcco
 
       const res = await userService.createStaff(payload);
       if (!res.success || !res.data) {
-        setError(res.message || 'Failed to create account.');
+        showToast(res.message || 'Failed to create account.', 'error');
         return;
       }
       setSuccess(res.data);
+      showToast(
+        `Account created for ${res.data.user.first_name} ${res.data.user.last_name}.`,
+        'success',
+      );
       onCreated?.(res.data);
     } catch (err: unknown) {
       const e = err as {
@@ -157,11 +173,11 @@ const CreateStaffAccountModal = ({ isOpen, onClose, onCreated }: CreateStaffAcco
       const data = e.response?.data;
       if (status === 422 && data?.errors) {
         setFieldErrors(data.errors);
-        setError(data.message || 'Please correct the highlighted fields.');
+        showToast(data.message || 'Please correct the highlighted fields.', 'error');
       } else if (status === 403) {
-        setError(data?.message || 'You do not have permission to create staff accounts.');
+        showToast(data?.message || 'You do not have permission to create staff accounts.', 'error');
       } else {
-        setError(data?.message || 'Something went wrong. Please try again.');
+        showToast(data?.message || 'Something went wrong. Please try again.', 'error');
       }
     } finally {
       setSubmitting(false);
@@ -298,12 +314,6 @@ const CreateStaffAccountModal = ({ isOpen, onClose, onCreated }: CreateStaffAcco
         ) : (
           /* FORM VIEW ----------------------------------------------------- */
           <div className="px-6 py-4 space-y-4">
-            {error && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-                {error}
-              </div>
-            )}
-
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">First name *</label>
@@ -399,7 +409,7 @@ const CreateStaffAccountModal = ({ isOpen, onClose, onCreated }: CreateStaffAcco
                   onChange={(e) =>
                     update('location_id', e.target.value ? Number(e.target.value) : null)
                   }
-                  disabled={submitting || loadingLocations}
+                  disabled={submitting || loadingLocations || isLocationManager}
                   className={`w-full px-3 py-2 border ${fieldErrors.location_id ? 'border-red-400' : 'border-gray-300'} rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 disabled:bg-gray-100`}
                 >
                   <option value="">
@@ -411,6 +421,11 @@ const CreateStaffAccountModal = ({ isOpen, onClose, onCreated }: CreateStaffAcco
                     </option>
                   ))}
                 </select>
+                {isLocationManager && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    You can only create accounts for your assigned location.
+                  </p>
+                )}
                 {fieldErrors.location_id && (
                   <p className="text-xs text-red-600 mt-1">{fieldErrors.location_id[0]}</p>
                 )}
@@ -519,6 +534,11 @@ const CreateStaffAccountModal = ({ isOpen, onClose, onCreated }: CreateStaffAcco
             update('location_id', loc.id);
           }}
         />
+      )}
+
+      {/* Toast */}
+      {toast && (
+        <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />
       )}
     </div>
   );
