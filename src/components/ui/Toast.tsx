@@ -14,10 +14,10 @@ const typeStyles = {
   info: "text-purple-700",
 };
 
-const iconMap = {
-  success: <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />,
-  error: <AlertTriangle className="w-5 h-5 text-rose-500 shrink-0" />,
-  info: <Info className="w-5 h-5 text-blue-600 shrink-0" />,
+const getIcon = (type: "success" | "error" | "info") => {
+  if (type === "success") return <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />;
+  if (type === "error") return <AlertTriangle className="w-5 h-5 text-rose-500 shrink-0" />;
+  return <Info className="w-5 h-5 text-blue-600 shrink-0" />;
 };
 
 
@@ -34,7 +34,7 @@ const Toast: React.FC<ToastProps> = ({ message, type = "info", onClose }) => {
         className={`flex items-center gap-3 px-4 py-3 rounded-xl bg-white shadow-lg min-w-[220px] max-w-xs ${typeStyles[type]} animate-fade-in-up`}
         role="alert"
       >
-        <span className="flex-shrink-0">{iconMap[type]}</span>
+        <span className="flex-shrink-0">{getIcon(type)}</span>
         <div className="flex-1">
           <div className="text-sm font-medium text-gray-900">{message}</div>
           <div className="text-xs text-gray-500 mt-0.5">{typeDescriptions[type]}</div>

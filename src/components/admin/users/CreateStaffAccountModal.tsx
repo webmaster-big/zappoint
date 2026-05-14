@@ -508,7 +508,7 @@ const CreateStaffAccountModal = ({ isOpen, onClose, onCreated }: CreateStaffAcco
               </StandardButton>
               <StandardButton
                 onClick={handleSubmit}
-                disabled={submitting}
+                disabled={submitting || loadingLocations || Boolean(requiresLocation && !form.location_id)}
                 variant="primary"
                 size="md"
                 icon={submitting ? RefreshCw : UserPlus}
