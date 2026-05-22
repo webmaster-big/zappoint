@@ -25,6 +25,8 @@ import { ASSET_URL } from '../../../utils/storage';
 import { loadAcceptJS, processCardPayment, validateCardNumber, isTestCardNumber, formatCardNumber, getCardType, PAYMENT_TYPE } from '../../../services/PaymentService';
 import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
 import { extractIdFromSlug } from '../../../utils/slug';
+import { trackPageView } from '../../../utils/analytics';
+import { setNextTrackingId } from '../../../utils/analyticsHeaders';
 import StandardButton from '../../../components/ui/StandardButton';
 import SignatureCapture from '../../../components/SignatureCapture';
 import TermsAndConditionsCheckbox from '../../../components/TermsAndConditionsCheckbox';
@@ -640,6 +642,20 @@ const PurchaseAttraction = () => {
   const isSubmittingRef = useRef(false);
   const lastSubmitTimeRef = useRef(0);
 
+  // Fire `form_started` engagement exactly once per offer-page mount.
+  const formStartedRef = useRef(false);
+  const handleFormStarted = () => {
+    if (formStartedRef.current) return;
+    formStartedRef.current = true;
+    void trackPageView({
+      event_type: 'engagement',
+      event_name: 'form_started',
+      page_type: 'attraction_buy',
+      entity_type: 'attraction',
+      entity_id: attraction?.id != null ? Number(attraction.id) : (attractionId ?? undefined),
+    });
+  };
+
   const handlePurchase = async (e?: React.MouseEvent) => {
     // Prevent event bubbling and default behavior
     if (e) {
@@ -790,6 +806,7 @@ const PurchaseAttraction = () => {
 
       let response;
       try {
+        setNextTrackingId();
         response = await attractionPurchaseService.createPurchase(purchaseData);
       } catch (createErr) {
         console.error('❌ Purchase creation failed:', createErr);
@@ -1193,7 +1210,7 @@ const PurchaseAttraction = () => {
 
               {/* Step 2: Customer Information */}
               {currentStep === 2 && (
-                <div className="p-4 md:p-6 space-y-4 md:space-y-6">
+                <div className="p-4 md:p-6 space-y-4 md:space-y-6" onFocusCapture={handleFormStarted}>
                   <div>
                     <h2 className="text-lg md:text-xl font-semibold text-gray-900 mb-1">Your Information</h2>
                     <p className="text-xs md:text-sm text-gray-600">Please provide your contact details for ticket delivery</p>

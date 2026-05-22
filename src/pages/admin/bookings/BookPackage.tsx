@@ -21,6 +21,8 @@ import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
 import customerService from '../../../services/CustomerService';
 import DatePicker from '../../../components/ui/DatePicker';
 import { extractIdFromSlug } from '../../../utils/slug';
+import { trackPageView } from '../../../utils/analytics';
+import { setNextTrackingId } from '../../../utils/analyticsHeaders';
 import { formatDurationDisplay } from '../../../utils/timeFormat';
 import StandardButton from '../../../components/ui/StandardButton';
 import { globalNoteService, type GlobalNote } from '../../../services/GlobalNoteService';
@@ -1014,6 +1016,20 @@ const BookPackage: React.FC = () => {
   const isSubmittingRef = useRef(false);
   const lastSubmitTimeRef = useRef(0);
 
+  // Fire `form_started` engagement exactly once per offer-page mount.
+  const formStartedRef = useRef(false);
+  const handleFormStarted = () => {
+    if (formStartedRef.current) return;
+    formStartedRef.current = true;
+    void trackPageView({
+      event_type: 'engagement',
+      event_name: 'form_started',
+      page_type: 'package_book',
+      entity_type: 'package',
+      entity_id: pkg?.id,
+    });
+  };
+
   // Handle booking submission with payment processing
   const handlePayNow = async (e?: React.MouseEvent) => {
     // Prevent event bubbling and default behavior
@@ -1199,6 +1215,9 @@ const BookPackage: React.FC = () => {
         applied_discounts: buildAppliedDiscounts(specialPricingBreakdown).length > 0 ? buildAppliedDiscounts(specialPricingBreakdown) : null,
       };
       
+      // Per-conversion dedupe ID — backend uses this to avoid double-writing
+      // a conversion if the request is retried (e.g. user double-clicks Pay).
+      setNextTrackingId();
       const response = await bookingService.createBooking(bookingData);
       
       if (!response.success || !response.data) {
@@ -2121,7 +2140,7 @@ const BookPackage: React.FC = () => {
             ) : currentStep === 2 ? (
               <>
                 <h3 className="text-base md:text-lg font-medium text-gray-800 mb-4 md:mb-6 border-b pb-3">Personal Information</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5" onFocusCapture={handleFormStarted}>
                   <div className="md:col-span-2">
                     <label className="block font-medium mb-2 text-gray-800 text-sm">Email</label>
                     <input 

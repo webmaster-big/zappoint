@@ -51,6 +51,7 @@ import CustomerRegister from "./pages/customer/CustomerRegister";
 import LocationAnalytics from "./pages/admin/Analytics/LocationManagerAnalytics";
 import CompanyAnalytics from "./pages/admin/Analytics/CompanyAnalytics";
 import AccountingAnalytics from "./pages/admin/Analytics/AccountingAnalytics";
+import PageAnalytics from "./pages/admin/Analytics/PageAnalytics";
 import AttendantActivityLogs from "./pages/admin/Attendants/AttendantActivityLogs";
 import ManageAttendants from "./pages/admin/Attendants/ManageAttendants";
 import ManageAddOns from "./pages/admin/packages/AddOns";
@@ -90,6 +91,7 @@ import ViewEventPurchase from "./pages/admin/events/ViewEventPurchase";
 import PurchaseEvent from "./pages/customer/PurchaseEvent";
 import MyEvents from "./pages/customer/MyEvents";
 import MyAttractions from "./pages/customer/MyAttractions";
+import PageViewBeacon from "./components/PageViewBeacon";
 
 // Redirect /settings/google-calendar to the correct role-based settings page
 const GoogleCalendarRedirect = () => {
@@ -127,25 +129,25 @@ function App() {
         {/* Public Routes - Restricted (redirect if authenticated) */}
         <Route path="/admin" element={<PublicRoute restricted><Login /></PublicRoute>} />
         <Route path="/admin/register" element={<PublicRoute restricted><CompanyAdminRegistration /></PublicRoute>} />
-        <Route path="/customer/login" element={<PublicRoute restricted><CustomerLogin /></PublicRoute>} />
-        <Route path="/customer/register" element={<PublicRoute restricted><CustomerRegister /></PublicRoute>} />
+        <Route path="/customer/login" element={<PublicRoute restricted><><PageViewBeacon pageType="customer_login" /><CustomerLogin /></></PublicRoute>} />
+        <Route path="/customer/register" element={<PublicRoute restricted><><PageViewBeacon pageType="customer_register" /><CustomerRegister /></></PublicRoute>} />
         
         {/* Public Routes - Unrestricted */}
-        <Route path="/home" element={<Home />} />
-        <Route path="/book/package/:location/:slug" element={<BookPackage />} />
-        <Route path="/purchase/attraction/:location/:slug" element={<PurchaseAttraction />} />
-        <Route path="/purchase/event/:location/:slug" element={<PurchaseEvent />} />
-        <Route path="/events/:eventId/purchase" element={<PurchaseEvent />} />
-        <Route path="/rsvp/:token" element={<RsvpPage />} />
+        <Route path="/home" element={<><PageViewBeacon pageType="home" /><Home /></>} />
+        <Route path="/book/package/:location/:slug" element={<><PageViewBeacon pageType="package_book" entityType="package" entityIdFromSlugParam="slug" /><BookPackage /></>} />
+        <Route path="/purchase/attraction/:location/:slug" element={<><PageViewBeacon pageType="attraction_buy" entityType="attraction" entityIdFromSlugParam="slug" /><PurchaseAttraction /></>} />
+        <Route path="/purchase/event/:location/:slug" element={<><PageViewBeacon pageType="event_buy" entityType="event" entityIdFromSlugParam="slug" /><PurchaseEvent /></>} />
+        <Route path="/events/:eventId/purchase" element={<><PageViewBeacon pageType="event_buy" entityType="event" entityIdParam="eventId" /><PurchaseEvent /></>} />
+        <Route path="/rsvp/:token" element={<><PageViewBeacon pageType="rsvp" /><RsvpPage /></>} />
         
         {/* Customer Routes */}
         <Route element={<CustomerLayout />}>
-          <Route path="/" element={<EntertainmentLandingPage />} />
-          <Route path="/customer/reservations" element={<CustomerProtectedRoute><CustomerReservations /></CustomerProtectedRoute>} />
-          <Route path="/customer/attractions" element={<CustomerProtectedRoute><MyAttractions /></CustomerProtectedRoute>} />
-          <Route path="/customer/events" element={<CustomerProtectedRoute><MyEvents /></CustomerProtectedRoute>} />
-          <Route path="/customer/gift-cards" element={<CustomerProtectedRoute><CustomerGiftCards /></CustomerProtectedRoute>} />
-          <Route path="/customer/notifications" element={<CustomerProtectedRoute><CustomerNotifications /></CustomerProtectedRoute>} />
+          <Route path="/" element={<><PageViewBeacon pageType="home" /><EntertainmentLandingPage /></>} />
+          <Route path="/customer/reservations" element={<CustomerProtectedRoute><><PageViewBeacon pageType="my_reservations" /><CustomerReservations /></></CustomerProtectedRoute>} />
+          <Route path="/customer/attractions" element={<CustomerProtectedRoute><><PageViewBeacon pageType="my_attractions" /><MyAttractions /></></CustomerProtectedRoute>} />
+          <Route path="/customer/events" element={<CustomerProtectedRoute><><PageViewBeacon pageType="my_events" /><MyEvents /></></CustomerProtectedRoute>} />
+          <Route path="/customer/gift-cards" element={<CustomerProtectedRoute><><PageViewBeacon pageType="my_gift_cards" /><CustomerGiftCards /></></CustomerProtectedRoute>} />
+          <Route path="/customer/notifications" element={<CustomerProtectedRoute><><PageViewBeacon pageType="my_notifications" /><CustomerNotifications /></></CustomerProtectedRoute>} />
         </Route>
         
         {/* Protected Admin Routes */}
@@ -235,12 +237,14 @@ function App() {
           <Route path="/manager/attendants/activity" element={<ProtectedRoute allowedRoles={['location_manager']}><AttendantActivityLogs /></ProtectedRoute>} />
           <Route path="/manager/day-offs" element={<ProtectedRoute allowedRoles={['location_manager']}><DayOffs /></ProtectedRoute>} />
           <Route path="/manager/analytics" element={<ProtectedRoute allowedRoles={['location_manager']}><LocationAnalytics /></ProtectedRoute>} />
+          <Route path="/manager/analytics/pages" element={<ProtectedRoute allowedRoles={['location_manager']}><PageAnalytics /></ProtectedRoute>} />
           <Route path="/manager/accounting" element={<ProtectedRoute allowedRoles={['location_manager']}><AccountingAnalytics /></ProtectedRoute>} />
           <Route path="/manager/payments" element={<ProtectedRoute allowedRoles={['location_manager']}><Payments /></ProtectedRoute>} />
           <Route path="/manager/payments/:id" element={<ProtectedRoute allowedRoles={['location_manager']}><ViewPayment /></ProtectedRoute>} />
           
           {/* Company Admin-only Routes */}
           <Route path="/admin/analytics" element={<ProtectedRoute allowedRoles={['company_admin']}><CompanyAnalytics /></ProtectedRoute>} />
+          <Route path="/admin/analytics/pages" element={<ProtectedRoute allowedRoles={['company_admin']}><PageAnalytics /></ProtectedRoute>} />
           <Route path="/admin/accounting" element={<ProtectedRoute allowedRoles={['company_admin']}><AccountingAnalytics /></ProtectedRoute>} />
           <Route path="/admin/activity" element={<ProtectedRoute allowedRoles={['company_admin']}><LocationActivityLogs /></ProtectedRoute>} />
           <Route path="/admin/day-offs" element={<ProtectedRoute allowedRoles={['company_admin']}><DayOffs /></ProtectedRoute>} />

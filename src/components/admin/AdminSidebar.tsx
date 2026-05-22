@@ -39,7 +39,8 @@ import {
   Percent,
   Coins,
   CalendarCheck,
-  Calculator
+  Calculator,
+  Activity
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -90,6 +91,7 @@ const addDescriptions = (navItems: NavItem[]): NavItem[] => {
     'Account Activity Log': 'View user activity history',
     'Analytics & Reports': 'Business intelligence and reporting',
     'Performance Analytics': 'Business intelligence and performance metrics',
+    'Page Analytics': 'Visitor traffic, engagement and on-site conversions',
     'Accounting & Analytics': 'Financial reporting and sales breakdown',
     'Activity Logs': 'System-wide activity tracking',
     'Day Offs': 'Manage blocked dates and holidays',
@@ -241,6 +243,7 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
         ]},
         { label: 'Analytics & Reports', icon: BarChart3, section: 'Reports', items: [
           { label: 'Performance Analytics', href: '/manager/analytics', icon: BarChart3 },
+          { label: 'Page Analytics', href: '/manager/analytics/pages', icon: Activity },
           { label: 'Accounting & Analytics', href: '/manager/accounting', icon: Calculator }
         ]},
         { label: 'Profile', icon: User, href: '/manager/profile', section: 'Account' },
@@ -303,6 +306,7 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
         ]},
         { label: 'Analytics & Reports', icon: BarChart3, section: 'Reports', items: [
           { label: 'Performance Analytics', href: '/admin/analytics', icon: BarChart3 },
+          { label: 'Page Analytics', href: '/admin/analytics/pages', icon: Activity },
           { label: 'Accounting & Analytics', href: '/admin/accounting', icon: Calculator }
         ]},
         { label: 'Profile', icon: User, href: '/admin/profile', section: 'Account' },

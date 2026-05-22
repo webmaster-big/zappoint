@@ -2,11 +2,19 @@
 // `axios.create` so every service instance picks up tenant-scope stripping
 // and centralised 401/403 handling. See utils/apiInterceptors.ts.
 import './utils/apiInterceptors'
+// Analytics header injection (X-Visitor-Id / X-Session-Id / X-Analytics-Source
+// / X-Tracking-Id). Must be imported AFTER apiInterceptors so both axios.create
+// patches stack and every service instance gets both sets of interceptors.
+import './utils/analyticsHeaders'
+import { setupAnalytics } from './utils/analytics'
 
 import { createRoot } from 'react-dom/client'
 import App from './App.tsx'
 import { BrowserRouter } from 'react-router-dom'
 import { debugAuthorizeNetCredentials } from './services/SettingsService'
+
+// Install scroll-depth + pagehide-duration listeners exactly once.
+setupAnalytics();
 
 // Make debug function available globally for browser console access
 // Usage: debugAuthorizeNet(1) to check credentials for location 1

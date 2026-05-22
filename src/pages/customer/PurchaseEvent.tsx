@@ -20,6 +20,8 @@ import { getImageUrl, ASSET_URL } from '../../utils/storage';
 import { loadAcceptJS, processCardPayment, validateCardNumber, isTestCardNumber, formatCardNumber, getCardType, PAYMENT_TYPE } from '../../services/PaymentService';
 import { getAuthorizeNetPublicKey } from '../../services/SettingsService';
 import { extractIdFromSlug } from '../../utils/slug';
+import { trackPageView } from '../../utils/analytics';
+import { setNextTrackingId } from '../../utils/analyticsHeaders';
 import Toast from '../../components/ui/Toast';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import SignatureCapture from '../../components/SignatureCapture';
@@ -161,6 +163,20 @@ const PurchaseEvent = () => {
   // Dedup guard
   const isSubmittingRef = useRef(false);
   const lastSubmitTimeRef = useRef(0);
+
+  // Fire `form_started` engagement exactly once per offer-page mount.
+  const formStartedRef = useRef(false);
+  const handleFormStarted = () => {
+    if (formStartedRef.current) return;
+    formStartedRef.current = true;
+    void trackPageView({
+      event_type: 'engagement',
+      event_name: 'form_started',
+      page_type: 'event_buy',
+      entity_type: 'event',
+      entity_id: eventId ? Number(eventId) : undefined,
+    });
+  };
 
   // Billing address
   const [billingAddress, setBillingAddress] = useState('');
@@ -564,6 +580,7 @@ const PurchaseEvent = () => {
       // Step 1: Create event purchase FIRST (no charge yet)
       let response;
       try {
+        setNextTrackingId();
         response = await eventPurchaseService.createPurchase({
           event_id: parseInt(eventId!),
           customer_id: selectedCustomerId || customerData?.id || undefined,
@@ -923,7 +940,7 @@ const PurchaseEvent = () => {
 
               {/* ── STEP 2: Customer Info + Billing ── */}
               {currentStep === 2 && (
-                <div className="p-4 md:p-6 space-y-4 md:space-y-6">
+                <div className="p-4 md:p-6 space-y-4 md:space-y-6" onFocusCapture={handleFormStarted}>
                   <div>
                     <h2 className="text-lg md:text-xl font-semibold text-gray-900 mb-1">Your Information</h2>
                     <p className="text-xs md:text-sm text-gray-600">Please provide your contact details for ticket delivery</p>
