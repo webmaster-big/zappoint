@@ -163,6 +163,7 @@ const PageAnalytics: React.FC = () => {
 
   const [conversionsPage, setConversionsPage] = useState(1);
   const conversionsPerPage = 20;
+  const [convSearch, setConvSearch] = useState('');
 
   const [drillEntity, setDrillEntity] = useState<{ type: AnalyticsEntityType; id: number; name?: string } | null>(null);
 
@@ -693,10 +694,28 @@ const PageAnalytics: React.FC = () => {
       )}
 
       {/* ============ Conversions table ============ */}
-      <Section title="Recent conversions">
+      <Section title="Recent Conversions">
+        <div className="mb-3">
+          <input
+            type="text"
+            value={convSearch}
+            onChange={(e) => setConvSearch(e.target.value)}
+            placeholder="Search by event, entity, UTM source or campaign…"
+            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2"
+          />
+        </div>
         <SimpleTable
           columns={['When', 'Event', 'Entity', 'Value', 'UTM source', 'UTM campaign']}
-          rows={(conversions?.data ?? []).map((c) => [
+          rows={(conversions?.data ?? []).filter((c) => {
+            if (!convSearch.trim()) return true;
+            const q = convSearch.toLowerCase();
+            return (
+              fmtEventName(c.event_name).toLowerCase().includes(q) ||
+              (c.entity_type || '').toLowerCase().includes(q) ||
+              (c.utm_source || '').toLowerCase().includes(q) ||
+              (c.utm_campaign || '').toLowerCase().includes(q)
+            );
+          }).map((c) => [
             fmtDate(c.created_at),
             fmtEventName(c.event_name),
             c.entity_type ? `${fmtEntityLabel(c.entity_type)} #${c.entity_id ?? '—'}` : '—',
@@ -713,7 +732,7 @@ const PageAnalytics: React.FC = () => {
               totalItems={conversions.total}
               itemsPerPage={conversions.per_page}
               itemLabel="conversions"
-              onPageChange={(p) => setConversionsPage(p)}
+              onPageChange={(p) => { setConversionsPage(p); setConvSearch(''); }}
             />
           </div>
         )}
