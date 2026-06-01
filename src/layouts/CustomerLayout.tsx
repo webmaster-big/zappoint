@@ -31,12 +31,10 @@ const CustomerLayout = () => {
 
 
 
-  // Check for logged-in user on component mount
   useEffect(() => {
     checkUserLoginStatus();
   }, []);
 
-  // Close mobile menu when location changes (don't affect user state)
   useEffect(() => {
     setMobileMenuOpen(false);
     setUserMenuOpen(false);
@@ -47,7 +45,6 @@ const CustomerLayout = () => {
       const userData = localStorage.getItem('zapzone_customer');
       if (userData) {
         const user = JSON.parse(userData);
-        // Check if user has a valid token
         if (user.token) {
           setCustomerUser(user);
         } else {
@@ -72,18 +69,14 @@ const CustomerLayout = () => {
     setIsLoggingOut(true);
     
     try {
-      // Call logout API
       await customerService.logout(customerUser.token);
     } catch (error) {
       console.error('Logout error:', error);
-      // Continue with logout even if API call fails
     } finally {
-      // Clear localStorage and state
       localStorage.removeItem('zapzone_customer');
       setCustomerUser(null);
       setUserMenuOpen(false);
       
-      // Redirect to home page
       setTimeout(() => {
         setIsLoggingOut(false);
         navigate('/');
@@ -91,7 +84,6 @@ const CustomerLayout = () => {
     }
   };
 
-  // Don't render anything until we've checked localStorage
   if (isLoading) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
@@ -105,11 +97,9 @@ const CustomerLayout = () => {
 
   return (
     <div className="min-h-screen bg-white">
-      {/* Minimalistic Header with Blur */}
       <header className="bg-white/80 backdrop-blur-md border-b border-blue-800 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
-            {/* Minimalistic Logo */}
             <div className="flex items-center">
               <img 
                 src="/Zap-Zone.png" 
@@ -119,9 +109,7 @@ const CustomerLayout = () => {
               />
             </div>
             
-            {/* Desktop Navigation */}
             <div className="hidden lg:flex items-center space-x-6">
-              {/* Navigation Links (only real pages) */}
               <nav className="flex items-center space-x-4">
             
                 {customerUser && (
@@ -156,18 +144,20 @@ const CustomerLayout = () => {
                     >
                       Gift Cards
                     </Link>
+                    <Link
+                      to="/customer/membership"
+                      className={`px-2 py-1 font-medium text-sm transition-colors ${location.pathname.startsWith('/customer/membership') ? 'text-blue-800 border-b-2 border-blue-800' : 'text-gray-700 hover:text-blue-800'}`}
+                    >
+                      Membership
+                    </Link>
                   </>
                 )}
               </nav>
-              {/* Auth Buttons - Conditional Rendering */}
               {customerUser ? (
-                /* Logged In User Menu + Notification */
                 <div className="flex items-center space-x-2 relative">
-                  {/* Notification Bell */}
                   <Link to="/customer/notifications" className="p-2 hover:bg-blue-50 text-blue-800 transition-colors">
                     <Bell size={16} />
                   </Link>
-                  {/* User Menu */}
                   <div className="relative">
                     <button 
                       className="flex items-center space-x-2 px-4 py-2 text-sm text-gray-700 hover:text-blue-800 font-medium transition-colors hover:bg-blue-50"
@@ -179,7 +169,6 @@ const CustomerLayout = () => {
                         className={`transition-transform ${userMenuOpen ? 'rotate-90' : ''}`}
                       />
                     </button>
-                    {/* User Dropdown Menu */}
                     {userMenuOpen && (
                       <div className="absolute right-0 mt-1 w-48 bg-white border border-blue-800 py-1 z-50">
                         <div className="px-4 py-2 border-b border-blue-200">
@@ -216,7 +205,6 @@ const CustomerLayout = () => {
                 </div>
                 
               ) : (
-                /* Not Logged In Auth Buttons */
                 <div className="flex items-center space-x-2">
                   <Link 
                     to="/customer/login"
@@ -235,7 +223,6 @@ const CustomerLayout = () => {
               )}
             </div>
 
-            {/* Mobile Menu Button */}
             <button 
               className="lg:hidden p-2 hover:bg-blue-50 transition-colors border border-blue-800"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -244,11 +231,9 @@ const CustomerLayout = () => {
             </button>
           </div>
 
-          {/* Mobile Navigation */}
           {mobileMenuOpen && (
             <div className="lg:hidden py-4 border-t border-blue-800 bg-white/90 backdrop-blur-md">
               <div className="space-y-4">
-                {/* Mobile Navigation Links */}
                 <div className="flex flex-col space-y-2">
                 
                   {customerUser && (
@@ -287,6 +272,20 @@ const CustomerLayout = () => {
                         className={`px-4 py-2 font-medium text-sm transition-colors ${location.pathname.startsWith('/customer/gift-cards') ? 'text-blue-800 bg-blue-50' : 'text-gray-700 hover:text-blue-800 hover:bg-blue-50'}`}
                       >
                         Gift Cards
+                      </Link>
+                      <Link
+                        to="/customer/membership"
+                        onClick={() => setMobileMenuOpen(false)}
+                        className={`px-4 py-2 font-medium text-sm transition-colors ${location.pathname.startsWith('/customer/membership') ? 'text-blue-800 bg-blue-50' : 'text-gray-700 hover:text-blue-800 hover:bg-blue-50'}`}
+                      >
+                        Membership
+                      </Link>
+                      <Link
+                        to="/customer/notifications"
+                        onClick={() => setMobileMenuOpen(false)}
+                        className={`px-4 py-2 font-medium text-sm transition-colors ${location.pathname.startsWith('/customer/notifications') ? 'text-blue-800 bg-blue-50' : 'text-gray-700 hover:text-blue-800 hover:bg-blue-50'}`}
+                      >
+                        Notifications
                       </Link>
                     </>
                   )}
@@ -348,7 +347,6 @@ const CustomerLayout = () => {
 
       </header>
 
-      {/* Page Content */}
       <main>
         <Outlet />
       </main>

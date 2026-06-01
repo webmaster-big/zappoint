@@ -40,7 +40,8 @@ import {
   Coins,
   CalendarCheck,
   Calculator,
-  Activity
+  Activity,
+  IdCard
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -56,7 +57,6 @@ import { attractionCacheService } from '../../services/AttractionCacheService';
 import { attractionPurchaseCacheService } from '../../services/AttractionPurchaseCacheService';
 import { eventCacheService } from '../../services/EventCacheService';
 
-// Helper function to add descriptions to navigation items
 const addDescriptions = (navItems: NavItem[]): NavItem[] => {
   const descriptions: Record<string, string> = {
     'Dashboard': 'Overview of your account and recent activity',
@@ -103,12 +103,9 @@ const addDescriptions = (navItems: NavItem[]): NavItem[] => {
 
   return navItems.map(item => {
     const newItem = { ...item };
-    // Add description if available
     if (descriptions[item.label]) {
       newItem.description = descriptions[item.label];
     }
-  // ...existing code...
-    // Recursively process nested items
     if (item.items && item.items.length > 0) {
       newItem.items = addDescriptions(item.items);
     }
@@ -116,7 +113,6 @@ const addDescriptions = (navItems: NavItem[]): NavItem[] => {
   });
 };
 
-// Grouped navigation for sidebar sections
 const getNavigation = (role: UserData['role']): NavItem[] => {
   const commonItems: NavItem[] = [
     { label: 'Bookings', icon: Calendar, items: [
@@ -133,6 +129,12 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
     { label: 'Customers', icon: Users, items: [
       { label: 'Customer Analytics', href: '/customers/analytics', icon: Dot },
       { label: 'Customers', href: '/customers', icon: Dot }
+    ]},
+    { label: 'Memberships', icon: IdCard, items: [
+      { label: 'Memberships', href: '/memberships', icon: Dot },
+      { label: 'Plans', href: '/memberships/plans', icon: Dot },
+      { label: 'Check-In', href: '/memberships/check-in', icon: Dot },
+      { label: 'Reports', href: '/memberships/reports', icon: Dot }
     ]},
   ];
 
@@ -227,6 +229,12 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
           { label: 'Customer Analytics', href: '/customers/analytics', icon: PieChart },
           { label: 'Customers', href: '/customers', icon: Users }
         ]},
+        { label: 'Memberships', icon: IdCard, section: 'Memberships', items: [
+          { label: 'Memberships', href: '/memberships', icon: List },
+          { label: 'Plans', href: '/memberships/plans', icon: Package },
+          { label: 'Check-In', href: '/memberships/check-in', icon: ScanLine },
+          { label: 'Reports', href: '/memberships/reports', icon: BarChart3 }
+        ]},
         { label: 'Email Campaigns', icon: Mail, section: 'Communication', items: [
           { label: 'Email Templates', href: '/admin/email/templates', icon: FileText },
           { label: 'Create Template', href: '/admin/email/templates/create', icon: Plus },
@@ -290,6 +298,12 @@ const getNavigation = (role: UserData['role']): NavItem[] => {
           { label: 'Customer Analytics', href: '/customers/analytics', icon: PieChart },
           { label: 'Customers', href: '/customers', icon: Users }
         ]},
+        { label: 'Memberships', icon: IdCard, section: 'Memberships', items: [
+          { label: 'Memberships', href: '/memberships', icon: List },
+          { label: 'Plans', href: '/memberships/plans', icon: Package },
+          { label: 'Check-In', href: '/memberships/check-in', icon: ScanLine },
+          { label: 'Reports', href: '/memberships/reports', icon: BarChart3 }
+        ]},
         { label: 'Email Campaigns', icon: Mail, section: 'Communication', items: [
           { label: 'Email Templates', href: '/admin/email/templates', icon: FileText },
           { label: 'Create Template', href: '/admin/email/templates/create', icon: Plus },
@@ -329,7 +343,6 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
   const { themeColor, fullColor } = useThemeColor();
   const location = useLocation();
   
-  // Initialize openDropdowns from localStorage to persist state across navigation
   const [openDropdowns, setOpenDropdowns] = useState<Record<string, boolean>>(() => {
     try {
       const saved = localStorage.getItem('zapzone_sidebar_dropdowns');
@@ -347,18 +360,14 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
   const searchRef = useRef<HTMLDivElement>(null);
   const navRef = useRef<HTMLElement>(null);
   
-  // Sidebar layout preference
   const [sidebarLayout, setSidebarLayout] = useState<'dropdown' | 'grouped'>('dropdown');
   
-  // Persist openDropdowns to localStorage whenever it changes
   useEffect(() => {
     localStorage.setItem('zapzone_sidebar_dropdowns', JSON.stringify(openDropdowns));
   }, [openDropdowns]);
   
-  // Ref to track pending scroll restoration
   const pendingScrollRef = useRef<number | null>(null);
   
-  // Use useLayoutEffect to restore scroll position BEFORE browser paints (prevents blinking)
   useLayoutEffect(() => {
     const navElement = navRef.current;
     if (!navElement) return;
@@ -367,11 +376,9 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
     if (savedScrollPosition) {
       const scrollPos = parseInt(savedScrollPosition, 10);
       if (scrollPos > 0) {
-        // Immediately set scroll position before paint
         navElement.scrollTop = scrollPos;
         pendingScrollRef.current = scrollPos;
         
-        // Double-check after a microtask in case React batched updates reset it
         queueMicrotask(() => {
           if (navElement && pendingScrollRef.current !== null) {
             navElement.scrollTop = pendingScrollRef.current;
@@ -381,16 +388,13 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
     }
   }, [location.pathname]);
   
-  // Additional scroll restoration after render completes
   useEffect(() => {
     const navElement = navRef.current;
     if (!navElement || pendingScrollRef.current === null) return;
     
-    // Restore scroll after layout is complete
     const scrollPos = pendingScrollRef.current;
     navElement.scrollTop = scrollPos;
     
-    // Use requestAnimationFrame as final fallback
     const rafId = requestAnimationFrame(() => {
       if (navElement) {
         navElement.scrollTop = scrollPos;
@@ -401,7 +405,6 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
     return () => cancelAnimationFrame(rafId);
   }, [location.pathname]);
   
-  // Save scroll position continuously as user scrolls
   useEffect(() => {
     const navElement = navRef.current;
     if (!navElement) return;
@@ -415,7 +418,6 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
     return () => navElement.removeEventListener('scroll', handleScroll);
   }, []);
   
-  // Helper function to save scroll position immediately
   const saveScrollPosition = () => {
     if (navRef.current) {
       const scrollTop = navRef.current.scrollTop;
@@ -424,9 +426,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
     }
   };
 
-  // Load company logo on mount and listen for updates
   useEffect(() => {
-    // Load from localStorage first
     const loadCompanyLogo = () => {
       const storedLogo = localStorage.getItem('company_logo_path');
       if (storedLogo) {
@@ -434,7 +434,6 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
         return;
       }
       
-      // Try to get from cached company data
       const user = JSON.parse(localStorage.getItem('zapzone_user') || '{}');
       if (user.company_id) {
         const cachedCompany = localStorage.getItem(`company_${user.company_id}`);
@@ -450,7 +449,6 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
     
     loadCompanyLogo();
     
-    // Listen for logo updates
     const handleLogoUpdate = (event: CustomEvent<{ logoPath: string }>) => {
       if (event.detail?.logoPath) {
         setCompanyLogo(event.detail.logoPath);
@@ -466,22 +464,18 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
     };
   }, []);
 
-  // Unread notifications count from localStorage (zapzone_notifications)
   const [unreadNotifications, setUnreadNotifications] = useState<number>(0);
   const isStreamConnectedRef = useRef<boolean>(false);
   const notificationCountRef = useRef<number>(0);
   const countInitializedRef = useRef<boolean>(false);
   
-  // Toast notification state
   const [showToast, setShowToast] = useState(false);
   const [toastData, setToastData] = useState<{ title: string; message: string; type: string } | null>(null);
   const toastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Get CSS variable value for the current theme color
   const getThemeColorValue = () => {
     if (typeof window === 'undefined') return '#1e40af'; // Default blue-800
     
-    // Create a temporary element to get computed color value
     const temp = document.createElement('div');
     temp.className = `bg-${fullColor}`;
     temp.style.display = 'none';
@@ -492,7 +486,6 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
     return color || '#1e40af';
   };
 
-  // Helper to get unread count from localStorage
   const getUnreadCount = async () => {
     try {
       const user = JSON.parse(localStorage.getItem('zapzone_user') || '{}');
@@ -502,13 +495,11 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
 
       if (!token) return 0;
 
-      // Build query parameters
       const params = new URLSearchParams({
         per_page: '1', // We only need the count
         unread: 'true',
       });
 
-      // Only add location_id if not company_admin
       if (!isCompanyAdmin && locationId) {
         params.append('location_id', locationId.toString());
       }
@@ -520,14 +511,12 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
         },
       });
 
-      // Handle authentication errors - token is invalid/expired (HTTP status)
       if (response.status === 401 || response.status === 403) {
         console.warn('[AdminSidebar] Authentication failed (HTTP status), logging out user');
         forceLogout();
         return 0;
       }
 
-      // Check content type - if it's HTML, it means auth failed and server returned login page
       const contentType = response.headers.get('content-type');
       if (contentType && !contentType.includes('application/json')) {
         console.warn('[AdminSidebar] Received non-JSON response (likely HTML error page), logging out user');
@@ -539,13 +528,11 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
       try {
         data = await response.json();
       } catch (parseError) {
-        // If JSON parsing fails, it's likely an HTML error page (auth failure)
         console.warn('[AdminSidebar] Failed to parse JSON response (received HTML), logging out user');
         forceLogout();
         return 0;
       }
 
-      // Handle authentication errors from response body (Laravel often returns this way)
       if (
         data.message === 'Unauthenticated.' || 
         data.message === 'Unauthenticated' ||
@@ -564,16 +551,13 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
       return 0;
     } catch (error) {
       console.error('[AdminSidebar] Error fetching unread notifications count:', error);
-      // If there's any network error or unexpected error, it might be auth-related
       return 0;
     }
   };
 
-  // Force logout helper - clears all storage and redirects
   const forceLogout = async () => {
     console.warn('[AdminSidebar] Forcing logout - clearing all user data');
     
-    // Clear all caches
     await Promise.all([
       bookingCacheService.clearCache(),
       roomCacheService.clearCache(),
@@ -584,22 +568,17 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
       eventCacheService.clearCache()
     ]);
     
-    // Clear all possible user data
     localStorage.removeItem('zapzone_user');
     localStorage.removeItem('zapzone_token');
     sessionStorage.clear();
     
-    // Disconnect notification stream
     notificationStreamService.disconnect();
     
-    // Force hard redirect to login page
     window.location.replace('/admin');
   };
 
 
-  // Initialize notification count FIRST before SSE connection - Critical timing!
   useEffect(() => {
-    // Initialize notification count from backend API IMMEDIATELY on mount
     const initializeCount = async () => {
       const count = await getUnreadCount();
       notificationCountRef.current = count;
@@ -609,7 +588,6 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
     initializeCount();
   }, []);
 
-  // Sync unread count on mount, when localStorage changes, and when custom event is dispatched
   useEffect(() => {
     const updateUnread = async () => {
       const count = await getUnreadCount();
@@ -624,13 +602,11 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
     };
   }, []);
 
-  // Setup SSE connection for real-time notifications
   useEffect(() => {
     if (!user) {
       return;
     }
 
-    // Try to get location_id from user prop first, then from localStorage
     let locationId = user.location_id;
     let userId = user.id;
     
@@ -643,7 +619,6 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
           userId = userId || parsedUser.id;
         }
       } catch (error) {
-        // Error parsing localStorage
       }
     }
     
@@ -656,51 +631,32 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
       return;
     }
 
-    // Handle incoming notifications
     const handleNotification = async (notification: NotificationObject) => {
-      // RULE 1: Never notify the user who created the notification
-      // If notification.user_id exists and matches the current logged-in user's id, skip it
-      // This means the current user created this notification, so don't show it to them
       if (notification.user_id !== null && notification.user_id !== undefined && notification.user_id === userId) {
         return;
       }
 
-      // RULE 2: Location-based filtering when user_id is null (broadcast/system notifications)
-      // If notification.user_id is null, it's a system or broadcast notification
-      // In this case, only show to users at the matching location (unless company_admin)
       if (user.role !== 'company_admin') {
-        // If notification has a location_id and it doesn't match user's location, skip
         if (notification.location_id !== null && notification.location_id !== undefined && notification.location_id !== locationId) {
           return;
         }
         
-        // If notification has no user_id and no location_id, it might be a global system notification
-        // We'll allow these through for all users
       }
       
-      // Company admins see all notifications from all locations
       
-      // Get new count from backend
       const newCount = await getUnreadCount();
       
-      // CRITICAL: Only show toast if the initial count has been loaded AND count increased
-      // This prevents false toasts from SSE events that fire before baseline count is established
       const countIncreased = countInitializedRef.current && newCount > notificationCountRef.current;
       
-      // Update the count
       notificationCountRef.current = newCount;
       countInitializedRef.current = true;
       
-      // Update unread count display
       setUnreadNotifications(newCount);
       
-      // Only show toast if count increased
       if (countIncreased) {
-        // Refresh purchase cache in background so management pages get fresh data
         attractionPurchaseCacheService.syncInBackground();
         bookingCacheService.syncInBackground();
 
-        // Show toast for this new notification
         if (toastTimeoutRef.current) {
           clearTimeout(toastTimeoutRef.current);
         }
@@ -716,7 +672,6 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
           setShowToast(false);
         }, 5000);
         
-        // Optional: Show browser notification if permitted
         if ('Notification' in window && Notification.permission === 'granted') {
           new Notification(notification.title, {
             body: notification.message,
@@ -727,12 +682,9 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
       }
     };
 
-    // Handle connection errors
     const handleError = (error?: any) => {
-      // Stream connection error - might be auth failure
       console.warn('[AdminSidebar] Notification stream connection error:', error);
       
-      // If error indicates authentication failure, force logout
       if (error && typeof error === 'object') {
         const errorMessage = error.message || error.toString?.() || '';
         if (
@@ -747,16 +699,13 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
       }
     };
 
-    // Connect to the notification stream
     notificationStreamService.connect(locationId, handleNotification, handleError);
     isStreamConnectedRef.current = true;
 
-    // Request notification permission on mount (optional)
     if ('Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission();
     }
 
-    // Cleanup on unmount
     return () => {
       notificationStreamService.disconnect();
       isStreamConnectedRef.current = false;
@@ -767,14 +716,12 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
     };
   }, [user]);
 
-  // Optionally, update unread count when sidebar opens (for SPA navigation)
   useEffect(() => {
     if (isOpen) {
       getUnreadCount().then(count => setUnreadNotifications(count));
     }
   }, [isOpen]);
   
-  // Load and listen for sidebar layout changes
   useEffect(() => {
     const savedLayout = localStorage.getItem('zapzone_sidebar_layout');
     if (savedLayout === 'dropdown' || savedLayout === 'grouped') {
@@ -795,18 +742,15 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
   }, []);
 
   useEffect(() => {
-    // Close sidebar when clicking outside on mobile
     const handleClickOutside = (event: MouseEvent) => {
       const sidebar = document.getElementById('sidebar');
       if (isOpen && sidebar && !sidebar.contains(event.target as Node)) {
         setIsOpen(false);
       }
-      // Close profile dropdown when clicking outside
       if (showProfileDropdown && profileDropdownRef.current && 
           !profileDropdownRef.current.contains(event.target as Node)) {
         setShowProfileDropdown(false);
       }
-      // Close search suggestions when clicking outside
       if (showSuggestions && searchRef.current && 
           !searchRef.current.contains(event.target as Node)) {
         setShowSuggestions(false);
@@ -820,13 +764,11 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
   if (!user) return null;
   let navigation = getNavigation(user.role);
   
-  // Transform navigation for grouped layout
   if (sidebarLayout === 'grouped') {
     const groupedNav: NavItem[] = [];
     const seenSections = new Set<string>();
     
     navigation.forEach(item => {
-      // Add section header if this is a new section
       if (item.section && !seenSections.has(item.section)) {
         seenSections.add(item.section);
         groupedNav.push({
@@ -837,7 +779,6 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
       }
       
       if (item.items && item.items.length > 0) {
-        // Add flat items from dropdown
         item.items.forEach(subItem => {
           groupedNav.push({
             ...subItem,
@@ -845,7 +786,6 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
           });
         });
       } else {
-        // Add standalone items
         groupedNav.push({
           ...item,
           isGrouped: true
@@ -856,7 +796,6 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
     navigation = groupedNav;
   }
 
-  // Flatten all links for search (role-based)
   const getAllLinks = (nav: NavItem[]): { label: string; href: string; description?: string; fragmentId?: string }[] => {
     const links: { label: string; href: string; description?: string; fragmentId?: string }[] = [];
     nav.forEach(item => {
@@ -869,12 +808,10 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
   };
   const allLinks = getAllLinks(navigation);
 
-  // Handle search input changes
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setSearchValue(value);
 
-    // Show suggestions matching input (label or fragmentId)
     if (value.trim()) {
       const suggestions = allLinks
         .filter(link =>
@@ -890,10 +827,8 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
     }
   };
 
-  // Handle search selection
 
   const toggleDropdown = (label: string) => {
-    // Save scroll position before state change
     saveScrollPosition();
     
     setOpenDropdowns(prev => ({
@@ -903,7 +838,6 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
   };
 
   const NavItemComponent: React.FC<{ item: NavItem; depth?: number }> = ({ item, depth = 0 }) => {
-    // Handle group headers for grouped layout
     if (item.isGroupHeader && sidebarLayout === 'grouped' && !isMinimized) {
       return (
         <div className="mt-4 first:mt-0">
@@ -916,7 +850,6 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
     }
     
     const hasItems = item.items && item.items.length > 0;
-    // Check if any child is active
     const isChildActive = hasItems && item.items!.some(child => child.href && location.pathname === child.href);
     const isDropdownOpen = openDropdowns[item.label] || isChildActive;
     const isActive = item.href && location.pathname === item.href;
@@ -925,7 +858,6 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
     const itemRef = useRef<HTMLDivElement>(null);
     const [tooltipPosition, setTooltipPosition] = useState({ top: 0, left: 0 });
 
-    // Calculate tooltip position when showing
     const handleMouseEnter = () => {
       if (isMinimized && depth === 0 && itemRef.current) {
         const rect = itemRef.current.getBoundingClientRect();
@@ -959,9 +891,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
       </>
     );
     
-    // Only close sidebar on navigation for mobile screens
     const handleNavClick = () => {
-      // Save scroll position immediately before navigation
       saveScrollPosition();
       
       if (window.innerWidth < 1024) {
@@ -1008,7 +938,6 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
           </Link>
         ) : null}
         
-        {/* Tooltip for minimized state - portaled to body to escape sidebar transforms & overflow */}
         {isMinimized && depth === 0 && showTooltip && !showDropdownMenu && createPortal(
           <div 
             className="px-3 py-2 bg-gray-900 text-white text-sm rounded-lg whitespace-nowrap pointer-events-none" 
@@ -1026,7 +955,6 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
           document.body
         )}
 
-        {/* Dropdown menu for minimized state - portaled to body to escape sidebar transforms & overflow */}
         {isMinimized && depth === 0 && hasItems && showDropdownMenu && createPortal(
           <div 
             className="bg-white border border-gray-200 rounded-lg shadow-lg py-2 min-w-[200px]"
@@ -1078,7 +1006,6 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
 
   return (
     <>
-      {/* Toast Notification - Right Top */}
       {showToast && toastData && (
         <div 
           className="fixed top-6 right-6 z-[9999] animate-slideDown"
@@ -1091,7 +1018,6 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
               boxShadow: '0 20px 60px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.05)'
             }}
           >
-            {/* Animated gradient border */}
             <div 
               className="absolute inset-0 rounded-2xl"
               style={{
@@ -1101,7 +1027,6 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
               }}
             />
             
-            {/* Colored accent bar */}
             <div 
               className="absolute top-0 left-0 right-0 h-1.5"
               style={{ 
@@ -1112,7 +1037,6 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
             
             <div className="relative p-5">
               <div className="flex items-start gap-4">
-                {/* Animated Icon */}
                 <div 
                   className="flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center relative"
                   style={{ 
@@ -1134,7 +1058,6 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
                   />
                 </div>
                 
-                {/* Content */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between mb-2">
                     <div>
@@ -1169,7 +1092,6 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
                 </div>
               </div>
               
-              {/* Enhanced Progress bar */}
               <div className="mt-4 -mx-5 -mb-5 h-1.5 bg-gray-100 overflow-hidden">
                 <div 
                   className="h-full animate-shrink relative"
@@ -1192,14 +1114,12 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
         </div>
       )}
       
-      {/* Mobile overlay */}
       {isOpen && (
         <div
           className="fixed inset-0 bg-black/50 z-40 lg:hidden"
           onClick={() => setIsOpen(false)}
         />
       )}
-      {/* Floating Toggle Button */}
       {!isOpen && (
         <button
           className={`fixed top-4 right-4 z-50 p-2 rounded bg-${fullColor} text-white shadow-lg lg:hidden`}
@@ -1209,7 +1129,6 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
           <Menu size={20} />
         </button>
       )}
-      {/* Sidebar */}
       <aside
         id="sidebar"
         className={`fixed top-0 left-0 z-50 h-screen bg-white via-white to-white shadow-md transition-all duration-300 ease-in-out transform animate-slide-in-from-left
@@ -1217,7 +1136,6 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
         style={{ overflow: 'visible' }}
       >
         <div className="flex flex-col h-full" style={{ overflow: 'visible' }}>
-          {/* Header with Logo and Minimize Button */}
           <div className="relative flex items-center justify-center p-4 border-b border-gray-200 transition-all duration-300">
             <div className="flex items-center justify-center w-full transition-all duration-300">
               {companyLogo ? (
@@ -1239,7 +1157,6 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
               />
             </div>
             
-            {/* Minimize/Maximize Toggle Button - Desktop only, positioned on the right border */}
             <button
               onClick={() => setIsMinimized && setIsMinimized(!isMinimized)}
               className={`hidden lg:flex absolute -right-3 top-1/2 -translate-y-1/2 items-center justify-center w-6 h-6 rounded-full bg-white border-2 border-gray-200 hover:border-${themeColor}-600 hover:bg-${themeColor}-50 text-gray-600 hover:text-${themeColor}-600 transition-all duration-300 shadow-sm hover:shadow-md z-10`}
@@ -1252,11 +1169,9 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
             </button>
           </div>
 
-          {/* Search and Notifications */}
           <div className="p-4" ref={searchRef}>
             {isMinimized ? (
               <div className="flex items-center justify-center">
-                {/* Notification Icon with Badge - Minimized */}
                 <Link
                   to="/notifications"
                   className={`relative p-2 rounded-md hover:bg-${themeColor}-50 transition-colors flex-shrink-0`}
@@ -1293,7 +1208,6 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
                     onFocus={() => searchValue.trim() && setShowSuggestions(true)}
                     autoComplete="off"
                   />
-                  {/* Custom search suggestions dropdown */}
                   {showSuggestions && searchSuggestions.length > 0 && (
                     <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded shadow-lg z-50 max-h-60 overflow-y-auto">
                       {searchSuggestions.map(suggestion => (
@@ -1318,7 +1232,6 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
                   )}
                 </div>
                 
-                {/* Notification Icon with Badge */}
                 <Link
                   to="/notifications"
                   className={`relative p-2 rounded-md hover:bg-${themeColor}-50 transition-colors flex-shrink-0`}
@@ -1344,7 +1257,6 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
               </div>
             )}
           </div>
-          {/* Navigation */}
           <nav 
             ref={navRef} 
             className="flex-1 px-4 py-4 space-y-2 hidden-scrollbar" 
@@ -1359,9 +1271,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
               <NavItemComponent key={`${item.label}-${idx}`} item={item} />
             ))}
           </nav>
-          {/* User profile & Notifications */}
           <div className="p-4 border-t border-gray-200">
-            {/* User Profile Dropdown */}
             {isMinimized ? (
               <div className="flex items-center justify-center relative" ref={profileDropdownRef}>
                 <button
@@ -1375,7 +1285,6 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
                       alt={user.name}
                       className="w-full h-full object-cover"
                       onError={(e) => {
-                        // Fallback to icon if image fails to load
                         e.currentTarget.style.display = 'none';
                         const parent = e.currentTarget.parentElement;
                         if (parent) {
@@ -1402,7 +1311,6 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
                       </p>
                     </div>
                     <div className="p-2">
-                      {/* Theme Toggle */}
                       <button
                         onClick={toggleTheme}
                         className="w-full flex items-center gap-3 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg transition-all duration-200 ease-in-out"
@@ -1420,10 +1328,8 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
                         )}
                       </button>
                       
-                      {/* Divider */}
                       <div className="border-t border-gray-100 my-2"></div>
                       
-                      {/* Sign Out */}
                       <button
                         onClick={handleSignOut}
                         className="w-full flex items-center gap-3 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-all duration-200 ease-in-out"
@@ -1445,7 +1351,6 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
                         alt={user.name}
                         className="w-full h-full object-cover"
                         onError={(e) => {
-                          // Fallback to icon if image fails to load
                           e.currentTarget.style.display = 'none';
                           const parent = e.currentTarget.parentElement;
                           if (parent) {
@@ -1478,7 +1383,6 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
                   {showProfileDropdown && (
                     <div className="absolute right-0 bottom-0 mb-10 w-48 bg-white border border-gray-200 rounded-xl shadow-lg z-50 overflow-hidden">
                       <div className="p-2">
-                        {/* Theme Toggle */}
                         <button
                           onClick={toggleTheme}
                           className="w-full flex items-center gap-3 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
@@ -1496,10 +1400,8 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, handleSignOu
                           )}
                         </button>
                         
-                        {/* Divider */}
                         <div className="border-t border-gray-100 my-2"></div>
                         
-                        {/* Sign Out */}
                         <button
                           onClick={handleSignOut}
                           className="w-full flex items-center gap-3 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-all duration-200 ease-in-out"

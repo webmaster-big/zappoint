@@ -40,11 +40,9 @@ import CompanyAdminRegistration from "./pages/auth/Register";
 import CompanyAdminProfile from "./pages/admin/profile/CompanyAdminProfile";
 import LocationManagerProfile from "./pages/admin/profile/LocationManagerProfile";
 import AttendantProfile from "./pages/admin/profile/AttendantProfile";
-// import CreateAttendant from "./pages/admin/users/CreateAttendant"; // TODO: File missing
 import Notifications from "./pages/admin/Notifications";
 import LocationActivityLogs from "./pages/admin/LocationActivityLogs";
 import ManageAccounts from "./pages/admin/users/ManageAccounts";
-// import CreateAccount from "./pages/admin/users/CreateAccounts"; // TODO: File missing
 import EntertainmentLandingPage from "./pages/customer/Home";
 import CustomerLogin from "./pages/customer/CustomerLogin";
 import CustomerRegister from "./pages/customer/CustomerRegister";
@@ -93,14 +91,20 @@ import MyEvents from "./pages/customer/MyEvents";
 import MyAttractions from "./pages/customer/MyAttractions";
 import PageViewBeacon from "./components/PageViewBeacon";
 
-// Redirect /settings/google-calendar to the correct role-based settings page
+import MyMembership from "./pages/customer/MyMembership";
+import PurchaseMembership from "./pages/customer/PurchaseMembership";
+import MembershipPlans from "./pages/admin/memberships/MembershipPlans";
+import Memberships from "./pages/admin/memberships/Memberships";
+import MembershipDetails from "./pages/admin/memberships/MembershipDetails";
+import MembershipCheckIn from "./pages/admin/memberships/MembershipCheckIn";
+import MembershipReports from "./pages/admin/memberships/MembershipReports";
+
 const GoogleCalendarRedirect = () => {
   const location = useLocation();
   const user = getStoredUser();
   const role = user?.role || '';
   const rolePrefix = role === 'company_admin' ? 'admin' : role === 'location_manager' ? 'manager' : role === 'attendant' ? 'attendant' : 'admin';
 
-  // If opened as a popup, notify the opener and close immediately
   if (window.opener) {
     const params = new URLSearchParams(location.search);
     if (params.get('connected') === 'true') {
@@ -126,13 +130,11 @@ function App() {
     <ThemeProvider>
       <PageTitleSetter />
       <Routes>
-        {/* Public Routes - Restricted (redirect if authenticated) */}
         <Route path="/admin" element={<PublicRoute restricted><Login /></PublicRoute>} />
         <Route path="/admin/register" element={<PublicRoute restricted><CompanyAdminRegistration /></PublicRoute>} />
         <Route path="/customer/login" element={<PublicRoute restricted><><PageViewBeacon pageType="customer_login" /><CustomerLogin /></></PublicRoute>} />
         <Route path="/customer/register" element={<PublicRoute restricted><><PageViewBeacon pageType="customer_register" /><CustomerRegister /></></PublicRoute>} />
         
-        {/* Public Routes - Unrestricted */}
         <Route path="/home" element={<><PageViewBeacon pageType="home" /><Home /></>} />
         <Route path="/book/package/:location/:slug" element={<><PageViewBeacon pageType="package_book" entityType="package" entityIdFromSlugParam="slug" /><BookPackage /></>} />
         <Route path="/purchase/attraction/:location/:slug" element={<><PageViewBeacon pageType="attraction_buy" entityType="attraction" entityIdFromSlugParam="slug" /><PurchaseAttraction /></>} />
@@ -140,7 +142,6 @@ function App() {
         <Route path="/events/:eventId/purchase" element={<><PageViewBeacon pageType="event_buy" entityType="event" entityIdParam="eventId" /><PurchaseEvent /></>} />
         <Route path="/rsvp/:token" element={<><PageViewBeacon pageType="rsvp" /><RsvpPage /></>} />
         
-        {/* Customer Routes */}
         <Route element={<CustomerLayout />}>
           <Route path="/" element={<><PageViewBeacon pageType="home" /><EntertainmentLandingPage /></>} />
           <Route path="/customer/reservations" element={<CustomerProtectedRoute><><PageViewBeacon pageType="my_reservations" /><CustomerReservations /></></CustomerProtectedRoute>} />
@@ -148,16 +149,15 @@ function App() {
           <Route path="/customer/events" element={<CustomerProtectedRoute><><PageViewBeacon pageType="my_events" /><MyEvents /></></CustomerProtectedRoute>} />
           <Route path="/customer/gift-cards" element={<CustomerProtectedRoute><><PageViewBeacon pageType="my_gift_cards" /><CustomerGiftCards /></></CustomerProtectedRoute>} />
           <Route path="/customer/notifications" element={<CustomerProtectedRoute><><PageViewBeacon pageType="my_notifications" /><CustomerNotifications /></></CustomerProtectedRoute>} />
+          <Route path="/customer/membership" element={<CustomerProtectedRoute><><PageViewBeacon pageType="my_membership" /><MyMembership /></></CustomerProtectedRoute>} />
+          <Route path="/customer/membership/purchase" element={<CustomerProtectedRoute><><PageViewBeacon pageType="membership_purchase" /><PurchaseMembership /></></CustomerProtectedRoute>} />
         </Route>
         
-        {/* Protected Admin Routes */}
         <Route element={<ProtectedRoute><MainLayout /></ProtectedRoute>}> 
-          {/* Dashboard Routes - Role-specific */}
           <Route path="/attendant/dashboard" element={<ProtectedRoute allowedRoles={['attendant']}><AttendantDashboard /></ProtectedRoute>} />
           <Route path="/manager/dashboard" element={<ProtectedRoute allowedRoles={['location_manager']}><LocationManagerDashboard /></ProtectedRoute>} />
           <Route path="/company/dashboard" element={<ProtectedRoute allowedRoles={['company_admin']}><CompanyDashboard /></ProtectedRoute>} />
           
-          {/* Attractions Routes - All authenticated users */}
           <Route path="/attractions/create" element={<CreateAttraction />} />
           <Route path="/edit-attraction/:id" element={<EditAttraction />} />
           <Route path="/attractions/edit/:id" element={<EditAttraction />} />
@@ -168,7 +168,6 @@ function App() {
           <Route path="/attractions/purchases/create" element={<CreatePurchase />} />
           <Route path="/attractions/check-in" element={<AttractionCheckIn />} />
           
-          {/* Events Routes - All authenticated users */}
           <Route path="/events" element={<Events />} />
           <Route path="/events/create" element={<CreateEvent />} />
           <Route path="/events/:id/edit" element={<EditEvent />} />
@@ -176,7 +175,6 @@ function App() {
           <Route path="/events/purchases" element={<EventPurchases />} />
           <Route path="/events/purchases/:id" element={<ViewEventPurchase />} />
           
-          {/* Packages Routes - All authenticated users */}
           <Route path="/packages/create" element={<CreatePackage />} />
           <Route path="/packages/edit/:id" element={<EditPackage />} />
           <Route path="/packages" element={<Packages />} />
@@ -189,13 +187,10 @@ function App() {
           <Route path="/packages/add-ons" element={<ManageAddOns />} />
           <Route path="/packages/gift-cards" element={<GiftCard />} />
           
-          {/* Fee Support Routes - All authenticated users */}
           <Route path="/fee-supports" element={<FeeSupports />} />
 
-          {/* Special Pricing Routes - All authenticated users */}
           <Route path="/special-pricings" element={<SpecialPricings />} />
 
-          {/* Bookings Routes - All authenticated users */}
           <Route path="/bookings" element={<Bookings />} />
           <Route path="/bookings/edit/:id" element={<EditBooking />} />
           <Route path="/bookings/:id" element={<ViewBooking />} />
@@ -205,14 +200,17 @@ function App() {
           <Route path="/bookings/manual" element={<ManualBooking />} />
           <Route path="/bookings/check-in" element={<CheckIn />} />
           
-          {/* Payments Routes - All authenticated users */}
           <Route path="/payments/:id" element={<ViewPayment />} />
           
-          {/* Customers Routes - All authenticated users */}
           <Route path="/customers/analytics" element={<CustomerAnalytics />} />
           <Route path="/customers" element={<CustomerListing />} />
+
+          <Route path="/memberships" element={<Memberships />} />
+          <Route path="/memberships/plans" element={<MembershipPlans />} />
+          <Route path="/memberships/check-in" element={<MembershipCheckIn />} />
+          <Route path="/memberships/reports" element={<MembershipReports />} />
+          <Route path="/memberships/:id" element={<MembershipDetails />} />
           
-          {/* Email Campaigns Routes - All authenticated users */}
           <Route path="/admin/email/templates" element={<EmailTemplates />} />
           <Route path="/admin/email/templates/create" element={<CreateEmailTemplate />} />
           <Route path="/admin/email/templates/edit/:id" element={<EditEmailTemplate />} />
@@ -220,19 +218,15 @@ function App() {
           <Route path="/admin/email/campaigns/create" element={<CreateEmailCampaign />} />
           <Route path="/admin/email/campaigns/:id" element={<EmailCampaignDetails />} />
           
-          {/* Email Notifications Routes - All authenticated users */}
           <Route path="/admin/email/notifications" element={<EmailNotifications />} />
           <Route path="/admin/email/notifications/create" element={<CreateEmailNotification />} />
           <Route path="/admin/email/notifications/edit/:id" element={<EditEmailNotification />} />
           <Route path="/admin/email/notifications/:id" element={<EmailNotificationDetails />} />
           
-          {/* Profile Routes - Role-specific */}
           <Route path="/admin/profile" element={<ProtectedRoute allowedRoles={['company_admin']}><CompanyAdminProfile /></ProtectedRoute>} />
           <Route path="/manager/profile" element={<ProtectedRoute allowedRoles={['location_manager']}><LocationManagerProfile /></ProtectedRoute>} />
           <Route path="/attendant/profile" element={<ProtectedRoute allowedRoles={['attendant']}><AttendantProfile /></ProtectedRoute>} />
           
-          {/* Manager-only Routes */}
-          {/* <Route path="/manager/attendant/create" element={<ProtectedRoute allowedRoles={['location_manager']}><CreateAttendant /></ProtectedRoute>} /> */}
           <Route path="/manager/attendants" element={<ProtectedRoute allowedRoles={['location_manager']}><ManageAttendants /></ProtectedRoute>} />
           <Route path="/manager/attendants/activity" element={<ProtectedRoute allowedRoles={['location_manager']}><AttendantActivityLogs /></ProtectedRoute>} />
           <Route path="/manager/day-offs" element={<ProtectedRoute allowedRoles={['location_manager']}><DayOffs /></ProtectedRoute>} />
@@ -242,7 +236,6 @@ function App() {
           <Route path="/manager/payments" element={<ProtectedRoute allowedRoles={['location_manager']}><Payments /></ProtectedRoute>} />
           <Route path="/manager/payments/:id" element={<ProtectedRoute allowedRoles={['location_manager']}><ViewPayment /></ProtectedRoute>} />
           
-          {/* Company Admin-only Routes */}
           <Route path="/admin/analytics" element={<ProtectedRoute allowedRoles={['company_admin']}><CompanyAnalytics /></ProtectedRoute>} />
           <Route path="/admin/analytics/pages" element={<ProtectedRoute allowedRoles={['company_admin']}><PageAnalytics /></ProtectedRoute>} />
           <Route path="/admin/accounting" element={<ProtectedRoute allowedRoles={['company_admin']}><AccountingAnalytics /></ProtectedRoute>} />
@@ -251,21 +244,16 @@ function App() {
           <Route path="/admin/users" element={<ProtectedRoute allowedRoles={['company_admin']}><ManageAccounts /></ProtectedRoute>} />
           <Route path="/admin/payments" element={<ProtectedRoute allowedRoles={['company_admin']}><Payments /></ProtectedRoute>} />
           <Route path="/admin/payments/:id" element={<ProtectedRoute allowedRoles={['company_admin']}><ViewPayment /></ProtectedRoute>} />
-          {/* <Route path="/admin/users/create" element={<ProtectedRoute allowedRoles={['company_admin']}><CreateAccount /></ProtectedRoute>} /> */}
           
-          {/* Shared Routes - All authenticated users */}
           <Route path="/notifications" element={<Notifications />} />
           
-          {/* Settings Routes - Role-specific */}
           <Route path="/attendant/settings" element={<ProtectedRoute allowedRoles={['attendant']}><Settings /></ProtectedRoute>} />
           <Route path="/manager/settings" element={<ProtectedRoute allowedRoles={['location_manager']}><Settings /></ProtectedRoute>} />
           <Route path="/admin/settings" element={<ProtectedRoute allowedRoles={['company_admin']}><Settings /></ProtectedRoute>} />
         </Route>
         
-        {/* Google Calendar OAuth callback redirect */}
         <Route path="/settings/google-calendar" element={<GoogleCalendarRedirect />} />
         
-        {/* 404 Not Found Route */}
         <Route path="*" element={<NotFound />} />
       </Routes>
     </ThemeProvider>
