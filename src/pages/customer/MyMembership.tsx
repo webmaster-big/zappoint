@@ -86,9 +86,18 @@ const MyMembership = () => {
       return map[b.benefit_type] ?? 'All applicable items';
     }
     if (b.scope_type === 'category') return `Category: ${b.scope_category ?? '—'}`;
+    const typeLabel: Partial<Record<MembershipBenefitType, string>> = {
+      package_discount:    'packages',
+      attraction_discount: 'attractions',
+      event_discount:      'events',
+      addon_discount:      'add-ons',
+      free_entry_pass:     'attractions',
+      guest_pass:          'guest entries',
+    };
+    const noun = typeLabel[b.benefit_type] ?? 'items';
     if (b.scope_targets && b.scope_targets.length > 0)
-      return `${b.scope_targets.length} specific item${b.scope_targets.length === 1 ? '' : 's'}`;
-    return 'Specific items';
+      return `Specific ${noun} (${b.scope_targets.length})`;
+    return `Specific ${noun}`;
   };
 
   const load = async (forceRefresh = false) => {
@@ -279,19 +288,20 @@ const MyMembership = () => {
 
               <div>
                 <p className="text-xs text-gray-400 uppercase mb-1.5">Applies To</p>
-                <p className="font-medium text-gray-800 mb-2">{benefitScopeLabel(detailBenefit)}</p>
-                {detailBenefit.scope_targets && detailBenefit.scope_targets.length > 0 && (
-                  <ul className="space-y-1.5 max-h-40 overflow-y-auto">
+                {detailBenefit.scope_targets && detailBenefit.scope_targets.length > 0 ? (
+                  <ul className="space-y-1.5 max-h-48 overflow-y-auto">
                     {detailBenefit.scope_targets.map((t) => (
                       <li key={t.id} className="flex items-center gap-2 text-gray-700 text-xs">
-                        <span className="w-1.5 h-1.5 rounded-full bg-gray-300 flex-shrink-0" />
+                        <span className="w-1.5 h-1.5 rounded-full bg-gray-400 flex-shrink-0" />
                         <span className="font-medium">{t.name}</span>
                         {t.location_name && (
-                          <span className="text-gray-400">— {t.location_name}</span>
+                          <span className="text-gray-400 ml-auto flex-shrink-0">— {t.location_name}</span>
                         )}
                       </li>
                     ))}
                   </ul>
+                ) : (
+                  <p className="font-medium text-gray-800">{benefitScopeLabel(detailBenefit)}</p>
                 )}
               </div>
 

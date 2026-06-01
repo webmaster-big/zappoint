@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Plus, Edit2, Trash2, ToggleLeft, ToggleRight, X, CreditCard, MapPin, Building2, Lock, Sparkles } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Plus, Edit2, Trash2, ToggleLeft, ToggleRight, X, CreditCard, MapPin, Building2, Lock, Sparkles, DollarSign, ExternalLink } from 'lucide-react';
 import membershipService from '../../../services/MembershipService';
 import { membershipCache } from '../../../services/MembershipCacheService';
 import locationService from '../../../services/LocationService';
@@ -30,6 +31,7 @@ const emptyForm: CreateMembershipPlanData = {
   location_access_mode: 'single',
   location_id: null,
   approved_location_ids: [],
+  billing_location_id: null,
   grace_period_days: 7,
   failed_payment_retry_days: 3,
   cancellation_mode: 'end_of_term',
@@ -43,6 +45,7 @@ const emptyForm: CreateMembershipPlanData = {
 const MembershipPlans = () => {
   const { themeColor } = useThemeColor();
   const user = getStoredUser();
+  const navigate = useNavigate();
   const isCompanyAdmin = user?.role === 'company_admin';
   const isLocationManager = user?.role === 'location_manager';
   const canManagePlans = isCompanyAdmin || isLocationManager;
@@ -117,6 +120,7 @@ const MembershipPlans = () => {
       location_access_mode: p.location_access_mode,
       location_id: p.location?.id ?? null,
       approved_location_ids: p.approved_locations?.map((l) => l.id) || [],
+      billing_location_id: p.billing_location_id ?? null,
       grace_period_days: p.grace_period_days,
       failed_payment_retry_days: p.failed_payment_retry_days,
       cancellation_mode: p.cancellation_mode,
@@ -489,6 +493,44 @@ const MembershipPlans = () => {
                     <Building2 size={12} /> Valid at all locations:
                   </p>
                   <p className="text-xs text-green-700 mt-1">{locations.map((l) => l.name).join(' · ')}</p>
+                </div>
+              )}
+              {isCompanyAdmin && form.location_access_mode === 'single' && (
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-xs text-blue-800 font-medium flex items-center gap-1.5">
+                    <DollarSign size={12} /> Billing: Auto
+                  </p>
+                  <p className="text-xs text-blue-700 mt-1">
+                    Payments will use the Authorize.Net account registered to{' '}
+                    <strong>{locations.find((l) => l.id === form.location_id)?.name ?? 'the selected location'}</strong>.
+                    {' '}
+                    <button type="button" onClick={() => navigate('/admin/settings')} className="underline hover:no-underline inline-flex items-center gap-0.5">
+                      Manage accounts <ExternalLink size={10} />
+                    </button>
+                  </p>
+                </div>
+              )}
+              {isCompanyAdmin && form.location_access_mode !== 'single' && (
+                <div>
+                  <TipLabel tip={<>Choose which location&apos;s Authorize.Net account handles ALL membership charges for this plan, regardless of where the member signed up. Leave blank to charge through each member&apos;s home location. <button type="button" onClick={() => navigate('/admin/settings')} className="underline">Add or manage Authorize.Net accounts in Settings.</button></>}>
+                    <DollarSign size={12} className="inline" /> Billing Location (Authorize.Net)
+                  </TipLabel>
+                  <select
+                    value={form.billing_location_id ?? ''}
+                    onChange={(e) => setForm({ ...form, billing_location_id: e.target.value ? parseInt(e.target.value) : null })}
+                    className={inputCls}
+                  >
+                    <option value="">Each member&apos;s home location (default)</option>
+                    {locations.map((loc) => (
+                      <option key={loc.id} value={loc.id}>{loc.name}</option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
+                    Need a new Authorize.Net account?{' '}
+                    <button type="button" onClick={() => navigate('/admin/settings')} className={`text-${themeColor}-600 underline hover:no-underline inline-flex items-center gap-0.5`}>
+                      Configure in Settings <ExternalLink size={10} />
+                    </button>
+                  </p>
                 </div>
               )}
               <div>
