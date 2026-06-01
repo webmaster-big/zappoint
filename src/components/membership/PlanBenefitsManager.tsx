@@ -79,7 +79,7 @@ const ANY_LABEL: Partial<Record<MembershipBenefitType, string>> = {
 const allowedScopesFor = (bt: MembershipBenefitType): MembershipBenefitScopeType[] =>
   SCOPE_MATRIX[bt] ?? ['any'];
 
-type ScopeOption = { id: number; name: string };
+type ScopeOption = { id: number; name: string; locationName?: string | null };
 type ScopeTargetType = 'package' | 'attraction' | 'event' | 'addon' | 'location';
 
 const VALUE_MODES: { value: MembershipBenefitValueMode; label: string }[] = [
@@ -220,7 +220,12 @@ const PlanBenefitsManager = ({ plan, onClose, canManage }: Props) => {
       (Array.isArray(arr) ? arr : [])
         .map((x) => {
           const o = x as Record<string, unknown>;
-          return { id: Number(o.id), name: String(o[nameKey] ?? `#${o.id}`) };
+          const loc = o.location as Record<string, unknown> | null | undefined;
+          return {
+            id: Number(o.id),
+            name: String(o[nameKey] ?? `#${o.id}`),
+            locationName: loc ? String(loc.name ?? '') : null,
+          };
         })
         .filter((o) => Number.isFinite(o.id));
 
@@ -582,7 +587,10 @@ const PlanBenefitsManager = ({ plan, onClose, canManage }: Props) => {
                                   onChange={() => toggleScopeTarget(o.id)}
                                   className={`rounded border-gray-300 text-${themeColor}-600 focus:ring-${themeColor}-500`}
                                 />
-                                <span className="truncate">{o.name}</span>
+                                <span className="truncate flex-1">{o.name}</span>
+                                {o.locationName && (
+                                  <span className="text-[11px] text-gray-400 flex-shrink-0 ml-1">— {o.locationName}</span>
+                                )}
                               </label>
                             );
                           })}

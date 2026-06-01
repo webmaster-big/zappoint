@@ -63,6 +63,8 @@ export interface MembershipPlanBenefit {
   conditions?: Record<string, unknown> | null;
   is_active: boolean;
   requires_manual_redemption: boolean;
+  /** Resolved target items with name + location info (server-populated) */
+  scope_targets?: Array<{ id: number; name: string; location_id?: number | null; location_name?: string | null }> | null;
   created_at?: string;
   updated_at?: string;
 }

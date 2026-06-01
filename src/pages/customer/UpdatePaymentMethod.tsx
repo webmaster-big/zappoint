@@ -15,7 +15,6 @@ import { getAuthorizeNetPublicKey } from '../../services/SettingsService';
 import locationService from '../../services/LocationService';
 import type { Membership } from '../../types/Membership.types';
 import Toast from '../../components/ui/Toast';
-import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import StandardButton from '../../components/ui/StandardButton';
 import InfoTooltip from '../../components/ui/InfoTooltip';
 import { useToast } from '../../hooks/useToast';
@@ -196,7 +195,27 @@ const UpdatePaymentMethod = () => {
   };
 
   if (loading) {
-    return <LoadingSpinner fullScreen size="medium" message="Loading…" />;
+    return (
+      <div className="min-h-screen bg-gray-50/80">
+        <section className={`relative bg-gradient-to-br from-${themeColor}-900 via-${themeColor}-800 to-${themeColor}-700 text-white py-6 md:py-8 overflow-hidden`}>
+          <div className="relative max-w-2xl mx-auto px-4 sm:px-6">
+            <div className="h-3 bg-white/20 rounded w-32 mb-4 animate-pulse" />
+            <div className="h-6 bg-white/30 rounded w-56 animate-pulse" />
+          </div>
+        </section>
+        <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6">
+          <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4 animate-pulse">
+            <div className="h-4 bg-gray-200 rounded w-1/3" />
+            <div className="h-10 bg-gray-100 rounded" />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="h-10 bg-gray-100 rounded" />
+              <div className="h-10 bg-gray-100 rounded" />
+            </div>
+            <div className="h-10 bg-gray-100 rounded" />
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (!membership) {

@@ -341,9 +341,27 @@ const MyMembership = () => {
                       return (
                         <li key={b.id} className="flex items-start gap-2 text-gray-700">
                           <CheckCircle2 size={14} className="text-green-600 mt-0.5 flex-shrink-0" />
-                          <span>
-                            {b.label || b.benefit_type.replace(/_/g, ' ')}
+                          <span className="flex-1 min-w-0">
+                            <span className="font-medium">
+                              {b.label || b.benefit_type.replace(/_/g, ' ')}
+                            </span>
                             {effect && <span className="text-green-700 font-medium"> — {effect}</span>}
+                            {b.scope_targets && b.scope_targets.length > 0 && (
+                              <span className="block mt-0.5 text-xs text-gray-500 space-y-0.5">
+                                {b.scope_targets.map((t) => (
+                                  <span key={t.id} className="flex items-center gap-1">
+                                    <span className="w-1 h-1 rounded-full bg-gray-400 flex-shrink-0" />
+                                    {t.name}
+                                    {t.location_name && (
+                                      <span className="text-gray-400">— {t.location_name}</span>
+                                    )}
+                                  </span>
+                                ))}
+                              </span>
+                            )}
+                            {(!b.scope_targets || b.scope_targets.length === 0) && b.scope_category && (
+                              <span className="block mt-0.5 text-xs text-gray-500">category: {b.scope_category}</span>
+                            )}
                           </span>
                         </li>
                       );
