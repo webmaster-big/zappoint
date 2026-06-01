@@ -380,7 +380,7 @@ export interface PurchaseMembershipPayload {
 }
 
 export interface CheckInPayload {
-  result: 'approved' | 'denied' | 'override';
+  result: 'allowed' | 'denied' | 'override';
   location_id: number;
   override_note?: string;
   photo_base64?: string;

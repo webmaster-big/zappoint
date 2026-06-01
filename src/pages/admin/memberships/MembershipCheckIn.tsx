@@ -179,11 +179,11 @@ const MembershipCheckIn = () => {
     return new File([u8], name, { type: mime });
   };
 
-  const handleCheckIn = async (action: 'approved' | 'denied' | 'override') => {
+  const handleCheckIn = async (action: 'allowed' | 'denied' | 'override') => {
     if (!result || !locationId) return;
     setActing(action);
     try {
-      if (action === 'approved' && result.photo_required && photoDataUrl) {
+      if (action === 'allowed' && result.photo_required && photoDataUrl) {
         await membershipService.uploadMembershipPhoto(result.membership.id, dataUrlToFile(photoDataUrl));
       }
       await membershipService.checkInMembership(result.membership.id, {
@@ -534,9 +534,9 @@ const MembershipCheckIn = () => {
                     variant="success"
                     size="md"
                     icon={CheckCircle2}
-                    loading={acting === 'approved'}
+                    loading={acting === 'allowed'}
                     disabled={photoRequired && !photoDataUrl}
-                    onClick={() => handleCheckIn('approved')}
+                    onClick={() => handleCheckIn('allowed')}
                   >
                     Approve Check-In
                   </StandardButton>
