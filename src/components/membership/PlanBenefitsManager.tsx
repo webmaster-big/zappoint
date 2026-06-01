@@ -51,6 +51,34 @@ const SCOPE_TYPES: { value: MembershipBenefitScopeType; label: string }[] = [
   { value: 'location', label: 'Location' },
 ];
 
+// Which scope types make sense for each benefit type. Mirrors the backend SCOPE_MATRIX
+// so the UI cannot build nonsensical combinations (e.g. a package discount scoped to an attraction).
+const SCOPE_MATRIX: Record<MembershipBenefitType, MembershipBenefitScopeType[]> = {
+  package_discount: ['any', 'package', 'category'],
+  attraction_discount: ['any', 'attraction', 'category'],
+  event_discount: ['any', 'event', 'category'],
+  addon_discount: ['any', 'addon'],
+  free_entry_pass: ['any', 'attraction'],
+  guest_pass: ['any', 'attraction'],
+  priority_booking: ['any'],
+  member_only_access: ['any', 'location'],
+  birthday_reward: ['any'],
+};
+
+// Contextual label for the "any" scope, based on the selected benefit type.
+const ANY_LABEL: Partial<Record<MembershipBenefitType, string>> = {
+  package_discount: 'All packages',
+  attraction_discount: 'All attractions',
+  event_discount: 'All events',
+  addon_discount: 'All add-ons',
+  free_entry_pass: 'All attractions',
+  guest_pass: 'All attractions',
+  member_only_access: 'All locations',
+};
+
+const allowedScopesFor = (bt: MembershipBenefitType): MembershipBenefitScopeType[] =>
+  SCOPE_MATRIX[bt] ?? ['any'];
+
 type ScopeOption = { id: number; name: string };
 type ScopeTargetType = 'package' | 'attraction' | 'event' | 'addon' | 'location';
 
@@ -62,19 +90,27 @@ const VALUE_MODES: { value: MembershipBenefitValueMode; label: string }[] = [
   { value: 'flag', label: 'Flag (access only)' },
 ];
 
+// Period is the window a redemption cap resets over. Only relevant when a cap is set.
 const PERIODS: { value: MembershipBenefitPeriod; label: string }[] = [
-  { value: 'per_term', label: 'Per term' },
-  { value: 'per_day', label: 'Per day' },
-  { value: 'per_visit', label: 'Per visit' },
-  { value: 'lifetime', label: 'Lifetime' },
-  { value: 'once', label: 'Once' },
+  { value: 'per_day', label: 'Per day (resets daily)' },
+  { value: 'per_term', label: 'Per billing term (resets each renewal)' },
+  { value: 'lifetime', label: 'Lifetime (never resets)' },
 ];
+
+// Legacy period values may exist in older records; map them onto the supported set.
+const normalizePeriod = (p?: string | null): MembershipBenefitPeriod => {
+  if (p === 'per_day' || p === 'per_term' || p === 'lifetime') return p;
+  if (p === 'once') return 'lifetime';
+  if (p === 'per_visit') return 'per_term';
+  return 'per_term';
+};
 
 const emptyForm: CreateMembershipPlanBenefitData = {
   benefit_type: 'package_discount',
   label: '',
   scope_type: 'any',
   scope_id: null,
+  scope_ids: null,
   scope_category: null,
   value_mode: 'percent',
   value: 10,
@@ -95,7 +131,7 @@ function describeBenefit(b: MembershipPlanBenefit): string {
     case 'free':
       return 'Free (100% off)';
     case 'count':
-      return `${v} pass${v === 1 ? '' : 'es'}${b.period ? ` / ${b.period.replace('_', ' ')}` : ''}`;
+      return `${v} pass${v === 1 ? '' : 'es'}${b.max_redemptions ? ` (max ${b.max_redemptions} / ${normalizePeriod(b.period).replace('_', ' ')})` : ''}`;
     case 'flag':
       return 'Access grant';
     default:
@@ -205,10 +241,13 @@ const PlanBenefitsManager = ({ plan, onClose, canManage }: Props) => {
       label: b.label ?? '',
       scope_type: b.scope_type,
       scope_id: b.scope_id ?? null,
+      scope_ids: b.scope_ids && b.scope_ids.length > 0
+        ? b.scope_ids
+        : (b.scope_id != null ? [b.scope_id] : null),
       scope_category: b.scope_category ?? null,
       value_mode: b.value_mode,
       value: Number(b.value),
-      period: b.period ?? 'per_term',
+      period: normalizePeriod(b.period),
       max_redemptions: b.max_redemptions ?? null,
       priority: b.priority,
       is_stackable: b.is_stackable,
@@ -250,14 +289,46 @@ const PlanBenefitsManager = ({ plan, onClose, canManage }: Props) => {
   const isDiscount = ['package_discount', 'attraction_discount', 'event_discount', 'addon_discount'].includes(form.benefit_type);
   const isPass = ['free_entry_pass', 'guest_pass'].includes(form.benefit_type);
 
+  // When the benefit type changes, drop any scope that is no longer valid for it.
+  const onBenefitTypeChange = (bt: MembershipBenefitType) => {
+    const allowed = allowedScopesFor(bt);
+    setForm((prev) => {
+      const keepScope = allowed.includes(prev.scope_type) ? prev.scope_type : 'any';
+      const scopeChanged = keepScope !== prev.scope_type;
+      return {
+        ...prev,
+        benefit_type: bt,
+        scope_type: keepScope,
+        scope_id: scopeChanged ? null : prev.scope_id,
+        scope_ids: scopeChanged ? null : prev.scope_ids,
+        scope_category: scopeChanged ? null : prev.scope_category,
+      };
+    });
+  };
+
+  const onScopeTypeChange = (st: MembershipBenefitScopeType) => {
+    setForm((prev) => ({ ...prev, scope_type: st, scope_id: null, scope_ids: null, scope_category: null }));
+  };
+
+  const toggleScopeTarget = (id: number) => {
+    setForm((prev) => {
+      const current = prev.scope_ids ?? [];
+      const next = current.includes(id) ? current.filter((x) => x !== id) : [...current, id];
+      return { ...prev, scope_ids: next.length > 0 ? next : null, scope_id: null };
+    });
+  };
+
   const scopeTargetLabel = (b: MembershipPlanBenefit): string => {
     if (b.scope_type === 'category') return b.scope_category ? `category: ${b.scope_category}` : 'category';
-    if (b.scope_type === 'any') return 'all items';
+    if (b.scope_type === 'any') return ANY_LABEL[b.benefit_type] ?? 'all items';
     const targetType = b.scope_type as ScopeTargetType;
     const opts = scopeOptions[targetType];
-    if (b.scope_id == null) return b.scope_type;
-    const match = opts?.find((o) => o.id === b.scope_id);
-    return `${b.scope_type}: ${match ? match.name : `#${b.scope_id}`}`;
+    const ids = b.scope_ids && b.scope_ids.length > 0 ? b.scope_ids : (b.scope_id != null ? [b.scope_id] : []);
+    if (ids.length === 0) return `all ${b.scope_type}s`;
+    const names = ids.map((id) => opts?.find((o) => o.id === id)?.name ?? `#${id}`);
+    const shown = names.slice(0, 2).join(', ');
+    const extra = names.length > 2 ? ` +${names.length - 2}` : '';
+    return `${b.scope_type}: ${shown}${extra}`;
   };
 
   return (
@@ -340,7 +411,7 @@ const PlanBenefitsManager = ({ plan, onClose, canManage }: Props) => {
                   <label className={labelCls}>Benefit type</label>
                   <select
                     value={form.benefit_type}
-                    onChange={(e) => setForm({ ...form, benefit_type: e.target.value as MembershipBenefitType })}
+                    onChange={(e) => onBenefitTypeChange(e.target.value as MembershipBenefitType)}
                     className={inputCls}
                   >
                     {BENEFIT_TYPES.map((t) => (
@@ -380,35 +451,58 @@ const PlanBenefitsManager = ({ plan, onClose, canManage }: Props) => {
                 )}
 
                 <div>
-                  <label className={labelCls}>Scope</label>
+                  <label className={`${labelCls} flex items-center gap-1`}>
+                    Applies to
+                    <InfoTooltip content="Which items this benefit covers. Options are limited to what makes sense for the selected benefit type." />
+                  </label>
                   <select
                     value={form.scope_type}
-                    onChange={(e) => setForm({ ...form, scope_type: e.target.value as MembershipBenefitScopeType, scope_id: null, scope_category: null })}
+                    onChange={(e) => onScopeTypeChange(e.target.value as MembershipBenefitScopeType)}
                     className={inputCls}
                   >
-                    {SCOPE_TYPES.map((s) => (
-                      <option key={s.value} value={s.value}>{s.label}</option>
+                    {SCOPE_TYPES.filter((s) => allowedScopesFor(form.benefit_type).includes(s.value)).map((s) => (
+                      <option key={s.value} value={s.value}>
+                        {s.value === 'any' ? (ANY_LABEL[form.benefit_type] ?? s.label) : s.label}
+                      </option>
                     ))}
                   </select>
                 </div>
 
                 {['package', 'attraction', 'event', 'addon', 'location'].includes(form.scope_type) && (
-                  <div>
+                  <div className="col-span-2">
                     <label className={`${labelCls} flex items-center gap-1`}>
-                      Target {form.scope_type}
-                      <InfoTooltip content={`Pick the specific ${form.scope_type} this benefit applies to. Leave as "All" to apply to every ${form.scope_type}.`} />
+                      Target {form.scope_type}s
+                      <InfoTooltip content={`Tick one or more ${form.scope_type}s this benefit applies to. Select none to apply to every ${form.scope_type}.`} />
                     </label>
-                    <select
-                      value={form.scope_id ?? ''}
-                      onChange={(e) => setForm({ ...form, scope_id: e.target.value ? parseInt(e.target.value) : null })}
-                      className={inputCls}
-                      disabled={optionsLoading}
-                    >
-                      <option value="">{optionsLoading ? 'Loading…' : `All ${form.scope_type}s`}</option>
-                      {scopeOptions[form.scope_type as ScopeTargetType]?.map((o) => (
-                        <option key={o.id} value={o.id}>{o.name}</option>
-                      ))}
-                    </select>
+                    {optionsLoading ? (
+                      <div className="text-xs text-gray-500 py-2">Loading {form.scope_type}s…</div>
+                    ) : (scopeOptions[form.scope_type as ScopeTargetType]?.length ?? 0) === 0 ? (
+                      <div className="text-xs text-gray-500 py-2">No {form.scope_type}s available.</div>
+                    ) : (
+                      <>
+                        <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-100">
+                          {scopeOptions[form.scope_type as ScopeTargetType]?.map((o) => {
+                            const checked = (form.scope_ids ?? []).includes(o.id);
+                            return (
+                              <label key={o.id} className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={() => toggleScopeTarget(o.id)}
+                                  className={`rounded border-gray-300 text-${themeColor}-600 focus:ring-${themeColor}-500`}
+                                />
+                                <span className="truncate">{o.name}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                        <p className="text-[11px] text-gray-500 mt-1">
+                          {(form.scope_ids?.length ?? 0) === 0
+                            ? `Applies to all ${form.scope_type}s`
+                            : `${form.scope_ids!.length} ${form.scope_type}${form.scope_ids!.length === 1 ? '' : 's'} selected`}
+                        </p>
+                      </>
+                    )}
                   </div>
                 )}
 
@@ -439,22 +533,7 @@ const PlanBenefitsManager = ({ plan, onClose, canManage }: Props) => {
 
                 <div>
                   <label className={`${labelCls} flex items-center gap-1`}>
-                    Period <InfoTooltip content="The window the redemption limit resets over." />
-                  </label>
-                  <select
-                    value={form.period ?? 'per_term'}
-                    onChange={(e) => setForm({ ...form, period: e.target.value as MembershipBenefitPeriod })}
-                    className={inputCls}
-                  >
-                    {PERIODS.map((p) => (
-                      <option key={p.value} value={p.value}>{p.label}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className={`${labelCls} flex items-center gap-1`}>
-                    Max redemptions <InfoTooltip content="Cap on how many times this benefit can be used per period. Leave empty for unlimited." />
+                    Max redemptions <InfoTooltip content="Cap on how many times this benefit can be used. Leave empty for unlimited — the reset window only matters when a cap is set." />
                   </label>
                   <input
                     type="number"
@@ -462,8 +541,26 @@ const PlanBenefitsManager = ({ plan, onClose, canManage }: Props) => {
                     value={form.max_redemptions ?? ''}
                     onChange={(e) => setForm({ ...form, max_redemptions: e.target.value ? parseInt(e.target.value) : null })}
                     className={inputCls}
+                    placeholder="Unlimited"
                   />
                 </div>
+
+                {form.max_redemptions != null && form.max_redemptions > 0 && (
+                  <div>
+                    <label className={`${labelCls} flex items-center gap-1`}>
+                      Resets <InfoTooltip content="How often the redemption cap above resets back to full." />
+                    </label>
+                    <select
+                      value={normalizePeriod(form.period)}
+                      onChange={(e) => setForm({ ...form, period: e.target.value as MembershipBenefitPeriod })}
+                      className={inputCls}
+                    >
+                      {PERIODS.map((p) => (
+                        <option key={p.value} value={p.value}>{p.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
                 <div>
                   <label className={`${labelCls} flex items-center gap-1`}>

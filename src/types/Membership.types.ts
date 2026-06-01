@@ -43,9 +43,7 @@ export type MembershipBenefitValueMode = 'percent' | 'fixed' | 'free' | 'count' 
 export type MembershipBenefitPeriod =
   | 'per_term'
   | 'per_day'
-  | 'per_visit'
-  | 'lifetime'
-  | 'once';
+  | 'lifetime';
 
 export interface MembershipPlanBenefit {
   id: number;
@@ -54,6 +52,7 @@ export interface MembershipPlanBenefit {
   label?: string | null;
   scope_type: MembershipBenefitScopeType;
   scope_id?: number | null;
+  scope_ids?: number[] | null;
   scope_category?: string | null;
   value_mode: MembershipBenefitValueMode;
   value: number;
@@ -72,6 +71,7 @@ export interface CreateMembershipPlanBenefitData {
   label?: string | null;
   scope_type: MembershipBenefitScopeType;
   scope_id?: number | null;
+  scope_ids?: number[] | null;
   scope_category?: string | null;
   value_mode: MembershipBenefitValueMode;
   value?: number;
