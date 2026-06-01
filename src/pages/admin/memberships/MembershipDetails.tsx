@@ -31,6 +31,41 @@ import { useToast } from '../../../hooks/useToast';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { formatMembershipDate, formatMembershipPrice } from '../../../utils/membershipFormat';
 
+const AUDIT_LABELS: Record<string, string> = {
+  activated:             'Membership Activated',
+  check_in:              'Check-In',
+  check_in_denied:       'Check-In Denied',
+  photo_update:          'Photo Updated',
+  status_change:         'Status Changed',
+  freeze:                'Membership Frozen',
+  unfreeze:              'Membership Unfrozen',
+  canceled:              'Membership Canceled',
+  term_reset:            'Term Reset',
+  payment_received:      'Payment Received',
+  payment_failed:        'Payment Failed',
+  payment_method_update: 'Payment Method Updated',
+  manual_override:       'Manual Override',
+};
+
+const auditLabel = (action: string) =>
+  AUDIT_LABELS[action] ?? action.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+
+const auditColor = (action: string): string => {
+  if (['check_in_denied', 'canceled', 'payment_failed'].includes(action)) return 'bg-red-100 text-red-700';
+  if (['activated', 'unfreeze'].includes(action)) return 'bg-green-100 text-green-700';
+  if (action === 'check_in' || action === 'manual_override') return 'bg-blue-100 text-blue-700';
+  if (action.startsWith('payment')) return 'bg-purple-100 text-purple-700';
+  if (['freeze', 'status_change'].includes(action)) return 'bg-amber-100 text-amber-700';
+  return 'bg-gray-100 text-gray-700';
+};
+
+const auditActor = (a: import('../../../types/Membership.types').MembershipAuditLog): string => {
+  if (a.actor_type === 'staff' && a.user) return `${a.user.first_name} ${a.user.last_name}`;
+  if (a.actor_type === 'customer') return 'Customer';
+  if (a.actor_type === 'system') return 'System';
+  return a.actor_type ?? 'Unknown';
+};
+
 const MembershipDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -39,6 +74,7 @@ const MembershipDetails = () => {
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState<string | null>(null);
   const [noteText, setNoteText] = useState('');
+  const [pmLabel, setPmLabel] = useState('');
   const { toast, showSuccess, showError, clear } = useToast();
 
   const [refundTarget, setRefundTarget] = useState<MembershipPayment | null>(null);
@@ -53,6 +89,7 @@ const MembershipDetails = () => {
 
   const applyUpdate = (updated: Membership) => {
     setM(updated);
+    setPmLabel(updated.payment_method_label ?? '');
     void membershipCache.updateMembershipInCache(updated);
   };
 
@@ -61,6 +98,7 @@ const MembershipDetails = () => {
     try {
       const data = await membershipService.getMembership(Number(id));
       setM(data);
+      setPmLabel(data.payment_method_label ?? '');
     } catch (e: unknown) {
       showError(e, 'Failed to load membership');
     } finally {
@@ -120,6 +158,16 @@ const MembershipDetails = () => {
     finally { setActing(null); }
   };
 
+  const updatePm = async () => {
+    if (!m || !pmLabel.trim()) return;
+    setActing('pm');
+    try {
+      applyUpdate(await membershipService.updatePaymentMethod(m.id, { payment_method_label: pmLabel.trim() }));
+      showSuccess('Payment method label updated');
+    } catch (e: unknown) { showError(e, 'Update failed'); }
+    finally { setActing(null); }
+  };
+
   const retry = async () => {
     if (!m) return;
     setActing('retry');
@@ -170,8 +218,15 @@ const MembershipDetails = () => {
     }
   };
 
-  if (loading) return <LoadingSpinner fullScreen size="medium" message="Loading membership…" />;
-  if (!m) return <div className="px-6 py-8 text-gray-600">Not found.</div>;
+  if (loading) return (
+    <div className="px-6 py-8 max-w-7xl mx-auto">
+      <div className="h-8 w-48 bg-gray-200 rounded animate-pulse mb-4" />
+      <div className="grid md:grid-cols-2 gap-6">
+        {[...Array(4)].map((_, i) => <div key={i} className="h-48 bg-gray-100 rounded-xl animate-pulse" />)}
+      </div>
+    </div>
+  );
+  if (!m) return <div className="px-6 py-8 text-gray-600">Membership not found.</div>;
 
 
   const paymentStatusBadge = (status: MembershipPayment['status']) => {
@@ -335,11 +390,23 @@ const MembershipDetails = () => {
           ) : (
             <ul className="text-sm divide-y divide-gray-100 max-h-60 overflow-auto">
               {(m.visits || []).slice(0, 20).map((v) => (
-                <li key={v.id} className="flex justify-between py-2">
-                  <span className="text-gray-700">{new Date(v.visited_at).toLocaleString()}</span>
-                  <span className="text-xs text-gray-500">
-                    Loc #{v.location_id}{!v.counted_against_quota && ' · override'}
-                  </span>
+                <li key={v.id} className="flex justify-between gap-2 py-2">
+                  <div>
+                    <span className="text-gray-700">{new Date(v.visited_at).toLocaleString()}</span>
+                    {v.denial_reason && <p className="text-xs text-red-500 mt-0.5">{v.denial_reason}</p>}
+                  </div>
+                  <div className="text-right">
+                    <span className={`text-xs font-medium ${
+                      v.result === 'allowed' ? 'text-green-600'
+                      : v.result === 'override' ? 'text-blue-600'
+                      : 'text-red-500'
+                    }`}>{v.result}</span>
+                    <span className="text-xs text-gray-400 block">
+                      {v.location?.name ?? (v.location_id ? `Loc #${v.location_id}` : '')}
+                      {v.staff ? ` · ${v.staff.first_name}` : ''}
+                      {!v.counted_against_usage ? ' · not counted' : ''}
+                    </span>
+                  </div>
                 </li>
               ))}
             </ul>
@@ -458,6 +525,25 @@ const MembershipDetails = () => {
           )}
         </div>
 
+        <div className={cardCls}>
+          <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
+            <CreditCard className={`w-4 h-4 text-${themeColor}-600`} /> Payment Method
+            <InfoTooltip content="Update the display label for the saved payment method on file. This is informational — it does not charge the card." />
+          </h3>
+          <p className="text-xs text-gray-500 mb-2">Current: <span className="text-gray-700 font-medium">{m.payment_method_label || '— none on file'}</span></p>
+          <div className="flex gap-2">
+            <input
+              value={pmLabel}
+              onChange={(e) => setPmLabel(e.target.value)}
+              placeholder="e.g. Visa *4242"
+              className={inputCls}
+            />
+            <StandardButton variant="primary" size="sm" loading={acting === 'pm'} onClick={updatePm}>
+              Save
+            </StandardButton>
+          </div>
+        </div>
+
         <div className={`${cardCls} md:col-span-2`}>
           <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
             <History className={`w-4 h-4 text-${themeColor}-600`} /> Audit Log
@@ -468,12 +554,29 @@ const MembershipDetails = () => {
           ) : (
             <ul className="text-sm divide-y divide-gray-100 max-h-72 overflow-auto">
               {(m.audit_logs || []).map((a) => (
-                <li key={a.id} className="py-2 flex justify-between gap-3">
-                  <span className="text-gray-700">
-                    <span className="font-mono text-xs bg-gray-100 px-2 py-0.5 rounded">{a.action}</span>{' '}
-                    {a.actor_type ? `· ${a.actor_type}#${a.actor_id}` : ''}
+                <li key={a.id} className="py-2.5 flex items-start justify-between gap-3">
+                  <div className="flex flex-col gap-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className={`font-medium text-xs px-2 py-0.5 rounded ${auditColor(a.action)}`}>
+                        {auditLabel(a.action)}
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        by <span className="text-gray-700 font-medium">{auditActor(a)}</span>
+                      </span>
+                      {a.after?.result && (
+                        <span className="text-xs text-gray-400">· {String(a.after.result)}</span>
+                      )}
+                      {a.after?.status && (
+                        <span className="text-xs text-gray-400">· {String(a.after.status)}</span>
+                      )}
+                    </div>
+                    {a.note && (
+                      <p className="text-xs text-gray-500 italic">“{a.note}”</p>
+                    )}
+                  </div>
+                  <span className="text-xs text-gray-400 whitespace-nowrap flex-shrink-0">
+                    {new Date(a.created_at).toLocaleString()}
                   </span>
-                  <span className="text-xs text-gray-400">{new Date(a.created_at).toLocaleString()}</span>
                 </li>
               ))}
             </ul>

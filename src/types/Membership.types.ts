@@ -201,11 +201,17 @@ export interface MembershipPlan {
 export interface MembershipVisit {
   id: number;
   membership_id: number;
-  location_id: number;
-  checked_in_by?: number | null;
+  customer_id?: number | null;
+  location_id?: number | null;
+  staff_user_id?: number | null;
   visited_at: string;
-  counted_against_quota: boolean;
-  override_note?: string | null;
+  result: 'allowed' | 'denied' | 'override';
+  denial_reason?: string | null;
+  counted_against_usage: boolean;
+  visits_remaining_after?: number | null;
+  notes?: string | null;
+  location?: { id: number; name: string } | null;
+  staff?: { id: number; first_name: string; last_name: string } | null;
 }
 
 export interface MembershipPayment {
@@ -234,11 +240,15 @@ export interface MembershipNote {
 export interface MembershipAuditLog {
   id: number;
   membership_id: number;
+  user_id?: number | null;
+  customer_id?: number | null;
   actor_type?: string | null;
-  actor_id?: number | null;
   action: string;
-  meta?: Record<string, unknown> | null;
+  before?: Record<string, unknown> | null;
+  after?: Record<string, unknown> | null;
+  note?: string | null;
   created_at: string;
+  user?: { id: number; first_name: string; last_name: string } | null;
 }
 
 export interface MembershipCustomerRef {
@@ -282,6 +292,7 @@ export interface Membership {
   photo_taken_at?: string | null;
   photo_by_user_id?: number | null;
 
+  payment_method_label?: string | null;
   payment_method_token?: string | null;
   recurring_billing_authorized: boolean;
   terms_accepted: boolean;

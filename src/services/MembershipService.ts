@@ -148,7 +148,7 @@ async function changeMembershipPlan(id: number, newPlanId: number, note?: string
 
 async function updatePaymentMethod(
   id: number,
-  payload: { payment_method_token?: string; opaque_data?: { dataDescriptor: string; dataValue: string } }
+  payload: { payment_method_label: string; payment_profile_token?: string }
 ): Promise<Membership> {
   const res = await api.patch(`/memberships/${id}/payment-method`, payload);
   return unwrap<Membership>(res.data);
