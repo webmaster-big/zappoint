@@ -16,11 +16,13 @@ import {
   Building2,
   ArrowUpCircle,
   Ticket,
+  Info,
+  ChevronRight,
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import membershipService from '../../services/MembershipService';
 import { membershipCache } from '../../services/MembershipCacheService';
-import type { Membership, MembershipBenefitRedemption } from '../../types/Membership.types';
+import type { Membership, MembershipBenefitRedemption, MembershipPlanBenefit, MembershipBenefitType } from '../../types/Membership.types';
 import Toast from '../../components/ui/Toast';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import StandardButton from '../../components/ui/StandardButton';
@@ -39,6 +41,7 @@ const MyMembership = () => {
   const [membership, setMembership] = useState<Membership | null>(null);
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState<string | null>(null);
+  const [detailBenefit, setDetailBenefit] = useState<MembershipPlanBenefit | null>(null);
   const { toast, showSuccess, showError, show, clear } = useToast();
 
   const cardCls = 'bg-white rounded-xl shadow-sm border border-gray-100 p-6';
@@ -53,6 +56,39 @@ const MyMembership = () => {
       case 'flag':    return 'Access granted';
       default:        return '';
     }
+  };
+
+  const describeBenefitEffect = (b: MembershipPlanBenefit): string => {
+    const v = Number(b.value);
+    switch (b.value_mode) {
+      case 'percent': return `${v}% off`;
+      case 'fixed':   return `$${v.toFixed(2)} off`;
+      case 'free':    return 'Free (100% off)';
+      case 'count':   return `${v} ${b.benefit_type.includes('guest') ? 'guest' : 'free'} pass${v === 1 ? '' : 'es'}`;
+      case 'flag':    return 'Access granted';
+      default:        return '—';
+    }
+  };
+
+  const benefitScopeLabel = (b: MembershipPlanBenefit): string => {
+    if (b.scope_type === 'any') {
+      const map: Partial<Record<MembershipBenefitType, string>> = {
+        package_discount:    'All packages',
+        attraction_discount: 'All attractions',
+        event_discount:      'All events',
+        addon_discount:      'All add-ons',
+        free_entry_pass:     'All attraction entries',
+        guest_pass:          'All guest entries',
+        priority_booking:    'All bookings',
+        birthday_reward:     'Birthday reward',
+        member_only_access:  'Member-only access',
+      };
+      return map[b.benefit_type] ?? 'All applicable items';
+    }
+    if (b.scope_type === 'category') return `Category: ${b.scope_category ?? '—'}`;
+    if (b.scope_targets && b.scope_targets.length > 0)
+      return `${b.scope_targets.length} specific item${b.scope_targets.length === 1 ? '' : 's'}`;
+    return 'Specific items';
   };
 
   const load = async (forceRefresh = false) => {
@@ -188,9 +224,101 @@ const MyMembership = () => {
     .filter((r) => ['percent', 'fixed', 'free'].includes(r.value_mode))
     .reduce((sum, r) => sum + Number(r.value_applied || 0), 0);
 
+  const isOneTimePlan = plan?.billing_interval === 'one_time';
+  const planRenews = plan?.renewable !== false && !isOneTimePlan;
+  const renewLabel = isOneTimePlan ? 'Expires' : planRenews ? 'Next Billing' : 'Term Ends';
+  const RenewIcon = isOneTimePlan ? Clock : planRenews ? RefreshCcw : Calendar;
+  const renewTooltip = isOneTimePlan
+    ? 'Your one-time membership access ends on this date.'
+    : planRenews
+    ? 'End of your current billing term. You will be notified when renewal is due.'
+    : 'End of your current billing term. This plan does not automatically renew.';
+
   return (
     <div className="min-h-screen bg-gray-50/80">
       {toast && <Toast message={toast.message} type={toast.type} onClose={clear} />}
+
+      {/* Benefit Detail Modal */}
+      {detailBenefit && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+          onClick={() => setDetailBenefit(null)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3 px-6 pt-5 pb-4 border-b border-gray-100">
+              <div>
+                <p className="text-xs uppercase tracking-wide text-gray-400 mb-0.5">Benefit Details</p>
+                <h3 className="text-base font-semibold text-gray-900">
+                  {detailBenefit.label || detailBenefit.benefit_type.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
+                </h3>
+              </div>
+              <button
+                onClick={() => setDetailBenefit(null)}
+                className="mt-0.5 text-gray-400 hover:text-gray-600 transition-colors"
+                aria-label="Close"
+              >
+                <XCircle size={20} />
+              </button>
+            </div>
+            <div className="px-6 py-5 space-y-4 text-sm">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-gray-400 uppercase mb-1">Discount</p>
+                  <p className="font-semibold text-green-700">{describeBenefitEffect(detailBenefit)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-400 uppercase mb-1">Applied</p>
+                  <p className="font-medium text-gray-800">
+                    {detailBenefit.requires_manual_redemption ? 'By staff (manual)' : 'Automatically'}
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs text-gray-400 uppercase mb-1.5">Applies To</p>
+                <p className="font-medium text-gray-800 mb-2">{benefitScopeLabel(detailBenefit)}</p>
+                {detailBenefit.scope_targets && detailBenefit.scope_targets.length > 0 && (
+                  <ul className="space-y-1.5 max-h-40 overflow-y-auto">
+                    {detailBenefit.scope_targets.map((t) => (
+                      <li key={t.id} className="flex items-center gap-2 text-gray-700 text-xs">
+                        <span className="w-1.5 h-1.5 rounded-full bg-gray-300 flex-shrink-0" />
+                        <span className="font-medium">{t.name}</span>
+                        {t.location_name && (
+                          <span className="text-gray-400">— {t.location_name}</span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-gray-400 uppercase mb-1">Usage Limit</p>
+                  <p className="font-medium text-gray-800">
+                    {detailBenefit.max_redemptions
+                      ? `${detailBenefit.max_redemptions}× per ${
+                          detailBenefit.period === 'per_day' ? 'day'
+                          : detailBenefit.period === 'lifetime' ? 'lifetime'
+                          : 'term'
+                        }`
+                      : 'Unlimited'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-400 uppercase mb-1">Stackable</p>
+                  <p className="font-medium text-gray-800">
+                    {detailBenefit.is_stackable ? 'Can combine with others' : 'Exclusive (no stack)'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <section className={`relative bg-gradient-to-br from-${themeColor}-900 via-${themeColor}-800 to-${themeColor}-700 text-white py-6 md:py-8 overflow-hidden`}>
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(255,255,255,0.06),transparent_60%)]" />
@@ -257,7 +385,7 @@ const MyMembership = () => {
                 <p className="font-medium text-gray-900">{fmt(membership.started_at)}</p>
               </div>
               <div>
-                <p className="text-xs uppercase text-gray-500 flex items-center gap-1"><RefreshCcw size={12} /> Renews <InfoTooltip content="End of your current paid term. Your next recurring charge fires on this date." size={11} /></p>
+                <p className="text-xs uppercase text-gray-500 flex items-center gap-1"><RenewIcon size={12} /> {renewLabel} <InfoTooltip content={renewTooltip} size={11} /></p>
                 <p className="font-medium text-gray-900">{fmt(membership.current_term_end)}</p>
               </div>
               <div>
@@ -325,7 +453,7 @@ const MyMembership = () => {
               return (
                 <div>
                   <p className="text-xs uppercase text-gray-500 mb-2 flex items-center gap-1"><Sparkles size={12} /> Member Benefits</p>
-                  <ul className="text-sm space-y-1">
+                  <ul className="text-sm space-y-1.5">
                     {structuredItems.map((b) => {
                       const v = Number(b.value);
                       const effect =
@@ -338,31 +466,42 @@ const MyMembership = () => {
                             }`
                         : b.value_mode === 'flag' ? 'Included'
                         : '';
+                      const scopeLabel = benefitScopeLabel(b);
+                      const hasTargets = b.scope_targets && b.scope_targets.length > 0;
                       return (
-                        <li key={b.id} className="flex items-start gap-2 text-gray-700">
+                        <li key={b.id} className="flex items-start gap-2 text-gray-700 group">
                           <CheckCircle2 size={14} className="text-green-600 mt-0.5 flex-shrink-0" />
                           <span className="flex-1 min-w-0">
                             <span className="font-medium">
                               {b.label || b.benefit_type.replace(/_/g, ' ')}
                             </span>
                             {effect && <span className="text-green-700 font-medium"> — {effect}</span>}
-                            {b.scope_targets && b.scope_targets.length > 0 && (
-                              <span className="block mt-0.5 text-xs text-gray-500 space-y-0.5">
-                                {b.scope_targets.map((t) => (
-                                  <span key={t.id} className="flex items-center gap-1">
-                                    <span className="w-1 h-1 rounded-full bg-gray-400 flex-shrink-0" />
-                                    {t.name}
-                                    {t.location_name && (
-                                      <span className="text-gray-400">— {t.location_name}</span>
-                                    )}
-                                  </span>
-                                ))}
-                              </span>
-                            )}
-                            {(!b.scope_targets || b.scope_targets.length === 0) && b.scope_category && (
-                              <span className="block mt-0.5 text-xs text-gray-500">category: {b.scope_category}</span>
-                            )}
+                            <span className="block mt-0.5 text-xs text-gray-500">
+                              {scopeLabel}
+                              {hasTargets && (
+                                <>
+                                  {': '}
+                                  {b.scope_targets!.slice(0, 2).map((t, i) => (
+                                    <span key={t.id}>
+                                      {i > 0 && ', '}
+                                      {t.name}
+                                    </span>
+                                  ))}
+                                  {b.scope_targets!.length > 2 && (
+                                    <span className="text-gray-400"> +{b.scope_targets!.length - 2} more</span>
+                                  )}
+                                </>
+                              )}
+                            </span>
                           </span>
+                          <button
+                            onClick={() => setDetailBenefit(b)}
+                            className="flex-shrink-0 flex items-center gap-0.5 text-xs text-gray-400 hover:text-violet-600 transition-colors mt-0.5 opacity-0 group-hover:opacity-100"
+                            title="View details"
+                          >
+                            <Info size={13} />
+                            <ChevronRight size={11} />
+                          </button>
                         </li>
                       );
                     })}
@@ -396,7 +535,7 @@ const MyMembership = () => {
                 >
                   Update payment method
                 </StandardButton>
-                <InfoTooltip content="Change the saved card used for future renewals." />
+                <InfoTooltip content="Update your saved payment method for future billing." />
               </div>
               <div className="inline-flex items-center gap-1">
                 <StandardButton
@@ -434,7 +573,7 @@ const MyMembership = () => {
                   >
                     Cancel membership
                   </StandardButton>
-                  <InfoTooltip content="Stop auto-renewal. Depending on your plan, access ends immediately or at the end of the current term." />
+                  <InfoTooltip content="End your membership. Depending on your plan, access ends immediately or at the end of the current term." />
                 </div>
               )}
             </div>

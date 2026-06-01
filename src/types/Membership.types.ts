@@ -189,6 +189,7 @@ export interface MembershipPlan {
   valid_locations?: string[];
   location_access_label?: string | null;
 
+  renewable?: boolean;
   grace_period_days: number;
   failed_payment_retry_days: number;
   cancellation_mode: MembershipCancellationMode;
