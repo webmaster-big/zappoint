@@ -62,6 +62,7 @@ export interface MembershipPlanBenefit {
   is_stackable: boolean;
   conditions?: Record<string, unknown> | null;
   is_active: boolean;
+  requires_manual_redemption: boolean;
   created_at?: string;
   updated_at?: string;
 }
@@ -81,6 +82,7 @@ export interface CreateMembershipPlanBenefitData {
   is_stackable?: boolean;
   conditions?: Record<string, unknown> | null;
   is_active?: boolean;
+  requires_manual_redemption?: boolean;
 }
 
 export type UpdateMembershipPlanBenefitData = Partial<CreateMembershipPlanBenefitData>;
@@ -167,6 +169,8 @@ export interface MembershipPlan {
   tier?: string | null;
   price: number;
   billing_interval: MembershipBillingInterval;
+  billing_cycle?: 'monthly' | 'annual' | 'custom' | null;
+  custom_billing_days?: number | null;
   trial_days: number;            // 0 = no trial; backend default is 0
   term_length_months?: number | null;
 
@@ -349,7 +353,17 @@ export interface MembershipReportSummary {
   revenue_in_range: number;
   visits_by_location: Array<{ location_id: number; location_name?: string; visits: number }>;
   top_plans: Array<{ plan_id: number; name: string; count: number }>;
-  underused_sample: Array<{ id: number; customer_id: number; visits_used_this_term: number }>;
+  underused_sample: Array<{
+    id: number;
+    customer_id: number;
+    customer_name?: string | null;
+    customer_email?: string | null;
+    plan_name?: string | null;
+    visits_per_term: number;
+    visits_used_this_term: number;
+    visits_remaining: number;
+    term_ends?: string | null;
+  }>;
   date_range: { from: string; to: string };
 }
 

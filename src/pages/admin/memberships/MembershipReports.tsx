@@ -202,9 +202,19 @@ const MembershipReports = () => {
               ) : (
                 <ul className="text-sm divide-y divide-gray-100">
                   {data.underused_sample.map((u) => (
-                    <li key={u.id} className="flex justify-between py-2">
-                      <span className="text-gray-700">Membership #{u.id} (cust {u.customer_id})</span>
-                      <span className="text-xs text-gray-500">{u.visits_used_this_term} visits</span>
+                    <li key={u.id} className="py-2.5 flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-medium text-gray-900 truncate">{u.customer_name || `Customer #${u.customer_id}`}</p>
+                        <p className="text-xs text-gray-500 truncate">{u.plan_name || `Membership #${u.id}`}</p>
+                        {u.customer_email && <p className="text-xs text-gray-400 truncate">{u.customer_email}</p>}
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <p className="text-sm font-semibold text-gray-800">{u.visits_used_this_term} / {u.visits_per_term} visits</p>
+                        <p className="text-xs text-gray-400">{u.visits_remaining} remaining</p>
+                        {u.term_ends && (
+                          <p className="text-xs text-gray-400">ends {new Date(u.term_ends).toLocaleDateString()}</p>
+                        )}
+                      </div>
                     </li>
                   ))}
                 </ul>

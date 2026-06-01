@@ -200,7 +200,31 @@ const PurchaseMembership = () => {
     ? parseFloat(String(existingMembership.billing_amount ?? existingMembership.plan?.price ?? 0))
     : 0;
   const selectedPrice = selectedPlan ? parseFloat(String(selectedPlan.price)) : 0;
-  const priceDiff = isUpgrade ? Math.round((selectedPrice - currentPrice) * 100) / 100 : selectedPrice;
+
+  // Prorated charge: only the remaining fraction of the current billing term.
+  // e.g. upgrading $30→$60 with 15 of 30 days left = ($60-$30)/30*15 = $15 today
+  const proratedCharge = (() => {
+    if (!isUpgrade || !existingMembership) return selectedPrice;
+    const rawDiff = selectedPrice - currentPrice;
+    if (rawDiff <= 0) return 0; // downgrade — no charge
+    const termEnd = existingMembership.current_term_end ? new Date(existingMembership.current_term_end) : null;
+    const termStart = existingMembership.current_term_start ? new Date(existingMembership.current_term_start) : null;
+    const billingDays = existingMembership.plan?.billing_cycle === 'annual' ? 365
+      : (existingMembership.plan?.custom_billing_days ?? 30);
+    let remainingDays = billingDays;
+    if (termEnd) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const msRemaining = termEnd.getTime() - today.getTime();
+      remainingDays = Math.max(0, Math.round(msRemaining / 86400000));
+    } else if (termStart) {
+      // fallback if termEnd is missing
+      remainingDays = billingDays;
+    }
+    return Math.round(rawDiff * remainingDays / billingDays * 100) / 100;
+  })();
+
+  const priceDiff = proratedCharge;
   const paymentRequired = !isUpgrade || priceDiff > 0.01;
 
   const validatePayment = () => {
@@ -582,11 +606,20 @@ const PurchaseMembership = () => {
                   {isUpgrade ? (
                     <>
                       <div className="flex justify-between">
-                        <span>Due today {priceDiff > 0.01 ? '(upgrade charge)' : ''}</span>
+                        <span>
+                          Due today
+                          {priceDiff > 0.01 ? ' (prorated upgrade)' : ''}
+                        </span>
                         <span className="font-semibold text-gray-800">
                           {priceDiff > 0.01 ? formatMembershipPrice(priceDiff) : '$0.00'}
                         </span>
                       </div>
+                      {priceDiff > 0.01 && existingMembership?.current_term_end && (
+                        <div className="flex justify-between text-gray-400">
+                          <span>Covers remaining term until</span>
+                          <span>{new Date(existingMembership.current_term_end).toLocaleDateString()}</span>
+                        </div>
+                      )}
                       <div className="flex justify-between">
                         <span>New recurring amount</span>
                         <span className="text-gray-700">
@@ -631,7 +664,7 @@ const PurchaseMembership = () => {
                   {submitting ? 'Processing…' : isUpgrade ? (
                     <span className="flex items-center justify-center gap-2">
                       <Lock size={14} />
-                      {priceDiff > 0.01 ? `Switch Plan · Pay ${formatMembershipPrice(priceDiff)}` : 'Switch Plan'}
+                      {priceDiff > 0.01 ? `Switch Plan · Pay ${formatMembershipPrice(priceDiff)} today` : 'Switch Plan (no charge)'}
                     </span>
                   ) : (
                     <span className="flex items-center justify-center gap-2">

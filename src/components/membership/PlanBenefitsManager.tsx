@@ -151,6 +151,7 @@ const emptyForm: CreateMembershipPlanBenefitData = {
   priority: 0,
   is_stackable: false,
   is_active: true,
+  requires_manual_redemption: false,
 };
 
 function describeBenefit(b: MembershipPlanBenefit): string {
@@ -291,6 +292,7 @@ const PlanBenefitsManager = ({ plan, onClose, canManage }: Props) => {
       priority: b.priority,
       is_stackable: b.is_stackable,
       is_active: b.is_active,
+      requires_manual_redemption: b.requires_manual_redemption ?? false,
     });
     setShowForm(true);
   };
@@ -467,6 +469,7 @@ const PlanBenefitsManager = ({ plan, onClose, canManage }: Props) => {
                         scope: {scopeTargetLabel(b)}
                       </span>
                       {b.is_stackable && <span className="text-[10px] uppercase text-gray-400">stackable</span>}
+                      {b.requires_manual_redemption && <span className="text-[10px] uppercase text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">manual</span>}
                       {!b.is_active && <span className="text-[10px] uppercase text-red-400">inactive</span>}
                     </div>
                     {b.label && <p className="text-xs text-gray-500 mt-0.5 truncate">{b.label}</p>}
@@ -684,6 +687,17 @@ const PlanBenefitsManager = ({ plan, onClose, canManage }: Props) => {
                   />
                   Stackable with other benefits
                   <InfoTooltip content="If off, this benefit will not combine with other discounts on the same line." />
+                </label>
+
+                <label className="text-sm text-gray-700 flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={!!form.requires_manual_redemption}
+                    onChange={(e) => setForm({ ...form, requires_manual_redemption: e.target.checked })}
+                    className={`rounded border-gray-300 text-amber-600 focus:ring-amber-500`}
+                  />
+                  Manual redemption only
+                  <InfoTooltip content="When enabled, this benefit is NOT auto-applied at checkout. Staff must redeem it manually. Use for birthday rewards, special staff discounts, etc." />
                 </label>
 
                 <label className="text-sm text-gray-700 flex items-center gap-2">

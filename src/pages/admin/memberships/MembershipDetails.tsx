@@ -475,16 +475,16 @@ const MembershipDetails = () => {
                         <button
                           onClick={() => handleRefundOpen(p)}
                           className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-lg border border-orange-200 text-orange-700 bg-orange-50 hover:bg-orange-100 transition"
-                          title="Refund this payment"
+                          title="Refund this settled payment"
                         >
                           <RotateCcw size={11} /> Refund
                         </button>
                       )}
-                      {(p.status === 'pending' || p.status === 'succeeded') && (
+                      {p.status === 'pending' && (
                         <button
                           onClick={() => { setVoidTarget(p); setVoidNote(''); }}
                           className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-lg border border-red-200 text-red-700 bg-red-50 hover:bg-red-100 transition"
-                          title="Void this payment"
+                          title="Void this unsettled payment (also cancels the membership)"
                         >
                           <Ban size={11} /> Void
                         </button>
@@ -721,9 +721,13 @@ const MembershipDetails = () => {
               </button>
             </div>
             <div className="px-6 py-5 space-y-4">
-              <div className="flex gap-3 items-start p-3 rounded-lg bg-amber-50 border border-amber-200">
-                <AlertTriangle size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
-                <p className="text-xs text-amber-800">This will mark the payment as voided. This action cannot be undone.</p>
+              <div className="flex gap-3 items-start p-3 rounded-lg bg-red-50 border border-red-200">
+                <AlertTriangle size={16} className="text-red-600 flex-shrink-0 mt-0.5" />
+                <div className="text-xs text-red-800 space-y-1">
+                  <p className="font-semibold">Void is for unsettled (pending) payments only.</p>
+                  <p>This will void the transaction with the payment gateway and <span className="font-semibold">immediately cancel the membership</span>. This cannot be undone.</p>
+                  <p className="text-red-600">For settled (succeeded) payments, use <span className="font-semibold">Refund</span> instead.</p>
+                </div>
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1.5">Internal Note <span className="text-gray-400 font-normal">(optional)</span></label>
