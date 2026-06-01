@@ -64,7 +64,7 @@ const MembershipCarousel = () => {
   const visible = useMemo(() => plans.filter((p) => p.is_active), [plans]);
 
   useEffect(() => {
-    if (!loading && visible.length > 0) setOpen(true);
+    if (CAROUSEL_ENABLED && !loading && visible.length > 0) setOpen(true);
   }, [loading, visible.length]);
 
   useEffect(() => {
