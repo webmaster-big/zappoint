@@ -8,6 +8,7 @@ import {
 import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
 import customerService from '../services/CustomerService';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
+import { membershipCache } from '../services/MembershipCacheService';
 import Toast from '../components/ui/Toast';
 
 interface CustomerUser {
@@ -73,6 +74,7 @@ const CustomerLayout = () => {
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
+      await membershipCache.invalidate();
       localStorage.removeItem('zapzone_customer');
       setCustomerUser(null);
       setUserMenuOpen(false);
