@@ -1441,6 +1441,13 @@ const PurchaseEvent = () => {
                       </div>
                     )}
                   </div>
+                  {membershipBenefits.membershipId && membershipBenefits.planName && membershipDiscount === 0 && (
+                    <div className="mt-3 flex items-center gap-1.5 rounded-lg bg-emerald-50 border border-emerald-200 px-2.5 py-1.5 text-xs">
+                      <span className="text-emerald-500">✓</span>
+                      <span className="font-medium text-emerald-800">{membershipBenefits.planName} membership</span>
+                      <span className="text-emerald-600">— no discounts apply to this event</span>
+                    </div>
+                  )}
                   {membershipDiscount > 0 && (
                     <div className="mt-3 flex justify-between text-emerald-600 text-sm">
                       <span>Member Savings{membershipBenefits.planName ? ` (${membershipBenefits.planName})` : ''}</span>

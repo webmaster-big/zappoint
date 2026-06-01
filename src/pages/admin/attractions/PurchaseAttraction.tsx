@@ -21,7 +21,7 @@ import { attractionPurchaseService } from '../../../services/AttractionPurchaseS
 import { customerService, type Customer } from '../../../services/CustomerService';
 import { generatePurchaseQRCode } from '../../../utils/qrcode';
 import Toast from '../../../components/ui/Toast';
-import { ASSET_URL } from '../../../utils/storage';
+import { ASSET_URL, getStoredUser } from '../../../utils/storage';
 import { loadAcceptJS, processCardPayment, validateCardNumber, isTestCardNumber, formatCardNumber, getCardType, PAYMENT_TYPE } from '../../../services/PaymentService';
 import { getAuthorizeNetPublicKey } from '../../../services/SettingsService';
 import { extractIdFromSlug } from '../../../utils/slug';
@@ -134,6 +134,9 @@ const PurchaseAttraction = () => {
   const { slug } = useParams<{ location: string; slug: string }>();
   const attractionId = slug ? extractIdFromSlug(slug) : null;
   const navigate = useNavigate();
+
+  // True when a customer (not an admin) is visiting this page.
+  const isCustomerMode = useMemo(() => !getStoredUser(), []);
 
   const [attraction, setAttraction] = useState<PurchaseAttractionAttraction | null>(null);
   const [loading, setLoading] = useState(true);
@@ -555,7 +558,13 @@ const PurchaseAttraction = () => {
     return list;
   }, [attraction, quantity, selectedAddOns]);
 
-  const membershipBenefits = useMembershipBenefits(selectedCustomerId, attraction?.locationId ?? null, benefitItems);
+  const membershipBenefits = useMembershipBenefits(
+    // Customer self-booking uses self-mode; admin booking uses the selected customer's ID.
+    isCustomerMode ? null : selectedCustomerId,
+    attraction?.locationId ?? null,
+    benefitItems,
+    { self: isCustomerMode },
+  );
   const membershipDiscount = membershipBenefits.discount;
   const total = Math.max(0, totalBeforeMembership - membershipDiscount);
 
@@ -1872,6 +1881,25 @@ const PurchaseAttraction = () => {
                 
                 <div className="pt-4">
                   <h3 className="font-bold text-gray-900 mb-3 text-sm md:text-base">Order Summary</h3>
+                  {/* Membership benefits status indicator */}
+                  {membershipBenefits.membershipId && membershipBenefits.planName && (
+                    <div className="mb-2 flex items-start gap-2 rounded-lg bg-emerald-50 border border-emerald-200 px-2.5 py-2 text-xs">
+                      <span className="text-emerald-500 mt-px">✓</span>
+                      <div className="flex-1">
+                        <span className="font-medium text-emerald-800">{membershipBenefits.planName} member</span>
+                        {membershipDiscount > 0 ? (
+                          <span className="ml-1 text-emerald-700">— ${membershipDiscount.toFixed(2)} saved</span>
+                        ) : membershipBenefits.passes.length > 0 ? (
+                          <span className="ml-1 text-emerald-700">— pass benefit available</span>
+                        ) : (
+                          <span className="ml-1 text-emerald-600">— no discounts apply</span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  {membershipBenefits.loading && (
+                    <div className="mb-2 text-xs text-gray-400 animate-pulse">Checking membership…</div>
+                  )}
                   <div className="space-y-2">
                   <div className="flex justify-between items-center">
                     <span className="text-xs md:text-sm text-gray-500">
@@ -2061,6 +2089,13 @@ const PurchaseAttraction = () => {
 
               <div className="pt-4 border-t border-gray-100">
                 <h3 className="font-bold text-gray-900 mb-3 text-sm">Pricing</h3>
+                {membershipBenefits.membershipId && membershipBenefits.planName && (
+                  <div className="mb-2 flex items-center gap-1.5 rounded-lg bg-emerald-50 border border-emerald-200 px-2.5 py-1.5 text-xs">
+                    <span className="text-emerald-500">✓</span>
+                    <span className="font-medium text-emerald-800">{membershipBenefits.planName}</span>
+                    {membershipDiscount > 0 && <span className="text-emerald-700">— saves ${membershipDiscount.toFixed(2)}</span>}
+                  </div>
+                )}
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
                     <span className="text-xs text-gray-500">

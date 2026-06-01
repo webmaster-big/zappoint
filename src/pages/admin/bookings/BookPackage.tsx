@@ -5,7 +5,7 @@ import type { BookPackagePackage } from '../../../types/BookPackage.types';
 import bookingService from '../../../services/bookingService';
 import timeSlotService, { type TimeSlot } from '../../../services/timeSlotService';
 import { dayOffService, type DayOff } from '../../../services/DayOffService';
-import { getImageUrl, formatTimeTo12Hour } from "../../../utils/storage";
+import { getImageUrl, formatTimeTo12Hour, getStoredUser } from "../../../utils/storage";
 
 interface DayOffWithTime {
   date: Date;
@@ -133,6 +133,10 @@ const getPaymentErrorMessage = (error: any): string => {
 const BookPackage: React.FC = () => {
   const { slug } = useParams<{ location: string; slug: string }>();
   const packageId = slug ? extractIdFromSlug(slug) : null;
+
+  // True when a customer (not an admin) is the one visiting this page.
+  const isCustomerMode = useMemo(() => !getStoredUser(), []);
+
   const [pkg, setPkg] = useState<BookPackagePackage | null>(null);
   const [loadingPackage, setLoadingPackage] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -881,7 +885,14 @@ const BookPackage: React.FC = () => {
     return list;
   }, [pkg, basePrice, selectedAddOns, selectedAttractions, participants]);
 
-  const membershipBenefits = useMembershipBenefits(customerId, pkg?.location_id ?? null, benefitItems);
+  const membershipBenefits = useMembershipBenefits(
+    // When a customer visits directly (no admin logged in), use self-mode so
+    // the customer's own token is used and past_due is also considered.
+    isCustomerMode ? null : customerId,
+    pkg?.location_id ?? null,
+    benefitItems,
+    { self: isCustomerMode },
+  );
   const membershipDiscount = membershipBenefits.discount;
 
   const subtotal = basePrice + addOnsTotal + attractionsTotal;
@@ -1369,6 +1380,27 @@ const BookPackage: React.FC = () => {
             
             <div className="bg-blue-50 rounded-xl p-4 sm:p-6 mb-4 sm:mb-6">
               <h3 className="font-semibold text-base sm:text-lg mb-3 text-gray-800">Payment Summary</h3>
+              {/* Membership benefits status indicator */}
+              {membershipBenefits.membershipId && membershipBenefits.planName && (
+                <div className="mb-3 flex items-start gap-2 rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2.5 text-sm">
+                  <span className="mt-0.5 text-emerald-500">✓</span>
+                  <div className="flex-1">
+                    <span className="font-medium text-emerald-800">
+                      {membershipBenefits.planName} membership active
+                    </span>
+                    {membershipDiscount > 0 ? (
+                      <span className="ml-1 text-emerald-700"> — ${membershipDiscount.toFixed(2)} savings applied</span>
+                    ) : membershipBenefits.passes.length > 0 ? (
+                      <span className="ml-1 text-emerald-700"> — {membershipBenefits.passes.length} pass benefit{membershipBenefits.passes.length > 1 ? 's' : ''} available</span>
+                    ) : (
+                      <span className="ml-1 text-emerald-600"> — no discounts apply to this booking</span>
+                    )}
+                  </div>
+                </div>
+              )}
+              {membershipBenefits.loading && (
+                <div className="mb-3 text-xs text-gray-400 animate-pulse">Checking membership benefits…</div>
+              )}
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Base Price:</span>

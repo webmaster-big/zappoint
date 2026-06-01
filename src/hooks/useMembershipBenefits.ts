@@ -57,12 +57,13 @@ export function useMembershipBenefits(
           const membership = await membershipService.myMembership();
           id = membership && (membership.status === 'active' || membership.status === 'past_due') ? membership.id : null;
         } else {
+          // Fetch latest memberships for this customer (no status filter so past_due is included)
           const { data } = await membershipService.listMemberships({
             customer_id: customerId,
-            status: 'active',  // backend also activates past_due, but active is primary check
-            per_page: 1,
+            per_page: 5,
           });
-          id = data.length > 0 ? data[0].id : null;
+          const usable = data.find((m) => m.status === 'active' || m.status === 'past_due');
+          id = usable?.id ?? null;
         }
         if (seq !== lookupSeq.current) return;
         setMembershipId(id);
