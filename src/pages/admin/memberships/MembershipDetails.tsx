@@ -1,0 +1,620 @@
+import { useEffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import {
+  ArrowLeft,
+  Pause,
+  XCircle,
+  Camera,
+  MessageSquarePlus,
+  RefreshCcw,
+  CreditCard,
+  ClipboardList,
+  History,
+  RotateCcw,
+  Ban,
+  AlertTriangle,
+  CheckCircle2,
+  Clock,
+  X,
+  DollarSign,
+} from 'lucide-react';
+import membershipService from '../../../services/MembershipService';
+import { membershipCache } from '../../../services/MembershipCacheService';
+import type { Membership, MembershipPayment } from '../../../types/Membership.types';
+import { getImageUrl } from '../../../utils/storage';
+import Toast from '../../../components/ui/Toast';
+import LoadingSpinner from '../../../components/ui/LoadingSpinner';
+import StandardButton from '../../../components/ui/StandardButton';
+import InfoTooltip from '../../../components/ui/InfoTooltip';
+import MembershipStatusBadge from '../../../components/membership/MembershipStatusBadge';
+import { useToast } from '../../../hooks/useToast';
+import { useThemeColor } from '../../../hooks/useThemeColor';
+import { formatMembershipDate, formatMembershipPrice } from '../../../utils/membershipFormat';
+
+const MembershipDetails = () => {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const { themeColor } = useThemeColor();
+  const [m, setM] = useState<Membership | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [acting, setActing] = useState<string | null>(null);
+  const [noteText, setNoteText] = useState('');
+  const { toast, showSuccess, showError, clear } = useToast();
+
+  const [refundTarget, setRefundTarget] = useState<MembershipPayment | null>(null);
+  const [voidTarget, setVoidTarget] = useState<MembershipPayment | null>(null);
+  const [refundAmount, setRefundAmount] = useState('');
+  const [refundNote, setRefundNote] = useState('');
+  const [voidNote, setVoidNote] = useState('');
+  const [paymentActing, setPaymentActing] = useState(false);
+
+  const cardCls = 'bg-white rounded-xl shadow-sm border border-gray-100 p-6';
+  const inputCls = `w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`;
+
+  const applyUpdate = (updated: Membership) => {
+    setM(updated);
+    void membershipCache.updateMembershipInCache(updated);
+  };
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const data = await membershipService.getMembership(Number(id));
+      setM(data);
+    } catch (e: unknown) {
+      showError(e, 'Failed to load membership');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+
+  const freeze = async () => {
+    if (!m) return;
+    const until = window.prompt('Freeze until (YYYY-MM-DD)');
+    if (!until) return;
+    setActing('freeze');
+    try { applyUpdate(await membershipService.freezeMembership(m.id, until)); showSuccess('Frozen'); }
+    catch (e: unknown) { showError(e, 'Freeze failed'); }
+    finally { setActing(null); }
+  };
+
+  const cancel = async (mode: 'immediate' | 'end_of_term') => {
+    if (!m || !window.confirm(`Cancel (${mode})?`)) return;
+    setActing('cancel');
+    try { applyUpdate(await membershipService.cancelMembership(m.id, mode)); showSuccess('Canceled'); }
+    catch (e: unknown) { showError(e, 'Cancel failed'); }
+    finally { setActing(null); }
+  };
+
+  const changeStatus = async (status: string) => {
+    if (!m) return;
+    setActing('status');
+    try { applyUpdate(await membershipService.updateMembershipStatus(m.id, status)); showSuccess('Status updated'); }
+    catch (e: unknown) { showError(e, 'Status update failed'); }
+    finally { setActing(null); }
+  };
+
+  const uploadPhoto = async (file: File) => {
+    if (!m) return;
+    setActing('photo');
+    try { applyUpdate(await membershipService.uploadMembershipPhoto(m.id, file)); showSuccess('Photo uploaded'); }
+    catch (e: unknown) { showError(e, 'Upload failed'); }
+    finally { setActing(null); }
+  };
+
+  const addNote = async () => {
+    if (!m || !noteText.trim()) return;
+    setActing('note');
+    try {
+      await membershipService.addMembershipNote(m.id, noteText.trim());
+      setNoteText('');
+      showSuccess('Note added');
+      applyUpdate(await membershipService.getMembership(m.id));
+    }
+    catch (e: unknown) { showError(e, 'Note failed'); }
+    finally { setActing(null); }
+  };
+
+  const retry = async () => {
+    if (!m) return;
+    setActing('retry');
+    try {
+      await membershipService.retryPayment(m.id);
+      showSuccess('Retry attempted');
+      applyUpdate(await membershipService.getMembership(m.id));
+    }
+    catch (e: unknown) { showError(e, 'Retry failed'); }
+    finally { setActing(null); }
+  };
+
+  const handleRefundOpen = (p: MembershipPayment) => {
+    setRefundTarget(p);
+    setRefundAmount(String(p.amount));
+    setRefundNote('');
+  };
+
+  const handleRefundSubmit = async () => {
+    if (!m || !refundTarget) return;
+    const amt = parseFloat(refundAmount);
+    if (isNaN(amt) || amt <= 0 || amt > refundTarget.amount) return;
+    setPaymentActing(true);
+    try {
+      await membershipService.refundMembershipPayment(m.id, refundTarget.id, amt, refundNote || undefined);
+      showSuccess('Refund recorded');
+      setRefundTarget(null);
+      applyUpdate(await membershipService.getMembership(m.id));
+    } catch (e: unknown) {
+      showError(e, 'Refund failed');
+    } finally {
+      setPaymentActing(false);
+    }
+  };
+
+  const handleVoidSubmit = async () => {
+    if (!m || !voidTarget) return;
+    setPaymentActing(true);
+    try {
+      await membershipService.voidMembershipPayment(m.id, voidTarget.id, voidNote || undefined);
+      showSuccess('Payment voided');
+      setVoidTarget(null);
+      applyUpdate(await membershipService.getMembership(m.id));
+    } catch (e: unknown) {
+      showError(e, 'Void failed');
+    } finally {
+      setPaymentActing(false);
+    }
+  };
+
+  if (loading) return <LoadingSpinner fullScreen size="medium" message="Loading membership…" />;
+  if (!m) return <div className="px-6 py-8 text-gray-600">Not found.</div>;
+
+
+  const paymentStatusBadge = (status: MembershipPayment['status']) => {
+    const cfg: Record<string, string> = {
+      succeeded: 'bg-green-100 text-green-700 border-green-200',
+      failed: 'bg-red-100 text-red-700 border-red-200',
+      pending: 'bg-yellow-100 text-yellow-700 border-yellow-200',
+      refunded: 'bg-purple-100 text-purple-700 border-purple-200',
+      voided: 'bg-gray-100 text-gray-600 border-gray-200',
+    };
+    const icons: Record<string, React.ReactNode> = {
+      succeeded: <CheckCircle2 size={11} />,
+      failed: <AlertTriangle size={11} />,
+      pending: <Clock size={11} />,
+      refunded: <RotateCcw size={11} />,
+      voided: <Ban size={11} />,
+    };
+    return (
+      <span className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full border ${cfg[status] ?? 'bg-gray-100 text-gray-600 border-gray-200'}`}>
+        {icons[status]} {status}
+      </span>
+    );
+  };
+
+  return (
+    <div className="px-6 py-8 max-w-6xl mx-auto">
+      {toast && <Toast message={toast.message} type={toast.type} onClose={clear} />}
+
+      <div className="mb-6">
+        <StandardButton variant="ghost" size="sm" icon={ArrowLeft} onClick={() => navigate('/memberships')}>
+          Back to Memberships
+        </StandardButton>
+      </div>
+
+      <div className={`${cardCls} flex items-start gap-6 flex-wrap mb-6`}>
+        {m.photo_path ? (
+          <img src={getImageUrl(m.photo_path)} alt="member" className="w-28 h-28 rounded-xl object-cover border border-gray-100" />
+        ) : (
+          <div className="w-28 h-28 rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-center text-gray-400">
+            <Camera />
+          </div>
+        )}
+        <div className="flex-1 min-w-[240px]">
+          <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
+            {m.customer?.first_name} {m.customer?.last_name}
+            <InfoTooltip
+              widthClass="w-80"
+              content={
+                <>
+                  <p className="font-semibold mb-1">Member Detail Page</p>
+                  <p>Full lifecycle view for a single membership: current status, plan terms, visit history, payment ledger, staff notes, and audit log.</p>
+                </>
+              }
+            />
+          </h1>
+          <p className="text-gray-600 mt-1">{m.customer?.email}</p>
+          <div className="mt-3 flex flex-wrap gap-2 text-sm items-center">
+            <MembershipStatusBadge status={m.status} size="md" />
+            <InfoTooltip
+              widthClass="w-72"
+              content={
+                <>
+                  <p><b>active</b> · paid & in good standing</p>
+                  <p><b>pending</b> · awaiting first payment</p>
+                  <p><b>past_due</b> · last charge failed, in grace period</p>
+                  <p><b>frozen</b> · paused by staff, no charges</p>
+                  <p><b>suspended</b> · disabled due to non-payment</p>
+                  <p><b>canceled</b> · ended (immediate or end-of-term)</p>
+                  <p><b>expired</b> · term ended without renewal</p>
+                </>
+              }
+            />
+            <span className="text-gray-700 font-medium">{m.plan?.name}</span>
+            <span className="text-gray-400">·</span>
+            <span className="text-gray-600 capitalize">{m.plan?.billing_interval?.replace('_', ' ')}</span>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {m.status === 'past_due' && (
+            <div className="inline-flex items-center gap-1">
+              <StandardButton variant="secondary" size="sm" icon={RefreshCcw} loading={acting === 'retry'} onClick={retry}>
+                Retry Payment
+              </StandardButton>
+              <InfoTooltip content="Manually re-attempts the failed renewal charge using the saved payment method." />
+            </div>
+          )}
+          {m.status === 'active' && (
+            <div className="inline-flex items-center gap-1">
+              <StandardButton variant="secondary" size="sm" icon={Pause} loading={acting === 'freeze'} onClick={freeze}>
+                Freeze
+              </StandardButton>
+              <InfoTooltip content="Pause billing and access until a chosen date. No charges fire while frozen." />
+            </div>
+          )}
+          {m.status === 'frozen' && (
+            <div className="inline-flex items-center gap-1">
+              <StandardButton variant="secondary" size="sm" loading={acting === 'status'} onClick={() => changeStatus('active')}>
+                Unfreeze
+              </StandardButton>
+              <InfoTooltip content="Resume the membership now. Billing schedule continues from the original cycle dates." />
+            </div>
+          )}
+          {m.status === 'suspended' && (
+            <div className="inline-flex items-center gap-1">
+              <StandardButton variant="secondary" size="sm" loading={acting === 'status'} onClick={() => changeStatus('active')}>
+                Reactivate
+              </StandardButton>
+              <InfoTooltip content="Re-enable a suspended membership. Make sure the payment issue is resolved first." />
+            </div>
+          )}
+          {!['canceled', 'expired'].includes(m.status) && (
+            <>
+              <div className="inline-flex items-center gap-1">
+                <StandardButton variant="danger" size="sm" icon={XCircle} loading={acting === 'cancel'} onClick={() => cancel('end_of_term')}>
+                  Cancel (End of Term)
+                </StandardButton>
+                <InfoTooltip content="Stops auto-renewal but member keeps access until the current paid term ends." />
+              </div>
+              <div className="inline-flex items-center gap-1">
+                <StandardButton variant="danger" size="sm" icon={XCircle} loading={acting === 'cancel'} onClick={() => cancel('immediate')}>
+                  Cancel Immediately
+                </StandardButton>
+                <InfoTooltip content="Ends access right now. No refund is issued automatically — handle separately if needed." />
+              </div>
+            </>
+          )}
+          <label
+            className={`inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 rounded-lg cursor-pointer ${acting === 'photo' ? 'opacity-50 pointer-events-none' : ''}`}
+          >
+            <Camera className="w-3 h-3" /> Upload Photo
+            <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files && uploadPhoto(e.target.files[0])} />
+          </label>
+          <InfoTooltip content="Upload or replace the member's verification photo used at check-in." />
+        </div>
+      </div>
+
+      <div className="grid md:grid-cols-2 gap-6">
+        <div className={cardCls}>
+          <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
+            <ClipboardList className={`w-4 h-4 text-${themeColor}-600`} /> Plan & Term
+            <InfoTooltip content="Plan configuration plus the dates and visit counters for the member's current billing term." />
+          </h3>
+          <dl className="grid grid-cols-[160px_1fr] gap-y-2 text-sm">
+            <dt className="text-gray-500">Plan</dt><dd className="text-gray-900 font-medium">{m.plan?.name}</dd>
+            <dt className="text-gray-500 flex items-center gap-1">Started <InfoTooltip content="The very first activation date of this membership." size={11} /></dt><dd className="text-gray-700">{formatMembershipDate(m.started_at)}</dd>
+            <dt className="text-gray-500 flex items-center gap-1">Term <InfoTooltip content="Current paid period. Visit allowances and renewal trigger on these dates." size={11} /></dt><dd className="text-gray-700">{formatMembershipDate(m.current_term_start)} → {formatMembershipDate(m.current_term_end)}</dd>
+            <dt className="text-gray-500 flex items-center gap-1">Visits used <InfoTooltip content="Number of check-ins counted against this term's allowance." size={11} /></dt><dd className="text-gray-700">{m.visits_used_this_term}</dd>
+            <dt className="text-gray-500 flex items-center gap-1">Visits remaining <InfoTooltip content="Calculated as included visits minus used. Infinity for unlimited plans." size={11} /></dt><dd className="text-gray-700">{m.visits_remaining ?? '∞'}</dd>
+            <dt className="text-gray-500 flex items-center gap-1">Home location <InfoTooltip content="Primary location for this member. Used by plans with single-location access." size={11} /></dt><dd className="text-gray-700">{m.home_location?.name || '—'}</dd>
+            <dt className="text-gray-500 flex items-center gap-1">QR token <InfoTooltip content="Server-generated unique token rendered as a QR code in the customer app. Used by the check-in scanner." size={11} /></dt><dd className="text-gray-700 font-mono text-xs break-all">{m.qr_token}</dd>
+          </dl>
+        </div>
+
+        <div className={cardCls}>
+          <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
+            <History className={`w-4 h-4 text-${themeColor}-600`} /> Recent Visits
+            <InfoTooltip content="Last 20 check-ins for this membership, including manual staff overrides." />
+          </h3>
+          {(m.visits || []).length === 0 ? (
+            <p className="text-sm text-gray-500">No visits yet.</p>
+          ) : (
+            <ul className="text-sm divide-y divide-gray-100 max-h-60 overflow-auto">
+              {(m.visits || []).slice(0, 20).map((v) => (
+                <li key={v.id} className="flex justify-between py-2">
+                  <span className="text-gray-700">{new Date(v.visited_at).toLocaleString()}</span>
+                  <span className="text-xs text-gray-500">
+                    Loc #{v.location_id}{!v.counted_against_quota && ' · override'}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div className={cardCls}>
+          <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
+            <CreditCard className={`w-4 h-4 text-${themeColor}-600`} /> Payments
+            <InfoTooltip content="Every charge attempt for this membership — successful, refunded, failed, or voided. Use the action buttons to refund settled charges or void pending ones." />
+          </h3>
+          {(m.membership_payments || []).length === 0 ? (
+            <p className="text-sm text-gray-500">No payments recorded.</p>
+          ) : (
+            <ul className="divide-y divide-gray-100">
+              {(m.membership_payments || []).map((p) => (
+                <li key={p.id} className="py-3 first:pt-0 last:pb-0">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap mb-1">
+                        {paymentStatusBadge(p.status)}
+                        <span className="text-sm font-semibold text-gray-900">{formatMembershipPrice(p.amount)}</span>
+                        {p.retry_attempt ? (
+                          <span className="text-[11px] text-gray-400">retry #{p.retry_attempt}</span>
+                        ) : null}
+                      </div>
+                      {p.description && (
+                        <p className="text-xs text-gray-600 mb-0.5">{p.description}</p>
+                      )}
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <span className="text-xs text-gray-400">
+                          {p.charged_at
+                            ? new Date(p.charged_at).toLocaleString()
+                            : p.failed_at
+                            ? new Date(p.failed_at).toLocaleString()
+                            : '—'}
+                        </span>
+                        {p.transaction_id && (
+                          <span className="text-[11px] font-mono text-gray-400 truncate max-w-[140px]" title={p.transaction_id}>
+                            txn: {p.transaction_id}
+                          </span>
+                        )}
+                        {p.failure_reason && p.status === 'failed' && (
+                          <span className="text-[11px] text-red-500 truncate max-w-[180px]" title={p.failure_reason}>
+                            {p.failure_reason}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      {p.status === 'succeeded' && (
+                        <button
+                          onClick={() => handleRefundOpen(p)}
+                          className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-lg border border-orange-200 text-orange-700 bg-orange-50 hover:bg-orange-100 transition"
+                          title="Refund this payment"
+                        >
+                          <RotateCcw size={11} /> Refund
+                        </button>
+                      )}
+                      {(p.status === 'pending' || p.status === 'succeeded') && (
+                        <button
+                          onClick={() => { setVoidTarget(p); setVoidNote(''); }}
+                          className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-lg border border-red-200 text-red-700 bg-red-50 hover:bg-red-100 transition"
+                          title="Void this payment"
+                        >
+                          <Ban size={11} /> Void
+                        </button>
+                      )}
+                      {p.status === 'failed' && (
+                        <button
+                          onClick={retry}
+                          disabled={acting === 'retry'}
+                          className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-lg border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 transition disabled:opacity-50"
+                          title="Retry failed payment"
+                        >
+                          <RefreshCcw size={11} className={acting === 'retry' ? 'animate-spin' : ''} />
+                          Retry
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div className={cardCls}>
+          <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
+            <MessageSquarePlus className={`w-4 h-4 text-${themeColor}-600`} /> Staff Notes
+            <InfoTooltip content="Internal-only notes visible to staff. Useful for incidents, payment arrangements, or special handling." />
+          </h3>
+          <div className="flex gap-2 mb-3">
+            <input
+              value={noteText}
+              onChange={(e) => setNoteText(e.target.value)}
+              placeholder="Add a note…"
+              className={inputCls}
+            />
+            <StandardButton variant="primary" size="sm" loading={acting === 'note'} onClick={addNote}>
+              Add
+            </StandardButton>
+          </div>
+          {(m.notes || []).length === 0 ? (
+            <p className="text-sm text-gray-500">No notes.</p>
+          ) : (
+            <ul className="text-sm divide-y divide-gray-100 max-h-60 overflow-auto">
+              {(m.notes || []).map((n) => (
+                <li key={n.id} className="py-2">
+                  <p className="text-gray-800">{n.body}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">{new Date(n.created_at).toLocaleString()}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div className={`${cardCls} md:col-span-2`}>
+          <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
+            <History className={`w-4 h-4 text-${themeColor}-600`} /> Audit Log
+            <InfoTooltip content="System-generated trail of every status change, freeze, cancel, payment event and override — useful for disputes and compliance." />
+          </h3>
+          {(m.audit_logs || []).length === 0 ? (
+            <p className="text-sm text-gray-500">No activity yet.</p>
+          ) : (
+            <ul className="text-sm divide-y divide-gray-100 max-h-72 overflow-auto">
+              {(m.audit_logs || []).map((a) => (
+                <li key={a.id} className="py-2 flex justify-between gap-3">
+                  <span className="text-gray-700">
+                    <span className="font-mono text-xs bg-gray-100 px-2 py-0.5 rounded">{a.action}</span>{' '}
+                    {a.actor_type ? `· ${a.actor_type}#${a.actor_id}` : ''}
+                  </span>
+                  <span className="text-xs text-gray-400">{new Date(a.created_at).toLocaleString()}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+
+      {refundTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
+            <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-gray-100">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-lg bg-orange-100">
+                  <RotateCcw className="w-4 h-4 text-orange-600" />
+                </div>
+                <div>
+                  <h3 className="text-base font-semibold text-gray-900">Refund Payment</h3>
+                  <p className="text-xs text-gray-500">Original: {formatMembershipPrice(refundTarget.amount)}</p>
+                </div>
+              </div>
+              <button onClick={() => setRefundTarget(null)} className="text-gray-400 hover:text-gray-600 transition" disabled={paymentActing}>
+                <X size={18} />
+              </button>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1.5">Refund Amount</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                    <DollarSign size={14} />
+                  </span>
+                  <input
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    max={refundTarget.amount}
+                    value={refundAmount}
+                    onChange={(e) => setRefundAmount(e.target.value)}
+                    className={`${inputCls} pl-8`}
+                    placeholder={String(refundTarget.amount)}
+                  />
+                </div>
+                {parseFloat(refundAmount) > refundTarget.amount && (
+                  <p className="text-xs text-red-500 mt-1">Cannot exceed original amount.</p>
+                )}
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1.5">Internal Note <span className="text-gray-400 font-normal">(optional)</span></label>
+                <textarea
+                  value={refundNote}
+                  onChange={(e) => setRefundNote(e.target.value)}
+                  rows={2}
+                  placeholder="Reason for refund…"
+                  className={inputCls}
+                />
+              </div>
+            </div>
+            <div className="flex gap-3 px-6 pb-5">
+              <button
+                onClick={() => setRefundTarget(null)}
+                disabled={paymentActing}
+                className="flex-1 text-sm font-medium px-4 py-2 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => void handleRefundSubmit()}
+                disabled={paymentActing || !refundAmount || parseFloat(refundAmount) <= 0 || parseFloat(refundAmount) > refundTarget.amount}
+                className={`flex-1 text-sm font-medium px-4 py-2 rounded-lg bg-orange-600 text-white hover:bg-orange-700 transition disabled:opacity-50 flex items-center justify-center gap-2`}
+              >
+                {paymentActing ? (
+                  <RefreshCcw size={14} className="animate-spin" />
+                ) : (
+                  <RotateCcw size={14} />
+                )}
+                {paymentActing ? 'Processing…' : 'Confirm Refund'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {voidTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm">
+            <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-gray-100">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-lg bg-red-100">
+                  <Ban className="w-4 h-4 text-red-600" />
+                </div>
+                <div>
+                  <h3 className="text-base font-semibold text-gray-900">Void Payment</h3>
+                  <p className="text-xs text-gray-500">{formatMembershipPrice(voidTarget.amount)} · {voidTarget.status}</p>
+                </div>
+              </div>
+              <button onClick={() => setVoidTarget(null)} className="text-gray-400 hover:text-gray-600 transition" disabled={paymentActing}>
+                <X size={18} />
+              </button>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              <div className="flex gap-3 items-start p-3 rounded-lg bg-amber-50 border border-amber-200">
+                <AlertTriangle size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-amber-800">This will mark the payment as voided. This action cannot be undone.</p>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1.5">Internal Note <span className="text-gray-400 font-normal">(optional)</span></label>
+                <textarea
+                  value={voidNote}
+                  onChange={(e) => setVoidNote(e.target.value)}
+                  rows={2}
+                  placeholder="Reason for voiding…"
+                  className={inputCls}
+                />
+              </div>
+            </div>
+            <div className="flex gap-3 px-6 pb-5">
+              <button
+                onClick={() => setVoidTarget(null)}
+                disabled={paymentActing}
+                className="flex-1 text-sm font-medium px-4 py-2 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => void handleVoidSubmit()}
+                disabled={paymentActing}
+                className="flex-1 text-sm font-medium px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 transition disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {paymentActing ? (
+                  <RefreshCcw size={14} className="animate-spin" />
+                ) : (
+                  <Ban size={14} />
+                )}
+                {paymentActing ? 'Processing…' : 'Void Payment'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default MembershipDetails;

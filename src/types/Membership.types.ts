@@ -1,4 +1,3 @@
-// Membership domain types — mirrors zapzone-backend membership tables.
 
 export type MembershipBillingInterval = 'monthly' | 'quarterly' | 'annual' | 'one_time';
 export type MembershipUsageType = 'unlimited' | 'limited_visits' | 'punch_card';
@@ -17,6 +16,143 @@ export type MembershipStatus =
 export interface MembershipPlanLocationRef {
   id: number;
   name?: string;
+}
+
+export type MembershipBenefitType =
+  | 'package_discount'
+  | 'attraction_discount'
+  | 'event_discount'
+  | 'addon_discount'
+  | 'free_entry_pass'
+  | 'guest_pass'
+  | 'priority_booking'
+  | 'member_only_access'
+  | 'birthday_reward';
+
+export type MembershipBenefitScopeType =
+  | 'any'
+  | 'package'
+  | 'attraction'
+  | 'event'
+  | 'addon'
+  | 'category'
+  | 'location';
+
+export type MembershipBenefitValueMode = 'percent' | 'fixed' | 'free' | 'count' | 'flag';
+
+export type MembershipBenefitPeriod =
+  | 'per_term'
+  | 'per_day'
+  | 'per_visit'
+  | 'lifetime'
+  | 'once';
+
+export interface MembershipPlanBenefit {
+  id: number;
+  membership_plan_id: number;
+  benefit_type: MembershipBenefitType;
+  label?: string | null;
+  scope_type: MembershipBenefitScopeType;
+  scope_id?: number | null;
+  scope_category?: string | null;
+  value_mode: MembershipBenefitValueMode;
+  value: number;
+  period?: MembershipBenefitPeriod | null;
+  max_redemptions?: number | null;
+  priority: number;
+  is_stackable: boolean;
+  conditions?: Record<string, unknown> | null;
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface CreateMembershipPlanBenefitData {
+  benefit_type: MembershipBenefitType;
+  label?: string | null;
+  scope_type: MembershipBenefitScopeType;
+  scope_id?: number | null;
+  scope_category?: string | null;
+  value_mode: MembershipBenefitValueMode;
+  value?: number;
+  period?: MembershipBenefitPeriod | null;
+  max_redemptions?: number | null;
+  priority?: number;
+  is_stackable?: boolean;
+  conditions?: Record<string, unknown> | null;
+  is_active?: boolean;
+}
+
+export type UpdateMembershipPlanBenefitData = Partial<CreateMembershipPlanBenefitData>;
+
+export interface MembershipBenefitQuoteItem {
+  type: 'package' | 'attraction' | 'event' | 'addon';
+  id?: number | null;
+  category?: string | null;
+  unit_price: number;
+  quantity?: number;
+}
+
+export interface MembershipBenefitQuoteLine {
+  index: number;
+  type: string;
+  id?: number | null;
+  line_total: number;
+  discount: number;
+  benefits: Array<{
+    benefit_id: number;
+    benefit_type: MembershipBenefitType;
+    label?: string | null;
+    value_mode: MembershipBenefitValueMode;
+    amount: number;
+  }>;
+}
+
+export interface MembershipBenefitQuotePass {
+  benefit_id: number;
+  benefit_type: MembershipBenefitType;
+  label?: string | null;
+  remaining: number | null;
+}
+
+export interface MembershipBenefitQuote {
+  eligible: boolean;
+  reason?: string | null;
+  membership_id?: number | null;
+  plan_name?: string | null;
+  currency_discount: number;
+  lines: MembershipBenefitQuoteLine[];
+  passes: MembershipBenefitQuotePass[];
+  applied: Array<{
+    membership_plan_benefit_id: number | null;
+    benefit_type: MembershipBenefitType;
+    value_mode: MembershipBenefitValueMode;
+    value_applied: number;
+  }>;
+}
+
+export interface MembershipBenefitQuoteRequest {
+  location_id?: number | null;
+  membership_id?: number | null;
+  items: MembershipBenefitQuoteItem[];
+}
+
+export interface MembershipBenefitRedemption {
+  id: number;
+  membership_id: number;
+  customer_id: number;
+  membership_plan_benefit_id?: number | null;
+  location_id?: number | null;
+  benefit_type: MembershipBenefitType;
+  value_mode: MembershipBenefitValueMode;
+  value_applied: number;
+  redeemable_type?: string | null;
+  redeemable_id?: number | null;
+  staff_user_id?: number | null;
+  reversed_at?: string | null;
+  reversal_reason?: string | null;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface MembershipPlan {
@@ -50,6 +186,8 @@ export interface MembershipPlan {
 
   discount_percent?: number | null;
   benefits?: string[] | null;
+  plan_benefits?: MembershipPlanBenefit[];
+  inherits_plan_id?: number | null;
 
   requires_photo: boolean;
   is_family_or_group: boolean;
@@ -73,10 +211,15 @@ export interface MembershipVisit {
 export interface MembershipPayment {
   id: number;
   membership_id: number;
+  payment_id?: number | null;
+  customer_id?: number | null;
   amount: number;
-  status: 'succeeded' | 'failed' | 'pending' | 'refunded';
-  gateway_reference?: string | null;
-  paid_at?: string | null;
+  status: 'succeeded' | 'failed' | 'pending' | 'refunded' | 'voided';
+  transaction_id?: string | null;
+  description?: string | null;
+  retry_attempt?: number;
+  charged_at?: string | null;
+  failed_at?: string | null;
   failure_reason?: string | null;
 }
 
@@ -153,8 +296,8 @@ export interface Membership {
   membership_payments?: MembershipPayment[];
   notes?: MembershipNote[];
   audit_logs?: MembershipAuditLog[];
+  benefit_redemptions?: MembershipBenefitRedemption[];
 
-  // Computed by backend — explicit list of locations where this membership can be used
   valid_locations?: string[];
   location_access_label?: string | null;
 
@@ -173,6 +316,7 @@ export interface MembershipScanResponse {
   eligibility: MembershipEligibility;
   photo_required: boolean;
   visits_today: number;
+  passes?: MembershipBenefitQuotePass[];
 }
 
 export interface MembershipReportSummary {

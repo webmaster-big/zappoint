@@ -1,0 +1,542 @@
+import { useEffect, useState } from 'react';
+import { Plus, Trash2, X, Edit2, Save, Tag, Sparkles } from 'lucide-react';
+import membershipService from '../../services/MembershipService';
+import packageService from '../../services/PackageService';
+import attractionService from '../../services/AttractionService';
+import eventService from '../../services/EventService';
+import addOnService from '../../services/AddOnService';
+import locationService from '../../services/LocationService';
+import { categoryService } from '../../services/CategoryService';
+import type {
+  MembershipPlan,
+  MembershipPlanBenefit,
+  CreateMembershipPlanBenefitData,
+  MembershipBenefitType,
+  MembershipBenefitScopeType,
+  MembershipBenefitValueMode,
+  MembershipBenefitPeriod,
+} from '../../types/Membership.types';
+import StandardButton from '../ui/StandardButton';
+import LoadingSpinner from '../ui/LoadingSpinner';
+import InfoTooltip from '../ui/InfoTooltip';
+import Toast from '../ui/Toast';
+import { useToast } from '../../hooks/useToast';
+import { useThemeColor } from '../../hooks/useThemeColor';
+
+interface Props {
+  plan: MembershipPlan;
+  onClose: () => void;
+  canManage: boolean;
+}
+
+const BENEFIT_TYPES: { value: MembershipBenefitType; label: string }[] = [
+  { value: 'package_discount', label: 'Package discount' },
+  { value: 'attraction_discount', label: 'Attraction discount' },
+  { value: 'event_discount', label: 'Event discount' },
+  { value: 'addon_discount', label: 'Add-on discount' },
+  { value: 'free_entry_pass', label: 'Free entry pass' },
+  { value: 'guest_pass', label: 'Guest pass' },
+  { value: 'priority_booking', label: 'Priority booking' },
+  { value: 'member_only_access', label: 'Member-only access' },
+  { value: 'birthday_reward', label: 'Birthday reward' },
+];
+
+const SCOPE_TYPES: { value: MembershipBenefitScopeType; label: string }[] = [
+  { value: 'any', label: 'Any (all items)' },
+  { value: 'package', label: 'Specific package' },
+  { value: 'attraction', label: 'Specific attraction' },
+  { value: 'event', label: 'Specific event' },
+  { value: 'addon', label: 'Specific add-on' },
+  { value: 'category', label: 'Category' },
+  { value: 'location', label: 'Location' },
+];
+
+type ScopeOption = { id: number; name: string };
+type ScopeTargetType = 'package' | 'attraction' | 'event' | 'addon' | 'location';
+
+const VALUE_MODES: { value: MembershipBenefitValueMode; label: string }[] = [
+  { value: 'percent', label: 'Percent (%)' },
+  { value: 'fixed', label: 'Fixed amount ($)' },
+  { value: 'free', label: 'Free (100% off)' },
+  { value: 'count', label: 'Count (passes)' },
+  { value: 'flag', label: 'Flag (access only)' },
+];
+
+const PERIODS: { value: MembershipBenefitPeriod; label: string }[] = [
+  { value: 'per_term', label: 'Per term' },
+  { value: 'per_day', label: 'Per day' },
+  { value: 'per_visit', label: 'Per visit' },
+  { value: 'lifetime', label: 'Lifetime' },
+  { value: 'once', label: 'Once' },
+];
+
+const emptyForm: CreateMembershipPlanBenefitData = {
+  benefit_type: 'package_discount',
+  label: '',
+  scope_type: 'any',
+  scope_id: null,
+  scope_category: null,
+  value_mode: 'percent',
+  value: 10,
+  period: 'per_term',
+  max_redemptions: null,
+  priority: 0,
+  is_stackable: false,
+  is_active: true,
+};
+
+function describeBenefit(b: MembershipPlanBenefit): string {
+  const v = Number(b.value);
+  switch (b.value_mode) {
+    case 'percent':
+      return `${v}% off`;
+    case 'fixed':
+      return `$${v.toFixed(2)} off`;
+    case 'free':
+      return 'Free (100% off)';
+    case 'count':
+      return `${v} pass${v === 1 ? '' : 'es'}${b.period ? ` / ${b.period.replace('_', ' ')}` : ''}`;
+    case 'flag':
+      return 'Access grant';
+    default:
+      return '';
+  }
+}
+
+const PlanBenefitsManager = ({ plan, onClose, canManage }: Props) => {
+  const { themeColor } = useThemeColor();
+  const { toast, showSuccess, showError, clear } = useToast();
+  const [benefits, setBenefits] = useState<MembershipPlanBenefit[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [form, setForm] = useState<CreateMembershipPlanBenefitData>(emptyForm);
+
+  const [scopeOptions, setScopeOptions] = useState<Record<ScopeTargetType, ScopeOption[]>>({
+    package: [],
+    attraction: [],
+    event: [],
+    addon: [],
+    location: [],
+  });
+  const [categories, setCategories] = useState<string[]>([]);
+  const [optionsLoading, setOptionsLoading] = useState(false);
+
+  const inputCls = `w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`;
+  const labelCls = 'block text-xs font-medium text-gray-800 mb-1';
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const list = await membershipService.listPlanBenefits(plan.id);
+      setBenefits(list);
+    } catch (e: unknown) {
+      showError(e, 'Failed to load benefits');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    let active = true;
+    const norm = (arr: unknown, nameKey = 'name'): ScopeOption[] =>
+      (Array.isArray(arr) ? arr : [])
+        .map((x) => {
+          const o = x as Record<string, unknown>;
+          return { id: Number(o.id), name: String(o[nameKey] ?? `#${o.id}`) };
+        })
+        .filter((o) => Number.isFinite(o.id));
+
+    (async () => {
+      setOptionsLoading(true);
+      const [pk, at, ev, ad, lo, ca] = await Promise.allSettled([
+        packageService.getPackages({ per_page: 500 }),
+        attractionService.getAttractions({ per_page: 500 }),
+        eventService.getEvents(),
+        addOnService.getAddOns({ per_page: 500 }),
+        locationService.getLocations(),
+        categoryService.getCategories(),
+      ]);
+      if (!active) return;
+
+      const packages = pk.status === 'fulfilled' ? norm(pk.value?.data?.packages) : [];
+      const attractions = at.status === 'fulfilled' ? norm(at.value?.data?.attractions) : [];
+      const events = ev.status === 'fulfilled' ? norm(ev.value?.data) : [];
+      const addons = ad.status === 'fulfilled' ? norm(ad.value?.data?.add_ons) : [];
+      const locations = lo.status === 'fulfilled' ? norm(lo.value?.data) : [];
+
+      let cats: string[] = [];
+      if (ca.status === 'fulfilled') {
+        const raw = ca.value as unknown;
+        const obj = raw as Record<string, unknown>;
+        const list = Array.isArray(raw)
+          ? raw
+          : Array.isArray(obj?.data)
+          ? (obj.data as unknown[])
+          : [];
+        cats = list
+          .map((c) => String((c as Record<string, unknown>)?.name ?? c))
+          .filter((n) => n && n !== 'undefined');
+      }
+      setScopeOptions({ package: packages, attraction: attractions, event: events, addon: addons, location: locations });
+      setCategories(Array.from(new Set(cats)));
+      setOptionsLoading(false);
+    })();
+
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [plan.id]);
+
+  const startCreate = () => {
+    setEditingId(null);
+    setForm(emptyForm);
+    setShowForm(true);
+  };
+
+  const startEdit = (b: MembershipPlanBenefit) => {
+    setEditingId(b.id);
+    setForm({
+      benefit_type: b.benefit_type,
+      label: b.label ?? '',
+      scope_type: b.scope_type,
+      scope_id: b.scope_id ?? null,
+      scope_category: b.scope_category ?? null,
+      value_mode: b.value_mode,
+      value: Number(b.value),
+      period: b.period ?? 'per_term',
+      max_redemptions: b.max_redemptions ?? null,
+      priority: b.priority,
+      is_stackable: b.is_stackable,
+      is_active: b.is_active,
+    });
+    setShowForm(true);
+  };
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      if (editingId) {
+        await membershipService.updatePlanBenefit(plan.id, editingId, form);
+        showSuccess('Benefit updated');
+      } else {
+        await membershipService.createPlanBenefit(plan.id, form);
+        showSuccess('Benefit added');
+      }
+      setShowForm(false);
+      await load();
+    } catch (e: unknown) {
+      showError(e, 'Save failed');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const remove = async (b: MembershipPlanBenefit) => {
+    if (!window.confirm(`Delete this ${b.benefit_type.replace('_', ' ')} benefit?`)) return;
+    try {
+      await membershipService.deletePlanBenefit(plan.id, b.id);
+      showSuccess('Benefit deleted');
+      await load();
+    } catch (e: unknown) {
+      showError(e, 'Delete failed');
+    }
+  };
+
+  const isDiscount = ['package_discount', 'attraction_discount', 'event_discount', 'addon_discount'].includes(form.benefit_type);
+  const isPass = ['free_entry_pass', 'guest_pass'].includes(form.benefit_type);
+
+  const scopeTargetLabel = (b: MembershipPlanBenefit): string => {
+    if (b.scope_type === 'category') return b.scope_category ? `category: ${b.scope_category}` : 'category';
+    if (b.scope_type === 'any') return 'all items';
+    const targetType = b.scope_type as ScopeTargetType;
+    const opts = scopeOptions[targetType];
+    if (b.scope_id == null) return b.scope_type;
+    const match = opts?.find((o) => o.id === b.scope_id);
+    return `${b.scope_type}: ${match ? match.name : `#${b.scope_id}`}`;
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 z-[10000] flex items-center justify-center p-4">
+      {toast && <Toast message={toast.message} type={toast.type} onClose={clear} />}
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
+        <div className={`px-5 py-5 bg-${themeColor}-50 border-b border-gray-100 flex items-center justify-between`}>
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <Sparkles className={`w-5 h-5 text-${themeColor}-600`} />
+              Enforceable Benefits — {plan.name}
+            </h2>
+            <p className="text-xs text-gray-600 mt-0.5">
+              These rules are applied automatically at checkout and check-in (server-enforced).
+            </p>
+          </div>
+          <button onClick={onClose} className="p-1 rounded hover:bg-white/60 text-gray-600">
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="px-5 py-5 overflow-y-auto flex-1">
+          {loading ? (
+            <div className="py-12 flex justify-center"><LoadingSpinner size="medium" /></div>
+          ) : benefits.length === 0 ? (
+            <div className="py-10 text-center text-gray-500">
+              <div className={`inline-flex p-3 rounded-full bg-${themeColor}-50 mb-2`}>
+                <Tag className={`w-6 h-6 text-${themeColor}-600`} />
+              </div>
+              <p>No enforceable benefits yet.</p>
+              <p className="text-xs mt-1">Add one to automate discounts or passes for this plan.</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {benefits.map((b) => (
+                <div
+                  key={b.id}
+                  className={`flex items-center justify-between gap-3 p-3 rounded-lg border ${
+                    b.is_active ? 'border-gray-200 bg-white' : 'border-gray-100 bg-gray-50 opacity-70'
+                  }`}
+                >
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-medium text-gray-900 capitalize">
+                        {b.benefit_type.replace(/_/g, ' ')}
+                      </span>
+                      <span className={`text-xs px-2 py-0.5 rounded-full bg-${themeColor}-50 text-${themeColor}-700`}>
+                        {describeBenefit(b)}
+                      </span>
+                      <span className="text-xs text-gray-500 capitalize">
+                        scope: {scopeTargetLabel(b)}
+                      </span>
+                      {b.is_stackable && <span className="text-[10px] uppercase text-gray-400">stackable</span>}
+                      {!b.is_active && <span className="text-[10px] uppercase text-red-400">inactive</span>}
+                    </div>
+                    {b.label && <p className="text-xs text-gray-500 mt-0.5 truncate">{b.label}</p>}
+                  </div>
+                  {canManage && (
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button onClick={() => startEdit(b)} className="p-1.5 rounded hover:bg-gray-100 text-gray-600" title="Edit">
+                        <Edit2 size={15} />
+                      </button>
+                      <button onClick={() => remove(b)} className="p-1.5 rounded hover:bg-red-50 text-red-500" title="Delete">
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {showForm && canManage && (
+            <div className="mt-5 border-t border-gray-100 pt-5">
+              <h3 className="text-sm font-semibold text-gray-900 mb-3">
+                {editingId ? 'Edit benefit' : 'New benefit'}
+              </h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className={labelCls}>Benefit type</label>
+                  <select
+                    value={form.benefit_type}
+                    onChange={(e) => setForm({ ...form, benefit_type: e.target.value as MembershipBenefitType })}
+                    className={inputCls}
+                  >
+                    {BENEFIT_TYPES.map((t) => (
+                      <option key={t.value} value={t.value}>{t.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className={`${labelCls} flex items-center gap-1`}>
+                    Value mode <InfoTooltip content="How the value is interpreted: percent off, fixed $ off, free, a pass count, or an access flag." />
+                  </label>
+                  <select
+                    value={form.value_mode}
+                    onChange={(e) => setForm({ ...form, value_mode: e.target.value as MembershipBenefitValueMode })}
+                    className={inputCls}
+                  >
+                    {VALUE_MODES.map((m) => (
+                      <option key={m.value} value={m.value}>{m.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {(isDiscount || isPass || form.value_mode === 'count' || form.value_mode === 'percent' || form.value_mode === 'fixed') && form.value_mode !== 'free' && form.value_mode !== 'flag' && (
+                  <div>
+                    <label className={labelCls}>
+                      {form.value_mode === 'percent' ? 'Percent off' : form.value_mode === 'fixed' ? 'Amount off ($)' : 'Count'}
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min={0}
+                      value={form.value ?? ''}
+                      onChange={(e) => setForm({ ...form, value: e.target.value ? parseFloat(e.target.value) : 0 })}
+                      className={inputCls}
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <label className={labelCls}>Scope</label>
+                  <select
+                    value={form.scope_type}
+                    onChange={(e) => setForm({ ...form, scope_type: e.target.value as MembershipBenefitScopeType, scope_id: null, scope_category: null })}
+                    className={inputCls}
+                  >
+                    {SCOPE_TYPES.map((s) => (
+                      <option key={s.value} value={s.value}>{s.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {['package', 'attraction', 'event', 'addon', 'location'].includes(form.scope_type) && (
+                  <div>
+                    <label className={`${labelCls} flex items-center gap-1`}>
+                      Target {form.scope_type}
+                      <InfoTooltip content={`Pick the specific ${form.scope_type} this benefit applies to. Leave as "All" to apply to every ${form.scope_type}.`} />
+                    </label>
+                    <select
+                      value={form.scope_id ?? ''}
+                      onChange={(e) => setForm({ ...form, scope_id: e.target.value ? parseInt(e.target.value) : null })}
+                      className={inputCls}
+                      disabled={optionsLoading}
+                    >
+                      <option value="">{optionsLoading ? 'Loading…' : `All ${form.scope_type}s`}</option>
+                      {scopeOptions[form.scope_type as ScopeTargetType]?.map((o) => (
+                        <option key={o.id} value={o.id}>{o.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {form.scope_type === 'category' && (
+                  <div>
+                    <label className={labelCls}>Category</label>
+                    {categories.length > 0 ? (
+                      <select
+                        value={form.scope_category ?? ''}
+                        onChange={(e) => setForm({ ...form, scope_category: e.target.value || null })}
+                        className={inputCls}
+                      >
+                        <option value="">Select a category…</option>
+                        {categories.map((c) => (
+                          <option key={c} value={c}>{c}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        value={form.scope_category ?? ''}
+                        onChange={(e) => setForm({ ...form, scope_category: e.target.value || null })}
+                        className={inputCls}
+                        placeholder="Category name"
+                      />
+                    )}
+                  </div>
+                )}
+
+                <div>
+                  <label className={`${labelCls} flex items-center gap-1`}>
+                    Period <InfoTooltip content="The window the redemption limit resets over." />
+                  </label>
+                  <select
+                    value={form.period ?? 'per_term'}
+                    onChange={(e) => setForm({ ...form, period: e.target.value as MembershipBenefitPeriod })}
+                    className={inputCls}
+                  >
+                    {PERIODS.map((p) => (
+                      <option key={p.value} value={p.value}>{p.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className={`${labelCls} flex items-center gap-1`}>
+                    Max redemptions <InfoTooltip content="Cap on how many times this benefit can be used per period. Leave empty for unlimited." />
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={form.max_redemptions ?? ''}
+                    onChange={(e) => setForm({ ...form, max_redemptions: e.target.value ? parseInt(e.target.value) : null })}
+                    className={inputCls}
+                  />
+                </div>
+
+                <div>
+                  <label className={`${labelCls} flex items-center gap-1`}>
+                    Priority <InfoTooltip content="Higher priority benefits are applied first when multiple match a line." />
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={form.priority ?? 0}
+                    onChange={(e) => setForm({ ...form, priority: e.target.value ? parseInt(e.target.value) : 0 })}
+                    className={inputCls}
+                  />
+                </div>
+
+                <div className="col-span-2">
+                  <label className={labelCls}>Label (optional)</label>
+                  <input
+                    value={form.label ?? ''}
+                    onChange={(e) => setForm({ ...form, label: e.target.value })}
+                    className={inputCls}
+                    placeholder="e.g. Member 15% off all packages"
+                  />
+                </div>
+
+                <label className="text-sm text-gray-700 flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={!!form.is_stackable}
+                    onChange={(e) => setForm({ ...form, is_stackable: e.target.checked })}
+                    className={`rounded border-gray-300 text-${themeColor}-600 focus:ring-${themeColor}-500`}
+                  />
+                  Stackable with other benefits
+                  <InfoTooltip content="If off, this benefit will not combine with other discounts on the same line." />
+                </label>
+
+                <label className="text-sm text-gray-700 flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={!!form.is_active}
+                    onChange={(e) => setForm({ ...form, is_active: e.target.checked })}
+                    className={`rounded border-gray-300 text-${themeColor}-600 focus:ring-${themeColor}-500`}
+                  />
+                  Active
+                </label>
+              </div>
+
+              <div className="flex gap-2 justify-end mt-4">
+                <StandardButton variant="secondary" size="sm" onClick={() => setShowForm(false)} disabled={saving}>
+                  Cancel
+                </StandardButton>
+                <StandardButton variant="primary" size="sm" icon={Save} onClick={save} loading={saving}>
+                  {editingId ? 'Update' : 'Add'} benefit
+                </StandardButton>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="px-5 py-4 border-t border-gray-100 flex gap-2 justify-between bg-gray-50">
+          <div>
+            {canManage && !showForm && (
+              <StandardButton variant="primary" size="sm" icon={Plus} onClick={startCreate}>
+                Add benefit
+              </StandardButton>
+            )}
+          </div>
+          <StandardButton variant="secondary" size="sm" onClick={onClose}>
+            Done
+          </StandardButton>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default PlanBenefitsManager;

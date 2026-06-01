@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect } from 'react';
 import {
   Calendar,
@@ -74,42 +73,34 @@ const CompanyDashboard: React.FC = () => {
   const [selectedDayBookings, setSelectedDayBookings] = useState<{ date: Date; bookings: any[] } | null>(null);
   const [monthlyBookings, setMonthlyBookings] = useState<any[]>([]);
 
-  // Timeframe selector for metrics
   const [metricsTimeframe, setMetricsTimeframe] = useState<TimeframeType>('all_time');
   const [timeframeDescription, setTimeframeDescription] = useState('All Time');
   const [customDateFrom, setCustomDateFrom] = useState('');
   const [customDateTo, setCustomDateTo] = useState('');
   
-  // Rooms for daily view
   const [rooms, setRooms] = useState<Room[]>([]);
   
-  // New bookings tracking
   const [newBookings, setNewBookings] = useState<any[]>([]);
 
-  // Quick action states for booking detail modal
   const [checkInLoading, setCheckInLoading] = useState(false);
   const [showCheckInConfirm, setShowCheckInConfirm] = useState(false);
   const [editingNotes, setEditingNotes] = useState(false);
   const [tempNotes, setTempNotes] = useState('');
   const [savingNotes, setSavingNotes] = useState(false);
 
-  // Payment modal states
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'in-store'>('in-store');
   const [paymentNotes, setPaymentNotes] = useState('');
   const [processingPayment, setProcessingPayment] = useState(false);
 
-  // Data states
   const [locations, setLocations] = useState<Location[]>([]);
   const [allBookings, setAllBookings] = useState<any[]>([]); // All-time bookings (optionally filtered by location)
   const [weeklyBookings, setWeeklyBookings] = useState<any[]>([]);
   const [dailyBookings, setDailyBookings] = useState<any[]>([]);
-  // All data (unfiltered) for location performance
   const [allWeeklyBookings, setAllWeeklyBookings] = useState<any[]>([]);
   const [allTicketPurchases, setAllTicketPurchases] = useState<any[]>([]);
   const [recentEventPurchases, setRecentEventPurchases] = useState<any[]>([]);
-  // Location stats from API (for company_admin)
   const [apiLocationStats, setApiLocationStats] = useState<any>(null);
   const [metrics, setMetrics] = useState({
     totalBookings: 0,
@@ -128,7 +119,6 @@ const CompanyDashboard: React.FC = () => {
     totalEventTickets: 0,
   });
 
-  // Get dates for the current week - moved up to avoid dependency issues
   const getWeekDates = (date: Date): Date[] => {
     const start = new Date(date);
     const day = start.getDay();
@@ -146,7 +136,6 @@ const CompanyDashboard: React.FC = () => {
 
   const weekDates = getWeekDates(currentWeek);
   
-  // Navigate to previous/next day
   const goToPreviousDay = () => {
     const newDate = new Date(currentDay);
     newDate.setDate(newDate.getDate() - 1);
@@ -159,7 +148,6 @@ const CompanyDashboard: React.FC = () => {
     setCurrentDay(newDate);
   };
 
-  // Navigate to previous/next week
   const goToPreviousWeek = () => {
     const newDate = new Date(currentWeek);
     newDate.setDate(newDate.getDate() - 7);
@@ -172,7 +160,6 @@ const CompanyDashboard: React.FC = () => {
     setCurrentWeek(newDate);
   };
 
-  // Navigate to previous/next month
   const goToPreviousMonth = () => {
     const newDate = new Date(currentMonth);
     newDate.setDate(1); // Set to first day to avoid month overflow
@@ -187,7 +174,6 @@ const CompanyDashboard: React.FC = () => {
     setCurrentMonth(newDate);
   };
 
-  // Get all days in the current month for calendar grid
   const getMonthDays = (date: Date) => {
     const year = date.getFullYear();
     const month = date.getMonth();
@@ -198,12 +184,10 @@ const CompanyDashboard: React.FC = () => {
     
     const days: (Date | null)[] = [];
     
-    // Add empty slots for days before the first of the month
     for (let i = 0; i < startDayOfWeek; i++) {
       days.push(null);
     }
     
-    // Add all days of the month
     for (let i = 1; i <= daysInMonth; i++) {
       days.push(new Date(year, month, i));
     }
@@ -213,7 +197,6 @@ const CompanyDashboard: React.FC = () => {
 
   const monthDays = getMonthDays(currentMonth);
 
-  // Monthly calendar data - derived from allBookings (no API call needed)
   useEffect(() => {
     if (calendarView !== 'month' || allBookings.length === 0) return;
     
@@ -231,7 +214,6 @@ const CompanyDashboard: React.FC = () => {
     console.log('📅 [CompanyDashboard] Monthly bookings filtered:', monthly.length);
   }, [allBookings, currentMonth, calendarView]);
 
-  // Get bookings for a specific day
   const getBookingsForDay = (date: Date) => {
     return monthlyBookings.filter(booking => {
       const bookingDate = parseLocalDate(booking.booking_date);
@@ -239,7 +221,6 @@ const CompanyDashboard: React.FC = () => {
     });
   };
 
-  // Natural sort function: alphabetical first, then numerical (Table 1, 2, 3 not 1, 10, 2)
   const naturalSort = (a: Room, b: Room): number => {
     const nameA = a.name;
     const nameB = b.name;
@@ -262,10 +243,8 @@ const CompanyDashboard: React.FC = () => {
     return 0;
   };
 
-  // Sorted rooms for display
   const sortedRooms = [...rooms].sort(naturalSort);
 
-  // Generate time slots for the SpaceSchedule-style daily view (15-min intervals from 8 AM to 10 PM)
   const generateTimeSlots = () => {
     const slots: { time: string; slot: string }[] = [];
     for (let hour = 8; hour <= 22; hour++) {
@@ -282,12 +261,9 @@ const CompanyDashboard: React.FC = () => {
 
   const dailyTimeSlots = generateTimeSlots();
 
-  // Check if there are any bookings without a room assigned
   const unassignedBookings = dailyBookings.filter(b => !b.room_id);
 
-  // Filter to show time slots that have bookings (including unassigned bookings)
   const visibleTimeSlots = dailyTimeSlots.filter(slotObj => {
-    // Check if any booking (with or without room) covers this slot
     return dailyBookings.some(booking => {
       const bookingTime = booking.booking_time?.substring(0, 5);
       if (!bookingTime) return false;
@@ -304,10 +280,8 @@ const CompanyDashboard: React.FC = () => {
     });
   });
 
-  // Get booking that starts at a specific time slot for a space (spaceId = 0 means unassigned)
   const getBookingForSlot = (spaceId: number, slot: string) => {
     return dailyBookings.find(booking => {
-      // For unassigned column (spaceId = 0), check for bookings without room
       if (spaceId === 0) {
         if (booking.room_id) return false; // Has a room, skip
       } else {
@@ -318,11 +292,9 @@ const CompanyDashboard: React.FC = () => {
     });
   };
 
-  // Check if a slot is occupied by a booking that started earlier (spaceId = 0 means unassigned)
   const isSlotOccupied = (spaceId: number, slot: string) => {
     const slotMinutes = parseInt(slot.split(':')[0]) * 60 + parseInt(slot.split(':')[1]);
     return dailyBookings.some(booking => {
-      // For unassigned column (spaceId = 0), check for bookings without room
       if (spaceId === 0) {
         if (booking.room_id) return false; // Has a room, skip
       } else {
@@ -342,7 +314,6 @@ const CompanyDashboard: React.FC = () => {
     });
   };
 
-  // Calculate row span based on booking duration (15-minute intervals)
   const getBookingRowSpan = (booking: any) => {
     let durationMinutes = 60;
     if (booking.duration && booking.duration_unit) {
@@ -353,7 +324,6 @@ const CompanyDashboard: React.FC = () => {
     return Math.max(1, Math.ceil(durationMinutes / 15));
   };
 
-  // Format time to 12-hour format
   const formatTime12Hour = (time: string) => {
     const [hours, minutes] = time.split(':').map(Number);
     const period = hours >= 12 ? 'PM' : 'AM';
@@ -361,7 +331,6 @@ const CompanyDashboard: React.FC = () => {
     return `${hour12}:${minutes.toString().padStart(2, '0')} ${period}`;
   };
 
-  // Calculate end time based on start time and duration
   const calculateEndTime = (startTime: string, duration: number, unit: string) => {
     const [hours, minutes] = startTime.split(':').map(Number);
     const durationMinutes = unit === 'hours' ? duration * 60 : duration;
@@ -371,14 +340,12 @@ const CompanyDashboard: React.FC = () => {
     return `${endHours.toString().padStart(2, '0')}:${endMins.toString().padStart(2, '0')}`;
   };
 
-  // Fetch all locations on mount
   useEffect(() => {
     const fetchLocations = async () => {
       try {
         console.log('Fetching locations...');
         const response = await locationService.getLocations();
         console.log('Locations response:', response);
-        // Handle both response formats: response.data.locations or response.data
         const locationsList = Array.isArray(response.data) ? response.data : [];
         console.log('Locations list:', locationsList);
         setLocations(locationsList);
@@ -391,23 +358,18 @@ const CompanyDashboard: React.FC = () => {
     fetchLocations();
   }, []);
 
-  // Fetch rooms/spaces for daily view - use cache for faster loading
   useEffect(() => {
     const fetchRooms = async () => {
       try {
-        // Try cache first for instant loading
         const cachedRooms = await roomCacheService.getCachedRooms();
         if (cachedRooms && cachedRooms.length > 0) {
           setRooms(cachedRooms);
-          // Trigger background sync for freshness
           roomCacheService.syncInBackground();
           return;
         }
-        // Fallback to API if cache empty
         const response = await roomService.getRooms({ per_page: 100 });
         const fetchedRooms = response.data.rooms || [];
         setRooms(fetchedRooms);
-        // Update cache with fetched rooms
         if (fetchedRooms.length > 0) {
           await roomCacheService.cacheRooms(fetchedRooms);
         }
@@ -418,7 +380,6 @@ const CompanyDashboard: React.FC = () => {
     fetchRooms();
   }, []);
 
-  // Helper: get cutoff date based on current metrics timeframe
   const getTimeframeCutoffDate = (): Date | null => {
     const now = new Date();
     switch (metricsTimeframe) {
@@ -447,7 +408,6 @@ const CompanyDashboard: React.FC = () => {
     }
   };
 
-  // Derive new bookings from allBookings based on selected timeframe
   useEffect(() => {
     if (allBookings.length === 0) {
       setNewBookings([]);
@@ -472,8 +432,6 @@ const CompanyDashboard: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allBookings, metricsTimeframe, customDateFrom, customDateTo]);
 
-  // Daily calendar data - derived from allBookings (no API call needed)
-  // Matches SpaceSchedule: only show confirmed, pending, and checked-in bookings
   useEffect(() => {
     if (calendarView !== 'day' || allBookings.length === 0) return;
     
@@ -493,14 +451,11 @@ const CompanyDashboard: React.FC = () => {
     console.log('📅 [CompanyDashboard] Daily bookings filtered for', dateStr, ':', daily.length);
   }, [allBookings, currentDay, calendarView]);
 
-  // Load ALL bookings (cache-first, then background sync)
-  // This is the primary data source for the table and calendar views
   useEffect(() => {
     const loadAllBookings = async () => {
       try {
         console.log('📦 [CompanyDashboard] Loading all bookings...');
         
-        // Step 1: Try cache first for instant loading
         const cachedBookings = await bookingCacheService.getFilteredBookingsFromCache(
           selectedLocation === 'all' ? {} : { location_id: selectedLocation as number }
         );
@@ -511,7 +466,6 @@ const CompanyDashboard: React.FC = () => {
           setLoading(false);
         }
         
-        // Step 2: Fetch fresh data from API in background (ALL bookings, no date filter)
         console.log('🔄 [CompanyDashboard] Background sync: Fetching fresh bookings...');
         const bookingsResponse = await bookingService.getBookings({
           location_id: selectedLocation === 'all' ? undefined : selectedLocation as number,
@@ -521,7 +475,6 @@ const CompanyDashboard: React.FC = () => {
         const bookings = bookingsResponse.data.bookings || [];
         console.log('✅ [CompanyDashboard] Fetched', bookings.length, 'bookings from API');
         
-        // Update state and cache
         setAllBookings(bookings);
         if (bookings.length > 0) {
           await bookingCacheService.cacheBookings(bookings);
@@ -537,11 +490,6 @@ const CompanyDashboard: React.FC = () => {
     loadAllBookings();
   }, [selectedLocation]);
 
-  // Fetch metrics data when selectedLocation or timeframe changes
-  // PERFORMANCE OPTIMIZATION: Cache-first loading with background refresh
-  // - Display cached metrics instantly
-  // - Fetch fresh data in background
-  // - Smooth update when new data arrives
   useEffect(() => {
     const fetchMetricsData = async () => {
       setMetricsLoading(true);
@@ -549,7 +497,6 @@ const CompanyDashboard: React.FC = () => {
       try {
         console.log('🔄 Starting metrics fetch for location:', selectedLocation, 'timeframe:', metricsTimeframe);
         
-        // Step 1: Try to load from cache first for instant display (with timeframe)
         const cachedData = await metricsCacheService.getCachedMetrics<typeof metrics>('company', selectedLocation, metricsTimeframe);
         
         if (cachedData) {
@@ -567,18 +514,12 @@ const CompanyDashboard: React.FC = () => {
           setLoading(false);
         }
         
-        // Note: We no longer fall back to the unfiltered purchase cache here.
-        // The unfiltered cache contains ALL purchases (up to 500) which would incorrectly
-        // display as "recent" purchases. Instead, we wait for the API response below
-        // which returns properly filtered recent purchases.
         
-        // Step 2: Fetch fresh data from API in background with timeframe
         console.log('📊 Fetching metrics from API with timeframe:', metricsTimeframe);
         const metricsParams: any = {
           timeframe: metricsTimeframe,
         };
         
-        // Add custom dates if timeframe is custom
         if (metricsTimeframe === 'custom' && customDateFrom && customDateTo) {
           metricsParams.date_from = customDateFrom;
           metricsParams.date_to = customDateTo;
@@ -590,19 +531,16 @@ const CompanyDashboard: React.FC = () => {
         console.log('📊 Metrics:', metricsResponse.metrics);
         console.log('🎫 Recent purchases:', metricsResponse.recentPurchases?.length || 0);
         
-        // Step 3: Update state with fresh data (smooth transition)
         if (metricsResponse.metrics) {
           setMetrics(metricsResponse.metrics);
         } else {
           console.error('⚠️ No metrics in API response');
         }
         
-        // Update timeframe description from API
         if (metricsResponse.timeframe) {
           setTimeframeDescription(metricsResponse.timeframe.description);
         }
         
-        // For company_admin, we get locationStats directly from API
         if (metricsResponse.locationStats) {
           setApiLocationStats(metricsResponse.locationStats);
           console.log('📍 Location stats from API (company_admin):', Object.keys(metricsResponse.locationStats).length, 'locations');
@@ -610,19 +548,16 @@ const CompanyDashboard: React.FC = () => {
           console.log('📍 Location details from API (manager/attendant):', metricsResponse.locationDetails.name);
         }
         
-        // Update ticket purchases from API response
         if (metricsResponse.recentPurchases && metricsResponse.recentPurchases.length > 0) {
           setAllTicketPurchases(metricsResponse.recentPurchases);
           await attractionPurchaseCacheService.cachePurchases(metricsResponse.recentPurchases as any);
           console.log('🎫 [CompanyDashboard] Ticket purchases updated:', metricsResponse.recentPurchases.length);
         }
 
-        // Update event purchases from API response
         if (metricsResponse.recentEventPurchases && metricsResponse.recentEventPurchases.length > 0) {
           setRecentEventPurchases(metricsResponse.recentEventPurchases);
         }
         
-        // Step 4: Cache the fresh data for next time (with timeframe)
         await metricsCacheService.cacheMetrics('company', {
           metrics: metricsResponse.metrics,
           locationStats: metricsResponse.locationStats,
@@ -632,7 +567,6 @@ const CompanyDashboard: React.FC = () => {
         
         console.log('✅ [CompanyDashboard] Metrics cached successfully for timeframe:', metricsTimeframe);
         
-        // Get current week for calendar and location performance
         const today = new Date();
         const weekStart = new Date(today);
         const day = weekStart.getDay();
@@ -644,24 +578,20 @@ const CompanyDashboard: React.FC = () => {
         
         console.log('📅 Current week range:', weekStart.toISOString().split('T')[0], 'to', weekEnd.toISOString().split('T')[0]);
         
-        // Fetch bookings for calendar view - USE CACHE FIRST for faster loading
         const bookingParams = {
           date_from: weekStart.toISOString().split('T')[0],
           date_to: weekEnd.toISOString().split('T')[0],
         };
         
-        // Try cache first for instant loading
         let allBookings = await bookingCacheService.getFilteredBookingsFromCache(bookingParams);
         
         if (allBookings && allBookings.length > 0) {
           console.log('📋 Using cached bookings:', allBookings.length);
-          // Filter by location if needed
           if (selectedLocation !== 'all') {
             allBookings = allBookings.filter(b => b.location_id === selectedLocation);
           }
           setAllWeeklyBookings(allBookings);
         } else {
-          // No cache, fetch from API
           console.log('📋 No cache, fetching from API...');
           const allBookingsParams: any = {
             date_from: weekStart.toISOString().split('T')[0],
@@ -676,7 +606,6 @@ const CompanyDashboard: React.FC = () => {
           const allBookingsResponse = await bookingService.getBookings(allBookingsParams);
           allBookings = allBookingsResponse.data.bookings || [];
           setAllWeeklyBookings(allBookings);
-          // Cache for next time
           await bookingCacheService.cacheBookings(allBookings);
         }
         
@@ -694,7 +623,6 @@ const CompanyDashboard: React.FC = () => {
     fetchMetricsData();
   }, [selectedLocation, metricsTimeframe, customDateFrom, customDateTo]);
 
-  // Weekly calendar data - derived from allBookings (no API call needed)
   useEffect(() => {
     if (allBookings.length === 0) return;
     
@@ -710,7 +638,6 @@ const CompanyDashboard: React.FC = () => {
     console.log('📅 [CompanyDashboard] Weekly bookings filtered:', weekly.length);
   }, [allBookings, currentWeek]);
 
-  // Dynamic metrics cards
   const metricsCards = [
     {
       title: 'Total Bookings',
@@ -768,8 +695,6 @@ const CompanyDashboard: React.FC = () => {
     },
   ];
 
-  // Only show bookings for the current week in the calendar and table
-  // Filter by selectedLocation in the component (not in the API call)
   const bookingsThisWeek = weeklyBookings.filter(booking => {
     const bookingDate = parseLocalDate(booking.booking_date);
     const isInCurrentWeek = weekDates.some(date => date.toDateString() === bookingDate.toDateString());
@@ -777,7 +702,6 @@ const CompanyDashboard: React.FC = () => {
     return isInCurrentWeek && matchesLocation;
   });
 
-  // Get unique activities and packages for filter options
   const allActivities = Array.from(new Set(weeklyBookings
     .map(booking => booking.attraction?.name)
     .filter(activity => activity !== null && activity !== undefined))) as string[];
@@ -786,7 +710,6 @@ const CompanyDashboard: React.FC = () => {
     .map(booking => booking.package?.name)
     .filter(pkg => pkg !== null && pkg !== undefined))) as string[];
 
-  // Apply calendar filter
   const filteredCalendarBookings = bookingsThisWeek.filter(booking => {
     if (calendarFilter.type === 'all') return true;
     if (calendarFilter.type === 'activity' && booking.attraction?.name === calendarFilter.value) return true;
@@ -795,9 +718,7 @@ const CompanyDashboard: React.FC = () => {
     return false;
   });
 
-  // Helper function to convert 24-hour time to 12-hour format
   const convertTo12HourFormat = (time24: string): string => {
-    // Handle both "HH:MM:SS" and "HH:MM" formats
     const [hourStr, minuteStr] = time24.split(':');
     const hour = parseInt(hourStr);
     const minute = minuteStr;
@@ -808,7 +729,6 @@ const CompanyDashboard: React.FC = () => {
     return `${displayHour}:${minute} ${isPM ? 'PM' : 'AM'}`;
   };
 
-  // Get unique time slots from bookings and sort them
   const getBookingTimeSlots = () => {
     const timeSlotsSet = new Set<string>();
     
@@ -817,11 +737,9 @@ const CompanyDashboard: React.FC = () => {
       timeSlotsSet.add(time12Hour);
     });
     
-    // Convert to array and sort chronologically
     const timeSlotsArray = Array.from(timeSlotsSet);
     
     return timeSlotsArray.sort((a, b) => {
-      // Parse time strings to compare
       const parseTime = (timeStr: string) => {
         const [time, period] = timeStr.split(' ');
         const [hourStr, minuteStr] = time.split(':');
@@ -840,11 +758,9 @@ const CompanyDashboard: React.FC = () => {
 
   const timeSlots = getBookingTimeSlots();
 
-  // Group bookings by time slot and day
   const groupBookingsByTimeAndDay = () => {
     const grouped: {[key: string]: {[key: string]: any[]}} = {};
     
-    // Initialize structure with only time slots that have bookings
     timeSlots.forEach(time => {
       grouped[time] = {};
       weekDates.forEach(date => {
@@ -853,11 +769,9 @@ const CompanyDashboard: React.FC = () => {
       });
     });
     
-    // Populate with bookings
     filteredCalendarBookings.forEach(booking => {
       const bookingDate = parseLocalDate(booking.booking_date);
       const dateStr = bookingDate.toDateString();
-      // Convert booking time from 24-hour to 12-hour format to match our time slots
       const time = convertTo12HourFormat(booking.booking_time);
       
       if (grouped[time] && grouped[time][dateStr]) {
@@ -870,7 +784,6 @@ const CompanyDashboard: React.FC = () => {
 
   const groupedBookings = groupBookingsByTimeAndDay();
 
-  // Quick actions - 8 items for clean grid
   const quickActions = [
     { title: 'New Booking', icon: Plus, link: '/bookings/create' },
     { title: 'Calendar', icon: Calendar, link: '/bookings/calendar' },
@@ -882,7 +795,6 @@ const CompanyDashboard: React.FC = () => {
     { title: 'Locations', icon: Building, link: '/admin/activity' },
   ];
 
-  // Status colors (supporting both capitalized display and lowercase API values)
   const statusColors = {
     Confirmed: 'bg-emerald-100 text-emerald-800',
     Pending: 'bg-amber-100 text-amber-800',
@@ -891,7 +803,6 @@ const CompanyDashboard: React.FC = () => {
     'Checked-in': 'bg-green-100 text-green-800',
   };
 
-  // Payment status colors
   const paymentColors = {
     Paid: 'bg-emerald-100 text-emerald-800',
     Partial: 'bg-amber-100 text-amber-800',
@@ -899,7 +810,6 @@ const CompanyDashboard: React.FC = () => {
     Pending: 'bg-amber-100 text-amber-800',
   };
 
-  // Filter ALL bookings by status, location, and search for the table (shows ALL bookings, not just this week)
   const filteredBookings = allBookings.filter(booking => {
     const statusMatch = selectedStatus === 'all' || booking.status.toLowerCase() === selectedStatus.toLowerCase();
     const locationMatch = selectedLocation === 'all' || booking.location_id === selectedLocation;
@@ -918,28 +828,22 @@ const CompanyDashboard: React.FC = () => {
     return statusMatch && locationMatch && searchMatch;
   });
 
-  // Pagination
   const totalPages = Math.ceil(filteredBookings.length / itemsPerPage);
   const currentBookings = filteredBookings.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
 
-  // Clear calendar filter
   const clearCalendarFilter = () => {
     setCalendarFilter({ type: 'all', value: '' });
   };
 
-  // Get location stats (including both bookings and purchases)
-  // Uses API data if available (preferred), otherwise falls back to client-side calculation
   const getLocationStats = () => {
-    // If we have API location stats, use them directly (much faster!)
     if (apiLocationStats) {
       console.log('Using API location stats:', apiLocationStats);
       return apiLocationStats;
     }
     
-    // Fallback to client-side calculation (for when API data not available)
     const stats: {[key: number]: {name: string, bookings: number, purchases: number, revenue: number, participants: number, utilization: number}} = {};
     
     console.log('=== LOCATION STATS CALCULATION (CLIENT-SIDE FALLBACK) ===');
@@ -954,7 +858,6 @@ const CompanyDashboard: React.FC = () => {
     console.log('All weekly bookings count:', allWeeklyBookings.length);
     console.log('All ticket purchases count:', allTicketPurchases.length);
     
-    // Filter all bookings for current week
     const currentWeekAllBookings = allWeeklyBookings.filter(booking => {
       const bookingDate = parseLocalDate(booking.booking_date);
       return weekDates.some(date => date.toDateString() === bookingDate.toDateString());
@@ -962,7 +865,6 @@ const CompanyDashboard: React.FC = () => {
     
     console.log('Current week bookings:', currentWeekAllBookings.length);
     
-    // Add bookings data from ALL bookings (not filtered by location)
     currentWeekAllBookings.forEach(booking => {
       console.log('Processing booking:', booking.id, 'Location ID:', booking.location_id);
       if (booking.location_id && stats[booking.location_id]) {
@@ -975,10 +877,8 @@ const CompanyDashboard: React.FC = () => {
       }
     });
     
-    // Add attraction purchases data from ALL purchases (not filtered by location)
     console.log('Total purchases to process:', allTicketPurchases.length);
     
-    // Filter purchases for current week
     const currentWeekAllPurchases = allTicketPurchases.filter(purchase => {
       if (!purchase.purchase_date && !purchase.created_at) return false;
       const purchaseDate = new Date(purchase.purchase_date || purchase.created_at);
@@ -989,7 +889,6 @@ const CompanyDashboard: React.FC = () => {
     
     currentWeekAllPurchases.forEach(purchase => {
       console.log('Processing purchase:', purchase.id);
-      // Check if purchase has attraction with location_id
       const locationId = purchase.attraction?.location_id || purchase.location_id;
       console.log('Purchase location_id:', locationId, 'Attraction:', purchase.attraction);
       
@@ -1003,7 +902,6 @@ const CompanyDashboard: React.FC = () => {
       }
     });
     
-    // Calculate utilization (percentage of max capacity)
     Object.keys(stats).forEach(locationId => {
       const maxCapacity = 200; // Assuming each location has a max capacity of 200
       stats[parseInt(locationId)].utilization = Math.min(100, Math.round((stats[parseInt(locationId)].participants / maxCapacity) * 100));
@@ -1018,7 +916,6 @@ const CompanyDashboard: React.FC = () => {
   const locationStats = getLocationStats();
 
 
-  // Get top performing locations (top 3)
   const getTopLocations = () => {
     return Object.entries(locationStats)
       .sort(([, a], [, b]) => (b as { revenue: number }).revenue - (a as { revenue: number }).revenue)
@@ -1029,15 +926,12 @@ const CompanyDashboard: React.FC = () => {
   console.log('Location Stats:', locationStats);
   console.log('Top Locations:', topLocations);
 
-  // For All Locations Overview: show top 6 by revenue, with expand/collapse
   const [showAllLocations, setShowAllLocations] = useState(false);
   const sortedLocations = Object.entries(locationStats).sort(([, a], [, b]) => (b as { revenue: number }).revenue - (a as { revenue: number }).revenue);
   const displayedLocations = showAllLocations ? sortedLocations : sortedLocations.slice(0, 4);
 
-  // Pagination controls
   const paginate = (pageNumber: number) => setCurrentPage(pageNumber);
 
-  // Payment modal handlers
   const handleOpenPaymentModal = () => {
     if (!selectedBooking) return;
     const remainingAmount = Math.max(0, Number(selectedBooking.total_amount || 0) - Number(selectedBooking.amount_paid || 0));
@@ -1104,7 +998,6 @@ const CompanyDashboard: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-6 space-y-6">
-      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-gray-900 flex items-center gap-2 mb-1">
@@ -1113,7 +1006,6 @@ const CompanyDashboard: React.FC = () => {
           <p className="text-sm md:text-base text-gray-500">Multi-location booking overview and management</p>
         </div>
         <div className="flex flex-col md:flex-row items-start md:items-center gap-3 mt-4 md:mt-0">
-          {/* Timeframe Selector */}
           <div className="flex items-center gap-2">
             <div className="relative">
               <select
@@ -1134,7 +1026,6 @@ const CompanyDashboard: React.FC = () => {
             )}
           </div>
           
-          {/* Custom Date Range Inputs */}
           {metricsTimeframe === 'custom' && (
             <div className="flex items-center gap-2">
               <input
@@ -1173,7 +1064,6 @@ const CompanyDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Metrics Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         {metricsCards.map((metric, index) => {
           const Icon = metric.icon;
@@ -1204,7 +1094,6 @@ const CompanyDashboard: React.FC = () => {
         })}
       </div>
 
-      {/* Location Performance - Modern Leaderboard & Grid */}
       <div className="bg-white rounded-xl shadow-sm p-4 md:p-6 border border-gray-100">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 md:mb-6">
           <h2 className="text-lg md:text-xl font-bold text-gray-900 flex items-center gap-2">
@@ -1213,7 +1102,6 @@ const CompanyDashboard: React.FC = () => {
         </div>
 
         <div className="flex flex-col lg:flex-row gap-8">
-          {/* Modern Leaderboard for Top Locations */}
           <div className="flex-1">
             <h3 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
               <TrendingUp className={`w-4 h-4 text-${fullColor}`} /> Top Performing Locations
@@ -1230,7 +1118,7 @@ const CompanyDashboard: React.FC = () => {
                       </div>
                       <div>
                         <div className="font-bold text-gray-900 text-lg">{typedStats.name}</div>
-                        <div className="text-xs text-gray-500">{typedStats.bookings} bookings • {typedStats.purchases} tickets{typedStats.eventPurchases ? ` • ${typedStats.eventPurchases} events` : ''} • {typedStats.participants} guests</div>
+                        <div className="text-xs text-gray-500">{typedStats.bookings} bookings • {typedStats.purchases} tickets • {typedStats.eventPurchases ?? 0} events • {typedStats.participants} guests</div>
                       </div>
                     </div>
                     <div className="text-right min-w-[120px]">
@@ -1254,7 +1142,6 @@ const CompanyDashboard: React.FC = () => {
             )}
           </div>
 
-          {/* Compact Grid for All Locations (limit to 6, expandable) */}
           <div className="flex-1">
             <h3 className="font-semibold text-gray-800 mb-4">All Locations Overview</h3>
             {displayedLocations.length > 0 ? (
@@ -1277,12 +1164,10 @@ const CompanyDashboard: React.FC = () => {
                           <div className="text-xs text-gray-500">Tickets</div>
                           <div className={`font-bold text-lg text-${fullColor}`}>{typedStats.purchases}</div>
                         </div>
-                        {typedStats.eventPurchases !== undefined && typedStats.eventPurchases > 0 && (
-                          <div className="flex-1">
-                            <div className="text-xs text-gray-500">Events</div>
-                            <div className={`font-bold text-lg text-${fullColor}`}>{typedStats.eventPurchases}</div>
-                          </div>
-                        )}
+                        <div className="flex-1">
+                          <div className="text-xs text-gray-500">Events</div>
+                          <div className={`font-bold text-lg text-${fullColor}`}>{typedStats.eventPurchases ?? 0}</div>
+                        </div>
                       </div>
                       <div className="flex items-center gap-4 mb-2">
                         <div className="flex-1">
@@ -1325,14 +1210,12 @@ const CompanyDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Calendar */}
       <div className="bg-white rounded-xl shadow-sm p-4 md:p-6 border border-gray-100">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 md:mb-6">
           <div className="flex items-center gap-4">
             <h2 className="text-xl md:text-2xl font-bold text-gray-900 flex items-center gap-2">
               <Calendar className={`w-5 h-5 md:w-6 md:h-6 text-${fullColor}`} /> Calendar
             </h2>
-            {/* View Toggle */}
             <div className="flex items-center bg-gray-100 rounded-lg p-1">
               <button
                 onClick={() => setCalendarView('day')}
@@ -1407,7 +1290,6 @@ const CompanyDashboard: React.FC = () => {
               Today
             </StandardButton>
             
-            {/* Calendar Filter Toggle - Only show for week view */}
             {calendarView === 'week' && (
             <StandardButton 
               variant={calendarFilter.type !== 'all' ? 'primary' : 'secondary'}
@@ -1427,7 +1309,6 @@ const CompanyDashboard: React.FC = () => {
           </div>
         </div>
         
-        {/* Filter Panel - Only for week view */}
         {showFilterPanel && calendarView === 'week' && (
           <div className="mb-4 md:mb-6 p-3 md:p-4 bg-gray-50 rounded-lg border border-gray-200">
             <div className="flex justify-between items-center mb-3">
@@ -1558,7 +1439,6 @@ const CompanyDashboard: React.FC = () => {
           </div>
         )}
         
-        {/* Week View - Table-based calendar */}
         {calendarView === 'week' && (
         <div className="overflow-x-auto rounded-lg border border-gray-200">
           <table className="w-full">
@@ -1598,7 +1478,6 @@ const CompanyDashboard: React.FC = () => {
                                   : 'bg-rose-50 border-rose-200'
                               }`}
                             >
-                              {/* First booking preview */}
                               <div className="text-xs space-y-1">
                                 <div className="font-semibold text-gray-900 truncate">
                                   {bookingsForCell[0].customer ? `${bookingsForCell[0].customer.first_name} ${bookingsForCell[0].customer.last_name}` : bookingsForCell[0].guest_name || 'Guest'}
@@ -1616,7 +1495,6 @@ const CompanyDashboard: React.FC = () => {
                                 </div>
                               </div>
                               
-                              {/* View more button */}
                               {bookingsForCell.length > 1 && (
                                 <StandardButton
                                   variant="ghost"
@@ -1634,7 +1512,6 @@ const CompanyDashboard: React.FC = () => {
                                 </StandardButton>
                               )}
                               
-                              {/* Single booking - click to view details */}
                               {bookingsForCell.length === 1 && (
                                 <StandardButton
                                   variant="ghost"
@@ -1672,7 +1549,6 @@ const CompanyDashboard: React.FC = () => {
         </div>
         )}
 
-        {/* Day View - All spaces for a single day */}
         {calendarView === 'day' && (
           <div className="rounded-lg border border-gray-200 overflow-hidden">
             <div className="bg-gray-50 border-b border-gray-200 px-4 py-3">
@@ -1713,7 +1589,6 @@ const CompanyDashboard: React.FC = () => {
                           </div>
                         </th>
                       ))}
-                      {/* Unassigned bookings column */}
                       {unassignedBookings.length > 0 && (
                         <th className="px-4 py-3 text-center text-sm font-semibold text-amber-700 border-r border-gray-200 min-w-[200px] bg-amber-50">
                           <div className="flex flex-col items-center gap-1">
@@ -1751,7 +1626,7 @@ const CompanyDashboard: React.FC = () => {
                                 className="px-2 py-1 border-r border-gray-200 align-top"
                               >
                                 <Link
-                                  to={`/admin/bookings/${booking.id}?from=dashboard`}
+                                  to={`/bookings/${booking.id}?from=dashboard`}
                                   className={`block h-full p-2 rounded-lg text-xs cursor-pointer transition-all hover:shadow-md ${
                                     booking.status === 'confirmed' 
                                       ? 'bg-green-100 border border-green-300 text-green-800'
@@ -1800,7 +1675,6 @@ const CompanyDashboard: React.FC = () => {
                             </td>
                           );
                         })}
-                        {/* Unassigned bookings column */}
                         {unassignedBookings.length > 0 && (() => {
                           const booking = getBookingForSlot(0, slotObj.slot);
                           const isOccupied = isSlotOccupied(0, slotObj.slot);
@@ -1820,7 +1694,7 @@ const CompanyDashboard: React.FC = () => {
                                 className="px-2 py-1 border-r border-gray-200 align-top bg-amber-50"
                               >
                                 <Link
-                                  to={`/admin/bookings/${booking.id}?from=dashboard`}
+                                  to={`/bookings/${booking.id}?from=dashboard`}
                                   className="block h-full p-2 rounded-lg text-xs cursor-pointer transition-all hover:shadow-md bg-amber-100 border border-amber-300 text-amber-800"
                                 >
                                   <div className="flex items-center justify-between mb-1">
@@ -1866,10 +1740,8 @@ const CompanyDashboard: React.FC = () => {
           </div>
         )}
 
-        {/* Month View */}
         {calendarView === 'month' && (
           <div className="rounded-lg border border-gray-200">
-            {/* Days of week header */}
             <div className="grid grid-cols-7 bg-gray-50 border-b border-gray-200">
               {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
                 <div key={day} className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -1878,7 +1750,6 @@ const CompanyDashboard: React.FC = () => {
               ))}
             </div>
             
-            {/* Calendar grid */}
             <div className="grid grid-cols-7">
               {monthDays.map((day, index) => {
                 if (!day) {
@@ -1891,7 +1762,6 @@ const CompanyDashboard: React.FC = () => {
                 const isToday = day.toDateString() === new Date().toDateString();
                 const hasBookings = dayBookings.length > 0;
                 
-                // Count by status
                 const confirmedCount = dayBookings.filter(b => b.status === 'confirmed' || b.status === 'Confirmed').length;
                 const pendingCount = dayBookings.filter(b => b.status === 'pending' || b.status === 'Pending').length;
                 const cancelledCount = dayBookings.filter(b => b.status === 'cancelled' || b.status === 'Cancelled').length;
@@ -1941,7 +1811,6 @@ const CompanyDashboard: React.FC = () => {
         )}
       </div>
 
-      {/* Quick Actions */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
         <h2 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
           <Activity className={`w-4 h-4 text-${fullColor}`} /> Quick Actions
@@ -1964,7 +1833,6 @@ const CompanyDashboard: React.FC = () => {
       </div>
 
 
-      {/* All Bookings table removed — use Manage Bookings page instead */}
       {false && <div className="bg-white rounded-xl shadow-sm p-4 md:p-6 border border-gray-100">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 md:mb-6">
           <h2 className="text-lg md:text-xl font-semibold text-gray-900">All Bookings</h2>
@@ -2048,12 +1916,10 @@ const CompanyDashboard: React.FC = () => {
                 const activityName = booking.attraction?.name || booking.package?.name || '-';
                 const locationName = booking.location?.name || '-';
                 
-                // Calculate actual payment status based on amounts
                 const totalAmount = parseFloat(String(booking.total_amount || 0));
                 const amountPaid = parseFloat(String(booking.amount_paid || 0));
                 let paymentStatus = booking.payment_status || 'pending';
                 
-                // Override with calculated status if amounts suggest otherwise
                 if (totalAmount > 0) {
                   if (amountPaid >= totalAmount) {
                     paymentStatus = 'paid';
@@ -2120,7 +1986,6 @@ const CompanyDashboard: React.FC = () => {
           </table>
         </div>
 
-        {/* Pagination */}
         {filteredBookings.length > 0 && (
           <div className="flex items-center justify-between mt-4 md:mt-6">
             <Pagination
@@ -2134,7 +1999,6 @@ const CompanyDashboard: React.FC = () => {
         )}
       </div>}
 
-      {/* Time Slot Modal - Shows all bookings for a specific date/time */}
       {selectedTimeSlot && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-in fade-in duration-200" onClick={() => setSelectedTimeSlot(null)}>
           <div className="bg-white rounded-xl shadow-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto transform transition-all duration-300 scale-100 animate-in zoom-in-95" onClick={(e) => e.stopPropagation()}>
@@ -2210,7 +2074,6 @@ const CompanyDashboard: React.FC = () => {
                 ))}
               </div>
 
-              {/* Bottom Close Button */}
               <div className="mt-6 pt-4 border-t border-gray-200">
                 <StandardButton
                   variant="secondary"
@@ -2226,7 +2089,6 @@ const CompanyDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Day Bookings Modal - Shows all bookings for a specific day (Month View) */}
       {selectedDayBookings && (
         <div 
           className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-in fade-in duration-200" 
@@ -2337,7 +2199,6 @@ const CompanyDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Booking Detail Modal */}
       {selectedBooking && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-in fade-in duration-200" onClick={() => setSelectedBooking(null)}>
           <div className="bg-white rounded-xl shadow-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto transform transition-all duration-300 scale-100 animate-in zoom-in-95" onClick={(e) => e.stopPropagation()}>
@@ -2354,7 +2215,6 @@ const CompanyDashboard: React.FC = () => {
                 />
               </div>
 
-              {/* Customer Information */}
               <div className="mb-6">
                 <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Customer Information</h4>
                 <div className="bg-gray-50 rounded-lg p-4 space-y-2">
@@ -2369,7 +2229,6 @@ const CompanyDashboard: React.FC = () => {
                 </div>
               </div>
 
-              {/* Booking Information */}
               <div className="mb-6">
                 <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Booking Information</h4>
                 <div className="bg-gray-50 rounded-lg p-4 space-y-3">
@@ -2400,7 +2259,6 @@ const CompanyDashboard: React.FC = () => {
                 </div>
               </div>
 
-              {/* Date & Time */}
               <div className="mb-6">
                 <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Date & Time</h4>
                 <div className="bg-gray-50 rounded-lg p-4 space-y-3">
@@ -2427,7 +2285,6 @@ const CompanyDashboard: React.FC = () => {
                 </div>
               </div>
 
-              {/* Package/Activity Details */}
               <div className="mb-6">
                 <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">{selectedBooking.package ? 'Package' : 'Activity'}</h4>
                 <div className="bg-gray-50 rounded-lg p-4">
@@ -2446,7 +2303,6 @@ const CompanyDashboard: React.FC = () => {
                 </div>
               </div>
 
-              {/* Location */}
               {selectedBooking.location && (
                 <div className="mb-6">
                   <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Location</h4>
@@ -2462,7 +2318,6 @@ const CompanyDashboard: React.FC = () => {
                 </div>
               )}
 
-              {/* Room */}
               {selectedBooking.room && (
                 <div className="mb-6">
                   <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Space</h4>
@@ -2480,7 +2335,6 @@ const CompanyDashboard: React.FC = () => {
                 </div>
               )}
 
-              {/* Guest of Honor Section - Only show if data exists */}
               {selectedBooking.guest_of_honor_name && (
                 <div className="mb-6">
                   <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Guest of Honor</h4>
@@ -2505,7 +2359,6 @@ const CompanyDashboard: React.FC = () => {
                 </div>
               )}
 
-              {/* Attractions */}
               {selectedBooking.attractions && Array.isArray(selectedBooking.attractions) && selectedBooking.attractions.length > 0 && (
                 <div className="mb-6">
                   <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Additional Attractions</h4>
@@ -2532,7 +2385,6 @@ const CompanyDashboard: React.FC = () => {
                 </div>
               )}
 
-              {/* Add-Ons */}
               {((selectedBooking.addOns || (selectedBooking as any).add_ons) && Array.isArray(selectedBooking.addOns || (selectedBooking as any).add_ons) && (selectedBooking.addOns || (selectedBooking as any).add_ons).length > 0) && (
                 <div className="mb-6">
                   <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Add-Ons</h4>
@@ -2559,7 +2411,6 @@ const CompanyDashboard: React.FC = () => {
                 </div>
               )}
 
-              {/* Payment Information */}
               <div className="mb-6">
                 <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Payment</h4>
                 <div className="bg-gray-50 rounded-lg p-4 space-y-3">
@@ -2616,7 +2467,6 @@ const CompanyDashboard: React.FC = () => {
                 </div>
               </div>
 
-              {/* Special Requests */}
               {selectedBooking.special_requests && (
                 <div className="mb-6">
                   <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3">Special Requests</h4>
@@ -2626,7 +2476,6 @@ const CompanyDashboard: React.FC = () => {
                 </div>
               )}
 
-              {/* Internal Notes */}
               <div className="mb-6">
                 <h4 className="text-sm font-semibold text-gray-700 uppercase mb-3 flex items-center gap-2">
                   <FileText size={14} /> Internal Notes
@@ -2683,7 +2532,6 @@ const CompanyDashboard: React.FC = () => {
                 </div>
               </div>
 
-              {/* Action Buttons */}
               <div className="mt-6 pt-4 border-t border-gray-200 space-y-2">
                 <div className="flex gap-2">
                   <Link
@@ -2740,7 +2588,6 @@ const CompanyDashboard: React.FC = () => {
                   )}
                 </div>
 
-                {/* Check In Confirmation */}
                 {showCheckInConfirm && (
                   <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
                     <p className="text-sm text-amber-800 font-medium mb-2">Confirm check-in for this party?</p>
@@ -2789,7 +2636,6 @@ const CompanyDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Recent Event Purchases */}
       {recentEventPurchases.length > 0 && (
         <div className="bg-white rounded-xl shadow-sm p-4 md:p-6 border border-gray-100">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 md:mb-6">
@@ -2839,7 +2685,6 @@ const CompanyDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Payment Modal */}
       {showPaymentModal && selectedBooking && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={handleClosePaymentModal}>
           <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
