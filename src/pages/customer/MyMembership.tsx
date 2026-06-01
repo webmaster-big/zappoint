@@ -14,11 +14,13 @@ import {
   Crown,
   Tag,
   Building2,
+  ArrowUpCircle,
+  Ticket,
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import membershipService from '../../services/MembershipService';
 import { membershipCache } from '../../services/MembershipCacheService';
-import type { Membership } from '../../types/Membership.types';
+import type { Membership, MembershipBenefitRedemption } from '../../types/Membership.types';
 import Toast from '../../components/ui/Toast';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import StandardButton from '../../components/ui/StandardButton';
@@ -40,6 +42,18 @@ const MyMembership = () => {
   const { toast, showSuccess, showError, show, clear } = useToast();
 
   const cardCls = 'bg-white rounded-xl shadow-sm border border-gray-100 p-6';
+
+  const describeRedemption = (r: MembershipBenefitRedemption): string => {
+    const v = Number(r.value_applied);
+    switch (r.value_mode) {
+      case 'percent': return `${v}% off`;
+      case 'fixed':   return `$${v.toFixed(2)} off`;
+      case 'free':    return 'Free (100% off)';
+      case 'count':   return 'Pass used';
+      case 'flag':    return 'Access granted';
+      default:        return '';
+    }
+  };
 
   const load = async (forceRefresh = false) => {
     try {
@@ -170,10 +184,9 @@ const MyMembership = () => {
     return '';
   })();
 
-  const totalSaved = (membership.benefit_redemptions ?? []).reduce(
-    (sum, r) => sum + Number(r.value_applied || 0),
-    0,
-  );
+  const totalSaved = (membership.benefit_redemptions ?? [])
+    .filter((r) => ['percent', 'fixed', 'free'].includes(r.value_mode))
+    .reduce((sum, r) => sum + Number(r.value_applied || 0), 0);
 
   return (
     <div className="min-h-screen bg-gray-50/80">
@@ -300,9 +313,14 @@ const MyMembership = () => {
 
             {(() => {
               const hasPlanBenefits = plan?.plan_benefits && plan.plan_benefits.length > 0;
-              const structuredItems = hasPlanBenefits ? plan!.plan_benefits! : [];
+              const inheritedBenefits = plan?.inherits_plan?.plan_benefits ?? [];
+              const ownBenefits = hasPlanBenefits ? plan!.plan_benefits! : [];
+              const structuredItems = [
+                ...inheritedBenefits.filter((b) => !ownBenefits.some((o) => o.id === b.id)),
+                ...ownBenefits,
+              ];
               // Free-text extras: only shown when no structured benefits are defined, for backward compat
-              const textItems = hasPlanBenefits ? [] : (plan?.benefits ?? []);
+              const textItems = structuredItems.length > 0 ? [] : (plan?.benefits ?? []);
               if (structuredItems.length === 0 && textItems.length === 0) return null;
               return (
                 <div>
@@ -314,7 +332,11 @@ const MyMembership = () => {
                         b.value_mode === 'percent' ? `${v}% off`
                         : b.value_mode === 'fixed' ? `$${v.toFixed(2)} off`
                         : b.value_mode === 'free' ? 'Free'
-                        : b.value_mode === 'count' ? `${v} ${b.benefit_type.includes('guest') ? 'guest' : 'free'} pass${v === 1 ? '' : 'es'}`
+                        : b.value_mode === 'count'
+                          ? `${v} ${b.benefit_type.includes('guest') ? 'guest' : 'free'} pass${v === 1 ? '' : 'es'} / ${
+                              b.period === 'per_day' ? 'per day' : b.period === 'per_term' ? 'per term' : 'lifetime'
+                            }`
+                        : b.value_mode === 'flag' ? 'Included'
                         : '';
                       return (
                         <li key={b.id} className="flex items-start gap-2 text-gray-700">
@@ -352,11 +374,22 @@ const MyMembership = () => {
                   variant="secondary"
                   size="sm"
                   icon={CreditCard}
-                  onClick={() => navigate('/customer/membership/purchase')}
+                  onClick={() => navigate('/customer/membership/update-payment')}
                 >
                   Update payment method
                 </StandardButton>
                 <InfoTooltip content="Change the saved card used for future renewals." />
+              </div>
+              <div className="inline-flex items-center gap-1">
+                <StandardButton
+                  variant="secondary"
+                  size="sm"
+                  icon={ArrowUpCircle}
+                  onClick={() => navigate('/customer/membership/purchase')}
+                >
+                  Change plan
+                </StandardButton>
+                <InfoTooltip content="Switch to a different membership plan. Upgrades charge the price difference immediately." />
               </div>
               {membership.status === 'active' && (
                 <div className="inline-flex items-center gap-1">
@@ -389,6 +422,60 @@ const MyMembership = () => {
             </div>
           </div>
         </div>
+
+        {membership.membership_payments && membership.membership_payments.length > 0 && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+              <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2">
+                <CreditCard className="w-4 h-4 text-gray-400" />
+                Saved Payment Method
+              </h3>
+              <button
+                onClick={() => navigate('/customer/membership/update-payment')}
+                className="text-xs text-violet-600 hover:underline font-medium"
+              >
+                Update
+              </button>
+            </div>
+            <div className="px-6 py-4">
+              {membership.payment_method_label ? (
+                <p className="text-sm text-gray-700 flex items-center gap-2">
+                  <CreditCard size={14} className="text-gray-400" />
+                  {membership.payment_method_label}
+                </p>
+              ) : (
+                <p className="text-sm text-gray-400 italic">No payment method saved</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {(membership.benefit_redemptions ?? []).length > 0 && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-100">
+              <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2">
+                <Ticket className="w-4 h-4 text-gray-400" /> Benefit Redemptions
+              </h3>
+            </div>
+            <ul className="text-sm divide-y divide-gray-100 max-h-72 overflow-auto">
+              {(membership.benefit_redemptions ?? []).map((r) => (
+                <li key={r.id} className="px-6 py-3 flex items-start justify-between gap-3">
+                  <div className="flex flex-col gap-0.5 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className={`font-medium text-xs px-2 py-0.5 rounded bg-violet-50 text-violet-700`}>
+                        {r.benefit?.label || r.benefit_type.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
+                      </span>
+                      <span className="text-xs text-gray-500">{describeRedemption(r)}</span>
+                    </div>
+                  </div>
+                  <span className="text-xs text-gray-400 whitespace-nowrap flex-shrink-0">
+                    {new Date(r.created_at!).toLocaleString()}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         {membership.membership_payments && membership.membership_payments.length > 0 && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">

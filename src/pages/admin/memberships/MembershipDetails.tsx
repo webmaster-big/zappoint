@@ -17,19 +17,31 @@ import {
   Clock,
   X,
   DollarSign,
+  Ticket,
 } from 'lucide-react';
 import membershipService from '../../../services/MembershipService';
 import { membershipCache } from '../../../services/MembershipCacheService';
-import type { Membership, MembershipPayment } from '../../../types/Membership.types';
+import type { Membership, MembershipPayment, MembershipBenefitRedemption } from '../../../types/Membership.types';
 import { getImageUrl } from '../../../utils/storage';
 import Toast from '../../../components/ui/Toast';
-import LoadingSpinner from '../../../components/ui/LoadingSpinner';
 import StandardButton from '../../../components/ui/StandardButton';
 import InfoTooltip from '../../../components/ui/InfoTooltip';
 import MembershipStatusBadge from '../../../components/membership/MembershipStatusBadge';
 import { useToast } from '../../../hooks/useToast';
 import { useThemeColor } from '../../../hooks/useThemeColor';
 import { formatMembershipDate, formatMembershipPrice } from '../../../utils/membershipFormat';
+
+const describeRedemptionValue = (r: MembershipBenefitRedemption): string => {
+  const v = Number(r.value_applied);
+  switch (r.value_mode) {
+    case 'percent': return `${v}% off`;
+    case 'fixed':   return `$${v.toFixed(2)} off`;
+    case 'free':    return 'Free (100% off)';
+    case 'count':   return 'Pass used';
+    case 'flag':    return 'Access granted';
+    default:        return '';
+  }
+};
 
 const AUDIT_LABELS: Record<string, string> = {
   activated:             'Membership Activated',
@@ -45,6 +57,7 @@ const AUDIT_LABELS: Record<string, string> = {
   payment_failed:        'Payment Failed',
   payment_method_update: 'Payment Method Updated',
   manual_override:       'Manual Override',
+  pass_redeemed:         'Pass Redeemed',
 };
 
 const auditLabel = (action: string) =>
@@ -563,10 +576,10 @@ const MembershipDetails = () => {
                       <span className="text-xs text-gray-500">
                         by <span className="text-gray-700 font-medium">{auditActor(a)}</span>
                       </span>
-                      {a.after?.result && (
+                      {!!a.after?.result && (
                         <span className="text-xs text-gray-400">· {String(a.after.result)}</span>
                       )}
-                      {a.after?.status && (
+                      {!!a.after?.status && (
                         <span className="text-xs text-gray-400">· {String(a.after.status)}</span>
                       )}
                     </div>
@@ -576,6 +589,37 @@ const MembershipDetails = () => {
                   </div>
                   <span className="text-xs text-gray-400 whitespace-nowrap flex-shrink-0">
                     {new Date(a.created_at).toLocaleString()}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div className={`${cardCls} md:col-span-2`}>
+          <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
+            <Ticket className={`w-4 h-4 text-${themeColor}-600`} /> Benefit Redemptions
+            <InfoTooltip content="Pass and discount redemptions applied to this membership. Shows the last 100 non-reversed redemptions." />
+          </h3>
+          {(m.benefit_redemptions || []).length === 0 ? (
+            <p className="text-sm text-gray-500">No benefit redemptions yet.</p>
+          ) : (
+            <ul className="text-sm divide-y divide-gray-100 max-h-72 overflow-auto">
+              {(m.benefit_redemptions || []).map((r) => (
+                <li key={r.id} className="py-2.5 flex items-start justify-between gap-3">
+                  <div className="flex flex-col gap-0.5 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className={`font-medium text-xs px-2 py-0.5 rounded bg-${themeColor}-50 text-${themeColor}-700`}>
+                        {r.benefit?.label || r.benefit_type.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
+                      </span>
+                      <span className="text-xs text-gray-500">{describeRedemptionValue(r)}</span>
+                      {r.staff && (
+                        <span className="text-xs text-gray-400">· {r.staff.first_name} {r.staff.last_name}</span>
+                      )}
+                    </div>
+                  </div>
+                  <span className="text-xs text-gray-400 whitespace-nowrap flex-shrink-0">
+                    {new Date(r.created_at!).toLocaleString()}
                   </span>
                 </li>
               ))}

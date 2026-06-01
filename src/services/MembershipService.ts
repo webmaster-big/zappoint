@@ -15,6 +15,9 @@ import type {
   UpdateMembershipPlanBenefitData,
   MembershipBenefitQuote,
   MembershipBenefitQuoteRequest,
+  MembershipBenefitRedemption,
+  MembershipBenefitQuotePass,
+  MembershipVisit,
 } from '../types/Membership.types';
 
 const api = axios.create({
@@ -148,9 +151,25 @@ async function changeMembershipPlan(id: number, newPlanId: number, note?: string
 
 async function updatePaymentMethod(
   id: number,
-  payload: { payment_method_label: string; payment_profile_token?: string }
+  payload: {
+    payment_method_label: string;
+    payment_profile_token?: string;
+    opaque_data?: { dataDescriptor: string; dataValue: string };
+  }
 ): Promise<Membership> {
   const res = await api.patch(`/memberships/${id}/payment-method`, payload);
+  return unwrap<Membership>(res.data);
+}
+
+async function upgradePlan(
+  id: number,
+  newPlanId: number,
+  opaqueData?: { dataDescriptor: string; dataValue: string },
+): Promise<Membership> {
+  const res = await api.post(`/memberships/${id}/upgrade-plan`, {
+    membership_plan_id: newPlanId,
+    ...(opaqueData ? { opaque_data: opaqueData } : {}),
+  });
   return unwrap<Membership>(res.data);
 }
 
@@ -213,6 +232,20 @@ async function checkInMembership(id: number, payload: CheckInPayload): Promise<M
   return unwrap<Membership>(res.data);
 }
 
+async function redeemPass(
+  membershipId: number,
+  benefitId: number,
+  locationId?: number,
+  note?: string
+): Promise<{ redemption: MembershipBenefitRedemption; visit: MembershipVisit; passes: MembershipBenefitQuotePass[] }> {
+  const res = await api.post(`/memberships/${membershipId}/redeem-pass`, {
+    benefit_id:  benefitId,
+    location_id: locationId,
+    note,
+  });
+  return unwrap(res.data);
+}
+
 
 async function reportSummary(params: { from?: string; to?: string; location_id?: number } = {}): Promise<MembershipReportSummary> {
   const res = await api.get('/membership-reports/summary', { params });
@@ -267,6 +300,7 @@ export const membershipService = {
   cancelMembership,
   changeMembershipPlan,
   updatePaymentMethod,
+  upgradePlan,
   retryPayment,
   refundMembershipPayment,
   voidMembershipPayment,
@@ -275,6 +309,7 @@ export const membershipService = {
   getEligibility,
   scanMembershipQr,
   checkInMembership,
+  redeemPass,
   listPlanBenefits,
   createPlanBenefit,
   updatePlanBenefit,

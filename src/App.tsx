@@ -93,6 +93,7 @@ import PageViewBeacon from "./components/PageViewBeacon";
 
 import MyMembership from "./pages/customer/MyMembership";
 import PurchaseMembership from "./pages/customer/PurchaseMembership";
+import UpdatePaymentMethod from "./pages/customer/UpdatePaymentMethod";
 import MembershipPlans from "./pages/admin/memberships/MembershipPlans";
 import Memberships from "./pages/admin/memberships/Memberships";
 import MembershipDetails from "./pages/admin/memberships/MembershipDetails";
@@ -151,6 +152,7 @@ function App() {
           <Route path="/customer/notifications" element={<CustomerProtectedRoute><><PageViewBeacon pageType="my_notifications" /><CustomerNotifications /></></CustomerProtectedRoute>} />
           <Route path="/customer/membership" element={<CustomerProtectedRoute><><PageViewBeacon pageType="my_membership" /><MyMembership /></></CustomerProtectedRoute>} />
           <Route path="/customer/membership/purchase" element={<CustomerProtectedRoute><><PageViewBeacon pageType="membership_purchase" /><PurchaseMembership /></></CustomerProtectedRoute>} />
+          <Route path="/customer/membership/update-payment" element={<CustomerProtectedRoute><><PageViewBeacon pageType="membership_update_payment" /><UpdatePaymentMethod /></></CustomerProtectedRoute>} />
         </Route>
         
         <Route element={<ProtectedRoute><MainLayout /></ProtectedRoute>}> 

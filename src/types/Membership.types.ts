@@ -153,6 +153,9 @@ export interface MembershipBenefitRedemption {
   reversal_reason?: string | null;
   created_at?: string;
   updated_at?: string;
+  // eager-loaded
+  benefit?: { id: number; label?: string | null; benefit_type: MembershipBenefitType } | null;
+  staff?: { id: number; first_name: string; last_name: string } | null;
 }
 
 export interface MembershipPlan {
@@ -188,6 +191,7 @@ export interface MembershipPlan {
   benefits?: string[] | null;
   plan_benefits?: MembershipPlanBenefit[];
   inherits_plan_id?: number | null;
+  inherits_plan?: { id: number; name: string; plan_benefits?: MembershipPlanBenefit[] } | null;
 
   requires_photo: boolean;
   is_family_or_group: boolean;
@@ -293,7 +297,7 @@ export interface Membership {
   photo_by_user_id?: number | null;
 
   payment_method_label?: string | null;
-  payment_method_token?: string | null;
+  payment_profile_token?: string | null;
   recurring_billing_authorized: boolean;
   terms_accepted: boolean;
   is_comped: boolean;
@@ -384,7 +388,7 @@ export interface PurchaseMembershipPayload {
   membership_plan_id: number;
   home_location_id?: number | null;
   home_location_name?: string | null; // Alternative to ID — backend resolves by name
-  payment_method_token?: string | null;
+  payment_profile_token?: string | null;
   opaque_data?: { dataDescriptor: string; dataValue: string } | null;
   terms_accepted: boolean;
   recurring_billing_authorized: boolean;

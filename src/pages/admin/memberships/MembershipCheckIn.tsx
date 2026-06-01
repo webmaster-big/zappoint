@@ -35,6 +35,7 @@ const MembershipCheckIn = () => {
   const [acting, setActing] = useState<string | null>(null);
   const [photoDataUrl, setPhotoDataUrl] = useState<string | null>(null);
   const [overrideNote, setOverrideNote] = useState('');
+  const [passNote, setPassNote] = useState<Record<number, string>>({}); // benefitId → note
   const [streamActive, setStreamActive] = useState(false);
   const { toast, show, showError, clear } = useToast();
 
@@ -109,6 +110,7 @@ const MembershipCheckIn = () => {
       setResult(res);
       setPhotoDataUrl(null);
       setOverrideNote('');
+      setPassNote({});
     } catch (e: unknown) {
       showError(e, 'Scan failed');
     }
@@ -193,9 +195,32 @@ const MembershipCheckIn = () => {
       });
       show(`Check-in ${action}`, action === 'denied' ? 'info' : 'success');
       void membershipCache.invalidate('list');
-      setTimeout(() => { setResult(null); setQr(''); setPhotoDataUrl(null); setOverrideNote(''); }, 1200);
+      setTimeout(() => { setResult(null); setQr(''); setPhotoDataUrl(null); setOverrideNote(''); setPassNote({}); }, 1200);
     } catch (e: unknown) {
       showError(e, 'Check-in failed');
+    } finally {
+      setActing(null);
+    }
+  };
+
+  const handleRedeemPass = async (benefitId: number) => {
+    if (!result || !locationId) return;
+    const key = `pass-${benefitId}`;
+    setActing(key);
+    try {
+      const updated = await membershipService.redeemPass(
+        result.membership.id,
+        benefitId,
+        locationId,
+        passNote[benefitId] || undefined
+      );
+      // Update passes count in place so staff can see remaining count drop
+      setResult((prev) => prev ? { ...prev, passes: updated.passes } : prev);
+      show('Pass redeemed — member admitted', 'success');
+      void membershipCache.invalidate('list');
+      setTimeout(() => { setResult(null); setQr(''); setPhotoDataUrl(null); setOverrideNote(''); setPassNote({}); }, 1400);
+    } catch (e: unknown) {
+      showError(e, 'Pass redemption failed');
     } finally {
       setActing(null);
     }
@@ -206,6 +231,7 @@ const MembershipCheckIn = () => {
     setQr('');
     setPhotoDataUrl(null);
     setOverrideNote('');
+    setPassNote({});
     closeCamera();
   };
 
@@ -213,6 +239,9 @@ const MembershipCheckIn = () => {
   const eligible = !!result?.eligibility?.eligible;
   const reason = result?.eligibility?.reason;
   const photoRequired = !!result?.photo_required;
+  const hasAvailablePasses = !eligible && (result?.passes ?? []).some(
+    (p) => p.remaining === null || p.remaining > 0
+  );
 
   const cardCls = 'bg-white rounded-xl shadow-sm border border-gray-100';
   const inputCls = `w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`;
@@ -433,22 +462,49 @@ const MembershipCheckIn = () => {
                 <div className="px-5 py-4 border-b border-gray-100">
                   <p className="text-xs text-gray-500 uppercase tracking-wider flex items-center gap-1 mb-2">
                     <Ticket size={12} /> Available Passes
-                    <InfoTooltip content="Free entry / guest passes this membership can redeem. 'Remaining' reflects the plan's per-period limit." />
+                    <InfoTooltip content="Free entry / guest passes this membership can redeem. Click 'Use' to admit this member and record the redemption." />
                   </p>
-                  <div className="space-y-1.5">
-                    {result.passes.map((pass) => (
-                      <div
-                        key={pass.benefit_id}
-                        className={`flex items-center justify-between px-3 py-2 rounded-lg bg-${themeColor}-50 border border-${themeColor}-100`}
-                      >
-                        <span className="text-sm font-medium text-gray-800 capitalize">
-                          {pass.label || pass.benefit_type.replace(/_/g, ' ')}
-                        </span>
-                        <span className={`text-xs font-semibold text-${themeColor}-700`}>
-                          {pass.remaining === null ? 'Unlimited' : `${pass.remaining} left`}
-                        </span>
-                      </div>
-                    ))}
+                  <div className="space-y-2">
+                    {result.passes.map((pass) => {
+                      const hasRemaining = pass.remaining === null || pass.remaining > 0;
+                      return (
+                        <div key={pass.benefit_id} className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-sm font-medium text-gray-800 capitalize">
+                              {pass.label || pass.benefit_type.replace(/_/g, ' ')}
+                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className={`text-xs font-semibold ${
+                                !hasRemaining ? 'text-red-500' :
+                                pass.remaining !== null && pass.remaining <= 2 ? 'text-amber-600' :
+                                `text-${themeColor}-700`
+                              }`}>
+                                {pass.remaining === null ? 'Unlimited' : `${pass.remaining} left`}
+                              </span>
+                              {hasRemaining && (
+                                <StandardButton
+                                  variant="primary"
+                                  size="sm"
+                                  loading={acting === `pass-${pass.benefit_id}`}
+                                  onClick={() => handleRedeemPass(pass.benefit_id)}
+                                >
+                                  Use Pass
+                                </StandardButton>
+                              )}
+                            </div>
+                          </div>
+                          {hasRemaining && (
+                            <input
+                              type="text"
+                              placeholder="Optional note (e.g. guest name)"
+                              value={passNote[pass.benefit_id] ?? ''}
+                              onChange={(e) => setPassNote((prev) => ({ ...prev, [pass.benefit_id]: e.target.value }))}
+                              className="mt-2 w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-gray-400"
+                            />
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -519,39 +575,47 @@ const MembershipCheckIn = () => {
                 </div>
               )}
 
-              <div className="px-5 py-4 bg-gray-50 flex flex-wrap gap-2 justify-end">
-                <StandardButton
-                  variant="danger"
-                  size="md"
-                  icon={XCircle}
-                  loading={acting === 'denied'}
-                  onClick={() => handleCheckIn('denied')}
-                >
-                  Deny
-                </StandardButton>
-                {eligible ? (
-                  <StandardButton
-                    variant="success"
-                    size="md"
-                    icon={CheckCircle2}
-                    loading={acting === 'allowed'}
-                    disabled={photoRequired && !photoDataUrl}
-                    onClick={() => handleCheckIn('allowed')}
-                  >
-                    Approve Check-In
-                  </StandardButton>
-                ) : (
-                  <StandardButton
-                    variant="primary"
-                    size="md"
-                    icon={ShieldAlert}
-                    loading={acting === 'override'}
-                    disabled={!overrideNote.trim()}
-                    onClick={() => handleCheckIn('override')}
-                  >
-                    Manual Override
-                  </StandardButton>
+              <div className="px-5 py-4 bg-gray-50 space-y-3">
+                {hasAvailablePasses && (
+                  <div className="flex items-center gap-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                    <Ticket size={13} className="flex-shrink-0" />
+                    <span>This member has passes available above — use a pass to admit rather than a manual override.</span>
+                  </div>
                 )}
+                <div className="flex flex-wrap gap-2 justify-end">
+                  <StandardButton
+                    variant="danger"
+                    size="md"
+                    icon={XCircle}
+                    loading={acting === 'denied'}
+                    onClick={() => handleCheckIn('denied')}
+                  >
+                    Deny
+                  </StandardButton>
+                  {eligible ? (
+                    <StandardButton
+                      variant="success"
+                      size="md"
+                      icon={CheckCircle2}
+                      loading={acting === 'allowed'}
+                      disabled={photoRequired && !photoDataUrl}
+                      onClick={() => handleCheckIn('allowed')}
+                    >
+                      Approve Check-In
+                    </StandardButton>
+                  ) : (
+                    <StandardButton
+                      variant={hasAvailablePasses ? 'secondary' : 'primary'}
+                      size="md"
+                      icon={ShieldAlert}
+                      loading={acting === 'override'}
+                      disabled={!overrideNote.trim()}
+                      onClick={() => handleCheckIn('override')}
+                    >
+                      Manual Override
+                    </StandardButton>
+                  )}
+                </div>
               </div>
             </div>
           )}

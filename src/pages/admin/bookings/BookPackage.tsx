@@ -1094,6 +1094,7 @@ const BookPackage: React.FC = () => {
         promo_code: appliedPromo ? appliedPromo.code : undefined,
         gift_card_code: appliedGiftCard ? appliedGiftCard.code : undefined,
         membership_id: membershipBenefits.membershipId ?? undefined,
+        membership_applied: membershipBenefits.applied.length > 0 ? membershipBenefits.applied : undefined,
         notes: form.notes || undefined,
         guest_of_honor_name: pkg.has_guest_of_honor && form.guestOfHonorName ? form.guestOfHonorName : undefined,
         guest_of_honor_age: pkg.has_guest_of_honor && form.guestOfHonorAge ? parseInt(form.guestOfHonorAge) : undefined,

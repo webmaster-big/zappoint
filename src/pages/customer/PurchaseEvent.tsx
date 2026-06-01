@@ -593,6 +593,7 @@ const PurchaseEvent = () => {
           amount_paid: 0,
           discount_amount: specialPricingDiscount > 0 ? specialPricingDiscount : undefined,
           membership_id: membershipBenefits.membershipId ?? undefined,
+          membership_applied: membershipBenefits.applied.length > 0 ? membershipBenefits.applied : undefined,
           payment_method: 'authorize.net',
           payment_status: 'pending',
           special_requests: specialRequests || undefined,

@@ -10,13 +10,15 @@ import {
   Building2,
   Lock,
   AlertCircle,
+  ArrowRight,
+  Info,
 } from 'lucide-react';
 import membershipService from '../../services/MembershipService';
 import { membershipCache } from '../../services/MembershipCacheService';
 import { loadAcceptJS, tokenizeCard } from '../../services/PaymentService';
 import { getAuthorizeNetPublicKey } from '../../services/SettingsService';
 import locationService from '../../services/LocationService';
-import type { MembershipPlan, MembershipPlanBenefit } from '../../types/Membership.types';
+import type { Membership, MembershipPlan, MembershipPlanBenefit } from '../../types/Membership.types';
 import Toast from '../../components/ui/Toast';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import StandardButton from '../../components/ui/StandardButton';
@@ -94,6 +96,7 @@ const PurchaseMembership = () => {
   const [homeLocationName, setHomeLocationName] = useState<string>('');
   const { toast, show, showSuccess, showError, clear } = useToast();
   const [selectedPlanId, setSelectedPlanId] = useState<number | null>(null);
+  const [existingMembership, setExistingMembership] = useState<Membership | null>(null);
 
   const [cardNumber, setCardNumber] = useState('');
   const [expiry, setExpiry] = useState('');   // MM/YY combined
@@ -125,10 +128,16 @@ const PurchaseMembership = () => {
     (async () => {
       setLoading(true);
       try {
-        const [plansResult, locsResult] = await Promise.all([
+        const [plansResult, locsResult, myMembership] = await Promise.all([
           membershipCache.getPublicPlans(),
           locationService.getLocations({ is_active: true, per_page: 100 }),
+          membershipCache.getMine().catch(() => null),
         ]);
+        const activeMembership =
+          myMembership && ['active', 'past_due', 'pending'].includes(myMembership.status)
+            ? myMembership
+            : null;
+        setExistingMembership(activeMembership);
         const activePlans = plansResult.filter((pl) => pl.is_active);
         setPlans(activePlans);
         const locs = (locsResult.data ?? []).map((l) => ({ id: l.id, name: l.name }));
@@ -183,7 +192,19 @@ const PurchaseMembership = () => {
   const cardDigits = cardNumber.replace(/\s+/g, '');
   const cardType = detectCardType(cardNumber);
 
+  const isUpgrade = !!existingMembership;
+  const currentPlanId = existingMembership?.membership_plan_id ?? existingMembership?.plan?.id ?? null;
+  const isCurrentPlan = !!selectedPlanId && selectedPlanId === currentPlanId;
+
+  const currentPrice = existingMembership
+    ? parseFloat(String(existingMembership.billing_amount ?? existingMembership.plan?.price ?? 0))
+    : 0;
+  const selectedPrice = selectedPlan ? parseFloat(String(selectedPlan.price)) : 0;
+  const priceDiff = isUpgrade ? Math.round((selectedPrice - currentPrice) * 100) / 100 : selectedPrice;
+  const paymentRequired = !isUpgrade || priceDiff > 0.01;
+
   const validatePayment = () => {
+    if (!paymentRequired) return true;
     const errors: typeof fieldErrors = {};
     if (cardDigits.length < 13) errors.cardNumber = 'Enter a valid card number';
     const parts = expiry.split('/');
@@ -208,39 +229,52 @@ const PurchaseMembership = () => {
 
   const canSubmit =
     !!selectedPlanId &&
+    !isCurrentPlan &&
     !!homeLocationId &&
-    termsAccepted &&
-    recurringAuthorized &&
-    cardDigits.length >= 13 &&
-    expiry.includes('/') &&
-    cvc.length >= 3;
+    (isUpgrade || termsAccepted) &&
+    (isUpgrade || recurringAuthorized) &&
+    (!paymentRequired || (cardDigits.length >= 13 && expiry.includes('/') && cvc.length >= 3));
 
   const handleSubmit = async () => {
     if (!canSubmit || !selectedPlan) return;
     if (!validatePayment()) return;
-    if (!apiLoginId) {
+    if (paymentRequired && !apiLoginId) {
       show('Payment system not ready. Try again in a moment.', 'error');
       return;
     }
     setSubmitting(true);
     try {
-      const opaque = await tokenizeCard(
-        { cardNumber: cardDigits, month: expMonth, year: expYear, cardCode: cvc },
-        apiLoginId,
-        clientKey,
-      );
-      await membershipService.purchaseMembership({
-        membership_plan_id: selectedPlan.id,
-        home_location_id: homeLocationId ?? undefined,
-        opaque_data: { dataDescriptor: opaque.dataDescriptor, dataValue: opaque.dataValue },
-        terms_accepted: termsAccepted,
-        recurring_billing_authorized: recurringAuthorized,
-      });
-      showSuccess('Membership activated!');
+      if (isUpgrade && existingMembership) {
+        let opaqueData: { dataDescriptor: string; dataValue: string } | undefined;
+        if (paymentRequired) {
+          const opaque = await tokenizeCard(
+            { cardNumber: cardDigits, month: expMonth, year: expYear, cardCode: cvc },
+            apiLoginId,
+            clientKey,
+          );
+          opaqueData = { dataDescriptor: opaque.dataDescriptor, dataValue: opaque.dataValue };
+        }
+        await membershipService.upgradePlan(existingMembership.id, selectedPlan.id, opaqueData);
+        showSuccess('Membership plan updated!');
+      } else {
+        const opaque = await tokenizeCard(
+          { cardNumber: cardDigits, month: expMonth, year: expYear, cardCode: cvc },
+          apiLoginId,
+          clientKey,
+        );
+        await membershipService.purchaseMembership({
+          membership_plan_id: selectedPlan.id,
+          home_location_id: homeLocationId ?? undefined,
+          opaque_data: { dataDescriptor: opaque.dataDescriptor, dataValue: opaque.dataValue },
+          terms_accepted: termsAccepted,
+          recurring_billing_authorized: recurringAuthorized,
+        });
+        showSuccess('Membership activated!');
+      }
       await membershipCache.invalidate();
       setTimeout(() => navigate('/customer/membership'), 800);
     } catch (e: unknown) {
-      showError(e, 'Purchase failed');
+      showError(e, isUpgrade ? 'Plan change failed' : 'Purchase failed');
     } finally {
       setSubmitting(false);
     }
@@ -264,36 +298,63 @@ const PurchaseMembership = () => {
             <span className={`text-${themeColor}-200/70 text-xs font-semibold uppercase tracking-widest`}>Membership</span>
           </div>
           <h1 className="text-xl font-bold text-white flex items-center gap-2">
-            <Sparkles className={`w-5 h-5 text-${themeColor}-200`} /> Become a Member
+            <Sparkles className={`w-5 h-5 text-${themeColor}-200`} /> {isUpgrade ? 'Change Membership Plan' : 'Become a Member'}
             <InfoTooltip
               widthClass="w-72"
               iconClassName="text-white/70 hover:text-white"
-              content="Pick a plan, choose your home location and pay securely. Your membership starts immediately and renews at your selected interval until you cancel."
+              content={isUpgrade
+                ? 'Select a different plan to switch. If the new plan costs more, you\'ll be charged the difference immediately.'
+                : 'Pick a plan, choose your home location and pay securely. Your membership starts immediately and renews at your selected interval until you cancel.'}
             />
           </h1>
-          <p className={`text-${themeColor}-200/60 text-sm mt-0.5`}>Unlimited fun, exclusive perks, member-only pricing.</p>
+          <p className={`text-${themeColor}-200/60 text-sm mt-0.5`}>{isUpgrade ? 'Switch to a different plan at any time.' : 'Unlimited fun, exclusive perks, member-only pricing.'}</p>
         </div>
       </section>
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-5">
 
+        {isUpgrade && existingMembership && (
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start gap-3">
+            <Info size={18} className="text-blue-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="font-semibold text-blue-800 text-sm">You already have an active membership</p>
+              <p className="text-sm text-blue-700 mt-0.5">
+                Current plan: <span className="font-medium">{existingMembership.plan?.name ?? `Plan #${existingMembership.membership_plan_id}`}</span>.{' '}
+                Select a different plan below to switch. Your current plan card is highlighted.
+              </p>
+            </div>
+            <button
+              onClick={() => navigate('/customer/membership')}
+              className="flex items-center gap-1 text-xs text-blue-700 hover:text-blue-900 transition font-medium whitespace-nowrap"
+            >
+              View membership <ArrowRight size={12} />
+            </button>
+          </div>
+        )}
+          {plans.length === 0 && <p className="text-gray-500 col-span-3 text-sm">No plans available right now.</p>}
         <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-3">
           {plans.length === 0 && <p className="text-gray-500 col-span-3 text-sm">No plans available right now.</p>}
           {plans.map((plan) => {
             const active = selectedPlanId === plan.id;
+            const isCurrent = isUpgrade && plan.id === currentPlanId;
             return (
               <button
                 key={plan.id}
-                onClick={() => setSelectedPlanId(plan.id)}
+                onClick={() => !isCurrent && setSelectedPlanId(plan.id)}
+                disabled={isCurrent}
                 className={`text-left rounded-xl p-4 transition border ${
-                  active
+                  isCurrent
+                    ? 'border-gray-300 bg-gray-100 opacity-75 cursor-not-allowed'
+                    : active
                     ? `border-${themeColor}-500 ring-2 ring-${themeColor}-200 bg-${themeColor}-50`
                     : `border-gray-200 hover:border-${themeColor}-300 bg-white hover:shadow-sm`
                 }`}
               >
                 <div className="flex items-start justify-between gap-2">
                   <h3 className="font-semibold text-gray-900">{plan.name}</h3>
-                  {active && <CheckCircle2 className={`w-4 h-4 text-${themeColor}-600 flex-shrink-0 mt-0.5`} />}
+                  {isCurrent
+                    ? <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-gray-200 text-gray-600 border border-gray-300 whitespace-nowrap">Current Plan</span>
+                    : active && <CheckCircle2 className={`w-4 h-4 text-${themeColor}-600 flex-shrink-0 mt-0.5`} />}
                 </div>
                 <p className="text-xl font-bold text-gray-900 mt-1">
                   {formatMembershipPrice(plan.price)}
@@ -359,9 +420,11 @@ const PurchaseMembership = () => {
                 )}
               </div>
 
+              {paymentRequired ? (
               <div className="px-5 py-4 border-b border-gray-100">
                 <h2 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-1.5">
-                  <CreditCard className={`w-4 h-4 text-${themeColor}-600`} /> Payment
+                  <CreditCard className={`w-4 h-4 text-${themeColor}-600`} />
+                  {isUpgrade ? 'Card for upgrade charge' : 'Payment'}
                   <InfoTooltip content="Your card is securely tokenized via Authorize.Net — never stored on our servers." size={13} />
                 </h2>
                 <div className="space-y-3">
@@ -459,7 +522,16 @@ const PurchaseMembership = () => {
                   </p>
                 </div>
               </div>
+              ) : (
+              <div className="px-5 py-4 border-b border-gray-100 bg-green-50/50">
+                <div className="flex items-center gap-2 text-green-700 text-sm">
+                  <ShieldCheck size={16} className="text-green-600 flex-shrink-0" />
+                  <span>No payment required — this plan costs the same or less than your current plan.</span>
+                </div>
+              </div>
+              )}
 
+              {!isUpgrade && (
               <div className="px-5 py-4 space-y-3 bg-gray-50/50">
                 <label className="flex items-start gap-2.5 cursor-pointer group">
                   <input
@@ -486,6 +558,7 @@ const PurchaseMembership = () => {
                   </span>
                 </label>
               </div>
+              )}
             </div>
 
             <div className="md:col-span-2 space-y-3">
@@ -506,19 +579,46 @@ const PurchaseMembership = () => {
                 </div>
 
                 <div className="text-xs text-gray-500 space-y-1.5 mb-4 border-t border-gray-100 pt-3">
-                  <div className="flex justify-between">
-                    <span>Due today</span>
-                    <span className="font-semibold text-gray-800">{formatMembershipPrice(selectedPlan.price)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Renews</span>
-                    <span className="text-gray-700 capitalize">{selectedPlan.billing_interval.replace('_', ' ')}</span>
-                  </div>
+                  {isUpgrade ? (
+                    <>
+                      <div className="flex justify-between">
+                        <span>Due today {priceDiff > 0.01 ? '(upgrade charge)' : ''}</span>
+                        <span className="font-semibold text-gray-800">
+                          {priceDiff > 0.01 ? formatMembershipPrice(priceDiff) : '$0.00'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>New recurring amount</span>
+                        <span className="text-gray-700">
+                          {formatMembershipPrice(selectedPlan.price)}/{selectedPlan.billing_interval.replace('_', ' ')}
+                        </span>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex justify-between">
+                        <span>Due today</span>
+                        <span className="font-semibold text-gray-800">{formatMembershipPrice(selectedPlan.price)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Renews</span>
+                        <span className="text-gray-700 capitalize">{selectedPlan.billing_interval.replace('_', ' ')}</span>
+                      </div>
+                    </>
+                  )}
+                  {!isUpgrade && (
                   <div className="flex justify-between">
                     <span>Home location</span>
                     <span className="text-gray-700">{homeLocationName}</span>
                   </div>
+                  )}
                 </div>
+
+                {isCurrentPlan && (
+                  <div className="mb-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 flex items-center gap-1.5">
+                    <AlertCircle size={12} /> You already have this plan.
+                  </div>
+                )}
 
                 <StandardButton
                   variant="primary"
@@ -528,7 +628,12 @@ const PurchaseMembership = () => {
                   onClick={handleSubmit}
                   className="w-full"
                 >
-                  {submitting ? 'Processing…' : (
+                  {submitting ? 'Processing…' : isUpgrade ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <Lock size={14} />
+                      {priceDiff > 0.01 ? `Switch Plan · Pay ${formatMembershipPrice(priceDiff)}` : 'Switch Plan'}
+                    </span>
+                  ) : (
                     <span className="flex items-center justify-center gap-2">
                       <Lock size={14} /> Activate · {formatMembershipPrice(selectedPlan.price)}
                     </span>

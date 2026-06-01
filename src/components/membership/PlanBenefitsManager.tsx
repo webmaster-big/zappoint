@@ -175,6 +175,7 @@ const PlanBenefitsManager = ({ plan, onClose, canManage }: Props) => {
   const { themeColor } = useThemeColor();
   const { toast, showSuccess, showError, clear } = useToast();
   const [benefits, setBenefits] = useState<MembershipPlanBenefit[]>([]);
+  const [inheritedBenefits, setInheritedBenefits] = useState<MembershipPlanBenefit[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showForm, setShowForm] = useState(false);
@@ -197,8 +198,14 @@ const PlanBenefitsManager = ({ plan, onClose, canManage }: Props) => {
   const load = async () => {
     setLoading(true);
     try {
-      const list = await membershipService.listPlanBenefits(plan.id);
+      const [list, inherited] = await Promise.all([
+        membershipService.listPlanBenefits(plan.id),
+        plan.inherits_plan_id
+          ? membershipService.listPlanBenefits(plan.inherits_plan_id)
+          : Promise.resolve([] as MembershipPlanBenefit[]),
+      ]);
       setBenefits(list);
+      setInheritedBenefits(inherited);
     } catch (e: unknown) {
       showError(e, 'Failed to load benefits');
     } finally {
@@ -399,7 +406,7 @@ const PlanBenefitsManager = ({ plan, onClose, canManage }: Props) => {
         <div className="px-5 py-5 overflow-y-auto flex-1">
           {loading ? (
             <div className="py-12 flex justify-center"><LoadingSpinner size="medium" /></div>
-          ) : benefits.length === 0 ? (
+          ) : benefits.length === 0 && inheritedBenefits.length === 0 ? (
             <div className="py-10 text-center text-gray-500">
               <div className={`inline-flex p-3 rounded-full bg-${themeColor}-50 mb-2`}>
                 <Tag className={`w-6 h-6 text-${themeColor}-600`} />
@@ -409,6 +416,38 @@ const PlanBenefitsManager = ({ plan, onClose, canManage }: Props) => {
             </div>
           ) : (
             <div className="space-y-2">
+              {inheritedBenefits.length > 0 && (
+                <>
+                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+                    Inherited from {plan.inherits_plan_id ? `Plan #${plan.inherits_plan_id}` : 'parent plan'} (read-only)
+                  </p>
+                  {inheritedBenefits.map((b) => (
+                    <div
+                      key={`inh-${b.id}`}
+                      className="flex items-center justify-between gap-3 p-3 rounded-lg border border-dashed border-gray-200 bg-gray-50 opacity-80"
+                    >
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-medium text-gray-700 capitalize">
+                            {b.benefit_type.replace(/_/g, ' ')}
+                          </span>
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
+                            {describeBenefit(b)}
+                          </span>
+                          <span className="text-xs text-gray-500 capitalize">scope: {scopeTargetLabel(b)}</span>
+                          {!b.is_active && <span className="text-[10px] uppercase text-red-400">inactive</span>}
+                        </div>
+                        {b.label && <p className="text-xs text-gray-400 mt-0.5 truncate">{b.label}</p>}
+                      </div>
+                    </div>
+                  ))}
+                  {benefits.length > 0 && (
+                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mt-3 mb-1">
+                      This plan's own benefits
+                    </p>
+                  )}
+                </>
+              )}
               {benefits.map((b) => (
                 <div
                   key={b.id}

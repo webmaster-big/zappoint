@@ -763,6 +763,7 @@ const PurchaseAttraction = () => {
         discount_amount: specialPricingDiscount > 0 ? specialPricingDiscount : undefined,
         applied_discounts: buildAppliedDiscounts(specialPricingBreakdown).length > 0 ? buildAppliedDiscounts(specialPricingBreakdown) : null,
         membership_id: membershipBenefits.membershipId ?? undefined,
+        membership_applied: membershipBenefits.applied.length > 0 ? membershipBenefits.applied : undefined,
       };
 
       let response;

@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import membershipService from '../services/MembershipService';
 import type {
   MembershipBenefitQuoteItem,
+  MembershipBenefitQuoteLine,
   MembershipBenefitQuotePass,
+  MembershipBenefitQuote,
 } from '../types/Membership.types';
 
 export interface UseMembershipBenefitsResult {
@@ -11,6 +13,8 @@ export interface UseMembershipBenefitsResult {
   planName: string | null;
   discount: number;
   passes: MembershipBenefitQuotePass[];
+  lines: MembershipBenefitQuoteLine[];
+  applied: MembershipBenefitQuote['applied'];
   eligible: boolean;
   reason: string | null;
 }
@@ -21,6 +25,8 @@ const EMPTY: UseMembershipBenefitsResult = {
   planName: null,
   discount: 0,
   passes: [],
+  lines: [],
+  applied: [],
   eligible: false,
   reason: null,
 };
@@ -49,11 +55,11 @@ export function useMembershipBenefits(
         let id: number | null = null;
         if (self) {
           const membership = await membershipService.myMembership();
-          id = membership && membership.status === 'active' ? membership.id : null;
+          id = membership && (membership.status === 'active' || membership.status === 'past_due') ? membership.id : null;
         } else {
           const { data } = await membershipService.listMemberships({
             customer_id: customerId,
-            status: 'active',
+            status: 'active',  // backend also activates past_due, but active is primary check
             per_page: 1,
           });
           id = data.length > 0 ? data[0].id : null;
@@ -89,6 +95,8 @@ export function useMembershipBenefits(
           planName: quote.plan_name ?? null,
           discount: Number(quote.currency_discount || 0),
           passes: quote.passes || [],
+          lines: quote.lines || [],
+          applied: quote.applied || [],
           eligible: !!quote.eligible,
           reason: quote.reason ?? null,
         });
