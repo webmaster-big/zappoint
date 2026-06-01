@@ -188,8 +188,8 @@ export interface MembershipPlan {
   approved_locations?: MembershipPlanLocationRef[];
   valid_locations?: string[];
   location_access_label?: string | null;
-  billing_location_id?: number | null;
-  billing_location?: { id: number; name: string } | null;
+  billing_account_id?: number | null;
+  billing_account?: { id: number; label?: string | null; environment: string; is_active: boolean; location_id?: number | null } | null;
 
   renewable?: boolean;
   grace_period_days: number;
@@ -390,7 +390,7 @@ export interface CreateMembershipPlanData {
   location_name?: string | null;       // Name alternative — backend resolves to ID
   approved_location_ids?: number[];
   approved_location_names?: string[]; // Alternative to IDs — backend resolves by name
-  billing_location_id?: number | null; // When set, payments route to this location's Authorize.Net account
+  billing_account_id?: number | null; // When set, payments route through this Authorize.Net account directly
   grace_period_days?: number;
   failed_payment_retry_days?: number;
   cancellation_mode?: MembershipCancellationMode;

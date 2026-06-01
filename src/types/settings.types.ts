@@ -9,7 +9,8 @@ export interface SettingsLocation {
 
 export interface SettingsAuthorizeNetAccount {
   id: number;
-  location_id: number;
+  location_id: number | null;  // null for centralized (company-level) accounts
+  label?: string | null;       // human-readable name for centralized accounts
   api_login_id?: string;
   environment: 'sandbox' | 'production';
   is_active: boolean;
@@ -17,7 +18,7 @@ export interface SettingsAuthorizeNetAccount {
   last_tested_at?: string;
   created_at?: string;
   updated_at?: string;
-  location: SettingsLocation;
+  location?: SettingsLocation | null;
 }
 
 export interface SettingsAuthorizeNetStatus {
@@ -30,7 +31,8 @@ export interface SettingsConnectAuthorizeNetData {
   transaction_key: string;
   public_client_key: string; // Public Client Key for Accept.js
   environment: 'sandbox' | 'production';
-  location_id?: number; // For company_admin to connect for specific location
+  location_id?: number | null; // null = centralized; omit or number = specific location
+  label?: string;              // human-readable name (used for centralized accounts)
 }
 
 export interface SettingsUpdateEmailData {

@@ -3,9 +3,10 @@ import { Plus, Edit2, Trash2, ToggleLeft, ToggleRight, X, CreditCard, MapPin, Bu
 import membershipService from '../../../services/MembershipService';
 import { membershipCache } from '../../../services/MembershipCacheService';
 import locationService from '../../../services/LocationService';
-import { connectAuthorizeNetAccount } from '../../../services/SettingsService';
+import { connectAuthorizeNetAccount, getAllAuthorizeNetAccounts } from '../../../services/SettingsService';
 import type { MembershipPlan, CreateMembershipPlanData } from '../../../types/Membership.types';
 import type { Location } from '../../../services/LocationService';
+import type { SettingsAuthorizeNetAccount } from '../../../types/settings.types';
 import Toast from '../../../components/ui/Toast';
 import LoadingSpinner from '../../../components/ui/LoadingSpinner';
 import StandardButton from '../../../components/ui/StandardButton';
@@ -31,7 +32,7 @@ const emptyForm: CreateMembershipPlanData = {
   location_access_mode: 'single',
   location_id: null,
   approved_location_ids: [],
-  billing_location_id: null,
+  billing_account_id: null,
   grace_period_days: 7,
   failed_payment_retry_days: 3,
   cancellation_mode: 'end_of_term',
@@ -60,12 +61,13 @@ const MembershipPlans = () => {
   const { toast, showSuccess, showError, clear } = useToast();
 
   // Authorize.Net add-account modal
-  const emptyAuthForm = { location_id: null as number | null, api_login_id: '', transaction_key: '', public_client_key: '', environment: 'sandbox' as 'sandbox' | 'production' };
+  const emptyAuthForm = { location_id: null as number | null, label: '', api_login_id: '', transaction_key: '', public_client_key: '', environment: 'sandbox' as 'sandbox' | 'production' };
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authForm, setAuthForm] = useState(emptyAuthForm);
   const [savingAuth, setSavingAuth] = useState(false);
   const [showTxKey, setShowTxKey] = useState(false);
   const [showPubKey, setShowPubKey] = useState(false);
+  const [authAccounts, setAuthAccounts] = useState<SettingsAuthorizeNetAccount[]>([]);
 
   const inputCls = `w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-${themeColor}-600 focus:border-${themeColor}-600`;
   const labelCls = 'block text-xs font-medium text-gray-800 mb-1';
@@ -92,6 +94,7 @@ const MembershipPlans = () => {
   useEffect(() => {
     load();
     locationService.getLocations().then((r) => setLocations(r.data)).catch(() => {});
+    getAllAuthorizeNetAccounts().then((r) => setAuthAccounts(r.data)).catch(() => {});
     const off = membershipCache.onUpdate((detail) => {
       if (detail.key === 'plans' || detail.key === 'all') load();
     });
@@ -127,7 +130,7 @@ const MembershipPlans = () => {
       location_access_mode: p.location_access_mode,
       location_id: p.location?.id ?? null,
       approved_location_ids: p.approved_locations?.map((l) => l.id) || [],
-      billing_location_id: p.billing_location_id ?? null,
+      billing_account_id: p.billing_account_id ?? null,
       grace_period_days: p.grace_period_days,
       failed_payment_retry_days: p.failed_payment_retry_days,
       cancellation_mode: p.cancellation_mode,
@@ -187,7 +190,6 @@ const MembershipPlans = () => {
   };
 
   const saveAuth = async () => {
-    if (!authForm.location_id) { showError(null, 'Select a location for this account'); return; }
     if (!authForm.api_login_id.trim() || !authForm.transaction_key.trim() || !authForm.public_client_key.trim()) {
       showError(null, 'All credential fields are required'); return;
     }
@@ -198,15 +200,18 @@ const MembershipPlans = () => {
         transaction_key: authForm.transaction_key.trim(),
         public_client_key: authForm.public_client_key.trim(),
         environment: authForm.environment,
-        location_id: authForm.location_id,
+        location_id: authForm.location_id ?? null,
+        label: authForm.location_id ? undefined : (authForm.label.trim() || 'Centralized Account'),
       });
       if (res.success) {
         showSuccess('Authorize.Net account connected');
-        // Auto-select the location as billing location for this plan
-        setForm((prev) => ({ ...prev, billing_location_id: authForm.location_id }));
+        // Auto-select the new account as billing account for this plan
+        const newAccountId = (res as any).data?.id ?? null;
+        if (newAccountId) setForm((prev) => ({ ...prev, billing_account_id: newAccountId }));
         setAuthForm(emptyAuthForm);
         setShowAuthModal(false);
-        // Refresh location list in case new location was indirectly added
+        // Refresh auth accounts list
+        getAllAuthorizeNetAccounts().then((r) => setAuthAccounts(r.data)).catch(() => {});
         locationService.getLocations().then((r) => setLocations(r.data)).catch(() => {});
       } else {
         showError(null, (res as any).message ?? 'Failed to connect account');
@@ -555,22 +560,25 @@ const MembershipPlans = () => {
               )}
               {isCompanyAdmin && form.location_access_mode !== 'single' && (
                 <div>
-                  <TipLabel tip="Choose which location's Authorize.Net account handles ALL membership charges for this plan. Leave blank to charge through each member's home location. Use 'Add new account' to register credentials for a new location.">
-                    <DollarSign size={12} className="inline" /> Billing Location (Authorize.Net)
+                  <TipLabel tip="Choose which Authorize.Net account handles ALL membership charges for this plan. Leave blank to charge through each member's home location's account. Click 'Add new account' to register a centralized or new location account.">
+                    <DollarSign size={12} className="inline" /> Billing Account (Authorize.Net)
                   </TipLabel>
                   <select
-                    value={form.billing_location_id ?? ''}
-                    onChange={(e) => setForm({ ...form, billing_location_id: e.target.value ? parseInt(e.target.value) : null })}
+                    value={form.billing_account_id ?? ''}
+                    onChange={(e) => setForm({ ...form, billing_account_id: e.target.value ? parseInt(e.target.value) : null })}
                     className={inputCls}
                   >
                     <option value="">Each member's home location (default)</option>
-                    {locations.map((loc) => (
-                      <option key={loc.id} value={loc.id}>{loc.name}</option>
+                    {authAccounts.map((acc) => (
+                      <option key={acc.id} value={acc.id}>
+                        {acc.label ?? acc.location?.name ?? `Account #${acc.id}`}
+                        {' '}({acc.environment})
+                      </option>
                     ))}
                   </select>
                   <button
                     type="button"
-                    onClick={() => { setAuthForm({ ...emptyAuthForm, location_id: form.billing_location_id ?? null }); setShowAuthModal(true); }}
+                    onClick={() => { setAuthForm({ ...emptyAuthForm }); setShowAuthModal(true); }}
                     className={`mt-1.5 text-xs text-${themeColor}-600 hover:text-${themeColor}-800 font-medium flex items-center gap-1 underline underline-offset-2`}
                   >
                     <KeyRound size={11} /> Add new Authorize.Net account
@@ -688,22 +696,36 @@ const MembershipPlans = () => {
             </div>
             <div className="px-6 py-5 space-y-4 text-sm">
               <p className="text-xs text-gray-500">
-                Enter the Authorize.Net credentials for a location. After saving, that location will be available as a billing location for membership plans.
+                Enter Authorize.Net credentials. Select a location to tie this account to a specific location, or leave the location blank to create a centralized (company-level) account.
               </p>
 
               <div>
-                <label className="block text-xs font-medium text-gray-800 mb-1">Location <span className="text-red-500">*</span></label>
+                <label className="block text-xs font-medium text-gray-800 mb-1">Location <span className="text-gray-400">(optional)</span></label>
                 <select
                   value={authForm.location_id ?? ''}
                   onChange={(e) => setAuthForm({ ...authForm, location_id: e.target.value ? parseInt(e.target.value) : null })}
                   className={inputCls}
                 >
-                  <option value="">Select a location</option>
+                  <option value="">No location — centralized account</option>
                   {locations.map((loc) => (
                     <option key={loc.id} value={loc.id}>{loc.name}</option>
                   ))}
                 </select>
               </div>
+
+              {!authForm.location_id && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-800 mb-1">Account Label</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Company Membership Gateway"
+                    value={authForm.label}
+                    onChange={(e) => setAuthForm({ ...authForm, label: e.target.value })}
+                    className={inputCls}
+                  />
+                  <p className="text-xs text-gray-400 mt-1">A friendly name so you can identify this centralized account.</p>
+                </div>
+              )}
 
               <div>
                 <label className="block text-xs font-medium text-gray-800 mb-1">API Login ID <span className="text-red-500">*</span></label>

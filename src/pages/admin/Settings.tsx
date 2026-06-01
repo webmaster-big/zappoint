@@ -1632,11 +1632,16 @@ const Settings = () => {
                             <div className="flex items-center gap-2 mb-2">
                               <MapPin size={16} className={`text-${themeColor}-600`} />
                               <span className="font-semibold text-gray-900">
-                                {account.location.name}
+                                {account.label ?? account.location?.name ?? `Account #${account.id}`}
                               </span>
-                              <span className="text-sm text-gray-500">
-                                {account.location.city}, {account.location.state}
-                              </span>
+                              {account.location && (
+                                <span className="text-sm text-gray-500">
+                                  {account.location.city}, {account.location.state}
+                                </span>
+                              )}
+                              {!account.location && (
+                                <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-700">Centralized</span>
+                              )}
                               <span className={`px-2 py-1 text-xs font-medium rounded-full ${
                                 account.environment === 'production'
                                   ? 'bg-green-100 text-green-700'
@@ -1680,7 +1685,7 @@ const Settings = () => {
                               account.is_active ? 'bg-green-500 animate-pulse' : 'bg-gray-400'
                             }`}></div>
                             <StandardButton
-                              onClick={() => handleLocationDisconnect(account.location_id, account.location.name)}
+                              onClick={() => handleLocationDisconnect(account.location_id ?? account.id, account.label ?? account.location?.name ?? `Account #${account.id}`)}
                               variant="danger"
                               size="sm"
                               icon={Trash2}
